@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         self.graph_view = GraphView()
         w.layout().addWidget(self.graph_view)
 
-        g = zx.generate.cliffords(4, 20)
+        g = zx.generate.cliffords(8, 20)
         self.graph_view.set_graph(g)
 
 
