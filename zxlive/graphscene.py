@@ -22,7 +22,7 @@ from typing import Optional, List, Tuple
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
 
-SCALE = 50.0
+SCALE = 60.0
 ZX_GREEN = '#ccffcc'
 ZX_RED = '#ff8888'
 
@@ -36,6 +36,11 @@ class VItem(QGraphicsEllipseItem):
         self.setZValue(1)
         self.adj_items = set()
         self.phase_item: Optional[PhaseItem] = None
+
+        pen = QPen()
+        pen.setWidthF(1.5)
+        pen.setColor(QColor('black'))
+        self.setPen(pen)
 
         t = g.type(v)
         if t == VertexType.Z:
@@ -63,6 +68,7 @@ class PhaseItem(QGraphicsTextItem):
     def __init__(self, v_item: VItem, phase: str):
         super().__init__(phase)
         self.setDefaultTextColor(QColor('blue'))
+        self.setFont(QFont('monospace'))
         self.phase = phase
         self.v_item = v_item
         self.setZValue(2)
@@ -80,12 +86,14 @@ class EItem(QGraphicsPathItem):
         self.t_item = t_item
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
+        pen = QPen()
+        pen.setWidthF(1.5)
         if g.edge_type(e) == EdgeType.HADAMARD:
-            pen = QPen(QColor('#0077ff'))
+            pen.setColor(QColor('#0077ff'))
             pen.setDashPattern([4.0, 2.0])
-            self.setPen(QPen(pen))
         else:
-            self.setPen(QPen(QColor('#000000')))
+            pen.setColor(QColor('#000000'))
+        self.setPen(QPen(pen))
 
         self.refresh()
 
