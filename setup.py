@@ -26,10 +26,10 @@ setuptools.setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    packages=["chyp"],
+    packages=["zxlive"],
     package_data={'': ['*.svg']},
     data_files=data_files,
-    install_requires=["PyQt5>=5.14", "pyzx>=0.7.3"],
+    install_requires=["PySide2>=5.14", "pyzx>=0.7.3"],
     python_requires=">=3.7",
     entry_points={'console_scripts': 'zxlive=zxlive.app:main'},
 )

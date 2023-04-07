@@ -14,9 +14,9 @@
 # limitations under the License.
 
 from __future__ import annotations
-from PyQt5.QtCore import Qt, QPointF
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PySide2.QtCore import Qt, QPointF
+from PySide2.QtGui import *
+from PySide2.QtWidgets import *
 from typing import Optional, List, Tuple
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
