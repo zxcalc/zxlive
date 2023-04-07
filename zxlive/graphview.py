@@ -21,6 +21,12 @@ from pyzx.graph.base import BaseGraph, VT, ET
 from .graphscene import GraphScene
 
 class GraphView(QGraphicsView):
+    """QtWidget containing a graph
+
+    This widget is view associated with a graph. However, most of the interesting stuff happens
+    in `GraphScene`.
+    """
+
     def __init__(self) -> None:
         self.graph_scene = GraphScene()
         super().__init__(self.graph_scene)

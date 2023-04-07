@@ -28,21 +28,29 @@ ZX_RED = '#ff8888'
 
 
 class VItem(QGraphicsEllipseItem):
+    """A QGraphicsItem representing a single vertex"""
+
     def __init__(self, g: BaseGraph[VT,ET], v: VT):
         super().__init__(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
+        self.setZValue(1) # draw vertices on top of edges but below phases
+
         self.g = g
         self.v = v
         self.setPos(g.row(v) * SCALE, g.qubit(v) * SCALE)
-        self.setZValue(1)
         self.adj_items: Set[EItem] = set()
-        self.phase_item: Optional[PhaseItem] = None
+        self.phase_item = PhaseItem(self)
 
         pen = QPen()
         pen.setWidthF(1.5)
         pen.setColor(QColor('black'))
         self.setPen(pen)
+        self.refresh()
 
-        t = g.type(v)
+
+    def refresh(self) -> None:
+        """Call this method whenever a vertex moves or its data changes"""
+
+        t = self.g.type(self.v)
         if t == VertexType.Z:
             self.setBrush(QBrush(QColor(ZX_GREEN)))
         elif t == VertexType.X:
@@ -50,7 +58,6 @@ class VItem(QGraphicsEllipseItem):
         else:
             self.setBrush(QBrush(QColor('#000000')))
 
-    def refresh(self) -> None:
         if self.phase_item:
             self.phase_item.refresh()
 
@@ -58,39 +65,54 @@ class VItem(QGraphicsEllipseItem):
             e_item.refresh()
 
 class PhaseItem(QGraphicsTextItem):
-    def __init__(self, v_item: VItem, phase: str):
-        super().__init__(phase)
+    """A QGraphicsItem representing a phase label"""
+
+    def __init__(self, v_item: VItem):
+        super().__init__()
+        self.setZValue(2) # draw phase labels on top
+
         self.setDefaultTextColor(QColor('blue'))
         self.setFont(QFont('monospace'))
-        self.phase = phase
         self.v_item = v_item
-        self.setZValue(2)
         self.refresh()
 
     def refresh(self) -> None:
+        """Call this when a vertex moves or its phase changes"""
+
+        phase = self.v_item.g.phase(self.v_item.v)
+        self.setPlainText(phase_to_s(phase))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.5*SCALE)
 
 class EItem(QGraphicsPathItem):
+    """A QGraphicsItem representing an edge"""
+
     def __init__(self, g: BaseGraph[VT,ET], e: ET, s_item: VItem, t_item: VItem):
         super().__init__()
-        self.setZValue(0)
+        self.setZValue(0) # draw edges below vertices and phases
+        self.g = g
+        self.e = e
         self.s_item = s_item
         self.t_item = t_item
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
+
+        self.refresh()
+
+    def refresh(self) -> None:
+        """Call whenever source or target moves or edge data changes"""
+
+        # set color/style according to edge type
         pen = QPen()
         pen.setWidthF(1.5)
-        if g.edge_type(e) == EdgeType.HADAMARD:
+        if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setColor(QColor('#0077ff'))
             pen.setDashPattern([4.0, 2.0])
         else:
             pen.setColor(QColor('#000000'))
         self.setPen(QPen(pen))
 
-        self.refresh()
-
-    def refresh(self) -> None:
+        # set path as a straight line from source to target
         path = QPainterPath()
         path.moveTo(self.s_item.pos())
         path.lineTo(self.t_item.pos())
@@ -98,6 +120,8 @@ class EItem(QGraphicsPathItem):
 
 
 class GraphScene(QGraphicsScene):
+    """The main class responsible for drawing/editing graphs"""
+
     def __init__(self) -> None:
         super().__init__()
         self.undo_stack = QUndoStack(self)
@@ -108,21 +132,24 @@ class GraphScene(QGraphicsScene):
         self.drag_items: List[Tuple[QGraphicsItem, QPointF]] = []
 
     def set_graph(self, g: BaseGraph[VT,ET]) -> None:
+        """Set the PyZX graph for the scene
+
+        If the scene already contains a graph, it will be replaced."""
+
         self.g = g
         self.clear()
         self.add_items()
         self.invalidate()
 
     def add_items(self) -> None:
+        """Add QGraphicsItem's for all vertices and edges in the graph"""
+
         v_items = {}
         for v in self.g.vertices():
             vi = VItem(self.g, v)
             v_items[v] = vi
-            self.addItem(vi)
-            phase = self.g.phase(v)
-            if phase != 0:
-                vi.phase_item = PhaseItem(vi, phase_to_s(phase))
-                self.addItem(vi.phase_item)
+            self.addItem(vi) # add the vertex to the scene
+            self.addItem(vi.phase_item) # add the phase label to the scene
 
         for e in self.g.edges():
             s,t = self.g.edge_st(e)
