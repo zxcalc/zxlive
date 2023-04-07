@@ -17,7 +17,7 @@ from __future__ import annotations
 from PySide2.QtCore import Qt, QPointF
 from PySide2.QtGui import *
 from PySide2.QtWidgets import *
-from typing import Optional, List, Tuple
+from typing import Optional, List, Set, Tuple
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
@@ -34,7 +34,7 @@ class VItem(QGraphicsEllipseItem):
         self.v = v
         self.setPos(g.row(v) * SCALE, g.qubit(v) * SCALE)
         self.setZValue(1)
-        self.adj_items = set()
+        self.adj_items: Set[EItem] = set()
         self.phase_item: Optional[PhaseItem] = None
 
         pen = QPen()
@@ -57,7 +57,7 @@ class VItem(QGraphicsEllipseItem):
         # painter.drawText(QPointF(0,-0.2*SCALE), phase_to_s(phase))
         # TODO: draw angle here
 
-    def refresh(self):
+    def refresh(self) -> None:
         if self.phase_item:
             self.phase_item.refresh()
 
@@ -74,7 +74,7 @@ class PhaseItem(QGraphicsTextItem):
         self.setZValue(2)
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.5*SCALE)
 
@@ -97,7 +97,7 @@ class EItem(QGraphicsPathItem):
 
         self.refresh()
 
-    def refresh(self):
+    def refresh(self) -> None:
         path = QPainterPath()
         path.moveTo(self.s_item.pos())
         path.lineTo(self.t_item.pos())
