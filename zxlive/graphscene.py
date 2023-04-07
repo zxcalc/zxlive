@@ -50,13 +50,6 @@ class VItem(QGraphicsEllipseItem):
         else:
             self.setBrush(QBrush(QColor('#000000')))
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget]=None) -> None:
-        super().paint(painter, option, widget)
-        # painter.setPen(QPen(QColor('blue')))
-        # phase = self.g.phase(self.v)
-        # painter.drawText(QPointF(0,-0.2*SCALE), phase_to_s(phase))
-        # TODO: draw angle here
-
     def refresh(self) -> None:
         if self.phase_item:
             self.phase_item.refresh()
