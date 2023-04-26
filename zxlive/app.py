@@ -17,6 +17,7 @@ from __future__ import annotations
 from PySide2.QtCore import *
 from PySide2.QtWidgets import *
 import sys
+from qt_material import apply_stylesheet, add_fonts
 
 from .mainwindow import MainWindow
 
@@ -31,6 +32,11 @@ class ZXLive(QApplication):
         self.setApplicationName('ZX Live')
         self.setDesktopFileName('ZX Live')
         self.main_window = MainWindow()
+
+        #Stylesheet
+        apply_stylesheet(self, theme='light_blue.xml')
+        add_fonts()
+
         self.lastWindowClosed.connect(self.quit)
 
 
