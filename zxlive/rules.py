@@ -122,7 +122,11 @@ def bialgebra(v_list):
     return g
 
 def Hadamard_slide(v):
-    
+    '''
+    g: BaseGraph[[VT,ET]]
+    v: node or vertex 
+    returns: absorbs the hadamard appropriately if the node phase is pi/2
+    '''
     g = v.g
     v = v.v
     if g.vertex_degree(v)!=2:
@@ -147,6 +151,12 @@ def Hadamard_slide(v):
 
 
 def add_node(u,v):
+    '''
+    g: BaseGraph[[VT,ET]]
+    u: node 1
+    v: node 2
+    returns: Adds a node between these two nodes and connect it via regular edge
+    '''
     g = u.g
     u = u.v
     v = v.v
@@ -170,6 +180,12 @@ def add_node(u,v):
     return g
 
 def add_wire(u,v):
+    '''
+    g: BaseGraph[[VT,ET]]
+    u: node 1
+    v: node 2
+    returns: Toggles the wire between two nodes. If the nodes are of different colors, then toggles the edge, otherwise does nothing.
+    '''
     g = u.g
     u = u.v
     v = v.v
@@ -190,6 +206,12 @@ def swap(a,b):
 
 
 def fusion(a,b):
+    '''
+    g: BaseGraph[[VT,ET]]
+    a: node 1
+    b: node 2
+    returns: fuses two nodes if of the same type, otherwise does nothing
+    '''
     g = a.g
     v = a.v
     w = b.v
@@ -222,6 +244,11 @@ def fusion(a,b):
     return g
 
 def identity(a):
+    '''
+    g: BaseGraph[[VT,ET]]
+    a: node 
+    returns: If node is bivalent then removes the node
+    '''
     g = a.g
     a = a.v
     if g.vertex_degree(a)==2:
@@ -234,6 +261,10 @@ def identity(a):
     return g
 
 def GH_graph(g):
+    '''
+    g: BaseGraph[[VT,ET]]
+    returns: returns the graph with only Z spiders and hadamard appropriately
+    '''
     lst_vertices = list(g.vertices())
     for v in lst_vertices:
         if g.type(v) == VertexType.X:
