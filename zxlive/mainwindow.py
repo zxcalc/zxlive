@@ -14,9 +14,9 @@
 # limitations under the License.
 
 from __future__ import annotations
-from PySide2.QtCore import QByteArray, QSettings
-from PySide2.QtGui import *
-from PySide2.QtWidgets import *
+from PySide6.QtCore import QByteArray, QSettings
+from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 import pyzx as zx
 from . import graphscene
 from pyzx.utils import EdgeType, VertexType, toggle_edge, toggle_vertex
