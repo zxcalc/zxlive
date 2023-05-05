@@ -9,6 +9,8 @@ To install from source, you need Python >= 3.7 and pip. If you have those, just 
 
     git clone https://github.com/Quantomatic/zxlive.git
     cd zxlive
+    python3 -m venv venv
+    source venv/bin/activate
     pip install .
 
 Then, you can run ZX Live by typing `python3 -m zxlive`.
