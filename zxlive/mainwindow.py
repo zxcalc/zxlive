@@ -162,20 +162,9 @@ class MainWindow(QMainWindow):
                 list_vertices_Wire = self.graph_view.graph_scene.selected_items
                 g = list_vertices_Wire[0].g
                 self.u_stack.append(copy.deepcopy(g))
-                g = bialgebra(list_vertices_Wire)
+                g = bialgebra(g, list_vertices_Wire)
                 self.graph_view.set_graph(g)
                 self.graph_view.graph_scene.selected_items = []
-
-        def Button_Hadamard_Slide_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                for l in list_vertices_Wire:
-                    g = Hadamard_slide(l)
-                self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
-
 
         def Button_Edit_Node_Color_Clicked():
             if self.graph_view.graph_scene.selected_items:
@@ -309,13 +298,6 @@ class MainWindow(QMainWindow):
         Button_Change_Color.setAutoExclusive(False)
         Button_Change_Color.clicked.connect(Button_Change_Color_Clicked)
         editToolBar.addWidget(Button_Change_Color)
-
-        Button_H_slide = QToolButton()
-        Button_H_slide.setText("Hadamard Rule")
-        Button_H_slide.setCheckable(False)
-        Button_H_slide.setAutoExclusive(False)
-        Button_H_slide.clicked.connect(Button_Hadamard_Slide_Clicked)
-        editToolBar.addWidget(Button_H_slide)
 
         Button_BiAlgebra = QToolButton()
         Button_BiAlgebra.setText("Bialgebra")
