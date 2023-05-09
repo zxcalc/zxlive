@@ -121,7 +121,7 @@ def Hadamard_slide(v):
     '''
     g: BaseGraph[[VT,ET]]
     v: node or vertex 
-    returns: absorbs the hadamard appropriately if the node phase is pi/2
+    returns: a new graph with Hadamard absorbed if node phase is pi/2
     '''
     g = v.g
     v = v.v
@@ -151,7 +151,7 @@ def add_node(u,v):
     g: BaseGraph[[VT,ET]]
     u: node 1
     v: node 2
-    returns: Adds a node between these two nodes and connect it via regular edge
+    returns: a graph with between 'u' and 'v', connected via regular edge
     '''
     g = u.g
     u = u.v
