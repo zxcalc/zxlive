@@ -181,7 +181,7 @@ class GraphScene(QGraphicsScene):
         self.drag_start = e.scenePos()
         
         if not self.items(e.scenePos(), deviceTransform=QTransform()):
-            for (it) in self.selected_items:
+            for it in self.selected_items:
                 it.is_pressed = False
                 it.refresh()
             self.selected_items = []
