@@ -37,7 +37,3 @@ class GraphView(QGraphicsView):
     def set_graph(self, g: BaseGraph[VT,ET]) -> None:
         self.graph_scene.set_graph(g)
         self.centerOn(0,0)
-
-    def get_graph(self) -> BaseGraph[VT,ET]:
-        return self.graph_scene.g
-    

@@ -9,7 +9,6 @@ VT_Z = VertexType.Z
 VT_X = VertexType.X
 
 def check_bialgebra(g, v_list):
-    v_list = [v.v for v in v_list]
 
     phases = g.phases()
     x_vertices = []
@@ -50,8 +49,6 @@ def bialgebra(g, v_list):
     '''
     if not check_bialgebra(g, v_list):
         return
-
-    v_list = [v.v for v in v_list]
 
     x_vertices = list(filter(lambda v: g.type(v) == VT_X, v_list))
     z_vertices = list(filter(lambda v: g.type(v) == VT_Z, v_list))
