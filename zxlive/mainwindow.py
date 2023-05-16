@@ -17,15 +17,17 @@ from __future__ import annotations
 from PySide6.QtCore import QByteArray, QSettings
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-import pyzx as zx
-from . import graphscene
-from pyzx.utils import EdgeType, VertexType, toggle_edge, toggle_vertex
+from pyzx.utils import VertexType, toggle_vertex
 import copy
+from fractions import Fraction
 
 
 from .graphview import GraphView
 from .rules import *
 from .construct import *
+
+from pyzx import basicrules
+from pyzx import to_gh
 
 class MainWindow(QMainWindow):
     """A simple window containing a single `GraphView`
@@ -62,193 +64,136 @@ class MainWindow(QMainWindow):
         # self.graph_view.set_graph(construct(5, 5))
 
         def Button_Fuse_Clicked():
-            list_vertices = self.graph_view.graph_scene.selected_items
-            if list_vertices == []:
-                return 
-            g = list_vertices[0].g
-            self.u_stack.append(copy.deepcopy(g))
-            if len(list_vertices)==1:
-                g = identity(list_vertices[0])
-                self.graph_view.graph_scene.selected_items = []
-                return self.graph_view.set_graph(g)
-            else:
-                x_vertices = []
-                z_vertices = []
-                for ver in list_vertices:
-                    if g.type(ver.v)==VertexType.X:
-                        x_vertices.append(ver)
-                    else:
-                        z_vertices.append(ver)
-            list_vertices = [x_vertices,z_vertices]
-            for lst in list_vertices:
-                ##print("list:", [it.v for it in lst])
-                lst = sorted(lst, key=lambda itm: itm.v)
-                ##print("list:", [it.v for it in lst])
-                if len(lst)<2:
-                    continue
-                else:
-                    copy_lst = lst.copy()
-                    for elem in copy_lst:
-                        #print("outer : ", elem.v)
-                        i=0
-                        if elem in lst:
-                            while(len(lst)>1):
-                                #print("inner : ", lst[i].v)
-                                #print("nighs : ", g.neighbors(elem.v))
-                                if lst[i].v in g.neighbors(elem.v):
-                                    g = fusion(elem, lst[i])
-                                    del lst[i]
-                                else:
-                                    i+=1
-                                if i ==len(lst):
-                                    break
-                            if len(lst)==1:
-                                break
-            self.graph_view.graph_scene.selected_items = []
-            return self.graph_view.set_graph(g)
+            g, vs = self.get_elements()
+            if vs == []:
+                return
+            self.backup()
+            if len(vs) == 1:
+                basicrules.remove_id(g, vs[0])
+                self.graph_view.set_graph(g)
+                return
+
+            x_vertices = [v for v in vs if g.type(v) == VertexType.X]
+            z_vertices = [v for v in vs if g.type(v) == VertexType.Z]
+            vs = [x_vertices, z_vertices]
+            for lst in vs:
+                lst = sorted(lst)
+                to_fuse = {}
+                visited = set()
+                for v in lst:
+                    if v in visited:
+                        continue
+                    to_fuse[v] = []
+                    # dfs
+                    stack = [v]
+                    while stack:
+                        u = stack.pop()
+                        if u in visited:
+                            continue
+                        visited.add(u)
+                        for w in g.neighbors(u):
+                            if w in lst:
+                                to_fuse[v].append(w)
+                                stack.append(w)
+                
+                for v in to_fuse:
+                    for w in to_fuse[v]:
+                        basicrules.fuse(g, v, w)
+            self.graph_view.set_graph(g)
 
 
         def Button_Reset_Clicked():
-            if len(self.u_stack) !=0 :
-                self.graph_view.set_graph(self.u_stack.pop(0))
+            if self.u_stack:
+                g = self.u_stack[0]
                 self.u_stack = []
                 self.d_stack = []
 
+                self.graph_view.graph_scene.selected_items = []
+                self.graph_view.set_graph(g)
+
         def Button_Undo_Clicked():
-            if len(self.u_stack) !=0 :
-                self.d_stack.append(self.graph_view.graph_scene.g)
-                self.d_stack.append(copy.deepcopy(self.u_stack[-1]))
-                self.graph_view.set_graph(self.u_stack.pop())
-                print("Undo-D: ",self.d_stack)
-                print("Undo-U: ",self.u_stack)
+            if self.u_stack:
+                g = self.u_stack.pop()
+                self.d_stack.append(copy.deepcopy(g))
+                self.graph_view.graph_scene.selected_items = []
+                self.graph_view.set_graph(g)
 
         def Button_Redo_Clicked():
-            if len(self.d_stack) != 0 :
-                self.u_stack.append(copy.deepcopy(self.d_stack[-1]))
-                self.d_stack.pop()
-                self.graph_view.set_graph(self.d_stack.pop())
-                print("Redo-D:",self.d_stack)
-                print("Redo-U:",self.u_stack)
+            if self.d_stack:
+                g = self.d_stack.pop()
+                self.u_stack.append(copy.deepcopy(g))
+                self.graph_view.graph_scene.selected_items = []
+                self.graph_view.set_graph(g)
 
         def Button_Add_Wire_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                if len(list_vertices_Wire) != 0:
-                    for i in range (len(list_vertices_Wire)-1):
-                        for l in range (i+1,len(list_vertices_Wire)):
-                            g = add_wire(list_vertices_Wire[i], list_vertices_Wire[l])
-                    self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
+            g, vs = self.get_elements()
+            self.backup()
+            if len(vs) == 2:
+                g.add_edge_smart(g.edge(vs[0], vs[1]), edgetype=ET_SIM)
+            self.graph_view.set_graph(g)
 
         def Button_Add_Node_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                if len(list_vertices_Wire) != 0:
-                    for i in range (len(list_vertices_Wire)-1):
-                        for l in range (i+1,len(list_vertices_Wire)):
-                            g = add_node(list_vertices_Wire[i], list_vertices_Wire[l])
-                    self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
+            g, vs = self.get_elements()
+            if len(vs) == 2:
+                self.backup()
+                add_node(g, vs[0], vs[1])
+            self.graph_view.set_graph(g)
 
         editToolBar = QToolBar("Edit", self)
         self.addToolBar(Qt.LeftToolBarArea, editToolBar)
 
         def Button_BiAlgebra_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                g = bialgebra(list_vertices_Wire)
-                self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
-
-        def Button_Hadamard_Slide_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                for l in list_vertices_Wire:
-                    g = Hadamard_slide(l)
-                self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
-
+            g, vs = self.get_elements()
+            if vs:
+                self.backup()
+                bialgebra(g, vs)
+            self.graph_view.set_graph(g)
 
         def Button_Edit_Node_Color_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                for l in list_vertices_Wire:
-                    g = edit_node_color(l)
-                self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
+            g, vs = self.get_elements()
+            self.backup()
+            for v in vs:
+                g.set_type(v, toggle_vertex(g.type(v)))
+
+            self.graph_view.set_graph(g)
 
         def Button_Change_Color_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                self.u_stack.append(copy.deepcopy(g))
-                for l in list_vertices_Wire:
-                    g = color_change(l)
-                self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
-
+            g, vs = self.get_elements()
+            self.backup()
+            for v in vs:
+                basicrules.color_change(g, v)
+            self.graph_view.set_graph(g)
 
         def Button_GH_State_Clicked():
-            g = self.graph_view.graph_scene.g
-            self.u_stack.append(copy.deepcopy(g))
-            g = GH_graph(g)
+            g, _ = self.get_elements()
+            self.backup()
+            to_gh(g)
             self.graph_view.set_graph(g)
-            self.graph_view.graph_scene.selected_items = []
 
         def Button_Change_Phase_Clicked():
-            if self.graph_view.graph_scene.selected_items:
-                list_vertices_Wire = self.graph_view.graph_scene.selected_items
-                g = list_vertices_Wire[0].g
-                slash_counter = 0
-                includes_slash = False
-                includes_else = False
-                input_list_int = []
-                if len(list_vertices_Wire) != 0:
-                    input, ok = QInputDialog.getText(self, "Input Dialog", "Enter Desired Phase Value:")
-                    if ok:
-                        for l in input:
-                            if l == "/":
-                                slash_counter += 1
-                            if not (l=="0" or l=="1" or l=="2" or l=="3" or l=="4" or l=="5" or l=="6" or l=="7" or l=="8" or l=="9" or l=="/"):
-                                includes_else = True
-                        if slash_counter == 1: includes_slash = True
-                        print(includes_slash, includes_else)
-                        if includes_slash == True and includes_else == False:
-                            input_list = input.split("/")
-                            for l in input_list:
-                                input_list_int.append(int(l))
-                            for l in input_list_int:
-                                self.u_stack.append(copy.deepcopy(g))
-                                for i in list_vertices_Wire:
-                                    g = phase_change(i, input)
-                        elif includes_slash == False and includes_else == False:
-                            for l in input:
-                                input_list_int.append(int(l))
-                            for l in input_list_int:
-                                self.u_stack.append(copy.deepcopy(g))
-                                for i in list_vertices_Wire:
-                                    g = phase_change(i, input)
-                        else:
-                            msg = QMessageBox()
-                            msg.setIcon(QMessageBox.Critical)
-                            msg.setText("Wrong Input Type")
-                            msg.setInformativeText('Please enter a valid input (e.g. 1/2, 2)')
-                            msg.exec_()
-                                    
-                input_list_int = []
+            g, vs = self.get_elements()
+            if len(vs) != 1:
                 self.graph_view.set_graph(g)
-                self.graph_view.graph_scene.selected_items = []
+                return
 
+            self.backup()
+            v = vs[0]
+
+            input, ok = QInputDialog.getText(self,
+                                            "Input Dialog",
+                                            "Enter Desired Phase Value:")
+            if not ok:
+                return
+            try:
+                g.set_phase(v, Fraction(input))
+            except ValueError:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText("Wrong Input Type")
+                msg.setInformativeText('Please enter a valid input (e.g. 1/2, 2)')
+                msg.exec_()
+
+            self.graph_view.set_graph(g)
         #style = "QToolButton#Button{border-radius: 8px}"
 
         Button_Fuse = QToolButton()
@@ -310,13 +255,6 @@ class MainWindow(QMainWindow):
         Button_Change_Color.clicked.connect(Button_Change_Color_Clicked)
         editToolBar.addWidget(Button_Change_Color)
 
-        Button_H_slide = QToolButton()
-        Button_H_slide.setText("Hadamard Rule")
-        Button_H_slide.setCheckable(False)
-        Button_H_slide.setAutoExclusive(False)
-        Button_H_slide.clicked.connect(Button_Hadamard_Slide_Clicked)
-        editToolBar.addWidget(Button_H_slide)
-
         Button_BiAlgebra = QToolButton()
         Button_BiAlgebra.setText("Bialgebra")
         Button_BiAlgebra.setCheckable(False)
@@ -344,3 +282,15 @@ class MainWindow(QMainWindow):
         conf = QSettings('zxlive', 'zxlive')
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
+
+    def get_elements(self):
+        g = self.graph_view.graph_scene.g
+        items = self.graph_view.graph_scene.selected_items
+        vs = [item.v for item in items]
+
+        self.graph_view.graph_scene.selected_items = []
+        return g, vs
+
+    def backup(self):
+        g = self.graph_view.graph_scene.g
+        self.u_stack.append(copy.deepcopy(g))
