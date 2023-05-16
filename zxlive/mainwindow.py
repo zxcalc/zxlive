@@ -17,7 +17,7 @@ from __future__ import annotations
 from PySide6.QtCore import QByteArray, QSettings
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from pyzx.utils import VertexType, toggle_vertex
+from pyzx.utils import VertexType
 import copy
 from fractions import Fraction
 
@@ -25,6 +25,7 @@ from fractions import Fraction
 from .graphview import GraphView
 from .rules import *
 from .construct import *
+from .commands import *
 
 from pyzx import basicrules
 from pyzx import to_gh
@@ -47,8 +48,6 @@ class MainWindow(QMainWindow):
         w.layout().setContentsMargins(0,0,0,0)
         w.layout().setSpacing(0)
         self.resize(1200, 800)
-        self.u_stack = []
-        self.d_stack = []
 
         # restore the shape/size of this window from the last time it was opened
         geom = conf.value("main_window_geometry")
@@ -66,16 +65,21 @@ class MainWindow(QMainWindow):
         def Button_Fuse_Clicked():
             g, vs = self.get_elements()
             if vs == []:
-                return
-            self.backup()
-            if len(vs) == 1:
-                basicrules.remove_id(g, vs[0])
                 self.graph_view.set_graph(g)
+                return
+
+            new_g = copy.deepcopy(g)
+
+            if len(vs) == 1:
+                basicrules.remove_id(new_g, vs[0])
+                cmd = SetGraph(self.graph_view, g, new_g)
+                self.graph_view.graph_scene.undo_stack.push(cmd)
                 return
 
             x_vertices = [v for v in vs if g.type(v) == VertexType.X]
             z_vertices = [v for v in vs if g.type(v) == VertexType.Z]
             vs = [x_vertices, z_vertices]
+            fuse = False
             for lst in vs:
                 lst = sorted(lst)
                 to_fuse = {}
@@ -95,80 +99,81 @@ class MainWindow(QMainWindow):
                             if w in lst:
                                 to_fuse[v].append(w)
                                 stack.append(w)
-                
+
                 for v in to_fuse:
                     for w in to_fuse[v]:
-                        basicrules.fuse(g, v, w)
-            self.graph_view.set_graph(g)
+                        basicrules.fuse(new_g, v, w)
+                        fuse = True
 
+            if not fuse:
+                self.graph_view.set_graph(g)
+                return
+
+            cmd = SetGraph(self.graph_view, g, new_g)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def Button_Reset_Clicked():
-            if self.u_stack:
-                g = self.u_stack[0]
-                self.u_stack = []
-                self.d_stack = []
-
-                self.graph_view.graph_scene.selected_items = []
-                self.graph_view.set_graph(g)
+            undo_stack = self.graph_view.graph_scene.undo_stack
+            while undo_stack.canUndo():
+                undo_stack.undo()
 
         def Button_Undo_Clicked():
-            if self.u_stack:
-                g = self.u_stack.pop()
-                self.d_stack.append(copy.deepcopy(g))
-                self.graph_view.graph_scene.selected_items = []
-                self.graph_view.set_graph(g)
+            self.graph_view.graph_scene.undo_stack.undo()
 
         def Button_Redo_Clicked():
-            if self.d_stack:
-                g = self.d_stack.pop()
-                self.u_stack.append(copy.deepcopy(g))
-                self.graph_view.graph_scene.selected_items = []
-                self.graph_view.set_graph(g)
+            self.graph_view.graph_scene.undo_stack.redo()
 
         def Button_Add_Wire_Clicked():
             g, vs = self.get_elements()
-            self.backup()
-            if len(vs) == 2:
-                g.add_edge_smart(g.edge(vs[0], vs[1]), edgetype=ET_SIM)
-            self.graph_view.set_graph(g)
+            if len(vs) != 2:
+                self.graph_view.set_graph(g)
+                return
+
+            new_g = copy.deepcopy(g)
+            e = new_g.edge(vs[0], vs[1])
+            new_g.add_edge_smart(e, edgetype=ET_SIM)
+            cmd = SetGraph(self.graph_view, g, new_g)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def Button_Add_Node_Clicked():
             g, vs = self.get_elements()
-            if len(vs) == 2:
-                self.backup()
-                add_node(g, vs[0], vs[1])
-            self.graph_view.set_graph(g)
+            if len(vs) != 2:
+                self.graph_view.set_graph(g)
+                return
+
+            cmd = AddIdentity(self.graph_view, vs[0], vs[1])
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         editToolBar = QToolBar("Edit", self)
         self.addToolBar(Qt.LeftToolBarArea, editToolBar)
 
         def Button_BiAlgebra_Clicked():
             g, vs = self.get_elements()
-            if vs:
-                self.backup()
-                bialgebra(g, vs)
-            self.graph_view.set_graph(g)
+            if not vs:
+                self.graph_view.set_graph(g)
+                return
+
+            new_g = copy.deepcopy(g)
+            bialgebra(new_g, vs)
+            cmd = SetGraph(self.graph_view, g, new_g)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def Button_Edit_Node_Color_Clicked():
-            g, vs = self.get_elements()
-            self.backup()
-            for v in vs:
-                g.set_type(v, toggle_vertex(g.type(v)))
-
-            self.graph_view.set_graph(g)
+            _, vs = self.get_elements()
+            cmd = EditNodeColor(self.graph_view, vs)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def Button_Change_Color_Clicked():
-            g, vs = self.get_elements()
-            self.backup()
-            for v in vs:
-                basicrules.color_change(g, v)
-            self.graph_view.set_graph(g)
+            _, vs = self.get_elements()
+            cmd = ChangeColor(self.graph_view, vs)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def Button_GH_State_Clicked():
-            g, _ = self.get_elements()
-            self.backup()
-            to_gh(g)
-            self.graph_view.set_graph(g)
+            g = self.graph_view.graph_scene.g
+            new_g = copy.deepcopy(g)
+            to_gh(new_g)
+            cmd = SetGraph(self.graph_view, g, new_g)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def Button_Change_Phase_Clicked():
             g, vs = self.get_elements()
@@ -176,25 +181,26 @@ class MainWindow(QMainWindow):
                 self.graph_view.set_graph(g)
                 return
 
-            self.backup()
             v = vs[0]
+            old_phase = g.phase(v)
 
-            input, ok = QInputDialog.getText(self,
-                                            "Input Dialog",
-                                            "Enter Desired Phase Value:")
+            input, ok = QInputDialog.getText(
+                self, "Input Dialog", "Enter Desired Phase Value:")
             if not ok:
                 return
             try:
-                g.set_phase(v, Fraction(input))
+                new_phase = Fraction(input)
             except ValueError:
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Critical)
                 msg.setText("Wrong Input Type")
                 msg.setInformativeText('Please enter a valid input (e.g. 1/2, 2)')
                 msg.exec_()
+                self.graph_view.set_graph(g)
+                return
 
-            self.graph_view.set_graph(g)
-        #style = "QToolButton#Button{border-radius: 8px}"
+            cmd = ChangePhase(self.graph_view, v, old_phase, new_phase)
+            self.graph_view.graph_scene.undo_stack.push(cmd)
 
         Button_Fuse = QToolButton()
         Button_Fuse.setText("Fuse")
@@ -290,7 +296,3 @@ class MainWindow(QMainWindow):
 
         self.graph_view.graph_scene.selected_items = []
         return g, vs
-
-    def backup(self):
-        g = self.graph_view.graph_scene.g
-        self.u_stack.append(copy.deepcopy(g))
