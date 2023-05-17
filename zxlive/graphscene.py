@@ -32,9 +32,9 @@ ZX_RED_PRESSED = '#660000'
 class VItem(QGraphicsEllipseItem):
     """A QGraphicsItem representing a single vertex"""
 
-    def __init__(self, g: BaseGraph[VT,ET], v: VT):
+    def __init__(self, g: BaseGraph[VT, ET], v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        self.setZValue(1) # draw vertices on top of edges but below phases
+        self.setZValue(1)  # draw vertices on top of edges but below phases
 
         self.g = g
         self.v = v
@@ -50,11 +50,10 @@ class VItem(QGraphicsEllipseItem):
         self.setPen(pen)
         self.refresh()
 
-
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
 
-        if self.is_pressed == False:
+        if not self.is_pressed:
             t = self.g.type(self.v)
             if t == VertexType.Z:
                 self.setBrush(QBrush(QColor(ZX_GREEN)))
@@ -63,7 +62,7 @@ class VItem(QGraphicsEllipseItem):
             else:
                 self.setBrush(QBrush(QColor('#000000')))
 
-        if self.is_pressed == True:
+        if self.is_pressed:
             t = self.g.type(self.v)
             if t == VertexType.Z:
                 self.setBrush(QBrush(QColor(ZX_GREEN_PRESSED)))
@@ -78,12 +77,13 @@ class VItem(QGraphicsEllipseItem):
         for e_item in self.adj_items:
             e_item.refresh()
 
+
 class PhaseItem(QGraphicsTextItem):
     """A QGraphicsItem representing a phase label"""
 
     def __init__(self, v_item: VItem):
         super().__init__()
-        self.setZValue(2) # draw phase labels on top
+        self.setZValue(2)  # draw phase labels on top
 
         self.setDefaultTextColor(QColor('#006bb3'))
         self.setFont(QFont('monospace'))
@@ -99,12 +99,14 @@ class PhaseItem(QGraphicsTextItem):
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6*SCALE)
 
+
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(self, g: BaseGraph[VT,ET], e: ET, s_item: VItem, t_item: VItem):
+    def __init__(
+            self, g: BaseGraph[VT, ET], e: ET, s_item: VItem, t_item: VItem):
         super().__init__()
-        self.setZValue(0) # draw edges below vertices and phases
+        self.setZValue(0)  # draw edges below vertices and phases
         self.g = g
         self.e = e
         self.s_item = s_item
@@ -145,11 +147,11 @@ class GraphScene(QGraphicsScene):
         self.is_moved = False
 
         self.setSceneRect(-100, -100, 4000, 4000)
-        self.setBackgroundBrush(QBrush(QColor(255,255,255)))
-        self.drag_start = QPointF(0,0)
+        self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+        self.drag_start = QPointF(0, 0)
         self.drag_items: List[Tuple[QGraphicsItem, QPointF]] = []
 
-    def set_graph(self, g: BaseGraph[VT,ET]) -> None:
+    def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         """Set the PyZX graph for the scene
 
         If the scene already contains a graph, it will be replaced."""
@@ -166,20 +168,18 @@ class GraphScene(QGraphicsScene):
         for v in self.g.vertices():
             vi = VItem(self.g, v)
             v_items[v] = vi
-            self.addItem(vi) # add the vertex to the scene
-            self.addItem(vi.phase_item) # add the phase label to the scene
+            self.addItem(vi)  # add the vertex to the scene
+            self.addItem(vi.phase_item)  # add the phase label to the scene
 
         for e in self.g.edges():
-            s,t = self.g.edge_st(e)
+            s, t = self.g.edge_st(e)
             self.addItem(EItem(self.g, e, v_items[s], v_items[t]))
-
-
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
-        
+
         self.drag_start = e.scenePos()
-        
+
         if not self.items(e.scenePos(), deviceTransform=QTransform()):
             for it in self.selected_items:
                 it.is_pressed = False
@@ -207,22 +207,21 @@ class GraphScene(QGraphicsScene):
         dx = round((p.x() - self.drag_start.x())/grid_size) * grid_size
         dy = round((p.y() - self.drag_start.y())/grid_size) * grid_size
         # move the items that have been dragged
-        for it,pos in self.drag_items:
+        for it, pos in self.drag_items:
             self.is_moved = True
             it.setPos(QPointF(pos.x() + dx, pos.y() + dy))
-            if isinstance(it, VItem): it.refresh()
+            if isinstance(it, VItem):
+                it.refresh()
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if it and isinstance(it, VItem) and self.is_moved:
-                    it.is_pressed = False
-                    if len(self.selected_items) == 0:
-                        break
-                    self.selected_items.pop(-1)
-                    it.refresh()
+                it.is_pressed = False
+                if len(self.selected_items) == 0:
                     break
+                self.selected_items.pop(-1)
+                it.refresh()
+                break
 
         self.drag_items = []
         self.is_moved = False
-

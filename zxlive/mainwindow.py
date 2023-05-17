@@ -30,10 +30,11 @@ from .commands import *
 from pyzx import basicrules
 from pyzx import to_gh
 
+
 class MainWindow(QMainWindow):
     """A simple window containing a single `GraphView`
-
-    This is just an example, and should be replaced with something more sophisticated.
+    This is just an example, and should be replaced with
+    something more sophisticated.
     """
 
     def __init__(self) -> None:
@@ -45,11 +46,11 @@ class MainWindow(QMainWindow):
         w = QWidget(self)
         w.setLayout(QVBoxLayout())
         self.setCentralWidget(w)
-        w.layout().setContentsMargins(0,0,0,0)
+        w.layout().setContentsMargins(0, 0, 0, 0)
         w.layout().setSpacing(0)
         self.resize(1200, 800)
 
-        # restore the shape/size of this window from the last time it was opened
+        # restore the window from the last time it was opened
         geom = conf.value("main_window_geometry")
         if geom and isinstance(geom, QByteArray):
             self.restoreGeometry(geom)
@@ -60,7 +61,7 @@ class MainWindow(QMainWindow):
         w.layout().addWidget(self.graph_view)
 
         self.graph_view.set_graph(construct_circuit())
-        # self.graph_view.set_graph(construct(5, 5))
+        # self.graph_view.set_graph(zx.generate.cliffords(5, 5))
 
         def Button_Fuse_Clicked():
             g, vs = self.get_elements()
@@ -194,7 +195,8 @@ class MainWindow(QMainWindow):
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Critical)
                 msg.setText("Wrong Input Type")
-                msg.setInformativeText('Please enter a valid input (e.g. 1/2, 2)')
+                info_text = 'Please enter a valid input (e.g. 1/2, 2)'
+                msg.setInformativeText(info_text)
                 msg.exec_()
                 self.graph_view.set_graph(g)
                 return

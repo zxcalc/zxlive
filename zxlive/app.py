@@ -21,6 +21,7 @@ from qt_material import apply_stylesheet, add_fonts
 
 from .mainwindow import MainWindow
 
+
 class ZXLive(QApplication):
     """The main ZX Live application
 
@@ -33,7 +34,6 @@ class ZXLive(QApplication):
         self.setDesktopFileName('ZX Live')
         self.main_window = MainWindow()
 
-        #Stylesheet
         apply_stylesheet(self, theme='light_blue.xml')
         add_fonts()
 
