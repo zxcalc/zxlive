@@ -20,11 +20,12 @@ from PySide6.QtGui import *
 from pyzx.graph.base import BaseGraph, VT, ET
 from .graphscene import GraphScene
 
+
 class GraphView(QGraphicsView):
     """QtWidget containing a graph
 
-    This widget is view associated with a graph. However, most of the interesting stuff happens
-    in `GraphScene`.
+    This widget is view associated with a graph. However, most of the
+    interesting stuff happens in `GraphScene`.
     """
 
     def __init__(self) -> None:
@@ -34,6 +35,6 @@ class GraphView(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
 
-    def set_graph(self, g: BaseGraph[VT,ET]) -> None:
+    def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         self.graph_scene.set_graph(g)
-        self.centerOn(0,0)
+        self.centerOn(0, 0)

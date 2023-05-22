@@ -9,6 +9,7 @@ ET_HAD = EdgeType.HADAMARD
 VT_Z = VertexType.Z
 VT_X = VertexType.X
 
+
 class SetGraph(QUndoCommand):
     def __init__(self, graph_view, g, new_g):
         super().__init__()
@@ -21,6 +22,7 @@ class SetGraph(QUndoCommand):
 
     def redo(self):
         self.graph_view.set_graph(self.new_g)
+
 
 class EditNodeColor(QUndoCommand):
     def __init__(self, graph_view, vs):
@@ -36,6 +38,7 @@ class EditNodeColor(QUndoCommand):
         self.graph_view.set_graph(g)
 
     undo = redo = toggle
+
 
 class AddIdentity(QUndoCommand):
     def __init__(self, graph_view, u, v):
@@ -70,6 +73,7 @@ class AddIdentity(QUndoCommand):
         g.add_edge(g.edge(v, w), g.edge_type(uv))
         g.remove_edge(uv)
         self.graph_view.set_graph(g)
+
 
 class ChangePhase(QUndoCommand):
     def __init__(self, graph_view, v, old_phase, new_phase):
