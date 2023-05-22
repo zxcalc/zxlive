@@ -8,6 +8,7 @@ ET_HAD = EdgeType.HADAMARD
 VT_Z = VertexType.Z
 VT_X = VertexType.X
 
+
 def check_bialgebra(g, v_list):
 
     phases = g.phases()
@@ -41,11 +42,13 @@ def check_bialgebra(g, v_list):
 
     return True
 
+
 def bialgebra(g, v_list):
     '''
     g: BaseGraph[[VT,ET]]
     v_list: list of vertex where bialgebra needs to be applied
-    returns: The graph with bialgebra rule applied if the vertices provided can be simplified by this rule
+    returns: The graph with bialgebra rule applied if the vertices
+    provided can be simplified by this rule
     '''
     if not check_bialgebra(g, v_list):
         return
@@ -65,22 +68,5 @@ def bialgebra(g, v_list):
             for n in g.neighbors(v):
                 g.add_edge(g.edge(node, n), ET_SIM)
             g.remove_vertex(v)
-    
+
     g.add_edge(g.edge(nodes[0], nodes[1]), ET_SIM)
-
-def add_node(g, u, v):
-    '''
-    g: BaseGraph[[VT,ET]]
-    u: node 1
-    v: node 2
-    returns: a graph with between 'u' and 'v', connected via regular edge
-    '''
-    uv = g.edge(u, v)
-    if uv in g.edge_set():
-        r = 0.5 * (g.row(u) + g.row(v))
-        q = 0.5 * (g.qubit(u) + g.qubit(v))
-        w = g.add_vertex(VT_Z, q, r, 0)
-
-        g.add_edge(g.edge(u, w), ET_SIM)
-        g.add_edge(g.edge(v, w), g.edge_type(uv))
-        g.remove_edge(uv)
