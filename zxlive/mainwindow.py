@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):
         self.graph_view.set_graph(construct_circuit())
         # self.graph_view.set_graph(zx.generate.cliffords(5, 5))
 
-        def Button_Fuse_Clicked():
+        def fuse_clicked():
             g, vs = self.get_elements()
             if vs == []:
                 self.graph_view.set_graph(g)
@@ -113,18 +113,18 @@ class MainWindow(QMainWindow):
             cmd = SetGraph(self.graph_view, g, new_g)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        def Button_Reset_Clicked():
+        def reset_clicked():
             undo_stack = self.graph_view.graph_scene.undo_stack
             while undo_stack.canUndo():
                 undo_stack.undo()
 
-        def Button_Undo_Clicked():
+        def undo_clicked():
             self.graph_view.graph_scene.undo_stack.undo()
 
-        def Button_Redo_Clicked():
+        def redo_clicked():
             self.graph_view.graph_scene.undo_stack.redo()
 
-        def Button_Add_Wire_Clicked():
+        def add_wire_clicked():
             g, vs = self.get_elements()
             if len(vs) != 2:
                 self.graph_view.set_graph(g)
@@ -136,7 +136,7 @@ class MainWindow(QMainWindow):
             cmd = SetGraph(self.graph_view, g, new_g)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        def Button_Add_Node_Clicked():
+        def add_node_clicked():
             g, vs = self.get_elements()
             if len(vs) != 2:
                 self.graph_view.set_graph(g)
@@ -145,10 +145,10 @@ class MainWindow(QMainWindow):
             cmd = AddIdentity(self.graph_view, vs[0], vs[1])
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        editToolBar = QToolBar("Edit", self)
-        self.addToolBar(Qt.LeftToolBarArea, editToolBar)
+        edit_tool_bar = QToolBar("Edit", self)
+        self.addToolBar(Qt.LeftToolBarArea, edit_tool_bar)
 
-        def Button_BiAlgebra_Clicked():
+        def bialgebra_clicked():
             g, vs = self.get_elements()
             if not vs:
                 self.graph_view.set_graph(g)
@@ -159,24 +159,24 @@ class MainWindow(QMainWindow):
             cmd = SetGraph(self.graph_view, g, new_g)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        def Button_Edit_Node_Color_Clicked():
+        def edit_node_color_clicked():
             _, vs = self.get_elements()
             cmd = EditNodeColor(self.graph_view, vs)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        def Button_Change_Color_Clicked():
+        def change_color_clicked():
             _, vs = self.get_elements()
             cmd = ChangeColor(self.graph_view, vs)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        def Button_GH_State_Clicked():
+        def gh_state_clicked():
             g = self.graph_view.graph_scene.g
             new_g = copy.deepcopy(g)
             to_gh(new_g)
             cmd = SetGraph(self.graph_view, g, new_g)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        def Button_Change_Phase_Clicked():
+        def change_phase_clicked():
             g, vs = self.get_elements()
             if len(vs) != 1:
                 self.graph_view.set_graph(g)
@@ -204,86 +204,86 @@ class MainWindow(QMainWindow):
             cmd = ChangePhase(self.graph_view, v, old_phase, new_phase)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
-        Button_Fuse = QToolButton()
-        Button_Fuse.setText("Fuse")
+        fuse = QToolButton()
+        fuse.setText("Fuse")
         """Button_Fuse.setObjectName("Button")
         Button_Fuse.setStyleSheet(style)"""
-        Button_Fuse.setCheckable(False)
-        Button_Fuse.setAutoExclusive(False)
-        Button_Fuse.setProperty('class', 'success')
-        Button_Fuse.clicked.connect(Button_Fuse_Clicked)
-        editToolBar.addWidget(Button_Fuse)
+        fuse.setCheckable(False)
+        fuse.setAutoExclusive(False)
+        fuse.setProperty('class', 'success')
+        fuse.clicked.connect(fuse_clicked)
+        edit_tool_bar.addWidget(fuse)
 
-        Button_Undo = QToolButton()
-        Button_Undo.setText("Undo")
-        Button_Undo.setCheckable(False)
-        Button_Undo.setAutoExclusive(False)
-        Button_Undo.clicked.connect(Button_Undo_Clicked)
-        editToolBar.addWidget(Button_Undo)
+        undo = QToolButton()
+        undo.setText("Undo")
+        undo.setCheckable(False)
+        undo.setAutoExclusive(False)
+        undo.clicked.connect(undo_clicked)
+        edit_tool_bar.addWidget(undo)
 
-        Button_Redo = QToolButton()
-        Button_Redo.setText("Redo (Unundo)")
-        Button_Redo.setCheckable(False)
-        Button_Redo.setAutoExclusive(False)
-        Button_Redo.clicked.connect(Button_Redo_Clicked)
-        editToolBar.addWidget(Button_Redo)
+        redo = QToolButton()
+        redo.setText("Redo (Unundo)")
+        redo.setCheckable(False)
+        redo.setAutoExclusive(False)
+        redo.clicked.connect(redo_clicked)
+        edit_tool_bar.addWidget(redo)
 
-        Button_Toggle_Wire = QToolButton()
-        Button_Toggle_Wire.setText("Add Wire")
-        Button_Toggle_Wire.setCheckable(False)
-        Button_Toggle_Wire.setAutoExclusive(False)
-        Button_Toggle_Wire.clicked.connect(Button_Add_Wire_Clicked)
-        editToolBar.addWidget(Button_Toggle_Wire)
+        toggle_wire = QToolButton()
+        toggle_wire.setText("Add Wire")
+        toggle_wire.setCheckable(False)
+        toggle_wire.setAutoExclusive(False)
+        toggle_wire.clicked.connect(add_wire_clicked)
+        edit_tool_bar.addWidget(toggle_wire)
 
-        Button_Add_Node = QToolButton()
-        Button_Add_Node.setText("Add Node")
-        Button_Add_Node.setCheckable(False)
-        Button_Add_Node.setAutoExclusive(False)
-        Button_Add_Node.clicked.connect(Button_Add_Node_Clicked)
-        editToolBar.addWidget(Button_Add_Node)
+        add_node = QToolButton()
+        add_node.setText("Add Node")
+        add_node.setCheckable(False)
+        add_node.setAutoExclusive(False)
+        add_node.clicked.connect(add_node_clicked)
+        edit_tool_bar.addWidget(add_node)
 
-        Button_edit_node = QToolButton()
-        Button_edit_node.setText("Edit Node Color")
-        Button_edit_node.setCheckable(False)
-        Button_edit_node.setAutoExclusive(False)
-        Button_edit_node.clicked.connect(Button_Edit_Node_Color_Clicked)
-        editToolBar.addWidget(Button_edit_node)
+        edit_node = QToolButton()
+        edit_node.setText("Edit Node Color")
+        edit_node.setCheckable(False)
+        edit_node.setAutoExclusive(False)
+        edit_node.clicked.connect(edit_node_color_clicked)
+        edit_tool_bar.addWidget(edit_node)
 
-        Button_Change_Phase = QToolButton()
-        Button_Change_Phase.setText("Change Phase")
-        Button_Change_Phase.setCheckable(False)
-        Button_Change_Phase.setAutoExclusive(False)
-        Button_Change_Phase.clicked.connect(Button_Change_Phase_Clicked)
-        editToolBar.addWidget(Button_Change_Phase)
+        change_phase = QToolButton()
+        change_phase.setText("Change Phase")
+        change_phase.setCheckable(False)
+        change_phase.setAutoExclusive(False)
+        change_phase.clicked.connect(change_phase_clicked)
+        edit_tool_bar.addWidget(change_phase)
 
-        Button_Change_Color = QToolButton()
-        Button_Change_Color.setText("Color Change")
-        Button_Change_Color.setCheckable(False)
-        Button_Change_Color.setAutoExclusive(False)
-        Button_Change_Color.clicked.connect(Button_Change_Color_Clicked)
-        editToolBar.addWidget(Button_Change_Color)
+        change_color = QToolButton()
+        change_color.setText("Color Change")
+        change_color.setCheckable(False)
+        change_color.setAutoExclusive(False)
+        change_color.clicked.connect(change_color_clicked)
+        edit_tool_bar.addWidget(change_color)
 
-        Button_BiAlgebra = QToolButton()
-        Button_BiAlgebra.setText("Bialgebra")
-        Button_BiAlgebra.setCheckable(False)
-        Button_BiAlgebra.setAutoExclusive(False)
-        Button_BiAlgebra.clicked.connect(Button_BiAlgebra_Clicked)
-        editToolBar.addWidget(Button_BiAlgebra)
+        do_bialgebra = QToolButton()
+        do_bialgebra.setText("Bialgebra")
+        do_bialgebra.setCheckable(False)
+        do_bialgebra.setAutoExclusive(False)
+        do_bialgebra.clicked.connect(bialgebra_clicked)
+        edit_tool_bar.addWidget(do_bialgebra)
 
-        Button_GH_State = QToolButton()
-        Button_GH_State.setText("GH State")
-        Button_GH_State.setCheckable(False)
-        Button_GH_State.setAutoExclusive(False)
-        Button_GH_State.clicked.connect(Button_GH_State_Clicked)
-        editToolBar.addWidget(Button_GH_State)
+        gh_state = QToolButton()
+        gh_state.setText("GH State")
+        gh_state.setCheckable(False)
+        gh_state.setAutoExclusive(False)
+        gh_state.clicked.connect(gh_state_clicked)
+        edit_tool_bar.addWidget(gh_state)
 
-        Button_Reset = QToolButton()
-        Button_Reset.setText("Reset")
-        Button_Reset.setCheckable(False)
-        Button_Reset.setAutoExclusive(False)
-        Button_Reset.setProperty('class', 'danger')
-        Button_Reset.clicked.connect(Button_Reset_Clicked)
-        editToolBar.addWidget(Button_Reset)
+        reset = QToolButton()
+        reset.setText("Reset")
+        reset.setCheckable(False)
+        reset.setAutoExclusive(False)
+        reset.setProperty('class', 'danger')
+        reset.clicked.connect(reset_clicked)
+        edit_tool_bar.addWidget(reset)
 
     def closeEvent(self, e: QCloseEvent) -> None:
         # save the shape/size of this window on close
