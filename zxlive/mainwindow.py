@@ -316,7 +316,7 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     msg = QMessageBox()
                     msg.setIcon(QMessageBox.Critical)
-                    msg.setText("Failed to convert the quantum circuit to ZX-diagram")
+                    msg.setText("Failed to convert the ZX-diagram to quantum circuit")
                     msg.setInformativeText(str(e))
                     msg.exec_()
                     return
