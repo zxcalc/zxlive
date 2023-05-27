@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from __future__ import annotations
-from PySide6.QtCore import QByteArray, QSettings
+from PySide6.QtCore import QByteArray, QSettings, QFile, QTextStream, QIODevice
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
 from pyzx.utils import VertexType
@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        conf = QSettings('zxlive', 'zxlive')
+        conf = QSettings("zxlive", "zxlive")
 
         self.setWindowTitle("zxlive")
 
@@ -186,7 +186,8 @@ class MainWindow(QMainWindow):
             old_phase = g.phase(v)
 
             input, ok = QInputDialog.getText(
-                self, "Input Dialog", "Enter Desired Phase Value:")
+                self, "Input Dialog", "Enter Desired Phase Value:"
+            )
             if not ok:
                 return
             try:
@@ -195,7 +196,7 @@ class MainWindow(QMainWindow):
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Critical)
                 msg.setText("Wrong Input Type")
-                info_text = 'Please enter a valid input (e.g. 1/2, 2)'
+                info_text = "Please enter a valid input (e.g. 1/2, 2)"
                 msg.setInformativeText(info_text)
                 msg.exec_()
                 self.graph_view.set_graph(g)
@@ -204,13 +205,136 @@ class MainWindow(QMainWindow):
             cmd = ChangePhase(self.graph_view, v, old_phase, new_phase)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
+        def import_diagram_clicked():
+            supported_formats = [
+                ("QGraph (*.zxg)", "zxg"),
+                ("QASM (*.qasm)", "qasm"),
+                ("TikZ (*.tikz)", "tikz"),
+                ("JSON (*.json)", "json"),
+            ]
+            file_path, selected_format = QFileDialog.getOpenFileName(
+                parent=w,
+                caption="Open File",
+                filter=";;".join([f[0] for f in supported_formats]),
+            )
+
+            file = QFile(file_path)
+            if not file.open(QIODevice.ReadOnly | QIODevice.Text):
+                return
+            input = QTextStream(file)
+
+            g = self.graph_view.graph_scene.g
+            if selected_format == "QGraph (*.zxg)":
+                try:
+                    new_g = zx.Graph().from_json(input.readAll())
+                except Exception as e:
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Failed to import QGraph file")
+                    msg.setInformativeText(str(e))
+                    msg.exec_()
+                    self.graph_view.set_graph(g)
+                    return
+                cmd = SetGraph(self.graph_view, g, new_g)
+                self.graph_view.graph_scene.undo_stack.push(cmd)
+            elif selected_format == "QASM (*.qasm)":
+                try:
+                    new_g = zx.Circuit.from_qasm(input.readAll()).to_graph()
+                except Exception as e:
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Failed to import QASM file")
+                    msg.setInformativeText(str(e))
+                    msg.exec_()
+                    self.graph_view.set_graph(g)
+                    return
+                cmd = SetGraph(self.graph_view, g, new_g)
+                self.graph_view.graph_scene.undo_stack.push(cmd)
+            elif selected_format == "TikZ (*.tikz)":
+                try:
+                    new_g = zx.Graph().from_tikz(input.readAll())
+                except Exception as e:
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Failed to import TikZ file")
+                    msg.setInformativeText(str(e))
+                    msg.exec_()
+                    self.graph_view.set_graph(g)
+                    return
+                cmd = SetGraph(self.graph_view, g, new_g)
+                self.graph_view.graph_scene.undo_stack.push(cmd)
+            elif selected_format == "JSON (*.json)":
+                try:
+                    new_g = zx.Graph().from_json(input.readAll())
+                except Exception as e:
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Failed to import JSON file")
+                    msg.setInformativeText(str(e))
+                    msg.exec_()
+                    self.graph_view.set_graph(g)
+                    return
+                cmd = SetGraph(self.graph_view, g, new_g)
+                self.graph_view.graph_scene.undo_stack.push(cmd)
+
+            file.close()
+
+        def export_diagram_clicked():
+            supported_formats = [
+                ("QGraph (*.zxg)", "zxg"),
+                ("QASM (*.qasm)", "qasm"),
+                ("TikZ (*.tikz)", "tikz"),
+                ("JSON (*.json)", "json"),
+            ]
+            file_path, selected_format = QFileDialog.getSaveFileName(
+                parent=w,
+                caption="Save File",
+                filter=";;".join([f[0] for f in supported_formats]),
+            )
+
+            # add file extension if not already there
+            file_extension = supported_formats[
+                [format_name for format_name, _ in supported_formats].index(
+                    selected_format
+                )
+            ][1]
+            if file_extension == file_path.split(".")[-1]:
+                file = QFile(file_path)
+            else:
+                file = QFile(file_path + "." + file_extension)
+
+            if not file.open(QIODevice.WriteOnly | QIODevice.Text):
+                return
+            out = QTextStream(file)
+
+            g = self.graph_view.graph_scene.g
+            if selected_format == "QGraph (*.zxg)":
+                out << g.to_json()
+            elif selected_format == "QASM (*.qasm)":
+                try:
+                    circuit = zx.extract_circuit(g)
+                except Exception as e:
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Failed to convert the quantum circuit to ZX-diagram")
+                    msg.setInformativeText(str(e))
+                    msg.exec_()
+                    return
+                out << circuit.to_qasm()
+            elif selected_format == "TikZ (*.tikz)":
+                out << g.to_tikz()
+            elif selected_format == "JSON (*.json)":
+                out << g.to_json()
+
+            file.close()
+
         fuse = QToolButton()
         fuse.setText("Fuse")
         """Button_Fuse.setObjectName("Button")
         Button_Fuse.setStyleSheet(style)"""
         fuse.setCheckable(False)
         fuse.setAutoExclusive(False)
-        fuse.setProperty('class', 'success')
+        fuse.setProperty("class", "success")
         fuse.clicked.connect(fuse_clicked)
         edit_tool_bar.addWidget(fuse)
 
@@ -277,17 +401,31 @@ class MainWindow(QMainWindow):
         gh_state.clicked.connect(gh_state_clicked)
         edit_tool_bar.addWidget(gh_state)
 
+        import_diagram = QToolButton()
+        import_diagram.setText("Import Diagram")
+        import_diagram.setCheckable(False)
+        import_diagram.setAutoExclusive(False)
+        import_diagram.clicked.connect(import_diagram_clicked)
+        edit_tool_bar.addWidget(import_diagram)
+
+        export_diagram = QToolButton()
+        export_diagram.setText("Export Diagram")
+        export_diagram.setCheckable(False)
+        export_diagram.setAutoExclusive(False)
+        export_diagram.clicked.connect(export_diagram_clicked)
+        edit_tool_bar.addWidget(export_diagram)
+
         reset = QToolButton()
         reset.setText("Reset")
         reset.setCheckable(False)
         reset.setAutoExclusive(False)
-        reset.setProperty('class', 'danger')
+        reset.setProperty("class", "danger")
         reset.clicked.connect(reset_clicked)
         edit_tool_bar.addWidget(reset)
 
     def closeEvent(self, e: QCloseEvent) -> None:
         # save the shape/size of this window on close
-        conf = QSettings('zxlive', 'zxlive')
+        conf = QSettings("zxlive", "zxlive")
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
