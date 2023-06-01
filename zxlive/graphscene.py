@@ -22,7 +22,7 @@ from typing import Optional, List, Set, Tuple
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
 
-from .commands import AddNode
+from .commands import AddNode, AddEdge
 
 SCALE = 60.0
 ZX_GREEN = "#ccffcc"
@@ -152,6 +152,9 @@ class GraphScene(QGraphicsScene):
         self.drag_start = QPointF(0, 0)
         self.drag_items: List[Tuple[QGraphicsItem, QPointF]] = []
 
+        self.edge_start_node_item = None
+        self.edge_end_node_item = None
+
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         """Set the PyZX graph for the scene
 
@@ -180,11 +183,11 @@ class GraphScene(QGraphicsScene):
         super().mousePressEvent(e)
 
         if e.button() == Qt.RightButton:
-            p = e.scenePos()
-            print(p.x(), p.y())
-            print(p.x() / SCALE, p.y() / SCALE)
-            cmd = AddNode(self, p.x() / SCALE, p.y() / SCALE)
-            self.undo_stack.push(cmd)
+            if self.items(e.scenePos(), deviceTransform=QTransform()):
+                for it in self.items(e.scenePos(), deviceTransform=QTransform()):
+                    if isinstance(it, VItem):
+                        self.edge_start_node_item = it.v
+                        self.edge_end_node_item = it.v
             return
 
         self.drag_start = e.scenePos()
@@ -223,6 +226,28 @@ class GraphScene(QGraphicsScene):
                 it.refresh()
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        if e.button() == Qt.RightButton:
+            if self.items(e.scenePos(), deviceTransform=QTransform()):
+                for it in self.items(e.scenePos(), deviceTransform=QTransform()):
+                    if (
+                        it
+                        and isinstance(it, VItem)
+                        and self.edge_end_node_item is not None
+                    ):
+                        self.edge_end_node_item = it.v
+                        if self.edge_start_node_item != self.edge_end_node_item:
+                            cmd = AddEdge(
+                                self, self.edge_start_node_item, self.edge_end_node_item
+                            )
+                            self.undo_stack.push(cmd)
+            else:
+                p = e.scenePos()
+                cmd = AddNode(self, p.x() / SCALE, p.y() / SCALE)
+                self.undo_stack.push(cmd)
+                self.edge_start_node_item = None
+                self.edge_end_node_item = None
+            return
+
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if it and isinstance(it, VItem) and self.is_moved:
                 it.is_pressed = False

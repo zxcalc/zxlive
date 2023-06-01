@@ -82,7 +82,7 @@ class AddEdge(QUndoCommand):
         g = self.graph_scene.g
         self.graph_scene.selected_items = []
 
-        g.add_edge(g.edge(u, v), ET_SIM)
+        g.add_edge(g.edge(u, v))
         self.graph_scene.set_graph(g)
 
 
