@@ -22,11 +22,13 @@ from typing import Optional, List, Set, Tuple
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
 
+from .commands import AddNode, AddEdge
+
 SCALE = 60.0
-ZX_GREEN = '#ccffcc'
+ZX_GREEN = "#ccffcc"
 ZX_GREEN_PRESSED = "#006600"
-ZX_RED = '#ff8888'
-ZX_RED_PRESSED = '#660000'
+ZX_RED = "#ff8888"
+ZX_RED_PRESSED = "#660000"
 
 
 class VItem(QGraphicsEllipseItem):
@@ -46,7 +48,7 @@ class VItem(QGraphicsEllipseItem):
 
         pen = QPen()
         pen.setWidthF(3)
-        pen.setColor(QColor('black'))
+        pen.setColor(QColor("black"))
         self.setPen(pen)
         self.refresh()
 
@@ -60,7 +62,7 @@ class VItem(QGraphicsEllipseItem):
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED)))
             else:
-                self.setBrush(QBrush(QColor('#000000')))
+                self.setBrush(QBrush(QColor("#000000")))
 
         if self.is_pressed:
             t = self.g.type(self.v)
@@ -69,7 +71,7 @@ class VItem(QGraphicsEllipseItem):
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED_PRESSED)))
             else:
-                self.setBrush(QBrush(QColor('#000000')))
+                self.setBrush(QBrush(QColor("#000000")))
 
         if self.phase_item:
             self.phase_item.refresh()
@@ -85,8 +87,8 @@ class PhaseItem(QGraphicsTextItem):
         super().__init__()
         self.setZValue(2)  # draw phase labels on top
 
-        self.setDefaultTextColor(QColor('#006bb3'))
-        self.setFont(QFont('monospace'))
+        self.setDefaultTextColor(QColor("#006bb3"))
+        self.setFont(QFont("monospace"))
         self.v_item = v_item
         self.refresh()
 
@@ -97,14 +99,13 @@ class PhaseItem(QGraphicsTextItem):
         # phase = self.v_item.v
         self.setPlainText(phase_to_s(phase))
         p = self.v_item.pos()
-        self.setPos(p.x(), p.y() - 0.6*SCALE)
+        self.setPos(p.x(), p.y() - 0.6 * SCALE)
 
 
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(
-            self, g: BaseGraph[VT, ET], e: ET, s_item: VItem, t_item: VItem):
+    def __init__(self, g: BaseGraph[VT, ET], e: ET, s_item: VItem, t_item: VItem):
         super().__init__()
         self.setZValue(0)  # draw edges below vertices and phases
         self.g = g
@@ -123,10 +124,10 @@ class EItem(QGraphicsPathItem):
         pen = QPen()
         pen.setWidthF(3)
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
-            pen.setColor(QColor('#0077ff'))
+            pen.setColor(QColor("#0077ff"))
             pen.setDashPattern([4.0, 2.0])
         else:
-            pen.setColor(QColor('#000000'))
+            pen.setColor(QColor("#000000"))
         self.setPen(QPen(pen))
 
         # set path as a straight line from source to target
@@ -150,6 +151,9 @@ class GraphScene(QGraphicsScene):
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
         self.drag_start = QPointF(0, 0)
         self.drag_items: List[Tuple[QGraphicsItem, QPointF]] = []
+
+        self.edge_start_node_item = None
+        self.edge_end_node_item = None
 
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         """Set the PyZX graph for the scene
@@ -178,6 +182,14 @@ class GraphScene(QGraphicsScene):
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
 
+        if e.button() == Qt.RightButton:
+            if self.items(e.scenePos(), deviceTransform=QTransform()):
+                for it in self.items(e.scenePos(), deviceTransform=QTransform()):
+                    if isinstance(it, VItem):
+                        self.edge_start_node_item = it.v
+                        self.edge_end_node_item = it.v
+            return
+
         self.drag_start = e.scenePos()
 
         if not self.items(e.scenePos(), deviceTransform=QTransform()):
@@ -204,8 +216,8 @@ class GraphScene(QGraphicsScene):
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         p = e.scenePos()
         grid_size = SCALE / 8
-        dx = round((p.x() - self.drag_start.x())/grid_size) * grid_size
-        dy = round((p.y() - self.drag_start.y())/grid_size) * grid_size
+        dx = round((p.x() - self.drag_start.x()) / grid_size) * grid_size
+        dy = round((p.y() - self.drag_start.y()) / grid_size) * grid_size
         # move the items that have been dragged
         for it, pos in self.drag_items:
             self.is_moved = True
@@ -214,6 +226,28 @@ class GraphScene(QGraphicsScene):
                 it.refresh()
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        if e.button() == Qt.RightButton:
+            if self.items(e.scenePos(), deviceTransform=QTransform()):
+                for it in self.items(e.scenePos(), deviceTransform=QTransform()):
+                    if (
+                        it
+                        and isinstance(it, VItem)
+                        and self.edge_end_node_item is not None
+                    ):
+                        self.edge_end_node_item = it.v
+                        if self.edge_start_node_item != self.edge_end_node_item:
+                            cmd = AddEdge(
+                                self, self.edge_start_node_item, self.edge_end_node_item
+                            )
+                            self.undo_stack.push(cmd)
+            else:
+                p = e.scenePos()
+                cmd = AddNode(self, p.x() / SCALE, p.y() / SCALE)
+                self.undo_stack.push(cmd)
+                self.edge_start_node_item = None
+                self.edge_end_node_item = None
+            return
+
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if it and isinstance(it, VItem) and self.is_moved:
                 it.is_pressed = False

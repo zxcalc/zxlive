@@ -40,6 +40,52 @@ class EditNodeColor(QUndoCommand):
     undo = redo = toggle
 
 
+class AddNode(QUndoCommand):
+    def __init__(self, graph_scene, x, y):
+        super().__init__()
+        self.graph_scene = graph_scene
+        self.x = x
+        self.y = y
+
+    def undo(self):
+        g = self.graph_scene.g
+        w = self.w
+        g.remove_vertex(w)
+
+        self.graph_scene.set_graph(g)
+
+    def redo(self):
+        g = self.graph_scene.g
+        w = g.add_vertex(VT_Z, self.y, self.x)
+        self.w = w
+
+        self.graph_scene.set_graph(g)
+
+
+class AddEdge(QUndoCommand):
+    def __init__(self, graph_scene, u, v):
+        super().__init__()
+        self.graph_scene = graph_scene
+        self.u = u
+        self.v = v
+
+    def undo(self):
+        u, v = self.u, self.v
+        g = self.graph_scene.g
+        self.graph_scene.selected_items = []
+
+        g.remove_edge(g.edge(u, v))
+        self.graph_scene.set_graph(g)
+
+    def redo(self):
+        u, v = self.u, self.v
+        g = self.graph_scene.g
+        self.graph_scene.selected_items = []
+
+        g.add_edge(g.edge(u, v))
+        self.graph_scene.set_graph(g)
+
+
 class AddIdentity(QUndoCommand):
     def __init__(self, graph_view, u, v):
         super().__init__()
