@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pyzx import basicrules
 from pyzx.utils import toggle_vertex, EdgeType, VertexType
 
@@ -63,6 +65,8 @@ class AddNode(QUndoCommand):
 
 
 class AddEdge(QUndoCommand):
+    _old_ety: Optional[EdgeType]
+
     def __init__(self, graph_scene, u, v):
         super().__init__()
         self.graph_scene = graph_scene
@@ -74,7 +78,11 @@ class AddEdge(QUndoCommand):
         g = self.graph_scene.g
         self.graph_scene.selected_items = []
 
-        g.remove_edge(g.edge(u, v))
+        e = g.edge(u, v)
+        if self._old_ety:
+            g.add_edge(e, self._old_ety)
+        else:
+            g.remove_edge(e)
         self.graph_scene.set_graph(g)
 
     def redo(self):
@@ -82,7 +90,14 @@ class AddEdge(QUndoCommand):
         g = self.graph_scene.g
         self.graph_scene.selected_items = []
 
-        g.add_edge(g.edge(u, v))
+        e = g.edge(u, v)
+        if g.connected(u, v):
+            self._old_ety = g.edge_type(e)
+            g.set_edge_type(e, ET_SIM)
+        else:
+            self._old_ety = None
+            g.add_edge(e, ET_SIM)
+
         self.graph_scene.set_graph(g)
 
 
