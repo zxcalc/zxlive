@@ -1,9 +1,13 @@
+from dataclasses import dataclass
 from typing import Optional
+from PySide6.QtGui import QUndoCommand
+
 
 from pyzx import basicrules
+from pyzx.graph.base import VT
 from pyzx.utils import toggle_vertex, EdgeType, VertexType
 
-from PySide6.QtGui import QUndoCommand
+from zxlive.graphscene import GraphScene
 
 ET_SIM = EdgeType.SIMPLE
 ET_HAD = EdgeType.HADAMARD
@@ -43,35 +47,46 @@ class EditNodeColor(QUndoCommand):
 
 
 class AddNode(QUndoCommand):
-    def __init__(self, graph_scene, x, y):
+    graph_scene: GraphScene
+    x: float
+    y: float
+    vty: VertexType
+
+    _added_vert: Optional[VT] = None
+
+    def __init__(self, graph_scene: GraphScene, x: float, y: float, vty: VertexType):
         super().__init__()
         self.graph_scene = graph_scene
         self.x = x
         self.y = y
+        self.vty = vty
 
     def undo(self):
+        assert self._added_vert is not None
         g = self.graph_scene.g
-        w = self.w
-        g.remove_vertex(w)
-
+        g.remove_vertex(self._added_vert)
         self.graph_scene.set_graph(g)
 
     def redo(self):
         g = self.graph_scene.g
-        w = g.add_vertex(VT_Z, self.y, self.x)
-        self.w = w
-
+        self._added_vert = g.add_vertex(self.vty, self.y, self.x)
         self.graph_scene.set_graph(g)
 
 
 class AddEdge(QUndoCommand):
-    _old_ety: Optional[EdgeType]
+    graph_scene: GraphScene
+    u: VT
+    v: VT
+    ety: EdgeType
 
-    def __init__(self, graph_scene, u, v):
+    _old_ety: Optional[EdgeType] = None
+
+    def __init__(self, graph_scene: GraphScene, u: VT, v: VT, ety: EdgeType):
         super().__init__()
         self.graph_scene = graph_scene
         self.u = u
         self.v = v
+        self.ety = ety
 
     def undo(self):
         u, v = self.u, self.v
@@ -93,11 +108,43 @@ class AddEdge(QUndoCommand):
         e = g.edge(u, v)
         if g.connected(u, v):
             self._old_ety = g.edge_type(e)
-            g.set_edge_type(e, ET_SIM)
+            g.set_edge_type(e, self.ety)
         else:
             self._old_ety = None
-            g.add_edge(e, ET_SIM)
+            g.add_edge(e, self.ety)
 
+        self.graph_scene.set_graph(g)
+
+
+class MoveNode(QUndoCommand):
+    graph_scene: GraphScene
+    v: VT
+    x: float
+    y: float
+
+    _old_x: Optional[float] = None
+    _old_y: Optional[float] = None
+
+    def __init__(self, graph_scene, v: VT, x: float, y: float):
+        super().__init__()
+        self.graph_scene = graph_scene
+        self.v = v
+        self.x = x
+        self.y = y
+
+    def undo(self):
+        assert self._old_x is not None and self._old_y is not None
+        g = self.graph_scene.g
+        g.set_row(self.v, self._old_x)
+        g.set_qubit(self.v, self._old_y)
+        self.graph_scene.set_graph(g)
+
+    def redo(self):
+        g = self.graph_scene.g
+        self._old_x = g.row(self.v)
+        self._old_y = g.qubit(self.v)
+        g.set_row(self.v, self.x)
+        g.set_qubit(self.v, self.y)
         self.graph_scene.set_graph(g)
 
 

@@ -21,7 +21,7 @@ from pyzx.utils import VertexType
 import copy
 from fractions import Fraction
 
-
+from .edit_panel import GraphEditPanel
 from .graphview import GraphView
 from .rules import *
 from .construct import *
@@ -56,8 +56,17 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geom)
         self.show()
 
+        tab_widget = QTabWidget()
+        w.layout().addWidget(tab_widget)
+
+        graph = construct_circuit()
+        edit_panel = GraphEditPanel(graph)
+        tab_widget.addTab(edit_panel, "Edit")
+
+        return
+
         # add a GraphView as the only widget in the window
-        self.graph_view = GraphView()
+        self.graph_view = GraphView(GraphScene())
         w.layout().addWidget(self.graph_view)
 
         self.graph_view.set_graph(construct_circuit())
