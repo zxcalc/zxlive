@@ -171,3 +171,19 @@ class ChangeColor(QUndoCommand):
         self.graph_view.set_graph(g)
 
     undo = redo = toggle
+
+
+class MoveNode(QUndoCommand):
+    def __init__(self, v, old_pos, new_pos):
+        super().__init__()
+        self.v = v
+        self.old_pos = old_pos
+        self.new_pos = new_pos
+
+    def redo(self):
+        self.v.set_position(*self.new_pos)
+        self.v.refresh()
+
+    def undo(self):
+        self.v.set_position(*self.old_pos)
+        self.v.refresh()

@@ -22,7 +22,7 @@ from typing import Optional, List, Set, Tuple
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
 
-from .commands import AddNode, AddEdge
+from .commands import AddNode, AddEdge, MoveNode
 
 SCALE = 60.0
 ZX_GREEN = "#ccffcc"
@@ -40,7 +40,7 @@ class VItem(QGraphicsEllipseItem):
 
         self.g = g
         self.v = v
-        self.setPos(g.row(v) * SCALE, g.qubit(v) * SCALE)
+        self.set_position(g.row(v) * SCALE, g.qubit(v) * SCALE)
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
 
@@ -51,6 +51,11 @@ class VItem(QGraphicsEllipseItem):
         pen.setColor(QColor("black"))
         self.setPen(pen)
         self.refresh()
+
+    def set_position(self, x: float, y: float) -> None:
+        self.setPos(QPointF(x, y))
+        self.g.set_row(self.v, x / SCALE)
+        self.g.set_qubit(self.v, y / SCALE)
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
@@ -187,7 +192,6 @@ class GraphScene(QGraphicsScene):
                 for it in self.items(e.scenePos(), deviceTransform=QTransform()):
                     if isinstance(it, VItem):
                         self.edge_start_node_item = it.v
-                        self.edge_end_node_item = it.v
             return
 
         self.drag_start = e.scenePos()
@@ -219,11 +223,14 @@ class GraphScene(QGraphicsScene):
         dx = round((p.x() - self.drag_start.x()) / grid_size) * grid_size
         dy = round((p.y() - self.drag_start.y()) / grid_size) * grid_size
         # move the items that have been dragged
-        for it, pos in self.drag_items:
+        if self.drag_items and not self.is_moved:
             self.is_moved = True
-            it.setPos(QPointF(pos.x() + dx, pos.y() + dy))
-            if isinstance(it, VItem):
-                it.refresh()
+            self.undo_stack.beginMacro('Moving items')
+        for it, pos in self.drag_items:
+            old_pos = pos.x(), pos.y()
+            new_pos = pos.x() + dx, pos.y() + dy
+            cmd = MoveNode(it, old_pos, new_pos)
+            self.undo_stack.push(cmd)
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         if e.button() == Qt.RightButton:
@@ -251,11 +258,13 @@ class GraphScene(QGraphicsScene):
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if it and isinstance(it, VItem) and self.is_moved:
                 it.is_pressed = False
-                if len(self.selected_items) == 0:
+                if not self.selected_items:
                     break
                 self.selected_items.pop(-1)
                 it.refresh()
                 break
 
         self.drag_items = []
-        self.is_moved = False
+        if self.is_moved:
+            self.is_moved = False
+            self.undo_stack.endMacro()
