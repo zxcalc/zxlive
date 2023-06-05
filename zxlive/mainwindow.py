@@ -14,6 +14,9 @@
 # limitations under the License.
 
 from __future__ import annotations
+
+from enum import IntEnum
+
 from PySide6.QtCore import QByteArray, QSettings, QFile, QTextStream, QIODevice
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
@@ -23,6 +26,7 @@ from fractions import Fraction
 
 from .edit_panel import GraphEditPanel
 from .graphview import GraphView
+from .proof_panel import ProofPanel
 from .rules import *
 from .construct import *
 from .commands import *
@@ -31,11 +35,21 @@ from pyzx import basicrules
 from pyzx import to_gh
 
 
+class Tab(IntEnum):
+    EditTab = 0
+    ProofTab = 1
+
+
 class MainWindow(QMainWindow):
     """A simple window containing a single `GraphView`
     This is just an example, and should be replaced with
     something more sophisticated.
     """
+
+    edit_panel: GraphEditPanel
+    proof_panel: ProofPanel
+
+    current_tab: Tab = Tab.EditTab
 
     def __init__(self) -> None:
         super().__init__()
@@ -58,12 +72,33 @@ class MainWindow(QMainWindow):
 
         tab_widget = QTabWidget()
         w.layout().addWidget(tab_widget)
+        tab_widget.currentChanged.connect(self._tab_changed)
 
         graph = construct_circuit()
-        edit_panel = GraphEditPanel(graph)
-        tab_widget.addTab(edit_panel, "Edit")
 
-        return
+        self.edit_panel = GraphEditPanel(graph)
+        tab_widget.addTab(self.edit_panel, "Edit")
+
+        self.proof_panel = ProofPanel(graph)
+        tab_widget.addTab(self.proof_panel, "Rewrite")
+
+    def _tab_changed(self, new_tab: Tab):
+        # This method is also invoked on application launch, so check
+        # if the tab has actually changed
+        if self.current_tab != new_tab:
+            old_panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
+            new_panel = self.edit_panel if new_tab == Tab.EditTab else self.proof_panel
+            # TODO: Do we want to maintain node selections when switching
+            new_panel.graph_view.set_graph(old_panel.graph)
+            # TODO: For now we always invalidate the undo stack when switching
+            #  between tabs. In the future this should only happen if we've
+            #  actually made changes to the graph before switching.
+            new_panel.undo_stack.clear()
+            self.current_tab = new_tab
+
+
+
+    def _old(self):
 
         # add a GraphView as the only widget in the window
         self.graph_view = GraphView(GraphScene())
