@@ -42,7 +42,7 @@ class GraphEditPanel(BasePanel):
         import_ = QToolButton(self, text="Import")
         export = QToolButton(self, text="Export")
         reset = QToolButton(self, text="Reset")
-        yield ToolbarSection(buttons=(export, reset, import_))
+        yield ToolbarSection(buttons=(import_, export, reset))
 
     def _select_vty(self, vty: VertexType) -> None:
         self._curr_vty = vty
@@ -52,14 +52,14 @@ class GraphEditPanel(BasePanel):
         self.graph_scene.curr_ety = ety
 
     def _add_vert(self, x: float, y: float) -> None:
-        cmd = AddNode(self.graph_view.graph_scene, x, y, self._curr_vty)
+        cmd = AddNode(self.graph_view, x, y, self._curr_vty)
         self.undo_stack.push(cmd)
 
     def _add_edge(self, u: VT, v: VT) -> None:
-        cmd = AddEdge(self.graph_view.graph_scene, u, v, self._curr_ety)
+        cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
         self.undo_stack.push(cmd)
 
     def _move_vert(self, v: VT, x: float, y: float):
-        cmd = MoveNode(self.graph_view.graph_scene, v, x, y)
+        cmd = MoveNode(self.graph_view, v, x, y)
         self.undo_stack.push(cmd)
 

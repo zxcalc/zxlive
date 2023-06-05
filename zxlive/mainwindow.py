@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
 
         def edit_node_color_clicked():
             _, vs = self.get_elements()
-            cmd = EditNodeColor(self.graph_view, vs)
+            cmd = ToggleNodeColor(self.graph_view, vs)
             self.graph_view.graph_scene.undo_stack.push(cmd)
 
         def change_color_clicked():
@@ -519,8 +519,8 @@ class MainWindow(QMainWindow):
 
     def get_elements(self):
         g = self.graph_view.graph_scene.g
-        items = self.graph_view.graph_scene.selected_items
+        items = self.graph_view.graph_scene._selected_items
         vs = [item.v for item in items]
 
-        self.graph_view.graph_scene.selected_items = []
+        self.graph_view.graph_scene._selected_items = []
         return g, vs

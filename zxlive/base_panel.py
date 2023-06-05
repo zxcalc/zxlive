@@ -34,7 +34,6 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     """Base class implementing functionality shared between the edit and
     proof panels."""
 
-    graph: BaseGraph[VT, ET]
     graph_scene: GraphScene
     graph_view: GraphView
 
@@ -43,7 +42,6 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
 
     def __init__(self, graph: BaseGraph, graph_scene: GraphScene) -> None:
         super().__init__()
-        self.graph = graph
         self.graph_scene = graph_scene
         self.graph_view = GraphView(self.graph_scene)
         self.undo_stack = QUndoStack(self)
@@ -56,13 +54,13 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         self.layout().addWidget(self.toolbar)
         self.layout().addWidget(self.graph_view)
 
-        self.graph_view.set_graph(self.graph)
+        self.graph_view.set_graph(graph)
 
         self._populate_toolbar()
 
-    def update_graph_view(self):
-        """Call this function whenever the graph has been updated."""
-        self.graph_view.set_graph(self.graph)
+    @property
+    def graph(self) -> BaseGraph[VT, ET]:
+        return self.graph_scene.g
 
     def _populate_toolbar(self) -> None:
         undo = QToolButton(self, text="Undo")

@@ -18,7 +18,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from typing import Optional, List, Set, Tuple, Callable
+from typing import Optional, List, Set, Callable, Iterator
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
@@ -143,9 +143,10 @@ VertMovedEvent = Optional[Callable[[VT, float, float], None]]
 class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
-    selected_items: list[VItem]
+    g: BaseGraph[VT, ET]
     on_vertex_moved: VertMovedEvent = None
 
+    _selected_items: list[VItem]
     _drag_start: QPointF
     _drag_items: List[tuple[QGraphicsItem, QPointF]]
     _is_moved: bool = False
@@ -153,12 +154,24 @@ class GraphScene(QGraphicsScene):
     def __init__(self, on_vertex_moved: VertMovedEvent = None) -> None:
         super().__init__()
         self.on_vertex_moved = on_vertex_moved
-        self.selected_items = []
+        self._selected_items = []
         self._drag_items = []
         self._drag_start = QPointF(0, 0)
 
         self.setSceneRect(-100, -100, 4000, 4000)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+
+    @property
+    def selected_vertices(self) -> Iterator[VT]:
+        """An iterator over all currently selected vertices."""
+        return (it.v for it in self._selected_items)
+
+    def clear_selection(self) -> None:
+        """Unselects all selected vertices."""
+        for it in self._selected_items:
+            it.is_pressed = False
+            it.refresh()
+        self._selected_items = []
 
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         """Set the PyZX graph for the scene
@@ -192,22 +205,22 @@ class GraphScene(QGraphicsScene):
         self._drag_start = e.scenePos()
 
         if not self.items(e.scenePos(), deviceTransform=QTransform()):
-            for it in self.selected_items:
+            for it in self._selected_items:
                 it.is_pressed = False
                 it.refresh()
-            self.selected_items = []
+            self._selected_items = []
 
         # TODO implement selecting/moving multiple items
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if it and isinstance(it, VItem):
                 self._drag_items = [(it, it.scenePos())]
                 if it.is_pressed:
-                    self.selected_items.pop(-1)
+                    self._selected_items.pop(-1)
                     it.is_pressed = False
                     it.refresh()
                     break
                 else:
-                    self.selected_items.append(it)
+                    self._selected_items.append(it)
                     it.is_pressed = True
                     it.refresh()
                     break
@@ -229,9 +242,9 @@ class GraphScene(QGraphicsScene):
             for it in self.items(e.scenePos(), deviceTransform=QTransform()):
                 if it and isinstance(it, VItem) and self._is_moved:
                     it.is_pressed = False
-                    if len(self.selected_items) == 0:
+                    if len(self._selected_items) == 0:
                         break
-                    self.selected_items.pop(-1)
+                    self._selected_items.pop(-1)
                     it.refresh()
                     if self.on_vertex_moved:
                         self.on_vertex_moved(it.v, it.x() / SCALE, it.y() / SCALE)
