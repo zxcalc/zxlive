@@ -9,7 +9,7 @@ from pyzx.graph.base import BaseGraph, VT
 import pyzx as zx
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddEdge, AddNode, MoveNode, SetGraph, ChangePhase
+from .commands import AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor
 from .graphscene import EditGraphScene
 
 
@@ -31,16 +31,16 @@ class GraphEditPanel(BasePanel):
         select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
         select_x = QToolButton(self, text="X Spider", checkable=True)
         select_boundary = QToolButton(self, text="Boundary", checkable=True)
-        select_z.clicked.connect(lambda _: self._select_vty(VertexType.Z))
-        select_x.clicked.connect(lambda _: self._select_vty(VertexType.X))
-        select_boundary.clicked.connect(lambda _: self._select_vty(VertexType.BOUNDARY))
+        select_z.clicked.connect(lambda _: self._vty_clicked(VertexType.Z))
+        select_x.clicked.connect(lambda _: self._vty_clicked(VertexType.X))
+        select_boundary.clicked.connect(lambda _: self._vty_clicked(VertexType.BOUNDARY))
         yield ToolbarSection(buttons=(select_z, select_x, select_boundary), exclusive=True)
 
         # Toolbar section for picking an edge type
         select_simple = QToolButton(self, text="Simple Edge", checkable=True, checked=True)  # Selected by default
         select_had = QToolButton(self, text="Had Edge", checkable=True)
-        select_simple.clicked.connect(lambda _: self._select_ety(EdgeType.SIMPLE))
-        select_had.clicked.connect(lambda _: self._select_ety(EdgeType.HADAMARD))
+        select_simple.clicked.connect(lambda _: self._ety_clicked(EdgeType.SIMPLE))
+        select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
         yield ToolbarSection(buttons=(select_simple, select_had), exclusive=True)
 
         # Toolbar for global import/export/reset
@@ -52,10 +52,14 @@ class GraphEditPanel(BasePanel):
         reset.clicked.connect(self._reset_clicked)
         yield ToolbarSection(buttons=(import_, export, reset))
 
-    def _select_vty(self, vty: VertexType) -> None:
+    def _vty_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty
+        selected = list(self.graph_scene.selected_vertices)
+        if len(selected) > 0:
+            cmd = ChangeNodeColor(self.graph_view, selected, vty)
+            self.undo_stack.push(cmd)
 
-    def _select_ety(self, ety: EdgeType) -> None:
+    def _ety_clicked(self, ety: EdgeType) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
 

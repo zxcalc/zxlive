@@ -64,20 +64,29 @@ class SetGraph(BaseCommand):
         self.graph_view.set_graph(self.new_g)
 
 
-class ToggleNodeColor(BaseCommand):
-    """Toggles the color of a set of spiders."""
+class ChangeNodeColor(BaseCommand):
+    """Changes the color of a set of spiders."""
     vs: Iterable[VT]
+    vty: VertexType
 
-    def __init__(self, graph_view: GraphView, vs: Iterable[VT]):
+    _old_vtys: Optional[list[VertexType]] = None
+
+    def __init__(self, graph_view: GraphView, vs: Iterable[VT], vty: VertexType):
         super().__init__(graph_view)
         self.vs = vs
+        self.vty = vty
 
-    def toggle(self):
-        for v in self.vs:
-            self.g.set_type(v, toggle_vertex(self.g.type(v)))
+    def undo(self) -> None:
+        assert self._old_vtys is not None
+        for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
+            self.g.set_type(v, old_vty)
         self.update_graph_view()
 
-    undo = redo = toggle
+    def redo(self) -> None:
+        self._old_vtys = [self.g.type(v) for v in self.vs]
+        for v in self.vs:
+            self.g.set_type(v, self.vty)
+        self.update_graph_view()
 
 
 class AddNode(BaseCommand):
