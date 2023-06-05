@@ -15,7 +15,7 @@ class ProofPanel(BasePanel):
     """Panel for the proof mode of ZX live."""
 
     def __init__(self, graph: BaseGraph) -> None:
-        self.graph_scene = GraphScene(self._move_vert)
+        self.graph_scene = GraphScene(self._vert_moved)
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
@@ -29,7 +29,7 @@ class ProofPanel(BasePanel):
 
         yield ToolbarSection(buttons=(fuse, bialgebra, gh_state), exclusive=True)
 
-    def _move_vert(self, v: VT, x: float, y: float):
+    def _vert_moved(self, v: VT, x: float, y: float):
         cmd = MoveNode(self.graph_view, v, x, y)
         self.undo_stack.push(cmd)
 

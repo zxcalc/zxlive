@@ -1,14 +1,15 @@
+from fractions import Fraction
 from typing import Iterator
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
-from PySide6.QtWidgets import QToolButton, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QToolButton, QFileDialog, QMessageBox, QInputDialog
 from pyzx import EdgeType, VertexType
 from pyzx.graph.base import BaseGraph, VT
 
 import pyzx as zx
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddEdge, AddNode, MoveNode, SetGraph
+from .commands import AddEdge, AddNode, MoveNode, SetGraph, ChangePhase
 from .graphscene import EditGraphScene
 
 
@@ -21,7 +22,8 @@ class GraphEditPanel(BasePanel):
     _curr_vty: VertexType = EdgeType.SIMPLE
 
     def __init__(self, graph: BaseGraph) -> None:
-        self.graph_scene = EditGraphScene(self._move_vert, self._add_vert, self._add_edge)
+        self.graph_scene = EditGraphScene(self._vert_moved, self._vert_double_clicked,
+                                          self._add_vert, self._add_edge)
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
@@ -65,8 +67,30 @@ class GraphEditPanel(BasePanel):
         cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
         self.undo_stack.push(cmd)
 
-    def _move_vert(self, v: VT, x: float, y: float):
+    def _vert_moved(self, v: VT, x: float, y: float) -> None:
         cmd = MoveNode(self.graph_view, v, x, y)
+        self.undo_stack.push(cmd)
+
+    def _vert_double_clicked(self, v: VT) -> None:
+        if self.graph.type(v) == VertexType.BOUNDARY:
+            return
+
+        input, ok = QInputDialog.getText(
+            self, "Input Dialog", "Enter Desired Phase Value:"
+        )
+        if not ok:
+            return
+        try:
+            new_phase = Fraction(input)
+        except ValueError:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText("Wrong Input Type")
+            info_text = "Please enter a valid input (e.g. 1/2, 2)"
+            msg.setInformativeText(info_text)
+            msg.exec_()
+            return
+        cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
 
     def _reset_clicked(self) -> None:

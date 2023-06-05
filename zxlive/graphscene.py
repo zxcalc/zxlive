@@ -138,6 +138,7 @@ class EItem(QGraphicsPathItem):
 
 
 VertMovedEvent = Optional[Callable[[VT, float, float], None]]
+VertDoubleClickedEvent = Optional[Callable[[VT], None]]
 
 
 class GraphScene(QGraphicsScene):
@@ -145,15 +146,18 @@ class GraphScene(QGraphicsScene):
 
     g: BaseGraph[VT, ET]
     on_vertex_moved: VertMovedEvent = None
+    on_vertex_double_clicked: VertDoubleClickedEvent = None
 
     _selected_items: list[VItem]
     _drag_start: QPointF
     _drag_items: List[tuple[QGraphicsItem, QPointF]]
     _is_moved: bool = False
 
-    def __init__(self, on_vertex_moved: VertMovedEvent = None) -> None:
+    def __init__(self, on_vertex_moved: VertMovedEvent = None,
+                 on_vertex_double_clicked: VertDoubleClickedEvent = None) -> None:
         super().__init__()
         self.on_vertex_moved = on_vertex_moved
+        self.on_vertex_double_clicked = on_vertex_double_clicked
         self._selected_items = []
         self._drag_items = []
         self._drag_start = QPointF(0, 0)
@@ -253,6 +257,13 @@ class GraphScene(QGraphicsScene):
             self._drag_items = []
             self._is_moved = False
 
+    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        for it in self.items(e.scenePos(), deviceTransform=QTransform()):
+            if isinstance(it, VItem):
+                if self.on_vertex_double_clicked is not None:
+                    self.on_vertex_double_clicked(it.v)
+                return
+
 
 # TODO: This is essentially a clone of EItem. We should common it up!
 class EDragItem(QGraphicsPathItem):
@@ -306,9 +317,10 @@ class EditGraphScene(GraphScene):
     _right_drag: Optional[EDragItem] = None
 
     def __init__(self, on_vertex_moved: VertMovedEvent = None,
+                 on_vertex_double_clicked: VertDoubleClickedEvent = None,
                  on_add_vert: AddVertEvent = None,
                  on_add_edge: AddEdgeEvent = None):
-        super().__init__(on_vertex_moved)
+        super().__init__(on_vertex_moved, on_vertex_double_clicked)
         self.on_add_vert = on_add_vert
         self.on_add_edge = on_add_edge
 
