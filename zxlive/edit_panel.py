@@ -31,9 +31,9 @@ class GraphEditPanel(BasePanel):
         select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
         select_x = QToolButton(self, text="X Spider", checkable=True)
         select_boundary = QToolButton(self, text="Boundary", checkable=True)
-        select_z.clicked.connect(lambda _: self._vty_clicked(VertexType.Z))
-        select_x.clicked.connect(lambda _: self._vty_clicked(VertexType.X))
-        select_boundary.clicked.connect(lambda _: self._vty_clicked(VertexType.BOUNDARY))
+        select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
+        select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
+        select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
         yield ToolbarSection(buttons=(select_z, select_x, select_boundary), exclusive=True)
 
         # Toolbar section for picking an edge type

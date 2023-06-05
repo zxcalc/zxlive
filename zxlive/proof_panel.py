@@ -6,7 +6,7 @@ from pyzx import VertexType, to_gh, basicrules
 from pyzx.graph.base import BaseGraph, VT
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import MoveNode, SetGraph
+from .commands import MoveNode, SetGraph, AddIdentity
 from .graphscene import GraphScene
 from .rules import bialgebra
 
@@ -20,14 +20,18 @@ class ProofPanel(BasePanel):
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         fuse = QToolButton(self, text="Fuse")
+        identity_z = QToolButton(self, text="Z identity")
+        identity_x = QToolButton(self, text="X identity")
         bialgebra = QToolButton(self, text="Bialgebra")
-        gh_state = QToolButton(self, text="Boundary")
+        gh_state = QToolButton(self, text="To GH form")
 
         fuse.clicked.connect(self._fuse_clicked)
+        identity_z.clicked.connect(lambda: self._identity_clicked(VertexType.Z))
+        identity_x.clicked.connect(lambda: self._identity_clicked(VertexType.X))
         bialgebra.clicked.connect(self._bialgebra_clicked)
         gh_state.clicked.connect(self._gh_state_clicked)
 
-        yield ToolbarSection(buttons=(fuse, bialgebra, gh_state), exclusive=True)
+        yield ToolbarSection(buttons=(fuse, identity_z, identity_x, bialgebra, gh_state), exclusive=True)
 
     def _vert_moved(self, v: VT, x: float, y: float):
         cmd = MoveNode(self.graph_view, v, x, y)
@@ -101,3 +105,10 @@ class ProofPanel(BasePanel):
         self.graph_scene.clear_selection()
         self.undo_stack.push(cmd)
 
+    def _identity_clicked(self, vty: VertexType) -> None:
+        selected = list(self.graph_scene.selected_vertices)
+        if len(selected) != 2:
+            return
+        u, v = selected
+        cmd = AddIdentity(self.graph_view, u, v, vty)
+        self.undo_stack.push(cmd)
