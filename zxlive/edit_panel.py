@@ -1,15 +1,13 @@
 from fractions import Fraction
 from typing import Iterator
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream
-from PySide6.QtWidgets import QToolButton, QFileDialog, QMessageBox, QInputDialog
+from PySide6.QtWidgets import QToolButton, QInputDialog
 from pyzx import EdgeType, VertexType
 from pyzx.graph.base import BaseGraph, VT
 
-import pyzx as zx
-
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor
+from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg
 from .graphscene import EditGraphScene
 
 
@@ -79,20 +77,15 @@ class GraphEditPanel(BasePanel):
         if self.graph.type(v) == VertexType.BOUNDARY:
             return
 
-        input, ok = QInputDialog.getText(
+        input_, ok = QInputDialog.getText(
             self, "Input Dialog", "Enter Desired Phase Value:"
         )
         if not ok:
             return
         try:
-            new_phase = Fraction(input)
+            new_phase = Fraction(input_)
         except ValueError:
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
-            msg.setText("Wrong Input Type")
-            info_text = "Please enter a valid input (e.g. 1/2, 2)"
-            msg.setInformativeText(info_text)
-            msg.exec_()
+            show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
@@ -102,125 +95,11 @@ class GraphEditPanel(BasePanel):
             self.undo_stack.undo()
 
     def _import_diagram_clicked(self) -> None:
-        supported_formats = [
-            ("QGraph (*.zxg)", "zxg"),
-            ("QASM (*.qasm)", "qasm"),
-            ("TikZ (*.tikz)", "tikz"),
-            ("JSON (*.json)", "json"),
-        ]
-        file_path, selected_format = QFileDialog.getOpenFileName(
-            parent=self,
-            caption="Open File",
-            filter=";;".join([f[0] for f in supported_formats]),
-        )
-
-        file = QFile(file_path)
-        if not file.open(QIODevice.ReadOnly | QIODevice.Text):
-            return
-        input = QTextStream(file)
-
-        g = self.graph_view.graph_scene.g
-        if selected_format == "QGraph (*.zxg)":
-            try:
-                new_g = zx.Graph().from_json(input.readAll())
-            except Exception as e:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setText("Failed to import QGraph file")
-                msg.setInformativeText(str(e))
-                msg.exec_()
-                self.graph_view.set_graph(g)
-                return
-            cmd = SetGraph(self.graph_view, new_g)
-            self.undo_stack.push(cmd)
-        elif selected_format == "QASM (*.qasm)":
-            try:
-                new_g = zx.Circuit.from_qasm(input.readAll()).to_graph()
-            except Exception as e:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setText("Failed to import QASM file")
-                msg.setInformativeText(str(e))
-                msg.exec_()
-                self.graph_view.set_graph(g)
-                return
-            cmd = SetGraph(self.graph_view, new_g)
-            self.undo_stack.push(cmd)
-        elif selected_format == "TikZ (*.tikz)":
-            try:
-                new_g = zx.Graph().from_tikz(input.readAll())
-            except Exception as e:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setText("Failed to import TikZ file")
-                msg.setInformativeText(str(e))
-                msg.exec_()
-                self.graph_view.set_graph(g)
-                return
-            cmd = SetGraph(self.graph_view, new_g)
-            self.undo_stack.push(cmd)
-        elif selected_format == "JSON (*.json)":
-            try:
-                new_g = zx.Graph().from_json(input.readAll())
-            except Exception as e:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setText("Failed to import JSON file")
-                msg.setInformativeText(str(e))
-                msg.exec_()
-                self.graph_view.set_graph(g)
-                return
+        g = import_diagram_dialog(self)
+        if g is not None:
             cmd = SetGraph(self.graph_view, g)
             self.undo_stack.push(cmd)
 
-        file.close()
-
     def _export_diagram_clicked(self) -> None:
-        supported_formats = [
-            ("QGraph (*.zxg)", "zxg"),
-            ("QASM (*.qasm)", "qasm"),
-            ("TikZ (*.tikz)", "tikz"),
-            ("JSON (*.json)", "json"),
-        ]
-        file_path, selected_format = QFileDialog.getSaveFileName(
-            parent=self,
-            caption="Save File",
-            filter=";;".join([f[0] for f in supported_formats]),
-        )
-
-        # add file extension if not already there
-        file_extension = supported_formats[
-            [format_name for format_name, _ in supported_formats].index(
-                selected_format
-            )
-        ][1]
-        if file_extension == file_path.split(".")[-1]:
-            file = QFile(file_path)
-        else:
-            file = QFile(file_path + "." + file_extension)
-
-        if not file.open(QIODevice.WriteOnly | QIODevice.Text):
-            return
-        out = QTextStream(file)
-
-        g = self.graph_view.graph_scene.g
-        if selected_format == "QGraph (*.zxg)":
-            out << g.to_json()
-        elif selected_format == "QASM (*.qasm)":
-            try:
-                circuit = zx.extract_circuit(g)
-            except Exception as e:
-                msg = QMessageBox()
-                msg.setIcon(QMessageBox.Critical)
-                msg.setText("Failed to convert the ZX-diagram to quantum circuit")
-                msg.setInformativeText(str(e))
-                msg.exec_()
-                return
-            out << circuit.to_qasm()
-        elif selected_format == "TikZ (*.tikz)":
-            out << g.to_tikz()
-        elif selected_format == "JSON (*.json)":
-            out << g.to_json()
-
-        file.close()
+        export_diagram_dialog(self.graph, self)
 
