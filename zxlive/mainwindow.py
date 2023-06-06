@@ -75,7 +75,6 @@ class MainWindow(QMainWindow):
         if self.current_tab != new_tab:
             old_panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
             new_panel = self.edit_panel if new_tab == Tab.EditTab else self.proof_panel
-            # TODO: Do we want to maintain node selections when switching
             new_panel.graph_view.set_graph(old_panel.graph)
             new_panel.graph_scene.select_vertices(list(old_panel.graph_scene.selected_vertices))
             # TODO: For now we always invalidate the undo stack when switching
