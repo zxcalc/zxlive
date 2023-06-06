@@ -35,7 +35,8 @@ class ProofPanel(BasePanel):
         strong_comp.clicked.connect(self._strong_comp_clicked)
         gh_state.clicked.connect(self._gh_state_clicked)
 
-        yield ToolbarSection(buttons=(fuse, identity_z, identity_x, color_change, bialgebra, strong_comp, gh_state), exclusive=True)
+        yield ToolbarSection(fuse, identity_z, identity_x, color_change, bialgebra,
+                             strong_comp, gh_state, exclusive=True)
 
     def _vert_moved(self, v: VT, x: float, y: float):
         cmd = MoveNode(self.graph_view, v, x, y)
