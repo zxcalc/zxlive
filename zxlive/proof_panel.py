@@ -6,7 +6,7 @@ from pyzx import VertexType, to_gh, basicrules
 from pyzx.graph.base import BaseGraph, VT
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import MoveNode, SetGraph, AddIdentity
+from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor
 from .graphscene import GraphScene
 from .rules import bialgebra
 
@@ -22,16 +22,18 @@ class ProofPanel(BasePanel):
         fuse = QToolButton(self, text="Fuse")
         identity_z = QToolButton(self, text="Z identity")
         identity_x = QToolButton(self, text="X identity")
+        color_change = QToolButton(self, text="Color change")
         bialgebra = QToolButton(self, text="Bialgebra")
         gh_state = QToolButton(self, text="To GH form")
 
         fuse.clicked.connect(self._fuse_clicked)
         identity_z.clicked.connect(lambda: self._identity_clicked(VertexType.Z))
         identity_x.clicked.connect(lambda: self._identity_clicked(VertexType.X))
+        color_change.clicked.connect(self._color_change_clicked)
         bialgebra.clicked.connect(self._bialgebra_clicked)
         gh_state.clicked.connect(self._gh_state_clicked)
 
-        yield ToolbarSection(buttons=(fuse, identity_z, identity_x, bialgebra, gh_state), exclusive=True)
+        yield ToolbarSection(buttons=(fuse, identity_z, identity_x, color_change, bialgebra, gh_state), exclusive=True)
 
     def _vert_moved(self, v: VT, x: float, y: float):
         cmd = MoveNode(self.graph_view, v, x, y)
@@ -111,4 +113,9 @@ class ProofPanel(BasePanel):
             return
         u, v = selected
         cmd = AddIdentity(self.graph_view, u, v, vty)
+        self.undo_stack.push(cmd)
+
+    def _color_change_clicked(self) -> None:
+        cmd = ChangeColor(self.graph_view, list(self.graph_scene.selected_vertices))
+        self.graph_scene.clear_selection()
         self.undo_stack.push(cmd)
