@@ -94,7 +94,10 @@ class ProofPanel(BasePanel):
     def _bialgebra_clicked(self):
         # TODO: Maybe replace copy with more efficient undo?
         new_g = copy.deepcopy(self.graph)
-        bialgebra(new_g, list(self.graph_scene.selected_vertices))
+        selected = list(self.graph_scene.selected_vertices)
+        if len(selected) < 2:
+            return
+        bialgebra(new_g, selected)
         self.graph_scene.clear_selection()
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
@@ -112,6 +115,8 @@ class ProofPanel(BasePanel):
         if len(selected) != 2:
             return
         u, v = selected
+        if not self.graph.connected(u, v):
+            return
         cmd = AddIdentity(self.graph_view, u, v, vty)
         self.undo_stack.push(cmd)
 
