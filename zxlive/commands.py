@@ -1,11 +1,12 @@
 from abc import ABC
+from dataclasses import dataclass
 from fractions import Fraction
 from typing import Optional, Iterable, Union
 from PySide6.QtGui import QUndoCommand
 
 from pyzx import basicrules
 from pyzx.graph.base import VT, BaseGraph, ET
-from pyzx.utils import toggle_vertex, EdgeType, VertexType
+from pyzx.utils import EdgeType, VertexType
 
 from .graphview import GraphView
 
@@ -19,6 +20,7 @@ class BaseCommandMeta(type(QUndoCommand), type(ABC)):
     pass
 
 
+@dataclass
 class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
     """Abstract base class for all commands.
 
@@ -47,6 +49,7 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
         self.graph_view.set_graph(self.g)
 
 
+@dataclass
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
     new_g: BaseGraph[VT, ET]
@@ -64,6 +67,7 @@ class SetGraph(BaseCommand):
         self.graph_view.set_graph(self.new_g)
 
 
+@dataclass
 class ChangeNodeColor(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: Iterable[VT]
@@ -89,6 +93,7 @@ class ChangeNodeColor(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class AddNode(BaseCommand):
     """Adds a new spider at a given position."""
     x: float
@@ -113,6 +118,7 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class AddEdge(BaseCommand):
     """Adds an edge between two spiders."""
     u: VT
@@ -148,6 +154,7 @@ class AddEdge(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class MoveNode(BaseCommand):
     """Updates the location of a given node."""
     v: VT
@@ -177,6 +184,7 @@ class MoveNode(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class AddIdentity(BaseCommand):
     """Adds an X or Z identity spider on an edge between two vertices."""
     u: VT
@@ -217,6 +225,7 @@ class AddIdentity(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
@@ -240,6 +249,7 @@ class ChangePhase(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class ChangeColor(BaseCommand):
     """Applies the color-change rule on a set of vertices.
 
