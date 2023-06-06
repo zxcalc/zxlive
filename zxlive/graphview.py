@@ -28,8 +28,8 @@ class GraphView(QGraphicsView):
     interesting stuff happens in `GraphScene`.
     """
 
-    def __init__(self) -> None:
-        self.graph_scene = GraphScene()
+    def __init__(self, graph_scene: GraphScene) -> None:
+        self.graph_scene = graph_scene
         super().__init__(self.graph_scene)
         self.setMouseTracking(True)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
