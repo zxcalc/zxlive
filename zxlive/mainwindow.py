@@ -88,11 +88,3 @@ class MainWindow(QMainWindow):
         conf = QSettings("zxlive", "zxlive")
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
-
-    def get_elements(self):
-        g = self.graph_view.graph_scene.g
-        items = self.graph_view.graph_scene._selected_items
-        vs = [item.v for item in items]
-
-        self.graph_view.graph_scene._selected_items = []
-        return g, vs
