@@ -18,7 +18,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from typing import Optional, List, Set, Callable, Iterator
+from typing import Optional, List, Set, Callable, Iterator, Iterable
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
@@ -177,6 +177,17 @@ class GraphScene(QGraphicsScene):
             it.refresh()
         self._selected_items = []
 
+    def select_vertices(self, vs: Iterable[VT]) -> None:
+        """Selects the given collection of vertices."""
+        self.clear_selection()
+        vs = set(vs)
+        for it in self.items():
+            if isinstance(it, VItem) and it.v in vs:
+                it.is_pressed = True
+                it.refresh()
+                self._selected_items.append(it)
+                vs.remove(it.v)
+
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         """Set the PyZX graph for the scene
 
@@ -184,6 +195,7 @@ class GraphScene(QGraphicsScene):
 
         self.g = g
         self.clear()
+        self._selected_items = []
         self.add_items()
         self.invalidate()
 
