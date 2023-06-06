@@ -25,6 +25,9 @@ def check_bialgebra(g, v_list):
         else:
             return False
 
+    if z_vertices == [] or x_vertices == []:
+        return False
+
     # all x vertices are connected to all z vertices
     for x in x_vertices:
         for z in z_vertices:

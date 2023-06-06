@@ -24,6 +24,7 @@ class ProofPanel(BasePanel):
         identity_x = QToolButton(self, text="X identity")
         color_change = QToolButton(self, text="Color change")
         bialgebra = QToolButton(self, text="Bialgebra")
+        strong_comp = QToolButton(self, text="Strong comp")
         gh_state = QToolButton(self, text="To GH form")
 
         fuse.clicked.connect(self._fuse_clicked)
@@ -31,9 +32,10 @@ class ProofPanel(BasePanel):
         identity_x.clicked.connect(lambda: self._identity_clicked(VertexType.X))
         color_change.clicked.connect(self._color_change_clicked)
         bialgebra.clicked.connect(self._bialgebra_clicked)
+        strong_comp.clicked.connect(self._strong_comp_clicked)
         gh_state.clicked.connect(self._gh_state_clicked)
 
-        yield ToolbarSection(buttons=(fuse, identity_z, identity_x, color_change, bialgebra, gh_state), exclusive=True)
+        yield ToolbarSection(buttons=(fuse, identity_z, identity_x, color_change, bialgebra, strong_comp, gh_state), exclusive=True)
 
     def _vert_moved(self, v: VT, x: float, y: float):
         cmd = MoveNode(self.graph_view, v, x, y)
@@ -90,6 +92,18 @@ class ProofPanel(BasePanel):
 
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
+
+    def _strong_comp_clicked(self):
+        new_g = copy.deepcopy(self.graph)
+        selected = list(self.graph_scene.selected_vertices)
+        if len(selected) != 2:
+            return
+        self.graph_scene.clear_selection()
+        v1, v2 = selected
+        if basicrules.check_strong_comp(new_g, v1, v2):
+            basicrules.strong_comp(new_g, v1, v2)
+            cmd = SetGraph(self.graph_view, new_g)
+            self.undo_stack.push(cmd)
 
     def _bialgebra_clicked(self):
         # TODO: Maybe replace copy with more efficient undo?
