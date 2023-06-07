@@ -1,5 +1,5 @@
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Optional, Iterable, Union
 from PySide6.QtGui import QUndoCommand
@@ -57,7 +57,7 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
     new_g: BaseGraph[VT, ET]
-    old_g: Optional[BaseGraph[VT, ET]] = None
+    old_g: Optional[BaseGraph[VT, ET]] = field(default=None, init=False)
 
     def undo(self):
         assert self.old_g is not None
@@ -74,7 +74,7 @@ class ChangeNodeColor(BaseCommand):
     vs: Iterable[VT]
     vty: VertexType
 
-    _old_vtys: Optional[list[VertexType]] = None
+    _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -96,7 +96,7 @@ class AddNode(BaseCommand):
     y: float
     vty: VertexType
 
-    _added_vert: Optional[VT] = None
+    _added_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self):
         assert self._added_vert is not None
@@ -115,7 +115,7 @@ class AddEdge(BaseCommand):
     v: VT
     ety: EdgeType
 
-    _old_ety: Optional[EdgeType] = None
+    _old_ety: Optional[EdgeType] = field(default=None, init=False)
 
     def undo(self):
         u, v = self.u, self.v
@@ -145,8 +145,8 @@ class MoveNode(BaseCommand):
     x: float
     y: float
 
-    _old_x: Optional[float] = None
-    _old_y: Optional[float] = None
+    _old_x: Optional[float] = field(default=None, init=False)
+    _old_y: Optional[float] = field(default=None, init=False)
 
     def undo(self):
         assert self._old_x is not None and self._old_y is not None
@@ -169,7 +169,7 @@ class AddIdentity(BaseCommand):
     v: VT
     vty: VertexType
 
-    _new_vert: Optional[VT] = None
+    _new_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self):
         u, v, w = self.u, self.v, self._new_vert
@@ -202,7 +202,7 @@ class ChangePhase(BaseCommand):
     v: VT
     new_phase: Union[Fraction, int]
 
-    _old_phase: Optional[Union[Fraction, int]] = None
+    _old_phase: Optional[Union[Fraction, int]] = field(default=None, init=False)
 
     def undo(self):
         assert self._old_phase is not None
