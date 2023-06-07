@@ -69,8 +69,8 @@ class GraphEditPanel(BasePanel):
         cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
         self.undo_stack.push(cmd)
 
-    def _vert_moved(self, v: VT, x: float, y: float) -> None:
-        cmd = MoveNode(self.graph_view, v, x, y)
+    def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
+        cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
 
     def _vert_double_clicked(self, v: VT) -> None:

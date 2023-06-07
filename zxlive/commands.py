@@ -49,7 +49,7 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
         # TODO: For performance reasons, we should track which parts
         #  of the graph have changed and only update those. For example
         #  we could store "dirty flags" for each node/edge.
-        self.graph_view.graph_scene.clear_selection()
+        self.graph_view.graph_scene.clearSelection()
         self.graph_view.set_graph(self.g)
 
 
@@ -141,24 +141,23 @@ class AddEdge(BaseCommand):
 @dataclass
 class MoveNode(BaseCommand):
     """Updates the location of a given node."""
-    v: VT
-    x: float
-    y: float
+    vs: list[tuple[VT, float, float]]
 
-    _old_x: Optional[float] = field(default=None, init=False)
-    _old_y: Optional[float] = field(default=None, init=False)
+    _old_positions: Optional[list[tuple[float, float]]] = field(default=None, init=False)
 
     def undo(self):
-        assert self._old_x is not None and self._old_y is not None
-        self.g.set_row(self.v, self._old_x)
-        self.g.set_qubit(self.v, self._old_y)
-        self.update_graph_view()
+        assert self._old_positions is not None
+        for (v, _, _), (x, y) in zip(self.vs, self._old_positions):
+            self.g.set_row(v, x)
+            self.g.set_qubit(v, y)
+            self.update_graph_view()
 
     def redo(self):
-        self._old_x = self.g.row(self.v)
-        self._old_y = self.g.qubit(self.v)
-        self.g.set_row(self.v, self.x)
-        self.g.set_qubit(self.v, self.y)
+        self._old_positions = []
+        for v, x, y in self.vs:
+            self._old_positions.append((self.g.row(v), self.g.qubit(v)))
+            self.g.set_row(v, x)
+            self.g.set_qubit(v, y)
         self.update_graph_view()
 
 

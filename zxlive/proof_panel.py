@@ -44,7 +44,7 @@ class ProofPanel(BasePanel):
 
     def _fuse_clicked(self):
         vs = list(self.graph_scene.selected_vertices)
-        self.graph_scene.clear_selection()
+        self.graph_scene.clearSelection()
 
         if vs == []:
             self.graph_view.set_graph(self.graph)
@@ -99,7 +99,7 @@ class ProofPanel(BasePanel):
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) != 2:
             return
-        self.graph_scene.clear_selection()
+        self.graph_scene.clearSelection()
         v1, v2 = selected
         if basicrules.check_strong_comp(new_g, v1, v2):
             basicrules.strong_comp(new_g, v1, v2)
@@ -113,7 +113,7 @@ class ProofPanel(BasePanel):
         if len(selected) < 2:
             return
         bialgebra(new_g, selected)
-        self.graph_scene.clear_selection()
+        self.graph_scene.clearSelection()
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
 
@@ -122,7 +122,7 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph)
         to_gh(new_g)
         cmd = SetGraph(self.graph_view, new_g)
-        self.graph_scene.clear_selection()
+        self.graph_scene.clearSelection()
         self.undo_stack.push(cmd)
 
     def _identity_clicked(self, vty: VertexType) -> None:
@@ -137,5 +137,5 @@ class ProofPanel(BasePanel):
 
     def _color_change_clicked(self) -> None:
         cmd = ChangeColor(self.graph_view, list(self.graph_scene.selected_vertices))
-        self.graph_scene.clear_selection()
+        self.graph_scene.clearSelection()
         self.undo_stack.push(cmd)
