@@ -15,10 +15,10 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, Signal
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from typing import Optional, Set, Callable, Iterator, Iterable, Any
+from typing import Optional, Set, Iterator, Iterable, Any
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
@@ -40,22 +40,23 @@ VITEM_SELECTED_Z = 1
 PHASE_ITEM_Z = 2
 
 
-VertMovedEvent = Optional[Callable[[list[tuple[VT, float, float]]], None]]
-VertDoubleClickedEvent = Optional[Callable[[VT], None]]
-AddVertEvent = Optional[Callable[[float, float], None]]
-AddEdgeEvent = Optional[Callable[[VT, VT], None]]
-
-
 class VItem(QGraphicsEllipseItem):
     """A QGraphicsItem representing a single vertex"""
 
-    def __init__(self, graph_scene: GraphScene, v: VT, on_vertex_moved: VertMovedEvent = None):
+    v: VT
+    phase_item: PhaseItem
+    adj_items: Set[EItem]  # Connected edges
+    graph_scene: GraphScene
+
+    # Position before starting a drag-move
+    _old_pos: QPointF
+
+    def __init__(self, graph_scene: GraphScene, v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         self.setZValue(VITEM_UNSELECTED_Z)
 
         self.graph_scene = graph_scene
         self.v = v
-        self.on_vertex_moved = on_vertex_moved
         self.setPos(self.g.row(v) * SCALE, self.g.qubit(v) * SCALE)
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
@@ -134,14 +135,24 @@ class VItem(QGraphicsEllipseItem):
 
         return super().itemChange(change, value)
 
+    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseDoubleClickEvent(e)
+        scene = self.scene()
+        assert isinstance(scene, GraphScene)
+        scene.vertex_double_clicked.emit(self.v)
+
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)
         if e.button() == Qt.LeftButton:
             if self._old_pos != self.pos():
-                self.on_vertex_moved([(it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
-                                      for it in self.graph_scene.selectedItems() if isinstance(it, VItem)])
+                scene = self.scene()
+                assert isinstance(scene, GraphScene)
+                scene.vertices_moved.emit([
+                    (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
+                    for it in self.graph_scene.selectedItems() if isinstance(it, VItem)
+                ])
         else:
             e.ignore()
 
@@ -207,15 +218,15 @@ class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
     g: BaseGraph[VT, ET]
-    on_vertex_moved: VertMovedEvent
-    on_vertex_double_clicked: VertDoubleClickedEvent
 
-    def __init__(self, on_vertex_moved: VertMovedEvent = None,
-                 on_vertex_double_clicked: VertDoubleClickedEvent = None) -> None:
+    # Signals to handle double-clicking and moving of vertices.
+    # Note that we have to set the argument types to `object`,
+    # otherwise it doesn't work for some reason...
+    vertex_double_clicked = Signal(object)  # Actual type: VT
+    vertices_moved = Signal(object)  # Actual type: list[tuple[VT, float, float]]
+
+    def __init__(self) -> None:
         super().__init__()
-        self.on_vertex_moved = on_vertex_moved
-        self.on_vertex_double_clicked = on_vertex_double_clicked
-
         self.setSceneRect(-100, -100, 4000, 4000)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
 
@@ -248,7 +259,7 @@ class GraphScene(QGraphicsScene):
 
         v_items = {}
         for v in self.g.vertices():
-            vi = VItem(self, v, self.on_vertex_moved)
+            vi = VItem(self, v)
             v_items[v] = vi
             self.addItem(vi)  # add the vertex to the scene
             self.addItem(vi.phase_item)  # add the phase label to the scene
@@ -256,15 +267,6 @@ class GraphScene(QGraphicsScene):
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
             self.addItem(EItem(self.g, e, v_items[s], v_items[t]))
-
-    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        super().mouseDoubleClickEvent(e)
-        for it in self.items(e.scenePos(), deviceTransform=QTransform()):
-            if isinstance(it, VItem):
-                if self.on_vertex_double_clicked is not None:
-                    self.on_vertex_double_clicked(it.v)
-                return
-        e.ignore()
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!
@@ -303,24 +305,23 @@ class EDragItem(QGraphicsPathItem):
 class EditGraphScene(GraphScene):
     """A graph scene tracking additional mouse events for graph editing."""
 
-    # Callbacks to handle addition of vertices and edges
-    on_add_vert: AddVertEvent = None
-    on_add_edge: AddEdgeEvent = None
+    # Signals to handle addition of vertices and edges.
+    # Note that we have to set the argument types to `object`,
+    # otherwise it doesn't work for some reason...
+    vertex_added = Signal(object, object)  # Actual types: float, float
+    edge_added = Signal(object, object)  # Actual types: VT, VT
 
     # Currently selected edge type for preview when dragging
     # to add a new edge
-    curr_ety: EdgeType = EdgeType.SIMPLE
+    curr_ety: EdgeType
 
     # The vertex a right mouse button drag was initiated on
-    _right_drag: Optional[EDragItem] = None
+    _right_drag: Optional[EDragItem]
 
-    def __init__(self, on_vertex_moved: VertMovedEvent = None,
-                 on_vertex_double_clicked: VertDoubleClickedEvent = None,
-                 on_add_vert: AddVertEvent = None,
-                 on_add_edge: AddEdgeEvent = None):
-        super().__init__(on_vertex_moved, on_vertex_double_clicked)
-        self.on_add_vert = on_add_vert
-        self.on_add_edge = on_add_edge
+    def __init__(self):
+        super().__init__()
+        self.curr_ety = EdgeType.SIMPLE
+        self._right_drag = None
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Right-press on a vertex means the start of a drag for edge adding
@@ -352,12 +353,12 @@ class EditGraphScene(GraphScene):
                     # TODO: Think about if we want to allow self loops here?
                     #  For example, if had edge is selected this would mean that
                     #  right clicking adds pi to the phase...
-                    if isinstance(it, VItem) and it != self._right_drag.start and self.on_add_edge:
-                        self.on_add_edge(self._right_drag.start.v, it.v)
+                    if isinstance(it, VItem) and it != self._right_drag.start:
+                        self.edge_added.emit(self._right_drag.start.v, it.v)
                 self._right_drag = None
             # Or a click on a free spot to add a new vertex
-            elif self.on_add_vert:
+            else:
                 p = e.scenePos()
-                self.on_add_vert(p.x() / SCALE, p.y() / SCALE)
+                self.vertex_added.emit(p.x() / SCALE, p.y() / SCALE)
         else:
             e.ignore()

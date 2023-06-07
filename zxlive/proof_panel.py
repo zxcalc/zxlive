@@ -15,7 +15,8 @@ class ProofPanel(BasePanel):
     """Panel for the proof mode of ZX live."""
 
     def __init__(self, graph: BaseGraph) -> None:
-        self.graph_scene = GraphScene(self._vert_moved)
+        self.graph_scene = GraphScene()
+        self.graph_scene.vertices_moved.connect(self._vert_moved)
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
