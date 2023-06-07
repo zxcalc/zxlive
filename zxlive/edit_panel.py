@@ -34,14 +34,14 @@ class GraphEditPanel(BasePanel):
         select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
         select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
         select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
-        yield ToolbarSection(buttons=(select_z, select_x, select_boundary), exclusive=True)
+        yield ToolbarSection(select_z, select_x, select_boundary, exclusive=True)
 
         # Toolbar section for picking an edge type
         select_simple = QToolButton(self, text="Simple Edge", checkable=True, checked=True)  # Selected by default
         select_had = QToolButton(self, text="Had Edge", checkable=True)
         select_simple.clicked.connect(lambda _: self._ety_clicked(EdgeType.SIMPLE))
         select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
-        yield ToolbarSection(buttons=(select_simple, select_had), exclusive=True)
+        yield ToolbarSection(select_simple, select_had, exclusive=True)
 
         # Toolbar for global import/export/reset
         import_ = QToolButton(self, text="Import")
@@ -50,7 +50,7 @@ class GraphEditPanel(BasePanel):
         import_.clicked.connect(self._import_diagram_clicked)
         export.clicked.connect(self._export_diagram_clicked)
         reset.clicked.connect(self._reset_clicked)
-        yield ToolbarSection(buttons=(import_, export, reset))
+        yield ToolbarSection(import_, export, reset)
 
     def _vty_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty

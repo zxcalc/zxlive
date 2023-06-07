@@ -20,6 +20,10 @@ class ToolbarSection:
     buttons: Sequence[QToolButton]
     exclusive: bool = False
 
+    def __init__(self, *args: QToolButton, exclusive: bool = False):
+        self.buttons = args
+        self.exclusive = exclusive
+
 
 class BasePanelMeta(type(QWidget), type(ABC)):
     """Dummy metaclass to enable `BasePanel` to inherit from both `QWidget`

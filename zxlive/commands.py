@@ -1,11 +1,12 @@
 from abc import ABC
+from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Optional, Iterable, Union
 from PySide6.QtGui import QUndoCommand
 
 from pyzx import basicrules
 from pyzx.graph.base import VT, BaseGraph, ET
-from pyzx.utils import toggle_vertex, EdgeType, VertexType
+from pyzx.utils import EdgeType, VertexType
 
 from .graphview import GraphView
 
@@ -19,6 +20,7 @@ class BaseCommandMeta(type(QUndoCommand), type(ABC)):
     pass
 
 
+@dataclass
 class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
     """Abstract base class for all commands.
 
@@ -27,9 +29,13 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
     graph has changed and requires redrawing."""
     graph_view: GraphView
 
-    def __init__(self, graph_view: GraphView):
+    def __post_init__(self):
+        # We need to make sure that `__init__` of the super `QUndoCommand`
+        # is being called, but a normal dataclass doesn't do that.
+        # Overriding `__init__` also doesn't work since the command sub-
+        # dataclasses don't call modified super constructors. Thus, we
+        # hook it into `__post_init__`.
         super().__init__()
-        self.graph_view = graph_view
 
     @property
     def g(self) -> BaseGraph[VT, ET]:
@@ -47,16 +53,14 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
         self.graph_view.set_graph(self.g)
 
 
+@dataclass
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
     new_g: BaseGraph[VT, ET]
-    old_g: BaseGraph[VT, ET]
-
-    def __init__(self, graph_view: GraphView, new_g: BaseGraph[VT, ET]):
-        super().__init__(graph_view)
-        self.new_g = new_g
+    old_g: Optional[BaseGraph[VT, ET]] = field(default=None, init=False)
 
     def undo(self):
+        assert self.old_g is not None
         self.graph_view.set_graph(self.old_g)
 
     def redo(self):
@@ -64,17 +68,13 @@ class SetGraph(BaseCommand):
         self.graph_view.set_graph(self.new_g)
 
 
+@dataclass
 class ChangeNodeColor(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: Iterable[VT]
     vty: VertexType
 
-    _old_vtys: Optional[list[VertexType]] = None
-
-    def __init__(self, graph_view: GraphView, vs: Iterable[VT], vty: VertexType):
-        super().__init__(graph_view)
-        self.vs = vs
-        self.vty = vty
+    _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -89,19 +89,14 @@ class ChangeNodeColor(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class AddNode(BaseCommand):
     """Adds a new spider at a given position."""
     x: float
     y: float
     vty: VertexType
 
-    _added_vert: Optional[VT] = None
-
-    def __init__(self, graph_view: GraphView, x: float, y: float, vty: VertexType):
-        super().__init__(graph_view)
-        self.x = x
-        self.y = y
-        self.vty = vty
+    _added_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self):
         assert self._added_vert is not None
@@ -113,19 +108,14 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class AddEdge(BaseCommand):
     """Adds an edge between two spiders."""
     u: VT
     v: VT
     ety: EdgeType
 
-    _old_ety: Optional[EdgeType] = None
-
-    def __init__(self, graph_view: GraphView, u: VT, v: VT, ety: EdgeType):
-        super().__init__(graph_view)
-        self.u = u
-        self.v = v
-        self.ety = ety
+    _old_ety: Optional[EdgeType] = field(default=None, init=False)
 
     def undo(self):
         u, v = self.u, self.v
@@ -148,20 +138,15 @@ class AddEdge(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class MoveNode(BaseCommand):
     """Updates the location of a given node."""
     v: VT
     x: float
     y: float
 
-    _old_x: Optional[float] = None
-    _old_y: Optional[float] = None
-
-    def __init__(self, graph_view: GraphView, v: VT, x: float, y: float):
-        super().__init__(graph_view)
-        self.v = v
-        self.x = x
-        self.y = y
+    _old_x: Optional[float] = field(default=None, init=False)
+    _old_y: Optional[float] = field(default=None, init=False)
 
     def undo(self):
         assert self._old_x is not None and self._old_y is not None
@@ -177,20 +162,14 @@ class MoveNode(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class AddIdentity(BaseCommand):
     """Adds an X or Z identity spider on an edge between two vertices."""
     u: VT
     v: VT
     vty: VertexType
 
-    _new_vert: Optional[VT] = None
-
-    def __init__(self, graph_view: GraphView, u: VT, v: VT, vty: VertexType):
-        super().__init__(graph_view)
-        self.u = u
-        self.v = v
-        assert vty in [VertexType.Z, VertexType.X]
-        self.vty = vty
+    _new_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self):
         u, v, w = self.u, self.v, self._new_vert
@@ -217,17 +196,13 @@ class AddIdentity(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
     new_phase: Union[Fraction, int]
 
-    _old_phase: Optional[Union[Fraction, int]] = None
-
-    def __init__(self, graph_view: GraphView, v: VT, new_phase: Union[Fraction, int]):
-        super().__init__(graph_view)
-        self.v = v
-        self.new_phase = new_phase
+    _old_phase: Optional[Union[Fraction, int]] = field(default=None, init=False)
 
     def undo(self):
         assert self._old_phase is not None
@@ -240,15 +215,12 @@ class ChangePhase(BaseCommand):
         self.update_graph_view()
 
 
+@dataclass
 class ChangeColor(BaseCommand):
     """Applies the color-change rule on a set of vertices.
 
     Changes the spider type using Hadamard conjugation."""
     vs: Iterable[VT]
-
-    def __init__(self, graph_view: GraphView, vs: Iterable[VT]):
-        super().__init__(graph_view)
-        self.vs = vs
 
     def toggle(self):
         for v in self.vs:
