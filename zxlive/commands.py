@@ -29,17 +29,13 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
     graph has changed and requires redrawing."""
     graph_view: GraphView
 
-    def __new__(cls, *args, **kwargs):
-        # This is a bit hacky: We need to make sure that `__init__`
-        # of the super `QUndoCommand` is being called, but a normal
-        # dataclass doesn't do that. Overriding `__init__` only in
-        # this `BaseCommand` also doesn't work since the command
-        # sub-dataclasses don't call modified super constructors.
-        # But, we can do a slightly illegal thing and call the
-        # constructor in `__new__`:
-        self = super().__new__(cls)
-        super().__init__(self)
-        return self
+    def __post_init__(self):
+        # We need to make sure that `__init__` of the super `QUndoCommand`
+        # is being called, but a normal dataclass doesn't do that.
+        # Overriding `__init__` also doesn't work since the command sub-
+        # dataclasses don't call modified super constructors. Thus, we
+        # hook it into `__post_init__`.
+        super().__init__()
 
     @property
     def g(self) -> BaseGraph[VT, ET]:
