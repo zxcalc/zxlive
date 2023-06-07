@@ -29,9 +29,17 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
     graph has changed and requires redrawing."""
     graph_view: GraphView
 
-    def __init__(self, graph_view: GraphView):
-        super().__init__()
-        self.graph_view = graph_view
+    def __new__(cls, *args, **kwargs):
+        # This is a bit hacky: We need to make sure that `__init__`
+        # of the super `QUndoCommand` is being called, but a normal
+        # dataclass doesn't do that. Overriding `__init__` only in
+        # this `BaseCommand` also doesn't work since the command
+        # sub-dataclasses don't call modified super constructors.
+        # But, we can do a slightly illegal thing and call the
+        # constructor in `__new__`:
+        self = super().__new__(cls)
+        super().__init__(self)
+        return self
 
     @property
     def g(self) -> BaseGraph[VT, ET]:
@@ -53,13 +61,10 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
     new_g: BaseGraph[VT, ET]
-    old_g: BaseGraph[VT, ET]
-
-    def __init__(self, graph_view: GraphView, new_g: BaseGraph[VT, ET]):
-        super().__init__(graph_view)
-        self.new_g = new_g
+    old_g: Optional[BaseGraph[VT, ET]] = None
 
     def undo(self):
+        assert self.old_g is not None
         self.graph_view.set_graph(self.old_g)
 
     def redo(self):
@@ -74,11 +79,6 @@ class ChangeNodeColor(BaseCommand):
     vty: VertexType
 
     _old_vtys: Optional[list[VertexType]] = None
-
-    def __init__(self, graph_view: GraphView, vs: Iterable[VT], vty: VertexType):
-        super().__init__(graph_view)
-        self.vs = vs
-        self.vty = vty
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -102,12 +102,6 @@ class AddNode(BaseCommand):
 
     _added_vert: Optional[VT] = None
 
-    def __init__(self, graph_view: GraphView, x: float, y: float, vty: VertexType):
-        super().__init__(graph_view)
-        self.x = x
-        self.y = y
-        self.vty = vty
-
     def undo(self):
         assert self._added_vert is not None
         self.g.remove_vertex(self._added_vert)
@@ -126,12 +120,6 @@ class AddEdge(BaseCommand):
     ety: EdgeType
 
     _old_ety: Optional[EdgeType] = None
-
-    def __init__(self, graph_view: GraphView, u: VT, v: VT, ety: EdgeType):
-        super().__init__(graph_view)
-        self.u = u
-        self.v = v
-        self.ety = ety
 
     def undo(self):
         u, v = self.u, self.v
@@ -164,12 +152,6 @@ class MoveNode(BaseCommand):
     _old_x: Optional[float] = None
     _old_y: Optional[float] = None
 
-    def __init__(self, graph_view: GraphView, v: VT, x: float, y: float):
-        super().__init__(graph_view)
-        self.v = v
-        self.x = x
-        self.y = y
-
     def undo(self):
         assert self._old_x is not None and self._old_y is not None
         self.g.set_row(self.v, self._old_x)
@@ -192,13 +174,6 @@ class AddIdentity(BaseCommand):
     vty: VertexType
 
     _new_vert: Optional[VT] = None
-
-    def __init__(self, graph_view: GraphView, u: VT, v: VT, vty: VertexType):
-        super().__init__(graph_view)
-        self.u = u
-        self.v = v
-        assert vty in [VertexType.Z, VertexType.X]
-        self.vty = vty
 
     def undo(self):
         u, v, w = self.u, self.v, self._new_vert
@@ -233,11 +208,6 @@ class ChangePhase(BaseCommand):
 
     _old_phase: Optional[Union[Fraction, int]] = None
 
-    def __init__(self, graph_view: GraphView, v: VT, new_phase: Union[Fraction, int]):
-        super().__init__(graph_view)
-        self.v = v
-        self.new_phase = new_phase
-
     def undo(self):
         assert self._old_phase is not None
         self.g.set_phase(self.v, self._old_phase)
@@ -255,10 +225,6 @@ class ChangeColor(BaseCommand):
 
     Changes the spider type using Hadamard conjugation."""
     vs: Iterable[VT]
-
-    def __init__(self, graph_view: GraphView, vs: Iterable[VT]):
-        super().__init__(graph_view)
-        self.vs = vs
 
     def toggle(self):
         for v in self.vs:
