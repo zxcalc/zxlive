@@ -96,7 +96,7 @@ class VItem(QGraphicsEllipseItem):
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED_PRESSED)))
             else:
-                self.setBrush(QBrush(QColor("#000000")))
+                self.setBrush(QBrush(QColor("#444444")))
 
         if self.phase_item:
             self.phase_item.refresh()
