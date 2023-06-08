@@ -14,11 +14,13 @@
 # limitations under the License.
 
 from __future__ import annotations
+
+from PySide6.QtCore import QRect, QSize
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
 from pyzx.graph.base import BaseGraph, VT, ET
-from .graphscene import GraphScene
+from .graphscene import GraphScene, VItem
 
 
 class GraphView(QGraphicsView):
@@ -35,6 +37,41 @@ class GraphView(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
 
+        # We implement the rubberband logic ourselves. Note that there is also
+        # the option to set `self.setDragMode(QGraphicsView.RubberBandDrag)`,
+        # but that doesn't seem to play nicely with selection in the GraphScene,
+        # presumably because it uses the coordinate system from this QGraphicsView
+        # and not the one from the GraphScene...
+        self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
+
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         self.graph_scene.set_graph(g)
         self.centerOn(0, 0)
+
+    def mousePressEvent(self, e: QMouseEvent) -> None:
+        super().mousePressEvent(e)
+        if e.button() == Qt.LeftButton and all(not isinstance(it, VItem) for it in self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform())):
+            self._rubberband_start = e.pos()
+            self.rubberband.setGeometry(QRect(self._rubberband_start, QSize()))
+            self.rubberband.show()
+        else:
+            e.ignore()
+
+    def mouseMoveEvent(self, e: QMouseEvent) -> None:
+        super().mouseMoveEvent(e)
+        if self.rubberband.isVisible():
+            self.rubberband.setGeometry(QRect(self._rubberband_start, e.pos()).normalized())
+        else:
+            e.ignore()
+
+    def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+        super().mouseReleaseEvent(e)
+        if e.button() == Qt.LeftButton and self.rubberband.isVisible():
+            self.rubberband.hide()
+            self.graph_scene.clearSelection()
+            rect = self.rubberband.geometry()
+            for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()):
+                if isinstance(it, VItem):
+                    it.setSelected(True)
+        else:
+            e.ignore()

@@ -16,12 +16,18 @@ class GraphEditPanel(BasePanel):
 
     graph_scene: EditGraphScene
 
-    _curr_ety: EdgeType = VertexType.Z
-    _curr_vty: VertexType = EdgeType.SIMPLE
+    _curr_ety: EdgeType
+    _curr_vty: VertexType
 
     def __init__(self, graph: BaseGraph) -> None:
-        self.graph_scene = EditGraphScene(self._vert_moved, self._vert_double_clicked,
-                                          self._add_vert, self._add_edge)
+        self.graph_scene = EditGraphScene()
+        self.graph_scene.vertices_moved.connect(self._vert_moved)
+        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+        self.graph_scene.vertex_added.connect(self._add_vert)
+        self.graph_scene.edge_added.connect(self._add_edge)
+
+        self._curr_vty = VertexType.Z
+        self._curr_ety = EdgeType.SIMPLE
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
@@ -69,8 +75,8 @@ class GraphEditPanel(BasePanel):
         cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
         self.undo_stack.push(cmd)
 
-    def _vert_moved(self, v: VT, x: float, y: float) -> None:
-        cmd = MoveNode(self.graph_view, v, x, y)
+    def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
+        cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
 
     def _vert_double_clicked(self, v: VT) -> None:

@@ -15,10 +15,10 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, Signal
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from typing import Optional, List, Set, Callable, Iterator, Iterable
+from typing import Optional, Set, Iterator, Iterable, Any
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
@@ -31,20 +31,41 @@ ZX_RED = "#ff8888"
 ZX_RED_PRESSED = "#660000"
 
 
+# Z values for different items. We use those to make sure that edges
+# are drawn below vertices and selected vertices above unselected
+# vertices during movement. Phase items are drawn on the very top.
+EITEM_Z = -1
+VITEM_UNSELECTED_Z = 0
+VITEM_SELECTED_Z = 1
+PHASE_ITEM_Z = 2
+
+
 class VItem(QGraphicsEllipseItem):
     """A QGraphicsItem representing a single vertex"""
 
-    def __init__(self, g: BaseGraph[VT, ET], v: VT):
-        super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        self.setZValue(1)  # draw vertices on top of edges but below phases
+    v: VT
+    phase_item: PhaseItem
+    adj_items: Set[EItem]  # Connected edges
+    graph_scene: GraphScene
 
-        self.g = g
+    # Position before starting a drag-move
+    _old_pos: QPointF
+
+    def __init__(self, graph_scene: GraphScene, v: VT):
+        super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        self.setZValue(VITEM_UNSELECTED_Z)
+
+        self.graph_scene = graph_scene
         self.v = v
-        self.setPos(g.row(v) * SCALE, g.qubit(v) * SCALE)
+        self.setPos(self.g.row(v) * SCALE, self.g.qubit(v) * SCALE)
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
 
-        self.is_pressed = False
+        self._old_pos = self.pos()
+
+        self.setFlag(QGraphicsItem.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
 
         pen = QPen()
         pen.setWidthF(3)
@@ -52,10 +73,14 @@ class VItem(QGraphicsEllipseItem):
         self.setPen(pen)
         self.refresh()
 
+    @property
+    def g(self) -> BaseGraph[VT, ET]:
+        return self.graph_scene.g
+
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
 
-        if not self.is_pressed:
+        if not self.isSelected():
             t = self.g.type(self.v)
             if t == VertexType.Z:
                 self.setBrush(QBrush(QColor(ZX_GREEN)))
@@ -64,14 +89,14 @@ class VItem(QGraphicsEllipseItem):
             else:
                 self.setBrush(QBrush(QColor("#000000")))
 
-        if self.is_pressed:
+        if self.isSelected():
             t = self.g.type(self.v)
             if t == VertexType.Z:
                 self.setBrush(QBrush(QColor(ZX_GREEN_PRESSED)))
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED_PRESSED)))
             else:
-                self.setBrush(QBrush(QColor("#000000")))
+                self.setBrush(QBrush(QColor("#444444")))
 
         if self.phase_item:
             self.phase_item.refresh()
@@ -79,13 +104,65 @@ class VItem(QGraphicsEllipseItem):
         for e_item in self.adj_items:
             e_item.refresh()
 
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
+        # By default, Qt draws a dashed rectangle around selected items.
+        # We have our own implementation to draw selected vertices, so
+        # we intercept the selected option here.
+        option.state &= ~QStyle.State_Selected
+        super().paint(painter, option, widget)
+
+    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
+        # Snap items to grid on movement by intercepting the position-change
+        # event and returning a new position
+        if change == QGraphicsItem.ItemPositionChange:
+            assert isinstance(value, QPointF)
+            grid_size = SCALE / 8
+            x = round(value.x() / grid_size) * grid_size
+            y = round(value.y() / grid_size) * grid_size
+            return QPointF(x, y)
+
+        # When selecting/deselecting items, we move them the front/back
+        if change == QGraphicsItem.ItemSelectedChange:
+            assert isinstance(value, int)  # 0 or 1
+            self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
+            return value
+
+        # Intercept selection- and position-has-changed events to call `refresh`.
+        # Note that the position and selected values are already updated when
+        # this event fires.
+        if change in (QGraphicsItem.ItemSelectedHasChanged, QGraphicsItem.ItemPositionHasChanged):
+            self.refresh()
+
+        return super().itemChange(change, value)
+
+    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseDoubleClickEvent(e)
+        scene = self.scene()
+        assert isinstance(scene, GraphScene)
+        scene.vertex_double_clicked.emit(self.v)
+
+    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
+        # manually detect mouse releases.
+        super().mouseReleaseEvent(e)
+        if e.button() == Qt.LeftButton:
+            if self._old_pos != self.pos():
+                scene = self.scene()
+                assert isinstance(scene, GraphScene)
+                scene.vertices_moved.emit([
+                    (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
+                    for it in self.graph_scene.selectedItems() if isinstance(it, VItem)
+                ])
+        else:
+            e.ignore()
+
 
 class PhaseItem(QGraphicsTextItem):
     """A QGraphicsItem representing a phase label"""
 
     def __init__(self, v_item: VItem):
         super().__init__()
-        self.setZValue(2)  # draw phase labels on top
+        self.setZValue(PHASE_ITEM_Z)
 
         self.setDefaultTextColor(QColor("#006bb3"))
         self.setFont(QFont("monospace"))
@@ -107,7 +184,7 @@ class EItem(QGraphicsPathItem):
 
     def __init__(self, g: BaseGraph[VT, ET], e: ET, s_item: VItem, t_item: VItem):
         super().__init__()
-        self.setZValue(0)  # draw edges below vertices and phases
+        self.setZValue(EITEM_Z)
         self.g = g
         self.e = e
         self.s_item = s_item
@@ -137,55 +214,34 @@ class EItem(QGraphicsPathItem):
         self.setPath(path)
 
 
-VertMovedEvent = Optional[Callable[[VT, float, float], None]]
-VertDoubleClickedEvent = Optional[Callable[[VT], None]]
-
-
 class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
     g: BaseGraph[VT, ET]
-    on_vertex_moved: VertMovedEvent = None
-    on_vertex_double_clicked: VertDoubleClickedEvent = None
 
-    _selected_items: list[VItem]
-    _drag_start: QPointF
-    _drag_items: List[tuple[QGraphicsItem, QPointF]]
-    _is_moved: bool = False
+    # Signals to handle double-clicking and moving of vertices.
+    # Note that we have to set the argument types to `object`,
+    # otherwise it doesn't work for some reason...
+    vertex_double_clicked = Signal(object)  # Actual type: VT
+    vertices_moved = Signal(object)  # Actual type: list[tuple[VT, float, float]]
 
-    def __init__(self, on_vertex_moved: VertMovedEvent = None,
-                 on_vertex_double_clicked: VertDoubleClickedEvent = None) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.on_vertex_moved = on_vertex_moved
-        self.on_vertex_double_clicked = on_vertex_double_clicked
-        self._selected_items = []
-        self._drag_items = []
-        self._drag_start = QPointF(0, 0)
-
         self.setSceneRect(-100, -100, 4000, 4000)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
 
     @property
     def selected_vertices(self) -> Iterator[VT]:
         """An iterator over all currently selected vertices."""
-        return (it.v for it in self._selected_items)
-
-    def clear_selection(self) -> None:
-        """Unselects all selected vertices."""
-        for it in self._selected_items:
-            it.is_pressed = False
-            it.refresh()
-        self._selected_items = []
+        return (it.v for it in self.selectedItems() if isinstance(it, VItem))
 
     def select_vertices(self, vs: Iterable[VT]) -> None:
         """Selects the given collection of vertices."""
-        self.clear_selection()
+        self.clearSelection()
         vs = set(vs)
         for it in self.items():
             if isinstance(it, VItem) and it.v in vs:
-                it.is_pressed = True
-                it.refresh()
-                self._selected_items.append(it)
+                it.setSelected(True)
                 vs.remove(it.v)
 
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
@@ -195,7 +251,6 @@ class GraphScene(QGraphicsScene):
 
         self.g = g
         self.clear()
-        self._selected_items = []
         self.add_items()
         self.invalidate()
 
@@ -204,7 +259,7 @@ class GraphScene(QGraphicsScene):
 
         v_items = {}
         for v in self.g.vertices():
-            vi = VItem(self.g, v)
+            vi = VItem(self, v)
             v_items[v] = vi
             self.addItem(vi)  # add the vertex to the scene
             self.addItem(vi.phase_item)  # add the phase label to the scene
@@ -213,69 +268,6 @@ class GraphScene(QGraphicsScene):
             s, t = self.g.edge_st(e)
             self.addItem(EItem(self.g, e, v_items[s], v_items[t]))
 
-    def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        super().mousePressEvent(e)
-        if e.button() != Qt.LeftButton:
-            return
-
-        self._drag_start = e.scenePos()
-
-        if not self.items(e.scenePos(), deviceTransform=QTransform()):
-            for it in self._selected_items:
-                it.is_pressed = False
-                it.refresh()
-            self._selected_items = []
-
-        # TODO implement selecting/moving multiple items
-        for it in self.items(e.scenePos(), deviceTransform=QTransform()):
-            if it and isinstance(it, VItem):
-                self._drag_items = [(it, it.scenePos())]
-                if it.is_pressed:
-                    self._selected_items.pop(-1)
-                    it.is_pressed = False
-                    it.refresh()
-                    break
-                else:
-                    self._selected_items.append(it)
-                    it.is_pressed = True
-                    it.refresh()
-                    break
-
-    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        p = e.scenePos()
-        grid_size = SCALE / 8
-        dx = round((p.x() - self._drag_start.x()) / grid_size) * grid_size
-        dy = round((p.y() - self._drag_start.y()) / grid_size) * grid_size
-        # move the items that have been dragged
-        for it, pos in self._drag_items:
-            self._is_moved = True
-            it.setPos(QPointF(pos.x() + dx, pos.y() + dy))
-            if isinstance(it, VItem):
-                it.refresh()
-
-    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        if e.button() == Qt.LeftButton:
-            for it in self.items(e.scenePos(), deviceTransform=QTransform()):
-                if it and isinstance(it, VItem) and self._is_moved:
-                    it.is_pressed = False
-                    if len(self._selected_items) == 0:
-                        break
-                    self._selected_items.pop(-1)
-                    it.refresh()
-                    if self.on_vertex_moved:
-                        self.on_vertex_moved(it.v, it.x() / SCALE, it.y() / SCALE)
-                    break
-
-            self._drag_items = []
-            self._is_moved = False
-
-    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        for it in self.items(e.scenePos(), deviceTransform=QTransform()):
-            if isinstance(it, VItem):
-                if self.on_vertex_double_clicked is not None:
-                    self.on_vertex_double_clicked(it.v)
-                return
-
 
 # TODO: This is essentially a clone of EItem. We should common it up!
 class EDragItem(QGraphicsPathItem):
@@ -283,7 +275,7 @@ class EDragItem(QGraphicsPathItem):
 
     def __init__(self, g: BaseGraph[VT, ET], ety: EdgeType, start: VItem, mouse_pos: QPointF):
         super().__init__()
-        self.setZValue(0)  # draw edges below vertices and phases
+        self.setZValue(EITEM_Z)
         self.g = g
         self.ety = ety
         self.start = start
@@ -310,31 +302,26 @@ class EDragItem(QGraphicsPathItem):
         self.setPath(path)
 
 
-AddVertEvent = Optional[Callable[[float, float], None]]
-AddEdgeEvent = Optional[Callable[[VT, VT], None]]
-
-
 class EditGraphScene(GraphScene):
     """A graph scene tracking additional mouse events for graph editing."""
 
-    # Callbacks to handle addition of vertices and edges
-    on_add_vert: AddVertEvent = None
-    on_add_edge: AddEdgeEvent = None
+    # Signals to handle addition of vertices and edges.
+    # Note that we have to set the argument types to `object`,
+    # otherwise it doesn't work for some reason...
+    vertex_added = Signal(object, object)  # Actual types: float, float
+    edge_added = Signal(object, object)  # Actual types: VT, VT
 
     # Currently selected edge type for preview when dragging
     # to add a new edge
-    curr_ety: EdgeType = EdgeType.SIMPLE
+    curr_ety: EdgeType
 
     # The vertex a right mouse button drag was initiated on
-    _right_drag: Optional[EDragItem] = None
+    _right_drag: Optional[EDragItem]
 
-    def __init__(self, on_vertex_moved: VertMovedEvent = None,
-                 on_vertex_double_clicked: VertDoubleClickedEvent = None,
-                 on_add_vert: AddVertEvent = None,
-                 on_add_edge: AddEdgeEvent = None):
-        super().__init__(on_vertex_moved, on_vertex_double_clicked)
-        self.on_add_vert = on_add_vert
-        self.on_add_edge = on_add_edge
+    def __init__(self):
+        super().__init__()
+        self.curr_ety = EdgeType.SIMPLE
+        self._right_drag = None
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Right-press on a vertex means the start of a drag for edge adding
@@ -345,12 +332,16 @@ class EditGraphScene(GraphScene):
                     if isinstance(it, VItem):
                         self._right_drag = EDragItem(self.g, self.curr_ety, it, e.scenePos())
                         self.addItem(self._right_drag)
+        else:
+            e.ignore()
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         if self._right_drag:
             self._right_drag.mouse_pos = e.scenePos()
             self._right_drag.refresh()
+        else:
+            e.ignore()
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(e)
@@ -362,10 +353,12 @@ class EditGraphScene(GraphScene):
                     # TODO: Think about if we want to allow self loops here?
                     #  For example, if had edge is selected this would mean that
                     #  right clicking adds pi to the phase...
-                    if isinstance(it, VItem) and it != self._right_drag.start and self.on_add_edge:
-                        self.on_add_edge(self._right_drag.start.v, it.v)
+                    if isinstance(it, VItem) and it != self._right_drag.start:
+                        self.edge_added.emit(self._right_drag.start.v, it.v)
                 self._right_drag = None
             # Or a click on a free spot to add a new vertex
-            elif self.on_add_vert:
+            else:
                 p = e.scenePos()
-                self.on_add_vert(p.x() / SCALE, p.y() / SCALE)
+                self.vertex_added.emit(p.x() / SCALE, p.y() / SCALE)
+        else:
+            e.ignore()
