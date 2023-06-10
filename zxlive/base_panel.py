@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Iterator, Sequence
 
-from PySide6.QtGui import QUndoStack
+from PySide6.QtGui import QUndoStack, QShortcut, QKeySequence
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup
 from pyzx.graph.base import BaseGraph, VT, ET
 
@@ -71,6 +71,9 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         redo = QToolButton(self, text="Redo")
         undo.clicked.connect(self._undo_clicked)
         redo.clicked.connect(self._redo_clicked)
+        QShortcut(QKeySequence('ctrl+Z'),undo).activated.connect(self._undo_clicked)
+        QShortcut(QKeySequence('ctrl+shift+Z'),redo).activated.connect(self._redo_clicked)
+
         for btn in (undo, redo):
             self.toolbar.addWidget(btn)
         self.toolbar.addSeparator()
