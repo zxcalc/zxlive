@@ -39,8 +39,8 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(fuse, identity_z, identity_x, color_change, bialgebra,
                              strong_comp, gh_state, exclusive=True)
 
-    def _vert_moved(self, v: VT, x: float, y: float):
-        cmd = MoveNode(self.graph_view, v, x, y)
+    def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
+        cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
 
     def _fuse_clicked(self):
