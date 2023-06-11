@@ -71,8 +71,8 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         redo = QToolButton(self, text="Redo")
         undo.clicked.connect(self._undo_clicked)
         redo.clicked.connect(self._redo_clicked)
-        QShortcut(QKeySequence('ctrl+Z'),undo).activated.connect(self._undo_clicked)
-        QShortcut(QKeySequence('ctrl+shift+Z'),redo).activated.connect(self._redo_clicked)
+        QShortcut(QKeySequence.Undo,undo).activated.connect(self._undo_clicked)
+        QShortcut(QKeySequence.Redo,redo).activated.connect(self._redo_clicked)
 
         for btn in (undo, redo):
             self.toolbar.addWidget(btn)
