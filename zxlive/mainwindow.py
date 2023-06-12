@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from enum import IntEnum
 
+from PySide6.QtGui import QAction
+
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
@@ -69,6 +71,16 @@ class MainWindow(QMainWindow):
         self.proof_panel = ProofPanel(graph)
         tab_widget.addTab(self.proof_panel, "Rewrite")
 
+        new_graph = QAction("&New graph",self)
+        new_graph.setStatusTip("Reinitialize with an empty graph")
+        new_graph.triggered.connect(self.new_graph_event)
+
+        menu = self.menuBar()
+
+        file_menu = menu.addMenu("&File")
+        
+        file_menu.addAction(new_graph)
+
     def _tab_changed(self, new_tab: Tab):
         # This method is also invoked on application launch, so check
         # if the tab has actually changed
@@ -88,3 +100,6 @@ class MainWindow(QMainWindow):
         conf = QSettings("zxlive", "zxlive")
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
+
+    def new_graph_event(self,e):
+        print("Still needs to be implemented")
