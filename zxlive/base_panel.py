@@ -5,9 +5,11 @@ from typing import Iterator, Sequence
 from PySide6.QtGui import QUndoStack, QShortcut, QKeySequence
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup
 from pyzx.graph.base import BaseGraph, VT, ET
+from pyzx.graph import Graph
 
 from .graphscene import GraphScene
 from .graphview import GraphView
+from .commands import SetGraph
 
 
 @dataclass
@@ -78,3 +80,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         pass
 
+    def clear_graph(self):
+        empty_graph = Graph()
+        cmd = SetGraph(self.graph_view,empty_graph)
+        self.undo_stack.push(cmd)

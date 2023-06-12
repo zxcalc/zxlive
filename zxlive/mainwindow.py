@@ -96,11 +96,11 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(redo)
 
     def _tab_changed(self, new_tab: Tab):
+        old_panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
+        new_panel = self.edit_panel if new_tab == Tab.EditTab else self.proof_panel
         # This method is also invoked on application launch, so check
         # if the tab has actually changed
         if self.current_tab != new_tab:
-            old_panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
-            new_panel = self.edit_panel if new_tab == Tab.EditTab else self.proof_panel
             new_panel.graph_view.set_graph(old_panel.graph)
             new_panel.graph_scene.select_vertices(list(old_panel.graph_scene.selected_vertices))
             # TODO: For now we always invalidate the undo stack when switching
@@ -108,6 +108,9 @@ class MainWindow(QMainWindow):
             #  actually made changes to the graph before switching.
             new_panel.undo_stack.clear()
             self.current_tab = new_tab
+            self.active_panel = new_panel
+        else:
+            self.active_panel = old_panel
 
     def closeEvent(self, e: QCloseEvent) -> None:
         # save the shape/size of this window on close
@@ -116,12 +119,10 @@ class MainWindow(QMainWindow):
         e.accept()
 
     def new_graph(self,e):
-        print("Still needs to be implemented")
+        self.active_panel.clear_graph()
 
     def undo(self,e):
-        panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
-        panel.undo_stack.undo()
+        self.active_panel.undo_stack.undo()
 
     def redo(self,e):
-        panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
-        panel.undo_stack.redo()
+        self.active_panel.undo_stack.redo()
