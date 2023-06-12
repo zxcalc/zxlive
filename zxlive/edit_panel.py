@@ -2,6 +2,7 @@ from fractions import Fraction
 from typing import Iterator
 
 from PySide6.QtWidgets import QToolButton, QInputDialog
+from PySide6.QtGui import QShortcut
 from pyzx import EdgeType, VertexType
 from pyzx.graph.base import BaseGraph, VT
 
@@ -32,20 +33,22 @@ class GraphEditPanel(BasePanel):
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         # Toolbar section for picking a vertex type
-        select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
-        select_x = QToolButton(self, text="X Spider", checkable=True)
-        select_boundary = QToolButton(self, text="Boundary", checkable=True)
-        select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
-        select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
-        select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
-        yield ToolbarSection(select_z, select_x, select_boundary, exclusive=True)
+        self.select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
+        self.select_x = QToolButton(self, text="X Spider", checkable=True)
+        self.select_boundary = QToolButton(self, text="Boundary", checkable=True)
+        self.select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
+        self.select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
+        self.select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
+        yield ToolbarSection(self.select_z, self.select_x, self.select_boundary, exclusive=True)
+        QShortcut("x",self).activated.connect(self.cycle_vertex_type_selection)
 
         # Toolbar section for picking an edge type
-        select_simple = QToolButton(self, text="Simple Edge", checkable=True, checked=True)  # Selected by default
-        select_had = QToolButton(self, text="Had Edge", checkable=True)
-        select_simple.clicked.connect(lambda _: self._ety_clicked(EdgeType.SIMPLE))
-        select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
-        yield ToolbarSection(select_simple, select_had, exclusive=True)
+        self.select_simple = QToolButton(self, text="Simple Edge", checkable=True, checked=True)  # Selected by default
+        self.select_had = QToolButton(self, text="Had Edge", checkable=True)
+        self.select_simple.clicked.connect(lambda _: self._ety_clicked(EdgeType.SIMPLE))
+        self.select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
+        yield ToolbarSection(self.select_simple, self.select_had, exclusive=True)
+        QShortcut("e",self).activated.connect(self.cycle_edge_type_selection)
 
         reset = QToolButton(self, text="Reset")
         reset.clicked.connect(self._reset_clicked)
@@ -94,4 +97,27 @@ class GraphEditPanel(BasePanel):
     def _reset_clicked(self) -> None:
         while self.undo_stack.canUndo():
             self.undo_stack.undo()
+
+    def cycle_vertex_type_selection(self):
+        if self.select_z.isChecked():
+            self.select_x.setChecked(True)
+            self._curr_vty = VertexType.X
+        elif self.select_x.isChecked():
+            self.select_boundary.setChecked(True)
+            self._curr_vty = VertexType.BOUNDARY
+        elif self.select_boundary.isChecked():
+            self.select_z.setChecked(True)
+            self._curr_vty = VertexType.Z
+        else:
+            raise ValueError("Something is wrong with the state of the vertex type selectors")
+
+    def cycle_edge_type_selection(self):
+        if self.select_simple.isChecked():
+            self.select_had.setChecked(True)
+            self._curr_ety = EdgeType.HADAMARD
+        elif self.select_had.isChecked():
+            self.select_simple.setChecked(True)
+            self._curr_ety = EdgeType.SIMPLE
+        else:
+            raise ValueError("Something is wrong with the state of the edge type selectors")
 
