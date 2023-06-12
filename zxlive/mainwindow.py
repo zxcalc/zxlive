@@ -22,6 +22,7 @@ from PySide6.QtGui import QAction
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
+from .commands import SetGraph
 
 
 class Tab(IntEnum):
@@ -71,10 +72,36 @@ class MainWindow(QMainWindow):
         self.proof_panel = ProofPanel(graph)
         tab_widget.addTab(self.proof_panel, "Rewrite")
 
-        new_graph = QAction("&New",self)
+        menu = self.menuBar()
+
+        new_graph = QAction("&New...",self)
         new_graph.setStatusTip("Reinitialize with an empty graph")
         new_graph.triggered.connect(self.new_graph)
         new_graph.setShortcut(QKeySequence.New)
+
+        open_file = QAction("&Open...", self)
+        open_file.setStatusTip("Open a file-picker dialog to choose a new diagram")
+        open_file.triggered.connect(self.open_file)
+        open_file.setShortcut(QKeySequence.Open)
+
+        close_action = QAction("Close...", self)
+        close_action.setStatusTip("Closes the window")
+        close_action.triggered.connect(self.close_action)
+        close_action.setShortcut(QKeySequence.Close)
+
+        # TODO: We should remember if we have saved the diagram before, 
+        # and give an open to overwrite this file with a Save action
+        save_as = QAction("&Save as...", self)
+        save_as.setStatusTip("Opens a file-picker dialog to save the diagram in a chosen file format")
+        save_as.triggered.connect(self.save_as)
+        save_as.setShortcut(QKeySequence.SaveAs)
+
+        file_menu = menu.addMenu("&File")
+        file_menu.addAction(new_graph)
+        file_menu.addAction(open_file)
+        file_menu.addSeparator()
+        file_menu.addAction(close_action)
+        file_menu.addAction(save_as)
 
         undo = QAction("Undo",self)
         undo.setStatusTip("Undoes the last action")
@@ -85,11 +112,6 @@ class MainWindow(QMainWindow):
         redo.setStatusTip("Redoes the last action")
         redo.triggered.connect(self.redo)
         redo.setShortcut(QKeySequence.Redo)
-
-        menu = self.menuBar()
-
-        file_menu = menu.addMenu("&File")
-        file_menu.addAction(new_graph)
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
@@ -126,3 +148,16 @@ class MainWindow(QMainWindow):
 
     def redo(self,e):
         self.active_panel.undo_stack.redo()
+
+    def open_file(self):
+        # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
+        g = import_diagram_dialog(self)
+        if g is not None:
+            cmd = SetGraph(self.graph_view, g)
+            self.active_panel.undo_stack.push(cmd)
+
+    def close_action(self):
+        self.close()
+
+    def save_as(self):
+        export_diagram_dialog(self.graph, self)

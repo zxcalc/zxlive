@@ -84,3 +84,5 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         empty_graph = Graph()
         cmd = SetGraph(self.graph_view,empty_graph)
         self.undo_stack.push(cmd)
+
+        

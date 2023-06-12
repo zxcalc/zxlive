@@ -47,14 +47,9 @@ class GraphEditPanel(BasePanel):
         select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
         yield ToolbarSection(select_simple, select_had, exclusive=True)
 
-        # Toolbar for global import/export/reset
-        import_ = QToolButton(self, text="Import")
-        export = QToolButton(self, text="Export")
         reset = QToolButton(self, text="Reset")
-        import_.clicked.connect(self._import_diagram_clicked)
-        export.clicked.connect(self._export_diagram_clicked)
         reset.clicked.connect(self._reset_clicked)
-        yield ToolbarSection(import_, export, reset)
+        yield ToolbarSection(reset)
 
     def _vty_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty
@@ -99,13 +94,4 @@ class GraphEditPanel(BasePanel):
     def _reset_clicked(self) -> None:
         while self.undo_stack.canUndo():
             self.undo_stack.undo()
-
-    def _import_diagram_clicked(self) -> None:
-        g = import_diagram_dialog(self)
-        if g is not None:
-            cmd = SetGraph(self.graph_view, g)
-            self.undo_stack.push(cmd)
-
-    def _export_diagram_clicked(self) -> None:
-        export_diagram_dialog(self.graph, self)
 
