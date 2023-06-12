@@ -71,15 +71,29 @@ class MainWindow(QMainWindow):
         self.proof_panel = ProofPanel(graph)
         tab_widget.addTab(self.proof_panel, "Rewrite")
 
-        new_graph = QAction("&New graph",self)
+        new_graph = QAction("&New",self)
         new_graph.setStatusTip("Reinitialize with an empty graph")
-        new_graph.triggered.connect(self.new_graph_event)
+        new_graph.triggered.connect(self.new_graph)
+        new_graph.setShortcut(QKeySequence.New)
+
+        undo = QAction("Undo",self)
+        undo.setStatusTip("Undoes the last action")
+        undo.triggered.connect(self.undo)
+        undo.setShortcut(QKeySequence.Undo)
+
+        redo = QAction("Redo",self)
+        redo.setStatusTip("Redoes the last action")
+        redo.triggered.connect(self.redo)
+        redo.setShortcut(QKeySequence.Redo)
 
         menu = self.menuBar()
 
         file_menu = menu.addMenu("&File")
-        
         file_menu.addAction(new_graph)
+
+        edit_menu = menu.addMenu("&Edit")
+        edit_menu.addAction(undo)
+        edit_menu.addAction(redo)
 
     def _tab_changed(self, new_tab: Tab):
         # This method is also invoked on application launch, so check
@@ -101,5 +115,13 @@ class MainWindow(QMainWindow):
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
-    def new_graph_event(self,e):
+    def new_graph(self,e):
         print("Still needs to be implemented")
+
+    def undo(self,e):
+        panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
+        panel.undo_stack.undo()
+
+    def redo(self,e):
+        panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
+        panel.undo_stack.redo()

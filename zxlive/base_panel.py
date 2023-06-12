@@ -67,17 +67,6 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         return self.graph_scene.g
 
     def _populate_toolbar(self) -> None:
-        undo = QToolButton(self, text="Undo")
-        redo = QToolButton(self, text="Redo")
-        undo.clicked.connect(self._undo_clicked)
-        redo.clicked.connect(self._redo_clicked)
-        QShortcut(QKeySequence.Undo,undo).activated.connect(self._undo_clicked)
-        QShortcut(QKeySequence.Redo,redo).activated.connect(self._redo_clicked)
-
-        for btn in (undo, redo):
-            self.toolbar.addWidget(btn)
-        self.toolbar.addSeparator()
-
         for section in self._toolbar_sections():
             group = QButtonGroup(self, exclusive=section.exclusive)
             for btn in section.buttons:
@@ -88,10 +77,4 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     @abstractmethod
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         pass
-
-    def _undo_clicked(self):
-        self.undo_stack.undo()
-
-    def _redo_clicked(self):
-        self.undo_stack.redo()
 
