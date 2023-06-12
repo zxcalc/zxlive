@@ -1,3 +1,4 @@
+import copy
 from fractions import Fraction
 from typing import Iterator
 
@@ -8,7 +9,6 @@ from pyzx.graph.base import BaseGraph, VT
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor
-from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg
 from .graphscene import EditGraphScene
 
 
@@ -29,6 +29,9 @@ class GraphEditPanel(BasePanel):
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
+        # Currently the copied part is stored internally, and is not made available to the clipboard.
+        # We could do this by using pyperclip.
+        self.copied_graph: Optional[BaseGraph[VT,ET]] = None
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
@@ -121,3 +124,23 @@ class GraphEditPanel(BasePanel):
         else:
             raise ValueError("Something is wrong with the state of the edge type selectors")
 
+    def save_graph_copy(self):
+        selection = list(self.graph_scene.selected_vertices)
+        self.copied_graph = self.graph_scene.g.subgraph_from_vertices(selection)
+
+    def paste_graph(self):
+        if self.copied_graph is None: return
+        new_g = copy.deepcopy(self.graph_scene.g)
+        new_verts, new_edges = new_g.merge(self.copied_graph.translate(0.5,0.5))
+        cmd = SetGraph(self.graph_view,new_g)
+        self.undo_stack.push(cmd)
+        self.graph_scene.select_vertices(new_verts)
+
+    def delete_selection(self):
+        selection = list(self.graph_scene.selected_vertices)
+        if not selection: return
+        new_g = copy.deepcopy(self.graph_scene.g)
+        self.graph_scene.clearSelection()
+        new_g.remove_vertices(selection)
+        cmd = SetGraph(self.graph_view,new_g)
+        self.undo_stack.push(cmd)

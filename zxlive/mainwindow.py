@@ -14,15 +14,17 @@
 # limitations under the License.
 
 from __future__ import annotations
+from typing import Callable
 
 from enum import IntEnum
 
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QShortcut
 
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
 from .commands import SetGraph
+from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg
 
 
 class Tab(IntEnum):
@@ -74,28 +76,18 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = QAction("&New...",self)
-        new_graph.setStatusTip("Reinitialize with an empty graph")
-        new_graph.triggered.connect(self.new_graph)
-        new_graph.setShortcut(QKeySequence.New)
-
-        open_file = QAction("&Open...", self)
-        open_file.setStatusTip("Open a file-picker dialog to choose a new diagram")
-        open_file.triggered.connect(self.open_file)
-        open_file.setShortcut(QKeySequence.Open)
-
-        close_action = QAction("Close...", self)
-        close_action.setStatusTip("Closes the window")
-        close_action.triggered.connect(self.close_action)
-        close_action.setShortcut(QKeySequence.Close)
-
+        new_graph = self._new_action("&New...",self.new_graph,QKeySequence.New,
+            "Reinitialize with an empty graph")
+        open_file = self._new_action("&Open...", self.open_file,QKeySequence.Open,
+            "Open a file-picker dialog to choose a new diagram")
+        close_action = self._new_action("Close...", self.close_action,QKeySequence.Close,
+            "Closes the window")
+        close_action.setShortcuts([QKeySequence.Close, QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
         # and give an open to overwrite this file with a Save action
-        save_as = QAction("&Save as...", self)
-        save_as.setStatusTip("Opens a file-picker dialog to save the diagram in a chosen file format")
-        save_as.triggered.connect(self.save_as)
-        save_as.setShortcut(QKeySequence.SaveAs)
-
+        save_as = self._new_action("&Save as...", self.save_as,QKeySequence.SaveAs,
+            "Opens a file-picker dialog to save the diagram in a chosen file format")
+        
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
         file_menu.addAction(open_file)
@@ -103,19 +95,37 @@ class MainWindow(QMainWindow):
         file_menu.addAction(close_action)
         file_menu.addAction(save_as)
 
-        undo = QAction("Undo",self)
-        undo.setStatusTip("Undoes the last action")
-        undo.triggered.connect(self.undo)
-        undo.setShortcut(QKeySequence.Undo)
-
-        redo = QAction("Redo",self)
-        redo.setStatusTip("Redoes the last action")
-        redo.triggered.connect(self.redo)
-        redo.setShortcut(QKeySequence.Redo)
+        undo = self._new_action("Undo", self.undo, QKeySequence.Undo,
+            "Undoes the last action")
+        redo = self._new_action("Redo", self.redo, QKeySequence.Redo,
+            "Redoes the last action")
+        cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.Cut,
+            "Cut the selected part of the diagram")
+        copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.Copy,
+            "Copy the selected part of the diagram")
+        paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.Paste,
+            "Paste the copied part of the diagram")
+        delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.Delete,
+            "Delete the selected part of the diagram")
+        delete_action.setShortcuts([QKeySequence.Delete,QKeySequence("Backspace")])
+        
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
         edit_menu.addAction(redo)
+        edit_menu.addSeparator()
+        edit_menu.addAction(cut_action)
+        edit_menu.addAction(copy_action)
+        edit_menu.addAction(paste_action)
+        edit_menu.addAction(delete_action)
+
+
+    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence,tooltip:str):
+        action = QAction(name, self)
+        action.setStatusTip(tooltip)
+        action.triggered.connect(trigger)
+        action.setShortcut(shortcut)
+        return action
 
     def _tab_changed(self, new_tab: Tab):
         old_panel = self.edit_panel if self.current_tab == Tab.EditTab else self.proof_panel
@@ -153,11 +163,28 @@ class MainWindow(QMainWindow):
         # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
         g = import_diagram_dialog(self)
         if g is not None:
-            cmd = SetGraph(self.graph_view, g)
+            cmd = SetGraph(self.active_panel.graph_view, g)
             self.active_panel.undo_stack.push(cmd)
 
     def close_action(self):
         self.close()
 
     def save_as(self):
-        export_diagram_dialog(self.graph, self)
+        export_diagram_dialog(self.active_panel.graph_scene.g, self)
+
+    def cut_graph(self):
+        if self.current_tab == Tab.EditTab:
+            self.active_panel.save_graph_copy()
+            self.active_panel.delete_selection()
+
+    def copy_graph(self):
+        if self.current_tab == Tab.EditTab:
+            self.active_panel.save_graph_copy()
+
+    def paste_graph(self):
+        if self.current_tab == Tab.EditTab:
+            self.active_panel.paste_graph()
+
+    def delete_graph(self):
+        if self.current_tab == Tab.EditTab:
+            self.active_panel.delete_selection()
