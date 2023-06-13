@@ -85,4 +85,5 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         cmd = SetGraph(self.graph_view,empty_graph)
         self.undo_stack.push(cmd)
 
-        
+    def select_all(self):
+        self.graph_scene.select_all()

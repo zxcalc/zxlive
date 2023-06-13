@@ -419,3 +419,8 @@ class EditGraphScene(GraphScene):
                 self.vertex_added.emit(p.x() / SCALE, p.y() / SCALE)
         else:
             e.ignore()
+
+    def select_all(self):
+        """Selects all vertices and edges in the scene."""
+        for it in self.items():
+            it.setSelected(True)

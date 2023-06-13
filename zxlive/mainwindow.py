@@ -109,6 +109,8 @@ class MainWindow(QMainWindow):
         new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.AddTab,
             "Create a new tab")
         self.addAction(new_tab)
+        select_all = self._new_action("Select All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
+        self.addAction(select_all)
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
@@ -188,3 +190,6 @@ class MainWindow(QMainWindow):
     @property
     def active_panel(self):
         return self.tab_widget.currentWidget()
+
+    def select_all(self):
+        self.active_panel.select_all()
