@@ -168,7 +168,9 @@ class VItem(QGraphicsEllipseItem):
         assert isinstance(scene, GraphScene)
         if self.is_dragging and len(scene.selectedItems()) == 1:
             reset = True
-            for it in scene.items(e.scenePos(), deviceTransform=QTransform()):
+            for it in scene.items():
+                if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
+                    continue
                 if it == self._dragged_on:
                     reset = False
                 elif isinstance(it, VItem) and it != self:
