@@ -131,6 +131,13 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
             return
         
+        if basicrules.check_remove_id(self.graph, vertex):
+            new_g = copy.deepcopy(self.graph)
+            basicrules.remove_id(new_g, vertex)
+            cmd = SetGraph(self.graph_view, new_g)
+            self.undo_stack.push(cmd)
+            return
+
         dir = trace.end - trace.start
         normal = QPointF(-dir.y(), dir.x())
         pos = QPointF(self.graph.row(vertex), self.graph.qubit(vertex))
