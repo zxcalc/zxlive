@@ -15,13 +15,33 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, QSize
+from PySide6.QtCore import QRect, QSize, QPoint, Signal
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
 from pyzx.graph.base import BaseGraph, VT, ET
 from .graphscene import GraphScene, VItem
 
+from enum import Enum
+from dataclasses import dataclass
+
+class GraphTool:
+    Selection = 1
+    MagicWand = 2
+
+@dataclass
+class WandTrace:
+    start: QPoint
+    end: QPoint
+    hit: set[VItem]
+
+    def __init__(self, start):
+        self.start = start
+        self.hit = set()
+        self.end = start
+
+WAND_COLOR = "#500050"
+WAND_WIDTH = 3.0
 
 class GraphView(QGraphicsView):
     """QtWidget containing a graph
@@ -30,8 +50,12 @@ class GraphView(QGraphicsView):
     interesting stuff happens in `GraphScene`.
     """
 
+    wand_trace_finished = Signal(object)
+
     def __init__(self, graph_scene: GraphScene) -> None:
         self.graph_scene = graph_scene
+        self.tool = GraphTool.Selection
+        
         super().__init__(self.graph_scene)
         self.setMouseTracking(True)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -44,34 +68,72 @@ class GraphView(QGraphicsView):
         # and not the one from the GraphScene...
         self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
 
+        self.wand_trace = None
+        self.wand_path = None
+
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         self.graph_scene.set_graph(g)
         self.centerOn(0, 0)
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         super().mousePressEvent(e)
+
         if e.button() == Qt.LeftButton and all(not isinstance(it, VItem) for it in self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform())):
-            self._rubberband_start = e.pos()
-            self.rubberband.setGeometry(QRect(self._rubberband_start, QSize()))
-            self.rubberband.show()
+            if self.tool == GraphTool.Selection:
+                self._rubberband_start = e.pos()
+                self.rubberband.setGeometry(QRect(self._rubberband_start, QSize()))
+                self.rubberband.show()
+            elif self.tool == GraphTool.MagicWand:
+                pos = self.mapToScene(e.pos())
+                self.wand_trace = WandTrace(pos)
+                self.wand_path = QGraphicsPathItem()
+                self.graph_scene.addItem(self.wand_path)
+                pen = QPen(QColor(WAND_COLOR), WAND_WIDTH)
+                self.wand_path.setPen(pen)
+                path = QPainterPath()
+                path.moveTo(pos)
+                self.wand_path.setPath(path)
+                self.wand_path.show()
         else:
             e.ignore()
 
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         super().mouseMoveEvent(e)
-        if self.rubberband.isVisible():
-            self.rubberband.setGeometry(QRect(self._rubberband_start, e.pos()).normalized())
+        if self.tool == GraphTool.Selection:
+            if self.rubberband.isVisible():
+                self.rubberband.setGeometry(QRect(self._rubberband_start, e.pos()).normalized())
+        elif self.tool == GraphTool.MagicWand:
+            if self.wand_trace is not None:
+                pos = self.mapToScene(e.pos())
+                self.wand_trace.end = pos
+                path = self.wand_path.path()
+                path.lineTo(pos)
+                self.wand_path.setPath(path)
+                items = self.graph_scene.items(pos)
+                for item in items:
+                    if item is not self.wand_path:
+                        self.wand_trace.hit.add(item)
+                        break
         else:
             e.ignore()
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
         super().mouseReleaseEvent(e)
-        if e.button() == Qt.LeftButton and self.rubberband.isVisible():
-            self.rubberband.hide()
-            self.graph_scene.clearSelection()
-            rect = self.rubberband.geometry()
-            for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()):
-                if isinstance(it, VItem):
-                    it.setSelected(True)
+        if e.button() == Qt.LeftButton:
+            if self.tool == GraphTool.Selection:
+                if self.rubberband.isVisible():
+                    self.rubberband.hide()
+                    self.graph_scene.clearSelection()
+                    rect = self.rubberband.geometry()
+                    for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()):
+                        if isinstance(it, VItem):
+                            it.setSelected(True)
+            elif self.tool == GraphTool.MagicWand:
+                if self.wand_trace is not None:
+                    self.wand_path.hide()
+                    self.graph_scene.removeItem(self.wand_path)
+                    self.wand_path = None
+                    self.wand_trace_finished.emit(self.wand_trace)
+                    self.wand_trace = None
         else:
             e.ignore()

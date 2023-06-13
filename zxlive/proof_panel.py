@@ -1,6 +1,7 @@
 import copy
 from typing import Iterator, Optional
 
+from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QToolButton
 from pyzx import VertexType, to_gh, basicrules, EdgeType
 from pyzx.graph.base import BaseGraph, VT
@@ -10,6 +11,8 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor, BaseCommand
 from .graphscene import GraphScene
 from .rules import bialgebra
+from .graphview import WandTrace, GraphTool
+from .graphscene import VItem
 
 
 class ProofPanel(BasePanel):
@@ -24,7 +27,17 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         super().__init__(graph, self.graph_scene)
 
+        self.graph_view.wand_trace_finished.connect(self._unfuse_slice)
+
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
+        self.selection = QToolButton(self, text="Selection", checkable=True, checked=True)
+        self.magic_wand = QToolButton(self, text="Magic Wand", checkable=True)
+
+        self.magic_wand.clicked.connect(self._magic_wand_clicked)
+        self.selection.clicked.connect(self._selection_clicked)
+
+        yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
+        
         self.rewrite_actions = {}
         buttons = []
         for name,action in pyzx.editor.operations.items():
@@ -100,8 +113,45 @@ class ProofPanel(BasePanel):
             else:
                 action['button'].setEnabled(False)
 
+    def _selection_clicked(self):
+        self.graph_view.tool = GraphTool.Selection
+
+    def _magic_wand_clicked(self):
+        self.graph_view.tool = GraphTool.MagicWand
+
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNode(self.graph_view, vs)
+        self.undo_stack.push(cmd)
+
+    def _unfuse_slice(self, trace):
+        filtered = [item for item in trace.hit if isinstance(item, VItem)]
+        if len(filtered) != 1:
+            return
+        vertex = filtered[0].v
+        if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
+            return
+        
+        dir = trace.end - trace.start
+        normal = QPointF(-dir.y(), dir.x())
+        pos = QPointF(self.graph.row(vertex), self.graph.qubit(vertex))
+        left, right = [], []
+        for neighbor in self.graph.neighbors(vertex):
+            npos = QPointF(self.graph.row(neighbor), self.graph.qubit(neighbor))
+            dot = QPointF.dotProduct(pos - npos, normal)
+            if dot <= 0:
+                left.append(neighbor)
+            else:
+                right.append(neighbor)
+
+        new_g = copy.deepcopy(self.graph)
+        left_vert = new_g.add_vertex(self.graph.type(vertex), qubit = pos.y(), row = pos.x() - 0.25)
+        new_g.set_row(vertex, pos.x() + 0.25)
+        for neighbor in left:
+            new_g.add_edge((neighbor, left_vert), self.graph.edge_type((vertex, neighbor)))
+            new_g.remove_edge((vertex, neighbor))
+        new_g.add_edge((vertex, left_vert))
+
+        cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
 
     def _vertex_dragged_onto(self, v: VT, w: VT) -> None:
