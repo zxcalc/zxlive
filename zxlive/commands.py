@@ -49,8 +49,12 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
         # TODO: For performance reasons, we should track which parts
         #  of the graph have changed and only update those. For example
         #  we could store "dirty flags" for each node/edge.
-        self.graph_view.graph_scene.clearSelection()
+        selection = list(self.graph_view.graph_scene.selected_vertices)
+        new_verts = self.g.vertex_set()
+        new_selection = [v for v in selection if v in new_verts]
+        # self.graph_view.graph_scene.clearSelection()
         self.graph_view.set_graph(self.g)
+        self.graph_view.graph_scene.select_vertices(new_selection)
 
 
 @dataclass
