@@ -49,7 +49,12 @@ class VItem(QGraphicsEllipseItem):
     graph_scene: GraphScene
 
     # Position before starting a drag-move
-    _old_pos: QPointF
+    _old_pos: Optional[QPointF]
+
+    # Vertex we are currently dragged on top of
+    _dragged_on: Optional[VItem]
+
+    _highlighted: bool
 
     def __init__(self, graph_scene: GraphScene, v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -61,7 +66,9 @@ class VItem(QGraphicsEllipseItem):
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
 
-        self._old_pos = self.pos()
+        self._old_pos = None
+        self._dragged_on = None
+        self._highlighted = False
 
         self.setFlag(QGraphicsItem.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.ItemIsSelectable, True)
@@ -77,8 +84,18 @@ class VItem(QGraphicsEllipseItem):
     def g(self) -> BaseGraph[VT, ET]:
         return self.graph_scene.g
 
+    @property
+    def is_dragging(self) -> bool:
+        return self._old_pos is not None
+
+    def set_highlighted(self, value: bool) -> None:
+        self._highlighted = value
+        self.refresh()
+
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
+
+        self.setScale(1.25 if self._highlighted else 1)
 
         if not self.isSelected():
             t = self.g.type(self.v)
@@ -141,6 +158,31 @@ class VItem(QGraphicsEllipseItem):
         assert isinstance(scene, GraphScene)
         scene.vertex_double_clicked.emit(self.v)
 
+    def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mousePressEvent(e)
+        self._old_pos = self.pos()
+
+    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(e)
+        scene = self.scene()
+        assert isinstance(scene, GraphScene)
+        if self.is_dragging and len(scene.selectedItems()) == 1:
+            reset = True
+            for it in scene.items(e.scenePos(), deviceTransform=QTransform()):
+                if it == self._dragged_on:
+                    reset = False
+                elif isinstance(it, VItem) and it != self:
+                    scene.vertex_dragged_onto.emit(self.v, it.v)
+                    # Try to un-highlight the previously hovered over vertex
+                    if self._dragged_on is not None:
+                        self._dragged_on.set_highlighted(False)
+                    self._dragged_on = it
+                    return
+            if reset:
+                self._dragged_on.set_highlighted(False)
+                self._dragged_on = None
+        e.ignore()
+
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
@@ -151,8 +193,12 @@ class VItem(QGraphicsEllipseItem):
                 assert isinstance(scene, GraphScene)
                 scene.vertices_moved.emit([
                     (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
-                    for it in self.graph_scene.selectedItems() if isinstance(it, VItem)
+                    for it in scene.selectedItems() if isinstance(it, VItem)
                 ])
+                if self._dragged_on is not None and len(scene.selectedItems()) == 1:
+                    scene.vertex_dragged_onto.emit(self.v, self._dragged_on.v)
+                self._dragged_on = None
+                self._old_pos = None
         else:
             e.ignore()
 
@@ -224,6 +270,8 @@ class GraphScene(QGraphicsScene):
     # otherwise it doesn't work for some reason...
     vertex_double_clicked = Signal(object)  # Actual type: VT
     vertices_moved = Signal(object)  # Actual type: list[tuple[VT, float, float]]
+    vertex_dragged_onto = Signal(object, object)  # Actual types: VT, VT
+    vertex_dropped_onto = Signal(object, object)  # Actual types: VT, VT
 
     def __init__(self) -> None:
         super().__init__()
@@ -243,6 +291,12 @@ class GraphScene(QGraphicsScene):
             if isinstance(it, VItem) and it.v in vs:
                 it.setSelected(True)
                 vs.remove(it.v)
+
+    def highlight_vertex(self, v: VT) -> None:
+        for it in self.items():
+            if isinstance(it, VItem) and it.v == v:
+                it.set_highlighted(True)
+                return
 
     def set_graph(self, g: BaseGraph[VT, ET]) -> None:
         """Set the PyZX graph for the scene
