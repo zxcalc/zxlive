@@ -87,7 +87,6 @@ class ProofPanel(BasePanel):
         return do_rewrite
 
     def update_on_selection(self):
-        print("update on selection")
         selection, edges = self.parse_selection()
         g = self.graph_scene.g
 
@@ -97,7 +96,6 @@ class ProofPanel(BasePanel):
             else:
                 matches = action['matcher'](g, lambda e: e in edges)
             if matches:
-                print(name,matches)
                 action['button'].setEnabled(True)
             else:
                 action['button'].setEnabled(False)
