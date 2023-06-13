@@ -76,16 +76,16 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = self._new_action("&New...",self.new_graph,QKeySequence.New,
+        new_graph = self._new_action("&New...",self.new_graph,QKeySequence.StandardKey.New,
             "Reinitialize with an empty graph")
-        open_file = self._new_action("&Open...", self.open_file,QKeySequence.Open,
+        open_file = self._new_action("&Open...", self.open_file,QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close...", self.close_action,QKeySequence.Close,
+        close_action = self._new_action("Close...", self.close_action,QKeySequence.StandardKey.Close,
             "Closes the window")
-        close_action.setShortcuts([QKeySequence.Close, QKeySequence("Ctrl+W")])
+        close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
         # and give an open to overwrite this file with a Save action
-        save_as = self._new_action("&Save as...", self.save_as,QKeySequence.SaveAs,
+        save_as = self._new_action("&Save as...", self.save_as,QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         
         file_menu = menu.addMenu("&File")
@@ -95,19 +95,19 @@ class MainWindow(QMainWindow):
         file_menu.addAction(close_action)
         file_menu.addAction(save_as)
 
-        undo = self._new_action("Undo", self.undo, QKeySequence.Undo,
+        undo = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action")
-        redo = self._new_action("Redo", self.redo, QKeySequence.Redo,
+        redo = self._new_action("Redo", self.redo, QKeySequence.StandardKey.Redo,
             "Redoes the last action")
-        cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.Cut,
+        cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
             "Cut the selected part of the diagram")
-        copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.Copy,
+        copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.Paste,
+        paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
-        delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.Delete,
+        delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram")
-        delete_action.setShortcuts([QKeySequence.Delete,QKeySequence("Backspace")])
+        delete_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Delete),QKeySequence("Backspace")])
         
 
         edit_menu = menu.addMenu("&Edit")
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(delete_action)
 
 
-    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence,tooltip:str):
+    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str):
         action = QAction(name, self)
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
@@ -173,18 +173,18 @@ class MainWindow(QMainWindow):
         export_diagram_dialog(self.active_panel.graph_scene.g, self)
 
     def cut_graph(self):
-        if self.current_tab == Tab.EditTab:
+        if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.save_graph_copy()
             self.active_panel.delete_selection()
 
     def copy_graph(self):
-        if self.current_tab == Tab.EditTab:
+        if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.save_graph_copy()
 
     def paste_graph(self):
-        if self.current_tab == Tab.EditTab:
+        if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.paste_graph()
 
     def delete_graph(self):
-        if self.current_tab == Tab.EditTab:
+        if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.delete_selection()
