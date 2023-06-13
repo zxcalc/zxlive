@@ -1,6 +1,7 @@
 import copy
 from fractions import Fraction
 from typing import Iterator
+from PySide6.QtCore import Signal
 
 from PySide6.QtWidgets import QToolButton, QInputDialog
 from PySide6.QtGui import QShortcut
@@ -16,6 +17,7 @@ class GraphEditPanel(BasePanel):
     """Panel for the edit mode of ZX live."""
 
     graph_scene: EditGraphScene
+    start_derivation_signal = Signal(object)
 
     _curr_ety: EdgeType
     _curr_vty: VertexType
@@ -35,6 +37,11 @@ class GraphEditPanel(BasePanel):
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
+        # Toolbar section for Starting Derivation
+        self.start_derivation = QToolButton(self, text="Start Derivation")
+        self.start_derivation.clicked.connect(self._start_derivation)
+        yield ToolbarSection(self.start_derivation)
+
         # Toolbar section for picking a vertex type
         self.select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
         self.select_x = QToolButton(self, text="X Spider", checkable=True)
@@ -124,14 +131,15 @@ class GraphEditPanel(BasePanel):
         else:
             raise ValueError("Something is wrong with the state of the edge type selectors")
 
-    def save_graph_copy(self):
+    def copy_selection(self) -> BaseGraph:
         selection = list(self.graph_scene.selected_vertices)
-        self.copied_graph = self.graph_scene.g.subgraph_from_vertices(selection)
+        copied_graph = self.graph_scene.g.subgraph_from_vertices(selection)
+        return copied_graph
 
-    def paste_graph(self):
-        if self.copied_graph is None: return
+    def paste_graph(self, graph: BaseGraph) -> None:
+        if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
-        new_verts, new_edges = new_g.merge(self.copied_graph.translate(0.5,0.5))
+        new_verts, new_edges = new_g.merge(graph.translate(0.5,0.5))
         cmd = SetGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
@@ -144,3 +152,6 @@ class GraphEditPanel(BasePanel):
         new_g.remove_vertices(selection)
         cmd = SetGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
+
+    def _start_derivation(self) -> None:
+        self.start_derivation_signal.emit(self.graph_scene.g)
