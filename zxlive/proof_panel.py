@@ -1,13 +1,13 @@
 import copy
-from typing import Iterator
+from typing import Iterator, Optional
 
 from PySide6.QtWidgets import QToolButton
-from pyzx import VertexType, to_gh, basicrules
+from pyzx import VertexType, to_gh, basicrules, EdgeType
 from pyzx.graph.base import BaseGraph, VT
 import pyzx
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor
+from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor, BaseCommand
 from .graphscene import GraphScene
 from .rules import bialgebra
 
@@ -20,6 +20,8 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
         self.graph_scene.selectionChanged.connect(self.update_on_selection)
+        self.graph_scene.vertex_dragged_onto.connect(self._vertex_dragged_onto)
+        self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
@@ -103,4 +105,20 @@ class ProofPanel(BasePanel):
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
+
+    def _vertex_dragged_onto(self, v: VT, w: VT) -> None:
+        ty1, ty2 = self.graph.type(v), self.graph.type(w)
+        if ty1 == ty2 and self.graph.connected(v, w) and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.SIMPLE:
+            self.graph_scene.highlight_vertex(w)
+        # TODO: Copying, ...
+
+    def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
+        ty1, ty2 = self.graph.type(v), self.graph.type(w)
+        if ty1 == ty2 and self.graph.connected(v, w) and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.SIMPLE:
+            g = copy.deepcopy(self.graph_scene.g)
+            pyzx.basicrules.fuse(g, w, v)
+            cmd = SetGraph(self.graph_view, g)
+            self.undo_stack.push(cmd)
+        # TODO: Copying, ...
+
 
