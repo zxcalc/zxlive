@@ -34,7 +34,7 @@ class ZXLive(QApplication):
         self.setDesktopFileName('ZX Live')
         self.main_window = MainWindow()
 
-        apply_stylesheet(self, theme='light_blue.xml')
+        # apply_stylesheet(self, theme='light_blue.xml')
         add_fonts()
 
         self.lastWindowClosed.connect(self.quit)
