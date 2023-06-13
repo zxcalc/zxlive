@@ -168,7 +168,9 @@ class VItem(QGraphicsEllipseItem):
         assert isinstance(scene, GraphScene)
         if self.is_dragging and len(scene.selectedItems()) == 1:
             reset = True
-            for it in scene.items(e.scenePos(), deviceTransform=QTransform()):
+            for it in scene.items():
+                if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
+                    continue
                 if it == self._dragged_on:
                     reset = False
                 elif isinstance(it, VItem) and it != self:
@@ -178,7 +180,7 @@ class VItem(QGraphicsEllipseItem):
                         self._dragged_on.set_highlighted(False)
                     self._dragged_on = it
                     return
-            if reset:
+            if reset and self._dragged_on is not None:
                 self._dragged_on.set_highlighted(False)
                 self._dragged_on = None
         e.ignore()
@@ -191,12 +193,13 @@ class VItem(QGraphicsEllipseItem):
             if self._old_pos != self.pos():
                 scene = self.scene()
                 assert isinstance(scene, GraphScene)
-                scene.vertices_moved.emit([
-                    (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
-                    for it in scene.selectedItems() if isinstance(it, VItem)
-                ])
-                if self._dragged_on is not None and len(scene.selectedItems()) == 1:
-                    scene.vertex_dragged_onto.emit(self.v, self._dragged_on.v)
+                if self._dragged_on is not None and self._dragged_on._highlighted and len(scene.selectedItems()) == 1:
+                    scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
+                else:
+                    scene.vertices_moved.emit([
+                        (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
+                        for it in scene.selectedItems() if isinstance(it, VItem)
+                    ])
                 self._dragged_on = None
                 self._old_pos = None
         else:
