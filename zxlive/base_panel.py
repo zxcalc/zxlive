@@ -4,13 +4,15 @@ from typing import Iterator, Sequence
 
 from PySide6.QtGui import QUndoStack, QShortcut, QKeySequence
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup
-from pyzx.graph.base import BaseGraph, VT, ET
+from pyzx.graph.base import BaseGraph, VT, ET, EdgeType
 from pyzx.graph import Graph
 
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .commands import SetGraph
 
+import copy
+import pyzx
 
 @dataclass
 class ToolbarSection:
@@ -64,6 +66,9 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
 
         self._populate_toolbar()
 
+        self.graph_scene.vertex_dragged_onto.connect(self._vertex_dragged_onto)
+        self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
+
     @property
     def graph(self) -> BaseGraph[VT, ET]:
         return self.graph_scene.g
@@ -87,3 +92,18 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
 
     def select_all(self):
         self.graph_scene.select_all()
+
+    def _vertex_dragged_onto(self, v: VT, w: VT) -> None:
+        ty1, ty2 = self.graph.type(v), self.graph.type(w)
+        if ty1 == ty2 and self.graph.connected(v, w) and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.SIMPLE:
+            self.graph_scene.highlight_vertex(w)
+        # TODO: Copying, ...
+
+    def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
+        ty1, ty2 = self.graph.type(v), self.graph.type(w)
+        if ty1 == ty2 and self.graph.connected(v, w) and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.SIMPLE:
+            g = copy.deepcopy(self.graph_scene.g)
+            pyzx.basicrules.fuse(g, w, v)
+            cmd = SetGraph(self.graph_view, g)
+            self.undo_stack.push(cmd)
+        # TODO: Copying, ...
