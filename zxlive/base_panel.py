@@ -107,3 +107,8 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
             cmd = SetGraph(self.graph_view, g)
             self.undo_stack.push(cmd)
         # TODO: Copying, ...
+
+    def copy_selection(self) -> BaseGraph:
+        selection = list(self.graph_scene.selected_vertices)
+        copied_graph = self.graph_scene.g.subgraph_from_vertices(selection)
+        return copied_graph

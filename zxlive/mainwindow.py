@@ -164,8 +164,7 @@ class MainWindow(QMainWindow):
             self.active_panel.delete_selection()
 
     def copy_graph(self):
-        if isinstance(self.active_panel, GraphEditPanel):
-            self.copied_graph = self.active_panel.copy_selection()
+        self.copied_graph = self.active_panel.copy_selection()
 
     def paste_graph(self):
         if isinstance(self.active_panel, GraphEditPanel):

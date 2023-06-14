@@ -131,11 +131,6 @@ class GraphEditPanel(BasePanel):
         else:
             raise ValueError("Something is wrong with the state of the edge type selectors")
 
-    def copy_selection(self) -> BaseGraph:
-        selection = list(self.graph_scene.selected_vertices)
-        copied_graph = self.graph_scene.g.subgraph_from_vertices(selection)
-        return copied_graph
-
     def paste_graph(self, graph: BaseGraph) -> None:
         if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
