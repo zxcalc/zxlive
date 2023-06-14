@@ -26,10 +26,9 @@ from pyzx.utils import phase_to_s
 
 SCALE = 60.0
 ZX_GREEN = "#ccffcc"
-ZX_GREEN_PRESSED = "#006600"
+ZX_GREEN_PRESSED = "#64BC90"
 ZX_RED = "#ff8888"
-ZX_RED_PRESSED = "#660000"
-
+ZX_RED_PRESSED = "#bb0f0f"
 
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
@@ -47,6 +46,8 @@ class VItem(QGraphicsEllipseItem):
     phase_item: PhaseItem
     adj_items: Set[EItem]  # Connected edges
     graph_scene: GraphScene
+    
+    halftone = "1000100010001000" #QPixmap("images/halftone.png")
 
     # Position before starting a drag-move
     _old_pos: Optional[QPointF]
@@ -105,15 +106,29 @@ class VItem(QGraphicsEllipseItem):
                 self.setBrush(QBrush(QColor(ZX_RED)))
             else:
                 self.setBrush(QBrush(QColor("#000000")))
+            pen = QPen()
+            pen.setWidthF(3)
+            pen.setColor(QColor("black"))
+            self.setPen(pen)
 
         if self.isSelected():
+            pen = QPen()
+            pen.setWidthF(5)
             t = self.g.type(self.v)
             if t == VertexType.Z:
-                self.setBrush(QBrush(QColor(ZX_GREEN_PRESSED)))
+                brush = QBrush(QColor(ZX_GREEN_PRESSED))
+                brush.setStyle(Qt.Dense1Pattern)
+                self.setBrush(brush)
             elif t == VertexType.X:
-                self.setBrush(QBrush(QColor(ZX_RED_PRESSED)))
+                brush = QBrush(QColor(ZX_RED_PRESSED))
+                brush.setStyle(Qt.Dense1Pattern)
+                self.setBrush(brush)
             else:
-                self.setBrush(QBrush(QColor("#444444")))
+                brush = QBrush(QColor("#444444"))
+                brush.setStyle(Qt.Dense1Pattern)
+                self.setBrush(brush)
+                pen.setColor(QColor("#444444"))
+            self.setPen(pen)
 
         if self.phase_item:
             self.phase_item.refresh()
