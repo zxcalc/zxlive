@@ -95,20 +95,25 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
 
     def _vertex_dragged_onto(self, v: VT, w: VT) -> None:
         ty1, ty2 = self.graph.type(v), self.graph.type(w)
-        if ty1 == ty2 and self.graph.connected(v, w) and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.SIMPLE:
+        if pyzx.basicrules.check_fuse(self.graph,v,w):
             self.graph_scene.highlight_vertex(w)
-        # TODO: Copying, ...
+        elif pyzx.basicrules.check_strong_comp(self.graph,v,w):
+            self.graph_scene.highlight_vertex(w)
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
-        ty1, ty2 = self.graph.type(v), self.graph.type(w)
-        if ty1 == ty2 and self.graph.connected(v, w) and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.SIMPLE:
-            g = copy.deepcopy(self.graph_scene.g)
-            pyzx.basicrules.fuse(g, w, v)
+        rule = None
+        if pyzx.basicrules.check_fuse(self.graph,v,w):
+            rule = pyzx.basicrules.fuse
+        elif pyzx.basicrules.check_strong_comp(self.graph,v,w):
+            rule = pyzx.basicrules.strong_comp
+        if rule is not None:
+            g = copy.deepcopy(self.graph)
+            rule(g,w,v)
             cmd = SetGraph(self.graph_view, g)
             self.undo_stack.push(cmd)
-        # TODO: Copying, ...
+
 
     def copy_selection(self) -> BaseGraph:
         selection = list(self.graph_scene.selected_vertices)
-        copied_graph = self.graph_scene.g.subgraph_from_vertices(selection)
+        copied_graph = self.graph.subgraph_from_vertices(selection)
         return copied_graph
