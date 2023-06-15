@@ -29,6 +29,7 @@ ZX_GREEN = "#ccffcc"
 ZX_GREEN_PRESSED = "#64BC90"
 ZX_RED = "#ff8888"
 ZX_RED_PRESSED = "#bb0f0f"
+HAD_EDGE_BLUE = "#0077ff"
 
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
@@ -95,7 +96,6 @@ class VItem(QGraphicsEllipseItem):
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
-
         self.setScale(1.25 if self._highlighted else 1)
 
         if not self.isSelected():
@@ -249,12 +249,22 @@ class EItem(QGraphicsPathItem):
     def __init__(self, g: BaseGraph[VT, ET], e: ET, s_item: VItem, t_item: VItem):
         super().__init__()
         self.setZValue(EITEM_Z)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+
         self.g = g
         self.e = e
         self.s_item = s_item
         self.t_item = t_item
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
+        self.selection_node = QGraphicsEllipseItem(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
+        pen = QPen()
+        pen.setWidthF(4)
+        pen.setColor(QColor('#0022FF'))
+        self.selection_node.setPen(pen)
+        self.selection_node.setOpacity(0.5)
+        # self.selection_node.setVisible(False)
 
         self.refresh()
 
@@ -265,7 +275,7 @@ class EItem(QGraphicsPathItem):
         pen = QPen()
         pen.setWidthF(3)
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
-            pen.setColor(QColor("#0077ff"))
+            pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
         else:
             pen.setColor(QColor("#000000"))
@@ -276,6 +286,36 @@ class EItem(QGraphicsPathItem):
         path.moveTo(self.s_item.pos())
         path.lineTo(self.t_item.pos())
         self.setPath(path)
+
+        avg_x = 0.5*(self.s_item.pos().x() + self.t_item.pos().x())
+        avg_y = 0.5*(self.s_item.pos().y() + self.t_item.pos().y())
+        self.selection_node.setPos(avg_x,avg_y)
+        if self.isSelected():
+            self.selection_node.setVisible(True)
+        else:
+            self.selection_node.setVisible(False)
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
+        # By default, Qt draws a dashed rectangle around selected items.
+        # We have our own implementation to draw selected vertices, so
+        # we intercept the selected option here.
+        option.state &= ~QStyle.State_Selected
+        super().paint(painter, option, widget)
+
+    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
+        # Intercept selection- and position-has-changed events to call `refresh`.
+        # Note that the position and selected values are already updated when
+        # this event fires.
+        if change in (QGraphicsItem.ItemSelectedHasChanged, QGraphicsItem.ItemPositionHasChanged):
+            self.refresh()
+
+        return super().itemChange(change, value)
+
+    def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mousePressEvent(e)
+        self.refresh()
+
+
 
 
 class GraphScene(QGraphicsScene):
@@ -300,6 +340,11 @@ class GraphScene(QGraphicsScene):
     def selected_vertices(self) -> Iterator[VT]:
         """An iterator over all currently selected vertices."""
         return (it.v for it in self.selectedItems() if isinstance(it, VItem))
+
+    @property
+    def selected_edges(self) -> Iterator[ET]:
+        return (it.e for it in self.selectedItems() if isinstance(it, EItem))
+    
 
     def select_vertices(self, vs: Iterable[VT]) -> None:
         """Selects the given collection of vertices."""
@@ -338,7 +383,9 @@ class GraphScene(QGraphicsScene):
 
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
-            self.addItem(EItem(self.g, e, v_items[s], v_items[t]))
+            ei = EItem(self.g, e, v_items[s], v_items[t])
+            self.addItem(ei)
+            self.addItem(ei.selection_node)
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!

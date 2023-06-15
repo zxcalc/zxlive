@@ -20,7 +20,7 @@ from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 
 from pyzx.graph.base import BaseGraph, VT, ET
-from .graphscene import GraphScene, VItem
+from .graphscene import GraphScene, VItem, EItem
 
 from enum import Enum
 from dataclasses import dataclass
@@ -78,7 +78,7 @@ class GraphView(QGraphicsView):
     def mousePressEvent(self, e: QMouseEvent) -> None:
         super().mousePressEvent(e)
 
-        if e.button() == Qt.LeftButton and all(not isinstance(it, VItem) for it in self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform())):
+        if e.button() == Qt.LeftButton and not self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform()):
             if self.tool == GraphTool.Selection:
                 self._rubberband_start = e.pos()
                 self.rubberband.setGeometry(QRect(self._rubberband_start, QSize()))
