@@ -61,7 +61,9 @@ class GraphView(QGraphicsView):
         super().__init__(self.graph_scene)
         self.setMouseTracking(True)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        # self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        #self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # This has to be enabled based on keyboard shortcuts
 
         # We implement the rubberband logic ourselves. Note that there is also
         # the option to set `self.setDragMode(QGraphicsView.RubberBandDrag)`,
