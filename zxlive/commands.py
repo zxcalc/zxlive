@@ -94,6 +94,27 @@ class ChangeNodeColor(BaseCommand):
 
 
 @dataclass
+class ChangeEdgeColor(BaseCommand):
+    """Changes the color of a set of edges"""
+    es: Iterable[ET]
+    ety: EdgeType
+
+    _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._old_etys is not None
+        for e, old_ety in zip(self.es, self._old_etys):  # TODO: strict=True in Python 3.10
+            self.g.set_edge_type(e, old_ety)
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._old_etys = [self.g.edge_type(e) for e in self.es]
+        for e in self.es:
+            self.g.set_edge_type(e, self.ety)
+        self.update_graph_view()
+
+
+@dataclass
 class AddNode(BaseCommand):
     """Adds a new spider at a given position."""
     x: float

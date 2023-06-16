@@ -9,7 +9,9 @@ from pyzx import EdgeType, VertexType
 from pyzx.graph.base import BaseGraph, VT
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor
+from .commands import (
+    AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor,
+    ChangeEdgeColor)
 from .graphscene import EditGraphScene
 
 
@@ -74,6 +76,10 @@ class GraphEditPanel(BasePanel):
     def _ety_clicked(self, ety: EdgeType) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
+        selected = list(self.graph_scene.selected_edges)
+        if len(selected) > 0:
+            cmd = ChangeEdgeColor(self.graph_view, selected, ety)
+            self.undo_stack.push(cmd)
 
     def _add_vert(self, x: float, y: float) -> None:
         cmd = AddNode(self.graph_view, x, y, self._curr_vty)
