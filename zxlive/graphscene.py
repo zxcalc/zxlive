@@ -387,6 +387,11 @@ class GraphScene(QGraphicsScene):
             self.addItem(ei)
             self.addItem(ei.selection_node)
 
+    def select_all(self):
+        """Selects all vertices and edges in the scene."""
+        for it in self.items():
+            it.setSelected(True)
+
 
 # TODO: This is essentially a clone of EItem. We should common it up!
 class EDragItem(QGraphicsPathItem):
@@ -481,8 +486,3 @@ class EditGraphScene(GraphScene):
                 self.vertex_added.emit(p.x() / SCALE, p.y() / SCALE)
         else:
             e.ignore()
-
-    def select_all(self):
-        """Selects all vertices and edges in the scene."""
-        for it in self.items():
-            it.setSelected(True)
