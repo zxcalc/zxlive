@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
             "Create a new tab")
         self.addAction(new_tab)
         select_all = self._new_action("Select All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
-
+        
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
         edit_menu.addAction(redo)
