@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
             "Create a new tab")
         self.addAction(new_tab)
         select_all = self._new_action("Select All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
-        
+
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
         edit_menu.addAction(redo)
@@ -149,7 +149,11 @@ class MainWindow(QMainWindow):
             self.active_panel.undo_stack.push(cmd)
 
     def close_action(self):
-        self.close()
+        i = self.tab_widget.currentIndex()
+        if i != -1:
+            self.tab_widget.tabCloseRequested.emit(i)
+        else: # no tabs open
+            self.close()
 
     def save_as(self):
         export_diagram_dialog(self.active_panel.graph_scene.g, self)
