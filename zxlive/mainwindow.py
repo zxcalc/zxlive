@@ -110,8 +110,7 @@ class MainWindow(QMainWindow):
             "Create a new tab")
         self.addAction(new_tab)
         select_all = self._new_action("Select All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
-        self.addAction(select_all)
-
+        
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
         edit_menu.addAction(redo)
@@ -120,7 +119,8 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(copy_action)
         edit_menu.addAction(paste_action)
         edit_menu.addAction(delete_action)
-
+        edit_menu.addSeparator()
+        edit_menu.addAction(select_all)
 
     def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str):
         action = QAction(name, self)
@@ -129,14 +129,16 @@ class MainWindow(QMainWindow):
         action.setShortcut(shortcut)
         return action
 
+    @property
+    def active_panel(self):
+        return self.tab_widget.currentWidget()
+
+
     def closeEvent(self, e: QCloseEvent) -> None:
         # save the shape/size of this window on close
         conf = QSettings("zxlive", "zxlive")
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
-
-    def new_graph(self,e):
-        self.active_panel.clear_graph()
 
     def undo(self,e):
         self.active_panel.undo_stack.undo()
@@ -155,8 +157,7 @@ class MainWindow(QMainWindow):
         self.close()
 
     def save_as(self):
-        active_panel = self.tab_widget.currentWidget()
-        export_diagram_dialog(active_panel.graph_scene.g, self)
+        export_diagram_dialog(self.active_panel.graph_scene.g, self)
 
     def cut_graph(self):
         if isinstance(self.active_panel, GraphEditPanel):
@@ -185,10 +186,6 @@ class MainWindow(QMainWindow):
         panel = ProofPanel(graph)
         self.tab_widget.addTab(panel, "New Proof")
         self.tab_widget.setCurrentWidget(panel)
-
-    @property
-    def active_panel(self):
-        return self.tab_widget.currentWidget()
 
     def select_all(self):
         self.active_panel.select_all()
