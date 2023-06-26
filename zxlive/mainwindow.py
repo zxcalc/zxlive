@@ -143,10 +143,9 @@ class MainWindow(QMainWindow):
 
     def open_file(self):
         # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
-        g = import_diagram_dialog(self)
+        g, name = import_diagram_dialog(self)
         if g is not None:
-            cmd = SetGraph(self.active_panel.graph_view, g)
-            self.active_panel.undo_stack.push(cmd)
+            self.new_graph(g, name)
 
     def close_action(self):
         i = self.tab_widget.currentIndex()
@@ -174,11 +173,12 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.delete_selection()
 
-    def new_graph(self, graph=None):
+    def new_graph(self, graph=None, name:Optional[str]=None):
         graph = graph or Graph()
         panel = GraphEditPanel(graph)
         panel.start_derivation_signal.connect(self.new_deriv)
-        self.tab_widget.addTab(panel, "New Graph")
+        if name is None: name = "New Graph"
+        self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
 
     def new_deriv(self, graph):

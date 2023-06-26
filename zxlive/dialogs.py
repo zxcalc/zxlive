@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Tuple
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream
+from PySide6.QtCore import QFile, QFileInfo, QIODevice, QTextStream
 from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox
 from pyzx import Graph, Circuit, extract_circuit
 from pyzx.graph.base import BaseGraph, VT, ET
@@ -14,6 +14,7 @@ class FileFormat(Enum):
     QASM = "quasm", "QASM"
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
+    All = "*", "All"
 
     def __new__(cls, *args, **kwds):
         obj = object.__new__(cls)
@@ -52,7 +53,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
     msg.exec()
 
 
-def import_diagram_dialog(parent: QWidget) -> Optional[BaseGraph[VT, ET]]:
+def import_diagram_dialog(parent: QWidget) -> Optional[Tuple[BaseGraph[VT, ET],str]]:
     """Shows a dialog to import a diagram from disk.
 
     Returns the imported graph or `None` if the import failed."""
@@ -73,16 +74,31 @@ def import_diagram_dialog(parent: QWidget) -> Optional[BaseGraph[VT, ET]]:
     stream = QTextStream(file)
     data = stream.readAll()
     file.close()
+    name = QFileInfo(file_path).baseName()
 
     # TODO: This would be nicer with match statements...
     try:
         if selected_format in (FileFormat.QGraph, FileFormat.Json):
-            return Graph().from_json(data)
+            return Graph.from_json(data), name
         elif selected_format == FileFormat.QASM:
-            return Circuit.from_qasm(data).to_graph()
+            return Circuit.from_qasm(data).to_graph(), name
+        elif selected_format == FileFormat.TikZ:
+            return Graph.from_tikz(data), name
         else:
-            assert selected_format == FileFormat.TikZ
-            return Graph().from_tikz(data)
+            assert selected_format == FileFormat.All
+            try:
+                circ = Circuit.load(file_path)
+                return circ.to_graph(), name
+            except TypeError:
+                try:
+                    return Graph.from_json(data), name
+                except Exception:
+                    try:
+                        return Graph.from_tikz(data), name
+                    except:
+                        show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
+                        return None
+
     except Exception as e:
         show_error_msg(f"Failed to import {selected_format.name} file", str(e))
         return None
