@@ -145,6 +145,13 @@ class MainWindow(QMainWindow):
     def redo(self,e):
         self.active_panel.undo_stack.redo()
 
+    def update_tab_name(self, clean:bool):
+        i = self.tab_widget.currentIndex()
+        name = self.tab_widget.tabText(i)
+        if name.endswith("*"): name = name[:-1]
+        if not clean: name += "*"
+        self.tab_widget.setTabText(i,name)
+
     def open_file(self):
         # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
         out = import_diagram_dialog(self)
@@ -181,17 +188,19 @@ class MainWindow(QMainWindow):
         out = QTextStream(file)
         out << data
         file.close()
+        self.active_panel.undo_stack.setClean()
 
 
     def save_as(self):
         out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
-        if out is not None:
-            file_path, file_type = out
-            self.active_panel.file_path = file_path
-            self.active_panel.file_type = file_type
-            name = QFileInfo(file_path).baseName()
-            i = self.tab_widget.currentIndex()
-            self.tab_widget.setTabText(i,name)
+        if out is None: return
+        file_path, file_type = out
+        self.active_panel.file_path = file_path
+        self.active_panel.file_type = file_type
+        self.active_panel.undo_stack.setClean()
+        name = QFileInfo(file_path).baseName()
+        i = self.tab_widget.currentIndex()
+        self.tab_widget.setTabText(i,name)
 
 
     def cut_graph(self):
@@ -217,11 +226,13 @@ class MainWindow(QMainWindow):
         if name is None: name = "New Graph"
         self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
+        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
     def new_deriv(self, graph):
         panel = ProofPanel(graph)
         self.tab_widget.addTab(panel, "New Proof")
         self.tab_widget.setCurrentWidget(panel)
+        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
     def select_all(self):
         self.active_panel.select_all()
