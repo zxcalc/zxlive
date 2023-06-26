@@ -18,13 +18,14 @@ from typing import Callable
 
 from enum import IntEnum
 
+from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice
 from PySide6.QtGui import QAction, QShortcut
 
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
 from .commands import SetGraph
-from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg
+from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 
 from pyzx import Graph
 
@@ -78,7 +79,9 @@ class MainWindow(QMainWindow):
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
         # and give an open to overwrite this file with a Save action
-        save_as = self._new_action("&Save as...", self.save_as,QKeySequence.StandardKey.SaveAs,
+        save_file = self._new_action("&Save", self.save_file,QKeySequence.StandardKey.Save,
+            "Save the diagram by overwriting the previous loaded file.")
+        save_as = self._new_action("Save &as...", self.save_as,QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         
         file_menu = menu.addMenu("&File")
@@ -86,6 +89,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_file)
         file_menu.addSeparator()
         file_menu.addAction(close_action)
+        file_menu.addAction(save_file)
         file_menu.addAction(save_as)
 
         undo = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
@@ -145,8 +149,10 @@ class MainWindow(QMainWindow):
         # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
         out = import_diagram_dialog(self)
         if out is not None:
-            g, name = out
-            self.new_graph(g, name)
+            name = QFileInfo(out.file_path).baseName()
+            self.new_graph(out.g, name)
+            self.active_panel.file_path = out.file_path
+            self.active_panel.file_type = out.file_type
 
     def close_action(self):
         i = self.tab_widget.currentIndex()
@@ -155,8 +161,38 @@ class MainWindow(QMainWindow):
         else: # no tabs open
             self.close()
 
+    def save_file(self):
+        if self.active_panel.file_path is None:
+            return self.save_as()
+        if self.active_panel.file_type == FileFormat.QASM:
+            show_error_msg("Can't save to circuit file",
+                "You imported this file from a circuit description. You can currently only save it in a graph format.")
+            return self.save_as()
+
+        if self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
+            data = self.active_panel.graph.to_json()
+        elif self.active_panel.file_type == FileFormat.TikZ:
+            data = self.active_panel.graph.to_tikz()
+        
+        file = QFile(self.active_panel.file_path)
+        if not file.open(QIODevice.WriteOnly | QIODevice.Text):
+            show_error_msg("Could not write to file")
+            return
+        out = QTextStream(file)
+        out << data
+        file.close()
+
+
     def save_as(self):
-        export_diagram_dialog(self.active_panel.graph_scene.g, self)
+        out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
+        if out is not None:
+            file_path, file_type = out
+            self.active_panel.file_path = file_path
+            self.active_panel.file_type = file_type
+            name = QFileInfo(file_path).baseName()
+            i = self.tab_widget.currentIndex()
+            self.tab_widget.setTabText(i,name)
+
 
     def cut_graph(self):
         if isinstance(self.active_panel, GraphEditPanel):

@@ -1,20 +1,23 @@
 from enum import Enum
 from typing import Optional, Tuple
+from dataclasses import dataclass
 
-from PySide6.QtCore import QFile, QFileInfo, QIODevice, QTextStream
+from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox
 from pyzx import Graph, Circuit, extract_circuit
-from pyzx.graph.base import BaseGraph, VT, ET
+from pyzx.graph.base import BaseGraph
+
+from .common import VT,ET, GraphT
 
 
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
 
+    All = "zxg *.json *.qasm *.tikz", "All Supported Formats"
     QGraph = "zxg", "QGraph"  # "file extension", "format name"
-    QASM = "quasm", "QASM"
+    QASM = "qasm", "QASM"
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
-    All = "*", "All"
 
     def __new__(cls, *args, **kwds):
         obj = object.__new__(cls)
@@ -44,6 +47,12 @@ class FileFormat(Enum):
         Used by `QFileDialog` to filter the shown file extensions."""
         return f"{self.name} (*.{self.extension})"
 
+@dataclass
+class ImportOutput:
+    file_type: FileFormat
+    file_path: str
+    g: GraphT
+
 
 def show_error_msg(title: str, description: Optional[str] = None) -> None:
     """Displays an error message box."""
@@ -53,7 +62,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
     msg.exec()
 
 
-def import_diagram_dialog(parent: QWidget) -> Optional[Tuple[BaseGraph[VT, ET],str]]:
+def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
     """Shows a dialog to import a diagram from disk.
 
     Returns the imported graph or `None` if the import failed."""
@@ -74,27 +83,26 @@ def import_diagram_dialog(parent: QWidget) -> Optional[Tuple[BaseGraph[VT, ET],s
     stream = QTextStream(file)
     data = stream.readAll()
     file.close()
-    name = QFileInfo(file_path).baseName()
 
     # TODO: This would be nicer with match statements...
     try:
         if selected_format in (FileFormat.QGraph, FileFormat.Json):
-            return Graph.from_json(data), name
+            return ImportOutput(selected_format, file_path, Graph.from_json(data))
         elif selected_format == FileFormat.QASM:
-            return Circuit.from_qasm(data).to_graph(), name
+            return ImportOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph())
         elif selected_format == FileFormat.TikZ:
-            return Graph.from_tikz(data), name
+            return ImportOutput(selected_format, file_path, Graph.from_tikz(data))
         else:
             assert selected_format == FileFormat.All
             try:
                 circ = Circuit.load(file_path)
-                return circ.to_graph(), name
+                return ImportOutput(FileFormat.QASM, file_path, circ.to_graph())
             except TypeError:
                 try:
-                    return Graph.from_json(data), name
+                    return ImportOutput(selected_format, file_path, Graph.from_json(data))
                 except Exception:
                     try:
-                        return Graph.from_tikz(data), name
+                        return ImportOutput(selected_format, file_path, Graph.from_tikz(data))
                     except:
                         show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
                         return None
@@ -116,7 +124,12 @@ def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> bool:
     if selected_filter == "":
         # This happens if the user clicks on cancel
         return False
+
+    ext = file_path.split(".")[-1]
+
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
+    if selected_format == FileFormat.All:
+        selected_format = next(f for f in FileFormat if f.extension == ext)
 
     # Add file extension if it's not already there
     if file_path.split(".")[-1].lower() != selected_format.extension:
@@ -142,4 +155,4 @@ def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> bool:
     out = QTextStream(file)
     out << data
     file.close()
-    return True
+    return file_path, selected_format

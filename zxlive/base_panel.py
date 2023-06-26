@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
-from typing import Iterator, Sequence
+from typing import Iterator, Sequence, Optional
 
 from PySide6.QtGui import QUndoStack, QShortcut, QKeySequence
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup
@@ -10,6 +10,7 @@ from pyzx.graph import Graph
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .commands import SetGraph
+from .dialogs import FileFormat
 
 import copy
 import pyzx
@@ -47,6 +48,8 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
 
     toolbar: QToolBar
     undo_stack: QUndoStack
+    file_path: Optional[str]
+    file_type: Optional[FileFormat]
 
     def __init__(self, graph: BaseGraph, graph_scene: GraphScene) -> None:
         super().__init__()
@@ -63,6 +66,8 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         self.layout().addWidget(self.graph_view)
 
         self.graph_view.set_graph(graph)
+        self.file_path = None
+        self.file_type = None
 
         self._populate_toolbar()
 
