@@ -143,8 +143,9 @@ class MainWindow(QMainWindow):
 
     def open_file(self):
         # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
-        g, name = import_diagram_dialog(self)
-        if g is not None:
+        out = import_diagram_dialog(self)
+        if out is not None:
+            g, name = out
             self.new_graph(g, name)
 
     def close_action(self):
