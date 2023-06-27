@@ -109,7 +109,9 @@ class MainWindow(QMainWindow):
         new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.AddTab,
             "Create a new tab")
         self.addAction(new_tab)
-        select_all = self._new_action("Select All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
+        select_all = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
+        deselect_all = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect, "Deselect all")
+        deselect_all.setShortcuts([QKeySequence(QKeySequence.StandardKey.Deselect), QKeySequence("Ctrl+D")])
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(undo)
@@ -121,6 +123,7 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(delete_action)
         edit_menu.addSeparator()
         edit_menu.addAction(select_all)
+        edit_menu.addAction(deselect_all)
 
     def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str):
         action = QAction(name, self)
@@ -258,3 +261,6 @@ class MainWindow(QMainWindow):
 
     def select_all(self):
         self.active_panel.select_all()
+
+    def deselect_all(self):
+        self.active_panel.deselect_all()

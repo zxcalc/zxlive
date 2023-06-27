@@ -98,6 +98,9 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     def select_all(self):
         self.graph_scene.select_all()
 
+    def deselect_all(self):
+        self.graph_scene.clearSelection()
+
     def _vertex_dragged_onto(self, v: VT, w: VT) -> None:
         ty1, ty2 = self.graph.type(v), self.graph.type(w)
         if pyzx.basicrules.check_fuse(self.graph,v,w):
