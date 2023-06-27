@@ -20,6 +20,7 @@ from enum import IntEnum
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice
 from PySide6.QtGui import QAction, QShortcut
+from PySide6.QtWidgets import QMessageBox
 
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
@@ -134,15 +135,23 @@ class MainWindow(QMainWindow):
 
 
     def closeEvent(self, e: QCloseEvent) -> None:
+        while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
+            success = self.close_action()
+            if not success: 
+                e.ignore()  # Abort the closing
+                return
+
         # save the shape/size of this window on close
         conf = QSettings("zxlive", "zxlive")
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
     def undo(self,e):
+        if self.active_panel is None: return
         self.active_panel.undo_stack.undo()
 
     def redo(self,e):
+        if self.active_panel is None: return
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean:bool):
@@ -163,10 +172,19 @@ class MainWindow(QMainWindow):
 
     def close_action(self):
         i = self.tab_widget.currentIndex()
-        if i != -1:
-            self.tab_widget.tabCloseRequested.emit(i)
-        else: # no tabs open
+        if i == -1: # no tabs open
             self.close()
+        if not self.active_panel.undo_stack.isClean():
+            name = self.tab_widget.tabText(i).replace("*","")
+            answer = QMessageBox.question(self, "Save Changes", 
+                            f"Do you wish to save your changes to {name} before closing?",
+                            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            if answer == QMessageBox.Cancel: return False
+            if answer == QMessageBox.Yes:
+                val = self.save_file()
+                if not val: return
+        self.tab_widget.tabCloseRequested.emit(i)
+        return True
 
     def save_file(self):
         if self.active_panel.file_path is None:
@@ -180,20 +198,23 @@ class MainWindow(QMainWindow):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
             data = self.active_panel.graph.to_tikz()
+        else:
+            raise TypeError("Unknown file format", self.active_panel.file_type)
         
         file = QFile(self.active_panel.file_path)
         if not file.open(QIODevice.WriteOnly | QIODevice.Text):
             show_error_msg("Could not write to file")
-            return
+            return False
         out = QTextStream(file)
         out << data
         file.close()
         self.active_panel.undo_stack.setClean()
+        return True
 
 
     def save_as(self):
         out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
-        if out is None: return
+        if out is None: return False
         file_path, file_type = out
         self.active_panel.file_path = file_path
         self.active_panel.file_type = file_type
@@ -201,6 +222,7 @@ class MainWindow(QMainWindow):
         name = QFileInfo(file_path).baseName()
         i = self.tab_widget.currentIndex()
         self.tab_widget.setTabText(i,name)
+        return True
 
 
     def cut_graph(self):

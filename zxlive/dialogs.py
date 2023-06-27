@@ -99,10 +99,10 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
                 return ImportOutput(FileFormat.QASM, file_path, circ.to_graph())
             except TypeError:
                 try:
-                    return ImportOutput(selected_format, file_path, Graph.from_json(data))
+                    return ImportOutput(FileFormat.QGraph, file_path, Graph.from_json(data))
                 except Exception:
                     try:
-                        return ImportOutput(selected_format, file_path, Graph.from_tikz(data))
+                        return ImportOutput(FileFormat.TikZ, file_path, Graph.from_tikz(data))
                     except:
                         show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
                         return None
@@ -112,7 +112,7 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
         return None
 
 
-def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> bool:
+def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> Optional[Tuple[str,FileFormat]]:
     """Shows a dialog to export the given diagram to disk.
 
     Returns `True` if the diagram was successfully saved."""
@@ -123,10 +123,9 @@ def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> bool:
     )
     if selected_filter == "":
         # This happens if the user clicks on cancel
-        return False
+        return None
 
     ext = file_path.split(".")[-1]
-
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
     if selected_format == FileFormat.All:
         selected_format = next(f for f in FileFormat if f.extension == ext)
@@ -142,7 +141,7 @@ def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> bool:
             circuit = extract_circuit(graph)
         except Exception as e:
             show_error_msg("Failed to convert the diagram to a circuit", str(e))
-            return False
+            return None
         data = circuit.to_qasm()
     else:
         assert selected_format == FileFormat.TikZ
@@ -151,7 +150,7 @@ def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> bool:
     file = QFile(file_path)
     if not file.open(QIODevice.WriteOnly | QIODevice.Text):
         show_error_msg("Could not write to file")
-        return False
+        return None
     out = QTextStream(file)
     out << data
     file.close()
