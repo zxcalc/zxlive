@@ -139,7 +139,5 @@ class ProofPanel(BasePanel):
 
         item1 = self.graph_scene.vertex_map[vertex]
         item2 = self.graph_scene.vertex_map[left_vert]
-
-        # We must assign the animations to a
         animate(item1, old_pos, item1.pos())
         animate(item2, old_pos, item2.pos())
