@@ -43,7 +43,7 @@ class WandTrace:
 WAND_COLOR = "#500050"
 WAND_WIDTH = 3.0
 
-ZOOMFACTOR = 1.20 # Specifies how sensitive zooming with the mousewheel is
+ZOOMFACTOR = 0.05 # Specifies how sensitive zooming with the mousewheel is
 
 class GraphView(QGraphicsView):
     """QtWidget containing a graph
@@ -159,10 +159,13 @@ class GraphView(QGraphicsView):
         oldPos = self.mapToScene(QPoint(int(p.x()),int(p.y())))
 
         # Zoom
-        if event.angleDelta().y() > 0:
-            zoomFactor = zoomInFactor
-        else:
-            zoomFactor = zoomOutFactor
+        ydelta = event.angleDelta().y()/10
+        zoomfactor = 1.0
+        print(ydelta)
+        if ydelta > 0:
+            zoomFactor = 1 + zoomInFactor * ydelta
+        elif ydelta < 0:
+            zoomFactor = 1/(1 + zoomInFactor *(-ydelta))
         self.scale(zoomFactor, zoomFactor)
 
         # Get the new position
