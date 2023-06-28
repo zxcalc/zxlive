@@ -1,14 +1,13 @@
-from __future__ import annotations
-from PySide6.QtCore import QByteArray, QSettings
-from PySide6.QtGui import *
-from PySide6.QtWidgets import *
+from typing import List
+
 import pyzx as zx
 from pyzx.utils import EdgeType, VertexType
 import copy
-from pyzx.graph import Graph
+
+from .common import GraphT, Graph
 
 
-def construct_circuit():
+def construct_circuit() -> GraphT:
     qubits = 4
 
     vlist = [
@@ -23,7 +22,7 @@ def construct_circuit():
 
     nvertices = len(vlist) + (2 * qubits)
 
-    ty = [VertexType.BOUNDARY] * nvertices
+    ty: List[VertexType.Type] = [VertexType.BOUNDARY] * nvertices
 
     nvlist = []
     # Adding inputs nodes to the nvlist.

@@ -6,8 +6,8 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QToolButton, QInputDialog
 from PySide6.QtGui import QShortcut
 from pyzx import EdgeType, VertexType
-from pyzx.graph.base import BaseGraph, VT
 
+from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
     AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor,
@@ -24,7 +24,7 @@ class GraphEditPanel(BasePanel):
     _curr_ety: EdgeType
     _curr_vty: VertexType
 
-    def __init__(self, graph: BaseGraph) -> None:
+    def __init__(self, graph: GraphT) -> None:
         self.graph_scene = EditGraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
@@ -33,9 +33,6 @@ class GraphEditPanel(BasePanel):
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
-        # Currently the copied part is stored internally, and is not made available to the clipboard.
-        # We could do this by using pyperclip.
-        self.copied_graph: Optional[BaseGraph[VT,ET]] = None
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
@@ -137,7 +134,7 @@ class GraphEditPanel(BasePanel):
         else:
             raise ValueError("Something is wrong with the state of the edge type selectors")
 
-    def paste_graph(self, graph: BaseGraph) -> None:
+    def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5,0.5))

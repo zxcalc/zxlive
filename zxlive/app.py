@@ -14,10 +14,9 @@
 # limitations under the License.
 
 from __future__ import annotations
-from PySide6.QtCore import *
-from PySide6.QtWidgets import *
+
+from PySide6.QtWidgets import QApplication
 import sys
-from qt_material import apply_stylesheet, add_fonts
 
 from .mainwindow import MainWindow
 
@@ -33,9 +32,6 @@ class ZXLive(QApplication):
         self.setApplicationName('ZX Live')
         self.setDesktopFileName('ZX Live')
         self.main_window = MainWindow()
-
-        # apply_stylesheet(self, theme='light_blue.xml')
-        add_fonts()
 
         self.lastWindowClosed.connect(self.quit)
 

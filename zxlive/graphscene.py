@@ -16,12 +16,16 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QPointF, Signal
-from PySide6.QtGui import *
-from PySide6.QtWidgets import *
+from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QKeyEvent, QPainterPath, \
+    QMouseEvent,  QCursor, QPixmap, QTransform, QFont
+from PySide6.QtWidgets import QWidget, QGraphicsEllipseItem, QGraphicsTextItem, QGraphicsPathItem, QGraphicsItem, \
+    QGraphicsScene, QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 from typing import Optional, Set, Iterator, Iterable, Any, Dict
 
-from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
+from pyzx.graph.base import VertexType, EdgeType
 from pyzx.utils import phase_to_s
+
+from .common import VT, ET, GraphT
 
 
 SCALE = 60.0
@@ -74,9 +78,9 @@ class VItem(QGraphicsEllipseItem):
         self._dragged_on = None
         self._highlighted = False
 
-        self.setFlag(QGraphicsItem.ItemIsMovable, True)
-        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
         pen = QPen()
         pen.setWidthF(3)
@@ -85,7 +89,7 @@ class VItem(QGraphicsEllipseItem):
         self.refresh()
 
     @property
-    def g(self) -> BaseGraph[VT, ET]:
+    def g(self) -> GraphT:
         return self.graph_scene.g
 
     @property
@@ -119,15 +123,15 @@ class VItem(QGraphicsEllipseItem):
             t = self.g.type(self.v)
             if t == VertexType.Z:
                 brush = QBrush(QColor(ZX_GREEN_PRESSED))
-                brush.setStyle(Qt.Dense1Pattern)
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.X:
                 brush = QBrush(QColor(ZX_RED_PRESSED))
-                brush.setStyle(Qt.Dense1Pattern)
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             else:
                 brush = QBrush(QColor("#444444"))
-                brush.setStyle(Qt.Dense1Pattern)
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
                 pen.setColor(QColor("#444444"))
             self.setPen(pen)
@@ -142,13 +146,13 @@ class VItem(QGraphicsEllipseItem):
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
-        option.state &= ~QStyle.State_Selected
+        option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Snap items to grid on movement by intercepting the position-change
         # event and returning a new position
-        if change == QGraphicsItem.ItemPositionChange:
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
             assert isinstance(value, QPointF)
             if self.is_animated: return value  # We don't snap to grid if an animation is moving us
             grid_size = SCALE / 8
@@ -157,7 +161,7 @@ class VItem(QGraphicsEllipseItem):
             return QPointF(x, y)
 
         # When selecting/deselecting items, we move them the front/back
-        if change == QGraphicsItem.ItemSelectedChange:
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
             assert isinstance(value, int)  # 0 or 1
             self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
             return value
@@ -165,7 +169,7 @@ class VItem(QGraphicsEllipseItem):
         # Intercept selection- and position-has-changed events to call `refresh`.
         # Note that the position and selected values are already updated when
         # this event fires.
-        if change in (QGraphicsItem.ItemSelectedHasChanged, QGraphicsItem.ItemPositionHasChanged):
+        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             self.refresh()
 
         return super().itemChange(change, value)
@@ -207,7 +211,7 @@ class VItem(QGraphicsEllipseItem):
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)
-        if e.button() == Qt.LeftButton:
+        if e.button() == Qt.MouseButton.LeftButton:
             if self._old_pos != self.pos():
                 scene = self.scene()
                 assert isinstance(scene, GraphScene)
@@ -249,11 +253,11 @@ class PhaseItem(QGraphicsTextItem):
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(self, g: BaseGraph[VT, ET], e: ET, s_item: VItem, t_item: VItem):
+    def __init__(self, g: GraphT, e: ET, s_item: VItem, t_item: VItem):
         super().__init__()
         self.setZValue(EITEM_Z)
-        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
         self.g = g
         self.e = e
@@ -302,14 +306,14 @@ class EItem(QGraphicsPathItem):
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
-        option.state &= ~QStyle.State_Selected
+        option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Intercept selection- and position-has-changed events to call `refresh`.
         # Note that the position and selected values are already updated when
         # this event fires.
-        if change in (QGraphicsItem.ItemSelectedHasChanged, QGraphicsItem.ItemPositionHasChanged):
+        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             self.refresh()
 
         return super().itemChange(change, value)
@@ -324,7 +328,7 @@ class EItem(QGraphicsPathItem):
 class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
-    g: BaseGraph[VT, ET]
+    g: GraphT
 
     # Signals to handle double-clicking and moving of vertices.
     # Note that we have to set the argument types to `object`,
@@ -366,7 +370,7 @@ class GraphScene(QGraphicsScene):
                 it.set_highlighted(True)
                 return
 
-    def set_graph(self, g: BaseGraph[VT, ET]) -> None:
+    def set_graph(self, g: GraphT) -> None:
         """Set the PyZX graph for the scene
 
         If the scene already contains a graph, it will be replaced."""
@@ -394,7 +398,7 @@ class GraphScene(QGraphicsScene):
             self.edge_map[e] = ei
 
 
-    def select_all(self):
+    def select_all(self) -> None:
         """Selects all vertices and edges in the scene."""
         for it in self.items():
             it.setSelected(True)
@@ -404,7 +408,7 @@ class GraphScene(QGraphicsScene):
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
-    def __init__(self, g: BaseGraph[VT, ET], ety: EdgeType, start: VItem, mouse_pos: QPointF):
+    def __init__(self, g: GraphT, ety: EdgeType.Type, start: VItem, mouse_pos: QPointF):
         super().__init__()
         self.setZValue(EITEM_Z)
         self.g = g
@@ -444,12 +448,12 @@ class EditGraphScene(GraphScene):
 
     # Currently selected edge type for preview when dragging
     # to add a new edge
-    curr_ety: EdgeType
+    curr_ety: EdgeType.Type
 
     # The vertex a right mouse button drag was initiated on
     _right_drag: Optional[EDragItem]
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.curr_ety = EdgeType.SIMPLE
         self._right_drag = None
@@ -457,7 +461,7 @@ class EditGraphScene(GraphScene):
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Right-press on a vertex means the start of a drag for edge adding
         super().mousePressEvent(e)
-        if e.button() == Qt.RightButton:
+        if e.button() == Qt.MouseButton.RightButton:
             if self.items(e.scenePos(), deviceTransform=QTransform()):
                 for it in self.items(e.scenePos(), deviceTransform=QTransform()):
                     if isinstance(it, VItem):
@@ -476,7 +480,7 @@ class EditGraphScene(GraphScene):
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(e)
-        if e.button() == Qt.RightButton:
+        if e.button() == Qt.MouseButton.RightButton:
             # It's either a drag to add an edge
             if self._right_drag:
                 self.removeItem(self._right_drag)

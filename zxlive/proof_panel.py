@@ -4,9 +4,9 @@ from typing import Iterator, Optional
 from PySide6.QtCore import QPointF, QPoint, QEasingCurve, QVariantAnimation
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from pyzx import VertexType, basicrules
-from pyzx.graph.base import BaseGraph, VT
 import pyzx
 
+from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor, BaseCommand
 from .graphscene import GraphScene
@@ -20,7 +20,7 @@ SPIDER_UNFUSE_TIME = 700  # Time in ms for how long the unfuse animation takes w
 class ProofPanel(BasePanel):
     """Panel for the proof mode of ZX live."""
 
-    def __init__(self, graph: BaseGraph) -> None:
+    def __init__(self, graph: GraphT) -> None:
         self.graph_scene = GraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time

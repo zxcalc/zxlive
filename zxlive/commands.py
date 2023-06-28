@@ -5,9 +5,9 @@ from typing import Optional, Iterable, Union
 from PySide6.QtGui import QUndoCommand
 
 from pyzx import basicrules
-from pyzx.graph.base import VT, BaseGraph, ET
 from pyzx.utils import EdgeType, VertexType
 
+from .common import VT, ET, GraphT
 from .graphview import GraphView
 
 
@@ -38,7 +38,7 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
         super().__init__()
 
     @property
-    def g(self) -> BaseGraph[VT, ET]:
+    def g(self) -> GraphT:
         """The graph this command modifies."""
         return self.graph_view.graph_scene.g
 
@@ -60,14 +60,14 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
 @dataclass
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
-    new_g: BaseGraph[VT, ET]
-    old_g: Optional[BaseGraph[VT, ET]] = field(default=None, init=False)
+    new_g: GraphT
+    old_g: Optional[GraphT] = field(default=None, init=False)
 
-    def undo(self):
+    def undo(self) -> None:
         assert self.old_g is not None
         self.graph_view.set_graph(self.old_g)
 
-    def redo(self):
+    def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
 
@@ -76,7 +76,7 @@ class SetGraph(BaseCommand):
 class ChangeNodeColor(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: Iterable[VT]
-    vty: VertexType
+    vty: VertexType.Type
 
     _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
 
@@ -119,16 +119,16 @@ class AddNode(BaseCommand):
     """Adds a new spider at a given position."""
     x: float
     y: float
-    vty: VertexType
+    vty: VertexType.Type
 
     _added_vert: Optional[VT] = field(default=None, init=False)
 
-    def undo(self):
+    def undo(self) -> None:
         assert self._added_vert is not None
         self.g.remove_vertex(self._added_vert)
         self.update_graph_view()
 
-    def redo(self):
+    def redo(self) -> None:
         self._added_vert = self.g.add_vertex(self.vty, self.y, self.x)
         self.update_graph_view()
 
@@ -138,11 +138,11 @@ class AddEdge(BaseCommand):
     """Adds an edge between two spiders."""
     u: VT
     v: VT
-    ety: EdgeType
+    ety: EdgeType.Type
 
     _old_ety: Optional[EdgeType] = field(default=None, init=False)
 
-    def undo(self):
+    def undo(self) -> None:
         u, v = self.u, self.v
         e = self.g.edge(u, v)
         if self._old_ety:
@@ -151,7 +151,7 @@ class AddEdge(BaseCommand):
             self.g.remove_edge(e)
         self.update_graph_view()
 
-    def redo(self):
+    def redo(self) -> None:
         u, v = self.u, self.v
         e = self.g.edge(u, v)
         if self.g.connected(u, v):
@@ -170,14 +170,14 @@ class MoveNode(BaseCommand):
 
     _old_positions: Optional[list[tuple[float, float]]] = field(default=None, init=False)
 
-    def undo(self):
+    def undo(self) -> None:
         assert self._old_positions is not None
         for (v, _, _), (x, y) in zip(self.vs, self._old_positions):
             self.g.set_row(v, x)
             self.g.set_qubit(v, y)
             self.update_graph_view()
 
-    def redo(self):
+    def redo(self) -> None:
         self._old_positions = []
         for v, x, y in self.vs:
             self._old_positions.append((self.g.row(v), self.g.qubit(v)))
@@ -191,11 +191,11 @@ class AddIdentity(BaseCommand):
     """Adds an X or Z identity spider on an edge between two vertices."""
     u: VT
     v: VT
-    vty: VertexType
+    vty: VertexType.Type
 
     _new_vert: Optional[VT] = field(default=None, init=False)
 
-    def undo(self):
+    def undo(self) -> None:
         u, v, w = self.u, self.v, self._new_vert
         assert w is not None
         g = self.g
@@ -206,7 +206,7 @@ class AddIdentity(BaseCommand):
         g.add_edge(g.edge(u, v), et)
         self.update_graph_view()
 
-    def redo(self):
+    def redo(self) -> None:
         u, v = self.u, self.v
         g = self.g
         uv = g.edge(u, v)
@@ -228,12 +228,12 @@ class ChangePhase(BaseCommand):
 
     _old_phase: Optional[Union[Fraction, int]] = field(default=None, init=False)
 
-    def undo(self):
+    def undo(self) -> None:
         assert self._old_phase is not None
         self.g.set_phase(self.v, self._old_phase)
         self.update_graph_view()
 
-    def redo(self):
+    def redo(self) -> None:
         self._old_phase = self.g.phase(self.v)
         self.g.set_phase(self.v, self.new_phase)
         self.update_graph_view()
@@ -246,7 +246,7 @@ class ChangeColor(BaseCommand):
     Changes the spider type using Hadamard conjugation."""
     vs: Iterable[VT]
 
-    def toggle(self):
+    def toggle(self) -> None:
         for v in self.vs:
             basicrules.color_change(self.g, v)
         self.update_graph_view()

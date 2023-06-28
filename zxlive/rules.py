@@ -1,15 +1,12 @@
+from statistics import fmean
+from typing import List
+
 from pyzx.utils import EdgeType, VertexType
 
-from statistics import fmean
-
-ET_SIM = EdgeType.SIMPLE
-ET_HAD = EdgeType.HADAMARD
-
-VT_Z = VertexType.Z
-VT_X = VertexType.X
+from .common import VT, ET, GraphT
 
 
-def check_bialgebra(g, v_list):
+def check_bialgebra(g:GraphT, v_list: List[VT]) -> bool:
 
     phases = g.phases()
     x_vertices = []
@@ -18,9 +15,9 @@ def check_bialgebra(g, v_list):
     for v in v_list:
         if phases[v] != 0:
             return False
-        if g.type(v) == VT_X:
+        if g.type(v) == VertexType.X:
             x_vertices.append(v)
-        elif g.type(v) == VT_Z:
+        elif g.type(v) == VertexType.Z:
             z_vertices.append(v)
         else:
             return False
@@ -33,7 +30,7 @@ def check_bialgebra(g, v_list):
         for z in z_vertices:
             if x not in g.neighbors(z):
                 return False
-            if g.edge_type(g.edge(x, z)) != ET_SIM:
+            if g.edge_type(g.edge(x, z)) != EdgeType.SIMPLE:
                 return False
 
     # not connected among themselves
@@ -46,7 +43,7 @@ def check_bialgebra(g, v_list):
     return True
 
 
-def bialgebra(g, v_list):
+def bialgebra(g:GraphT, v_list:List[VT]) -> None:
     '''
     g: BaseGraph[[VT,ET]]
     v_list: list of vertex where bialgebra needs to be applied
@@ -56,12 +53,13 @@ def bialgebra(g, v_list):
     if not check_bialgebra(g, v_list):
         return
 
-    x_vertices = list(filter(lambda v: g.type(v) == VT_X, v_list))
-    z_vertices = list(filter(lambda v: g.type(v) == VT_Z, v_list))
+    x_vertices = list(filter(lambda v: g.type(v) == VertexType.X, v_list))
+    z_vertices = list(filter(lambda v: g.type(v) == VertexType.Z, v_list))
 
     nodes = []
 
-    for nt, vs in [(VT_Z, x_vertices), (VT_X, z_vertices)]:
+    nt: VertexType.Type
+    for nt, vs in [(VertexType.Z, x_vertices), (VertexType.X, z_vertices)]:  # type: ignore
         q = fmean([g.qubit(x) for x in vs])
         r = fmean([g.row(x) for x in vs])
         node = g.add_vertex(nt, q, r)
@@ -69,7 +67,7 @@ def bialgebra(g, v_list):
 
         for v in vs:
             for n in g.neighbors(v):
-                g.add_edge(g.edge(node, n), ET_SIM)
+                g.add_edge(g.edge(node, n), EdgeType.SIMPLE) # type: ignore
             g.remove_vertex(v)
 
-    g.add_edge(g.edge(nodes[0], nodes[1]), ET_SIM)
+    g.add_edge(g.edge(nodes[0], nodes[1]), EdgeType.SIMPLE)

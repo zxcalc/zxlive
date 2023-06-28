@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
+from typing import Optional
 
-from PySide6.QtCore import QRect, QSize, QPoint, Signal
-from PySide6.QtWidgets import *
-from PySide6.QtGui import *
+from PySide6.QtCore import QRect, QSize, QPoint, QPointF, Signal, Qt
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsRectItem, QGraphicsLineItem, QGraphicsPathItem, QRubberBand
+from PySide6.QtGui import QPen, QBrush, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent
 
-from pyzx.graph.base import BaseGraph, VT, ET
 from .graphscene import GraphScene, VItem, EItem
 
 from enum import Enum
 from dataclasses import dataclass
+
+from .common import VT, ET, GraphT
 
 class GraphTool:
     Selection = 1
@@ -31,11 +32,11 @@ class GraphTool:
 
 @dataclass
 class WandTrace:
-    start: QPoint
-    end: QPoint
+    start: QPointF
+    end: QPointF
     hit: set[VItem]
 
-    def __init__(self, start):
+    def __init__(self, start: QPointF) -> None:
         self.start = start
         self.hit = set()
         self.end = start
@@ -62,7 +63,7 @@ class GraphView(QGraphicsView):
         self.setMouseTracking(True)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         # self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-        self.setResizeAnchor(QGraphicsView.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         #self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # This has to be enabled based on keyboard shortcuts
 
         # We implement the rubberband logic ourselves. Note that there is also
@@ -70,19 +71,19 @@ class GraphView(QGraphicsView):
         # but that doesn't seem to play nicely with selection in the GraphScene,
         # presumably because it uses the coordinate system from this QGraphicsView
         # and not the one from the GraphScene...
-        self.rubberband = QRubberBand(QRubberBand.Rectangle, self)
+        self.rubberband = QRubberBand(QRubberBand.Shape.Rectangle, self)
 
-        self.wand_trace = None
-        self.wand_path = None
+        self.wand_trace: Optional[WandTrace] = None
+        self.wand_path: Optional[QGraphicsPathItem] = None
 
-    def set_graph(self, g: BaseGraph[VT, ET]) -> None:
+    def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
         self.centerOn(0, 0)
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         super().mousePressEvent(e)
 
-        if e.button() == Qt.LeftButton and not self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform()):
+        if e.button() == Qt.MouseButton.LeftButton and not self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform()):
             if self.tool == GraphTool.Selection:
                 self._rubberband_start = e.pos()
                 self.rubberband.setGeometry(QRect(self._rubberband_start, QSize()))
@@ -108,6 +109,7 @@ class GraphView(QGraphicsView):
                 self.rubberband.setGeometry(QRect(self._rubberband_start, e.pos()).normalized())
         elif self.tool == GraphTool.MagicWand:
             if self.wand_trace is not None:
+                assert self.wand_path is not None
                 pos = self.mapToScene(e.pos())
                 self.wand_trace.end = pos
                 path = self.wand_path.path()
@@ -115,7 +117,7 @@ class GraphView(QGraphicsView):
                 self.wand_path.setPath(path)
                 items = self.graph_scene.items(pos)
                 for item in items:
-                    if item is not self.wand_path:
+                    if item is not self.wand_path and isinstance(item, VItem):
                         self.wand_trace.hit.add(item)
                         break
         else:
@@ -123,7 +125,7 @@ class GraphView(QGraphicsView):
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
         super().mouseReleaseEvent(e)
-        if e.button() == Qt.LeftButton:
+        if e.button() == Qt.MouseButton.LeftButton:
             if self.tool == GraphTool.Selection:
                 if self.rubberband.isVisible():
                     self.rubberband.hide()
@@ -134,6 +136,7 @@ class GraphView(QGraphicsView):
                             it.setSelected(True)
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
+                    assert self.wand_path is not None
                     self.wand_path.hide()
                     self.graph_scene.removeItem(self.wand_path)
                     self.wand_path = None
@@ -142,7 +145,7 @@ class GraphView(QGraphicsView):
         else:
             e.ignore()
 
-    def wheelEvent(self, event):
+    def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
         # We do this to allow for zooming
         # Zoom Factor
@@ -150,8 +153,8 @@ class GraphView(QGraphicsView):
         zoomOutFactor = 1 / zoomInFactor
 
         # Set Anchors
-        self.setTransformationAnchor(QGraphicsView.NoAnchor)
-        self.setResizeAnchor(QGraphicsView.NoAnchor)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
 
         # Save the scene pos

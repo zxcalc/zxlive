@@ -4,10 +4,9 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox
-from pyzx import Graph, Circuit, extract_circuit
-from pyzx.graph.base import BaseGraph
+from pyzx import Circuit, extract_circuit
 
-from .common import VT,ET, GraphT
+from .common import VT,ET, GraphT, Graph
 
 
 class FileFormat(Enum):
@@ -19,12 +18,12 @@ class FileFormat(Enum):
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
 
-    def __new__(cls, *args, **kwds):
+    def __new__(cls, *args, **kwds):  # type: ignore
         obj = object.__new__(cls)
         obj._value_ = args[0]  # Use extension as `_value_`
         return obj
 
-    def __init__(self, _extension: str, name: str):
+    def __init__(self, _extension: str, name: str) -> None:
         # Ignore extension param since it's already set by `__new__`
         self._name = name
 
@@ -56,7 +55,7 @@ class ImportOutput:
 
 def show_error_msg(title: str, description: Optional[str] = None) -> None:
     """Displays an error message box."""
-    msg = QMessageBox(icon=QMessageBox.Critical, text=title)
+    msg = QMessageBox(icon=QMessageBox.Icon.Critical, text=title)
     if description is not None:
         msg.setInformativeText(description)
     msg.exec()
@@ -77,7 +76,7 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
 
     file = QFile(file_path)
-    if not file.open(QIODevice.ReadOnly | QIODevice.Text):
+    if not file.open(QIODevice.OpenModeFlag.ReadOnly | QIODevice.OpenModeFlag.Text):
         show_error_msg("Could not open file")
         return None
     stream = QTextStream(file)
@@ -87,22 +86,22 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
     # TODO: This would be nicer with match statements...
     try:
         if selected_format in (FileFormat.QGraph, FileFormat.Json):
-            return ImportOutput(selected_format, file_path, Graph.from_json(data))
+            return ImportOutput(selected_format, file_path, Graph.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
-            return ImportOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph())
+            return ImportOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph()) # type: ignore
         elif selected_format == FileFormat.TikZ:
-            return ImportOutput(selected_format, file_path, Graph.from_tikz(data))
+            return ImportOutput(selected_format, file_path, Graph.from_tikz(data))  # type: ignore
         else:
             assert selected_format == FileFormat.All
             try:
                 circ = Circuit.load(file_path)
-                return ImportOutput(FileFormat.QASM, file_path, circ.to_graph())
+                return ImportOutput(FileFormat.QASM, file_path, circ.to_graph())  # type: ignore
             except TypeError:
                 try:
-                    return ImportOutput(FileFormat.QGraph, file_path, Graph.from_json(data))
+                    return ImportOutput(FileFormat.QGraph, file_path, Graph.from_json(data))  # type: ignore
                 except Exception:
                     try:
-                        return ImportOutput(FileFormat.TikZ, file_path, Graph.from_tikz(data))
+                        return ImportOutput(FileFormat.TikZ, file_path, Graph.from_tikz(data))  # type: ignore
                     except:
                         show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
                         return None
@@ -112,7 +111,7 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
         return None
 
 
-def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> Optional[Tuple[str,FileFormat]]:
+def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,FileFormat]]:
     """Shows a dialog to export the given diagram to disk.
 
     Returns `True` if the diagram was successfully saved."""
@@ -148,7 +147,7 @@ def export_diagram_dialog(graph: BaseGraph[VT, ET], parent: QWidget) -> Optional
         data = graph.to_tikz()
 
     file = QFile(file_path)
-    if not file.open(QIODevice.WriteOnly | QIODevice.Text):
+    if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
         show_error_msg("Could not write to file")
         return None
     out = QTextStream(file)

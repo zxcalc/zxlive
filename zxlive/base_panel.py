@@ -4,9 +4,9 @@ from typing import Iterator, Sequence, Optional
 
 from PySide6.QtGui import QUndoStack, QShortcut, QKeySequence
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup
-from pyzx.graph.base import BaseGraph, VT, ET, EdgeType
 from pyzx.graph import Graph
 
+from .common import VT, ET, GraphT
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .commands import SetGraph
@@ -51,7 +51,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     file_path: Optional[str]
     file_type: Optional[FileFormat]
 
-    def __init__(self, graph: BaseGraph, graph_scene: GraphScene) -> None:
+    def __init__(self, graph: GraphT, graph_scene: GraphScene) -> None:
         super().__init__()
         self.graph_scene = graph_scene
         self.graph_view = GraphView(self.graph_scene)
@@ -75,7 +75,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
 
     @property
-    def graph(self) -> BaseGraph[VT, ET]:
+    def graph(self) -> GraphT:
         return self.graph_scene.g
 
     def _populate_toolbar(self) -> None:
@@ -121,7 +121,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
             self.undo_stack.push(cmd)
 
 
-    def copy_selection(self) -> BaseGraph:
+    def copy_selection(self) -> GraphT:
         selection = list(self.graph_scene.selected_vertices)
         copied_graph = self.graph.subgraph_from_vertices(selection)
         return copied_graph

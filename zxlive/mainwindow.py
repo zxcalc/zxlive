@@ -14,13 +14,13 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Callable
+from typing import Callable, Optional
 
 from enum import IntEnum
 
-from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice
-from PySide6.QtGui import QAction, QShortcut
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray
+from PySide6.QtGui import QAction, QShortcut, QKeySequence
+from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
 
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
@@ -67,7 +67,10 @@ class MainWindow(QMainWindow):
 
         graph = construct_circuit()
         self.new_graph(graph)
-        self.copied_graph = None
+
+        # Currently the copied part is stored internally, and is not made available to the clipboard.
+        # We could do this by using pyperclip.
+        self.copied_graph: Optional[GraphT] = None
 
         menu = self.menuBar()
 
