@@ -15,7 +15,8 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QPointF, Signal
+from PySide6.QtCore import Qt, QPointF, Signal, QObject, QPropertyAnimation, \
+    QVariantAnimation, QAbstractAnimation
 from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QKeyEvent, QPainterPath, \
     QMouseEvent,  QCursor, QPixmap, QTransform, QFont
 from PySide6.QtWidgets import QWidget, QGraphicsEllipseItem, QGraphicsTextItem, QGraphicsPathItem, QGraphicsItem, \
@@ -54,6 +55,9 @@ class VItem(QGraphicsEllipseItem):
     
     halftone = "1000100010001000" #QPixmap("images/halftone.png")
 
+    # Set of animations that are currently running on this vertex
+    active_animations: set["VItemAnimation"]
+
     # Position before starting a drag-move
     _old_pos: Optional[QPointF]
 
@@ -61,8 +65,6 @@ class VItem(QGraphicsEllipseItem):
     _dragged_on: Optional[VItem]
 
     _highlighted: bool
-
-    is_animated: bool = False  # Wether it is being moved by an animation
 
     def __init__(self, graph_scene: GraphScene, v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -73,6 +75,7 @@ class VItem(QGraphicsEllipseItem):
         self.setPos(self.g.row(v) * SCALE, self.g.qubit(v) * SCALE)
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
+        self.active_animations = set()
 
         self._old_pos = None
         self._dragged_on = None
@@ -95,6 +98,10 @@ class VItem(QGraphicsEllipseItem):
     @property
     def is_dragging(self) -> bool:
         return self._old_pos is not None
+
+    @property
+    def is_animated(self) -> bool:
+        return len(self.active_animations) > 0
 
     def set_highlighted(self, value: bool) -> None:
         self._highlighted = value
@@ -176,16 +183,22 @@ class VItem(QGraphicsEllipseItem):
 
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(e)
+        if self.is_animated:
+            return
         scene = self.scene()
         assert isinstance(scene, GraphScene)
         scene.vertex_double_clicked.emit(self.v)
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
+        if self.is_animated:
+            return
         self._old_pos = self.pos()
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
+        if self.is_animated:
+            return
         scene = self.scene()
         assert isinstance(scene, GraphScene)
         if self.is_dragging and len(scene.selectedItems()) == 1:
@@ -211,6 +224,8 @@ class VItem(QGraphicsEllipseItem):
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)
+        if self.is_animated:
+            return
         if e.button() == Qt.MouseButton.LeftButton:
             if self._old_pos != self.pos():
                 scene = self.scene()
@@ -226,6 +241,34 @@ class VItem(QGraphicsEllipseItem):
                 self._old_pos = None
         else:
             e.ignore()
+
+
+class VItemAnimation(QVariantAnimation):
+    """Animator for vertex graphics items.
+
+    This animator lets the vertex know that its being animated which stops any
+    interaction with the user and disables grid snapping. Furthermore, this animator
+    ensures that it's not garbage collected until the animation is finished, so there is
+    no need to hold onto a reference of this class."""
+
+    it: VItem
+
+    def __init__(self, item: VItem) -> None:
+        super().__init__()
+        self.it = item
+        self.stateChanged.connect(self._on_state_changed)
+
+    def _on_state_changed(self, state: QAbstractAnimation.State):
+        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+            self.it.active_animations.add(self)
+        elif state == QAbstractAnimation.State.Stopped:
+            self.it.active_animations.remove(self)
+        elif state == QAbstractAnimation.State.Paused:
+            # TODO: Once we use pausing, we should decide what to do here.
+            #   Note that we cannot just remove ourselves from the set since the garbage
+            #   collector will eat us in that case. We'll probably need something like
+            #   `it.paused_animations`
+            pass
 
 
 class PhaseItem(QGraphicsTextItem):

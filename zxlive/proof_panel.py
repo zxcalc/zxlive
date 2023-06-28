@@ -1,7 +1,8 @@
 import copy
 from typing import Iterator, Optional
 
-from PySide6.QtCore import QPointF, QPoint, QEasingCurve, QVariantAnimation
+from PySide6.QtCore import QPointF, QPoint, QEasingCurve, QVariantAnimation, \
+    QPropertyAnimation
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from pyzx import VertexType, basicrules
 import pyzx
@@ -9,7 +10,7 @@ import pyzx
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor, BaseCommand
-from .graphscene import GraphScene
+from .graphscene import GraphScene, VItemAnimation
 from .rules import bialgebra
 from .graphview import WandTrace, GraphTool
 from .graphscene import VItem
@@ -125,37 +126,20 @@ class ProofPanel(BasePanel):
 
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
-        
-        self.item1 = self.graph_scene.vertex_map[vertex]
-        self.item2 = self.graph_scene.vertex_map[left_vert]
-        start_pos = QPoint(int(old_pos.x()),int(old_pos.y()))
-        end_pos1 = QPoint(int(self.item1.x()),int(self.item1.y()))
-        end_pos2 = QPoint(int(self.item2.x()),int(self.item2.y()))
 
-        self.item1.is_animated = True
-        self.item2.is_animated = True
-        self.item1.setPos(start_pos)
-        self.item2.setPos(start_pos)
-        self.item1.is_animated = False
-        self.item2.is_animated = False
-
-        def anim_vertex_func(vertex):
-            def anim_func(value):
-                vertex.is_animated = True
-                vertex.setPos(value)
-                vertex.is_animated = False
-            return anim_func
-        
-        def make_animation(vertex,start_pos, end_pos):
-            anim = QVariantAnimation()
+        def animate(it: VItem, start_pos: QPointF, end_pos: QPointF) -> VItemAnimation:
+            it.setPos(start_pos)
+            anim = VItemAnimation(it)
             anim.setDuration(SPIDER_UNFUSE_TIME)
             anim.setStartValue(start_pos)
             anim.setEndValue(end_pos)
             anim.setEasingCurve(QEasingCurve.OutElastic)
-            anim.valueChanged.connect(anim_vertex_func(vertex))
-            return anim
+            anim.valueChanged.connect(it.setPos)
+            anim.start()
 
-        self.anim1 = make_animation(self.item1,start_pos, end_pos1)
-        self.anim2 = make_animation(self.item2,start_pos, end_pos2)
-        self.anim1.start()
-        self.anim2.start()
+        item1 = self.graph_scene.vertex_map[vertex]
+        item2 = self.graph_scene.vertex_map[left_vert]
+
+        # We must assign the animations to a
+        animate(item1, old_pos, item1.pos())
+        animate(item2, old_pos, item2.pos())
