@@ -1,5 +1,6 @@
 import typing
-from typing import Tuple, TypeAlias
+from typing import Tuple
+from typing_extensions import TypeAlias
 import pyzx
 
 VT: TypeAlias = int
