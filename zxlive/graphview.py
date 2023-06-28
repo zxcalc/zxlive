@@ -161,7 +161,6 @@ class GraphView(QGraphicsView):
         # Zoom
         ydelta = event.angleDelta().y()/10
         zoomfactor = 1.0
-        print(ydelta)
         if ydelta > 0:
             zoomFactor = 1 + zoomInFactor * ydelta
         elif ydelta < 0:
