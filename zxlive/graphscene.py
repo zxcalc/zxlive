@@ -18,7 +18,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QPointF, Signal
 from PySide6.QtGui import *
 from PySide6.QtWidgets import *
-from typing import Optional, Set, Iterator, Iterable, Any
+from typing import Optional, Set, Iterator, Iterable, Any, Dict
 
 from pyzx.graph.base import BaseGraph, VT, ET, VertexType, EdgeType
 from pyzx.utils import phase_to_s
@@ -57,6 +57,8 @@ class VItem(QGraphicsEllipseItem):
     _dragged_on: Optional[VItem]
 
     _highlighted: bool
+
+    is_animated: bool = False  # Wether it is being moved by an animation
 
     def __init__(self, graph_scene: GraphScene, v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -148,6 +150,7 @@ class VItem(QGraphicsEllipseItem):
         # event and returning a new position
         if change == QGraphicsItem.ItemPositionChange:
             assert isinstance(value, QPointF)
+            if self.is_animated: return value  # We don't snap to grid if an animation is moving us
             grid_size = SCALE / 8
             x = round(value.x() / grid_size) * grid_size
             y = round(value.y() / grid_size) * grid_size
@@ -335,6 +338,8 @@ class GraphScene(QGraphicsScene):
         super().__init__()
         self.setSceneRect(-100, -100, 4000, 4000)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+        self.vertex_map: Dict[VT, VItem] = {}
+        self.edge_map: Dict[ET, EItem] = {}
 
     @property
     def selected_vertices(self) -> Iterator[VT]:
@@ -373,19 +378,21 @@ class GraphScene(QGraphicsScene):
 
     def add_items(self) -> None:
         """Add QGraphicsItem's for all vertices and edges in the graph"""
-
-        v_items = {}
+        self.vertex_map = {}
         for v in self.g.vertices():
             vi = VItem(self, v)
-            v_items[v] = vi
+            self.vertex_map[v] = vi
             self.addItem(vi)  # add the vertex to the scene
             self.addItem(vi.phase_item)  # add the phase label to the scene
-
+        
+        self.edge_map = {}
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
-            ei = EItem(self.g, e, v_items[s], v_items[t])
+            ei = EItem(self.g, e, self.vertex_map[s], self.vertex_map[t])
             self.addItem(ei)
             self.addItem(ei.selection_node)
+            self.edge_map[e] = ei
+
 
     def select_all(self):
         """Selects all vertices and edges in the scene."""

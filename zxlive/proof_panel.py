@@ -1,7 +1,7 @@
 import copy
 from typing import Iterator, Optional
 
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, QPoint, QEasingCurve, QVariantAnimation
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from pyzx import VertexType, basicrules
 from pyzx.graph.base import BaseGraph, VT
@@ -15,6 +15,7 @@ from .graphview import WandTrace, GraphTool
 from .graphscene import VItem
 from  . import proof_actions
 
+SPIDER_UNFUSE_TIME = 700  # Time in ms for how long the unfuse animation takes when using magic wand.
 
 class ProofPanel(BasePanel):
     """Panel for the proof mode of ZX live."""
@@ -86,7 +87,9 @@ class ProofPanel(BasePanel):
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
             return
-        vertex = filtered[0].v
+        item = filtered[0]
+        old_pos = item.pos()
+        vertex = item.v
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
             return
         
@@ -119,3 +122,37 @@ class ProofPanel(BasePanel):
 
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
+        
+        self.item1 = self.graph_scene.vertex_map[vertex]
+        self.item2 = self.graph_scene.vertex_map[left_vert]
+        start_pos = QPoint(int(old_pos.x()),int(old_pos.y()))
+        end_pos1 = QPoint(int(self.item1.x()),int(self.item1.y()))
+        end_pos2 = QPoint(int(self.item2.x()),int(self.item2.y()))
+
+        self.item1.is_animated = True
+        self.item2.is_animated = True
+        self.item1.setPos(start_pos)
+        self.item2.setPos(start_pos)
+        self.item1.is_animated = False
+        self.item2.is_animated = False
+
+        def anim_vertex_func(vertex):
+            def anim_func(value):
+                vertex.is_animated = True
+                vertex.setPos(value)
+                vertex.is_animated = False
+            return anim_func
+        
+        def make_animation(vertex,start_pos, end_pos):
+            anim = QVariantAnimation()
+            anim.setDuration(SPIDER_UNFUSE_TIME)
+            anim.setStartValue(start_pos)
+            anim.setEndValue(end_pos)
+            anim.setEasingCurve(QEasingCurve.OutElastic)
+            anim.valueChanged.connect(anim_vertex_func(vertex))
+            return anim
+
+        self.anim1 = make_animation(self.item1,start_pos, end_pos1)
+        self.anim2 = make_animation(self.item2,start_pos, end_pos2)
+        self.anim1.start()
+        self.anim2.start()
