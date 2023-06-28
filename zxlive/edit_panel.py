@@ -12,6 +12,7 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (
     AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor,
     ChangeEdgeColor)
+from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
 
 
