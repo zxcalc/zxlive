@@ -1,4 +1,3 @@
-from abc import ABC
 from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Optional, Iterable, Union
@@ -10,18 +9,8 @@ from pyzx.utils import EdgeType, VertexType
 from .common import VT, ET, GraphT
 from .graphview import GraphView
 
-
-class BaseCommandMeta(type(QUndoCommand), type(ABC)):
-    """Dummy metaclass to enable `BaseCommand` to inherit from both
-    `QUndoCommand` and `ABC`.
-
-    This avoids Python's infamous metaclass conflict issue.
-    See http://www.phyast.pitt.edu/~micheles/python/metatype.html """
-    pass
-
-
 @dataclass
-class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
+class BaseCommand(QUndoCommand):
     """Abstract base class for all commands.
 
     Each command has a reference to the graph view whose graph it
@@ -29,7 +18,7 @@ class BaseCommand(QUndoCommand, ABC, metaclass=BaseCommandMeta):
     graph has changed and requires redrawing."""
     graph_view: GraphView
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # We need to make sure that `__init__` of the super `QUndoCommand`
         # is being called, but a normal dataclass doesn't do that.
         # Overriding `__init__` also doesn't work since the command sub-
@@ -140,7 +129,7 @@ class AddEdge(BaseCommand):
     v: VT
     ety: EdgeType.Type
 
-    _old_ety: Optional[EdgeType] = field(default=None, init=False)
+    _old_ety: Optional[EdgeType.Type] = field(default=None, init=False)
 
     def undo(self) -> None:
         u, v = self.u, self.v
