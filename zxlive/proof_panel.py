@@ -100,7 +100,10 @@ class ProofPanel(BasePanel):
             self.undo_stack.push(cmd)
             return
 
-        dir = trace.end - trace.start
+        if trace.end.y() > trace.start.y():
+            dir = trace.end - trace.start
+        else:
+            dir = trace.start - trace.end
         normal = QPointF(-dir.y(), dir.x())
         pos = QPointF(self.graph.row(vertex), self.graph.qubit(vertex))
         left, right = [], []
