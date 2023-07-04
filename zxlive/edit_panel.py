@@ -155,4 +155,4 @@ class GraphEditPanel(BasePanel):
         self.undo_stack.push(cmd)
 
     def _start_derivation(self) -> None:
-        self.start_derivation_signal.emit(self.graph_scene.g)
+        self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))

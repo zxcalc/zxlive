@@ -1,5 +1,5 @@
 import copy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Literal, List, Optional
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
@@ -65,6 +65,14 @@ class ProofActionGroup(object):
         self.actions = actions
         self.btn_group: Optional[QButtonGroup] = None
         self.parent_panel = None
+
+    def copy(self):
+        copied_actions = []
+        for action in self.actions:
+            action_copy = replace(action)
+            action_copy.button = None
+            copied_actions.append(action_copy)
+        return ProofActionGroup(*copied_actions)
 
     def init_buttons(self, parent):
         self.btn_group = QButtonGroup(parent, exclusive=False)

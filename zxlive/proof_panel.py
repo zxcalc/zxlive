@@ -44,7 +44,7 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
     def init_action_groups(self):
-        self.action_groups = [proof_actions.actions_basic]
+        self.action_groups = [proof_actions.actions_basic.copy()]
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
             group.init_buttons(self)
