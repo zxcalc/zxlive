@@ -18,8 +18,8 @@ from typing import Callable, Optional
 
 from enum import IntEnum
 
-from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray
-from PySide6.QtGui import QAction, QShortcut, QKeySequence
+from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
+from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
 
 from .edit_panel import GraphEditPanel
@@ -27,6 +27,7 @@ from .proof_panel import ProofPanel
 from .construct import *
 from .commands import SetGraph
 from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .common import GraphT
 
 from pyzx import Graph
 
@@ -128,7 +129,7 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(select_all)
         edit_menu.addAction(deselect_all)
 
-    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str):
+    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
         action = QAction(name, self)
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
@@ -136,7 +137,7 @@ class MainWindow(QMainWindow):
         return action
 
     @property
-    def active_panel(self):
+    def active_panel(self) -> QWidget:
         return self.tab_widget.currentWidget()
 
 
@@ -152,23 +153,22 @@ class MainWindow(QMainWindow):
         conf.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
-    def undo(self,e):
+    def undo(self,e: QEvent) -> None:
         if self.active_panel is None: return
         self.active_panel.undo_stack.undo()
 
-    def redo(self,e):
+    def redo(self,e: QEvent) -> None:
         if self.active_panel is None: return
         self.active_panel.undo_stack.redo()
 
-    def update_tab_name(self, clean:bool):
+    def update_tab_name(self, clean:bool) -> None:
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
         if name.endswith("*"): name = name[:-1]
         if not clean: name += "*"
         self.tab_widget.setTabText(i,name)
 
-    def open_file(self):
-        # Currently this does not check which mode we are in. Opening a file should invalidate a proof in Proof mode.
+    def open_file(self) -> None:
         out = import_diagram_dialog(self)
         if out is not None:
             name = QFileInfo(out.file_path).baseName()
@@ -176,7 +176,7 @@ class MainWindow(QMainWindow):
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
-    def close_action(self):
+    def close_action(self) -> bool:
         i = self.tab_widget.currentIndex()
         if i == -1: # no tabs open
             self.close()
@@ -188,11 +188,11 @@ class MainWindow(QMainWindow):
             if answer == QMessageBox.Cancel: return False
             if answer == QMessageBox.Yes:
                 val = self.save_file()
-                if not val: return
+                if not val: return False
         self.tab_widget.tabCloseRequested.emit(i)
         return True
 
-    def save_file(self):
+    def save_file(self) -> bool:
         if self.active_panel.file_path is None:
             return self.save_as()
         if self.active_panel.file_type == FileFormat.QASM:
@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
         return True
 
 
-    def save_as(self):
+    def save_as(self) -> bool:
         out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
         file_path, file_type = out
@@ -231,23 +231,23 @@ class MainWindow(QMainWindow):
         return True
 
 
-    def cut_graph(self):
+    def cut_graph(self) -> None:
         if isinstance(self.active_panel, GraphEditPanel):
             self.copied_graph = self.active_panel.copy_selection()
             self.active_panel.delete_selection()
 
-    def copy_graph(self):
+    def copy_graph(self) -> None:
         self.copied_graph = self.active_panel.copy_selection()
 
-    def paste_graph(self):
+    def paste_graph(self) -> None:
         if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.paste_graph(self.copied_graph)
 
-    def delete_graph(self):
+    def delete_graph(self) -> None:
         if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.delete_selection()
 
-    def new_graph(self, graph=None, name:Optional[str]=None):
+    def new_graph(self, graph:Optional[GraphT] = None, name:Optional[str]=None) -> None:
         graph = graph or Graph()
         panel = GraphEditPanel(graph)
         panel.start_derivation_signal.connect(self.new_deriv)
@@ -256,14 +256,14 @@ class MainWindow(QMainWindow):
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
-    def new_deriv(self, graph):
+    def new_deriv(self, graph:GraphT) -> None:
         panel = ProofPanel(graph)
         self.tab_widget.addTab(panel, "New Proof")
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
-    def select_all(self):
+    def select_all(self) -> None:
         self.active_panel.select_all()
 
-    def deselect_all(self):
+    def deselect_all(self) -> None:
         self.active_panel.deselect_all()

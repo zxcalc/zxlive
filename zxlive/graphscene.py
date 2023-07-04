@@ -258,7 +258,7 @@ class VItemAnimation(QVariantAnimation):
         self.it = item
         self.stateChanged.connect(self._on_state_changed)
 
-    def _on_state_changed(self, state: QAbstractAnimation.State):
+    def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
             self.it.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
