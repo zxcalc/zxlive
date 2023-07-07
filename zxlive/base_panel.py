@@ -11,6 +11,7 @@ from .graphscene import GraphScene
 from .graphview import GraphView
 from .commands import SetGraph
 from .dialogs import FileFormat
+import zxlive.animations as anims
 
 import copy
 import pyzx
@@ -71,7 +72,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
 
         self._populate_toolbar()
 
-        self.graph_scene.vertex_dragged_onto.connect(self._vertex_dragged_onto)
+        self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
 
     @property
@@ -101,12 +102,14 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     def deselect_all(self):
         self.graph_scene.clearSelection()
 
-    def _vertex_dragged_onto(self, v: VT, w: VT) -> None:
-        ty1, ty2 = self.graph.type(v), self.graph.type(w)
-        if pyzx.basicrules.check_fuse(self.graph,v,w):
-            self.graph_scene.highlight_vertex(w)
-        elif pyzx.basicrules.check_strong_comp(self.graph,v,w):
-            self.graph_scene.highlight_vertex(w)
+    def _vertex_dragged(self, state: GraphScene.DragState, v: VT, w: VT) -> None:
+        if state == GraphScene.DragState.Onto:
+            if pyzx.basicrules.check_fuse(self.graph, v, w):
+                anims.anticipate_fuse(self.graph_scene.get_vitem(w))
+            elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
+                anims.anticipate_strong_comp(self.graph_scene.get_vitem(w))
+        else:
+            anims.back_to_default(self.graph_scene.get_vitem(w))
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
         rule = None
@@ -119,7 +122,6 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
             rule(g,w,v)
             cmd = SetGraph(self.graph_view, g)
             self.undo_stack.push(cmd)
-
 
     def copy_selection(self) -> GraphT:
         selection = list(self.graph_scene.selected_vertices)

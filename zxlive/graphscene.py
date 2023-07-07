@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+from enum import Enum
+
 from PySide6.QtCore import Qt, QPointF, Signal, QObject, QPropertyAnimation, \
     QVariantAnimation, QAbstractAnimation
 from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QKeyEvent, QPainterPath, \
@@ -27,6 +29,7 @@ from pyzx.graph.base import VertexType, EdgeType
 from pyzx.utils import phase_to_s
 
 from .common import VT, ET, GraphT
+
 
 
 SCALE = 60.0
@@ -64,7 +67,10 @@ class VItem(QGraphicsEllipseItem):
     # Vertex we are currently dragged on top of
     _dragged_on: Optional[VItem]
 
-    _highlighted: bool
+    class Properties(Enum):
+        """Properties of a VItem that can be animated."""
+        Position = 0
+        Scale = 1
 
     def __init__(self, graph_scene: GraphScene, v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -79,7 +85,6 @@ class VItem(QGraphicsEllipseItem):
 
         self._old_pos = None
         self._dragged_on = None
-        self._highlighted = False
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -103,14 +108,8 @@ class VItem(QGraphicsEllipseItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
-    def set_highlighted(self, value: bool) -> None:
-        self._highlighted = value
-        self.refresh()
-
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
-        self.setScale(1.25 if self._highlighted else 1)
-
         if not self.isSelected():
             t = self.g.type(self.v)
             if t == VertexType.Z:
@@ -159,15 +158,14 @@ class VItem(QGraphicsEllipseItem):
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Snap items to grid on movement by intercepting the position-change
         # event and returning a new position
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and not self.is_animated:
             assert isinstance(value, QPointF)
-            if self.is_animated: return value  # We don't snap to grid if an animation is moving us
             grid_size = SCALE / 8
             x = round(value.x() / grid_size) * grid_size
             y = round(value.y() / grid_size) * grid_size
             return QPointF(x, y)
 
-        # When selecting/deselecting items, we move them the front/back
+        # When selecting/deselecting items, we move them to the front/back
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
             assert isinstance(value, int)  # 0 or 1
             self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
@@ -177,7 +175,10 @@ class VItem(QGraphicsEllipseItem):
         # Note that the position and selected values are already updated when
         # this event fires.
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
-            self.refresh()
+            # If we're being animated, the animation will decide for itself whether we
+            # should be refreshed or not
+            if not self.is_animated:
+                self.refresh()
 
         return super().itemChange(change, value)
 
@@ -209,14 +210,15 @@ class VItem(QGraphicsEllipseItem):
                 if it == self._dragged_on:
                     reset = False
                 elif isinstance(it, VItem) and it != self:
-                    scene.vertex_dragged_onto.emit(self.v, it.v)
-                    # Try to un-highlight the previously hovered over vertex
+                    scene.vertex_dragged.emit(GraphScene.DragState.Onto, self.v, it.v)
+                    # If we previously hovered over a vertex, notify the scene that we
+                    # are no longer
                     if self._dragged_on is not None:
-                        self._dragged_on.set_highlighted(False)
+                        scene.vertex_dragged.emit(GraphScene.DragState.OffOf, self.v, self._dragged_on.v)
                     self._dragged_on = it
                     return
             if reset and self._dragged_on is not None:
-                self._dragged_on.set_highlighted(False)
+                scene.vertex_dragged.emit(GraphScene.DragState.OffOf, self.v, self._dragged_on.v)
                 self._dragged_on = None
         e.ignore()
 
@@ -230,7 +232,7 @@ class VItem(QGraphicsEllipseItem):
             if self._old_pos != self.pos():
                 scene = self.scene()
                 assert isinstance(scene, GraphScene)
-                if self._dragged_on is not None and self._dragged_on._highlighted and len(scene.selectedItems()) == 1:
+                if self._dragged_on is not None and len(scene.selectedItems()) == 1:
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
                     scene.vertices_moved.emit([
@@ -252,14 +254,24 @@ class VItemAnimation(QVariantAnimation):
     no need to hold onto a reference of this class."""
 
     it: VItem
+    property: VItem.Properties
+    refresh: bool  # Whether the item is refreshed at each frame
 
-    def __init__(self, item: VItem) -> None:
+    def __init__(self, item: VItem, property: VItem.Properties, refresh: bool = False) -> None:
         super().__init__()
+        if refresh and property != VItem.Properties.Position:
+            raise ValueError("Only position animations require refresh")
         self.it = item
+        self.property = property
+        self.refresh = refresh
         self.stateChanged.connect(self._on_state_changed)
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+            # Stop all animations that target the same property
+            for anim in self.it.active_animations.copy():
+                if anim.property == self.property:
+                    anim.stop()
             self.it.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
             self.it.active_animations.remove(self)
@@ -269,6 +281,16 @@ class VItemAnimation(QVariantAnimation):
             #   collector will eat us in that case. We'll probably need something like
             #   `it.paused_animations`
             pass
+
+    def updateCurrentValue(self, value: Any) -> None:
+        match self.property:
+            case VItem.Properties.Position:
+                self.it.setPos(value)
+            case VItem.Properties.Scale:
+                self.it.setScale(value)
+
+        if self.refresh:
+            self.it.refresh()
 
 
 class PhaseItem(QGraphicsTextItem):
@@ -378,8 +400,19 @@ class GraphScene(QGraphicsScene):
     # otherwise it doesn't work for some reason...
     vertex_double_clicked = Signal(object)  # Actual type: VT
     vertices_moved = Signal(object)  # Actual type: list[tuple[VT, float, float]]
-    vertex_dragged_onto = Signal(object, object)  # Actual types: VT, VT
-    vertex_dropped_onto = Signal(object, object)  # Actual types: VT, VT
+
+    # Triggers when a vertex is dragged onto or off of another vertex
+    # Actual types: DragState, VT, VT
+    vertex_dragged = Signal(object, object, object)
+
+    class DragState(Enum):
+        """A vertex can be dragged onto another vertex, or if it was dragged onto
+         before, it can be dragged off of it again."""
+        Onto = 0
+        OffOf = 1
+
+    # Triggers when a vertex is dropped onto another vertex. Actual types: VT, VT
+    vertex_dropped_onto = Signal(object, object)
 
     def __init__(self) -> None:
         super().__init__()
@@ -396,7 +429,6 @@ class GraphScene(QGraphicsScene):
     @property
     def selected_edges(self) -> Iterator[ET]:
         return (it.e for it in self.selectedItems() if isinstance(it, EItem))
-    
 
     def select_vertices(self, vs: Iterable[VT]) -> None:
         """Selects the given collection of vertices."""
@@ -407,18 +439,17 @@ class GraphScene(QGraphicsScene):
                 it.setSelected(True)
                 vs.remove(it.v)
 
-    def highlight_vertex(self, v: VT) -> None:
-        for it in self.items():
-            if isinstance(it, VItem) and it.v == v:
-                it.set_highlighted(True)
-                return
-
     def set_graph(self, g: GraphT) -> None:
         """Set the PyZX graph for the scene
 
         If the scene already contains a graph, it will be replaced."""
 
         self.g = g
+        # Stop all animations
+        for it in self.items():
+            if isinstance(it, VItem):
+                for anim in it.active_animations.copy():
+                    anim.stop()
         self.clear()
         self.add_items()
         self.invalidate()
@@ -440,11 +471,15 @@ class GraphScene(QGraphicsScene):
             self.addItem(ei.selection_node)
             self.edge_map[e] = ei
 
-
     def select_all(self) -> None:
         """Selects all vertices and edges in the scene."""
         for it in self.items():
             it.setSelected(True)
+
+    def get_vitem(self, v: VT) -> VItem:
+        """Returns the VItem corresponding to a vertex in the pyzx graph."""
+        # TODO: We should save those in a dict
+        return next(it for it in self.items() if isinstance(it, VItem) and it.v == v)
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!

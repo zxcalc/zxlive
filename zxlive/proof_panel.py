@@ -129,12 +129,11 @@ class ProofPanel(BasePanel):
 
         def animate(it: VItem, start_pos: QPointF, end_pos: QPointF) -> VItemAnimation:
             it.setPos(start_pos)
-            anim = VItemAnimation(it)
+            anim = VItemAnimation(it, VItem.Properties.Position, refresh=True)
             anim.setDuration(SPIDER_UNFUSE_TIME)
             anim.setStartValue(start_pos)
             anim.setEndValue(end_pos)
             anim.setEasingCurve(QEasingCurve.OutElastic)
-            anim.valueChanged.connect(it.setPos)
             anim.start()
 
         item1 = self.graph_scene.vertex_map[vertex]
