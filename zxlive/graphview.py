@@ -76,9 +76,10 @@ class GraphView(QGraphicsView):
         self.wand_trace: Optional[WandTrace] = None
         self.wand_path: Optional[QGraphicsPathItem] = None
 
+        self.centerOn(0, 0)
+
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
-        self.centerOn(0, 0)
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         super().mousePressEvent(e)

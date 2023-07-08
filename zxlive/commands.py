@@ -60,7 +60,6 @@ class SetGraph(BaseCommand):
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
 
-
 @dataclass
 class ChangeNodeColor(BaseCommand):
     """Changes the color of a set of spiders."""
@@ -154,7 +153,7 @@ class AddEdge(BaseCommand):
 
 @dataclass
 class MoveNode(BaseCommand):
-    """Updates the location of a given node."""
+    """Updates the location of a collection of nodes."""
     vs: list[tuple[VT, float, float]]
 
     _old_positions: Optional[list[tuple[float, float]]] = field(default=None, init=False)
