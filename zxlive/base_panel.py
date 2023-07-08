@@ -9,6 +9,7 @@ from pyzx.graph import Graph
 from .common import VT, ET, GraphT
 from .graphscene import GraphScene
 from .graphview import GraphView
+from .vitem import DragState
 from .commands import SetGraph
 from .dialogs import FileFormat
 import zxlive.animations as anims
@@ -102,8 +103,8 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     def deselect_all(self):
         self.graph_scene.clearSelection()
 
-    def _vertex_dragged(self, state: GraphScene.DragState, v: VT, w: VT) -> None:
-        if state == GraphScene.DragState.Onto:
+    def _vertex_dragged(self, state: DragState, v: VT, w: VT) -> None:
+        if state == DragState.Onto:
             if pyzx.basicrules.check_fuse(self.graph, v, w):
                 anims.anticipate_fuse(self.graph_scene.get_vitem(w))
             elif pyzx.basicrules.check_strong_comp(self.graph, v, w):

@@ -1,7 +1,7 @@
 import random
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation
-from zxlive.graphscene import VItem, VItemAnimation
+from .vitem import VItem, VItemAnimation
 
 
 def scale(it: VItem, target, duration, ease: QEasingCurve):

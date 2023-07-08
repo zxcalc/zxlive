@@ -10,10 +10,10 @@ import pyzx
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor, BaseCommand
-from .graphscene import GraphScene, VItemAnimation
+from .graphscene import GraphScene
 from .rules import bialgebra
 from .graphview import WandTrace, GraphTool
-from .graphscene import VItem
+from .vitem import VItem, VItemAnimation
 from  . import proof_actions
 
 SPIDER_UNFUSE_TIME = 700  # Time in ms for how long the unfuse animation takes when using magic wand.
