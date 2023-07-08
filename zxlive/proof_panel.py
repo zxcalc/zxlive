@@ -127,7 +127,7 @@ class ProofPanel(BasePanel):
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
 
-        def animate(it: VItem, start_pos: QPointF, end_pos: QPointF) -> VItemAnimation:
+        def animate(it: VItem, start_pos: QPointF, end_pos: QPointF) -> None:
             it.setPos(start_pos)
             anim = VItemAnimation(it, VItem.Properties.Position, refresh=True)
             anim.setDuration(SPIDER_UNFUSE_TIME)

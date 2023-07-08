@@ -40,13 +40,13 @@ def shake(it: VItem, amount: float, duration: float):
 
 def anticipate_fuse(it: VItem) -> None:
     """Animation that is played when a fuseable spider is dragged onto a vertex."""
-    scale(it, target=1.25, duration=50, ease=QEasingCurve.OutInQuad)
+    scale(it, target=1.25, duration=200, ease=QEasingCurve.OutInQuad)
 
 
 def anticipate_strong_comp(it: VItem) -> None:
     """Animation that is played when a bialgebra-capable spider is dragged onto a
     vertex."""
-    scale(it, target=1.25, duration=50, ease=QEasingCurve.OutInQuad)
+    scale(it, target=1.25, duration=200, ease=QEasingCurve.OutInQuad)
     # shake(it, amount=1.0, duration=70)
 
 
@@ -55,6 +55,6 @@ def back_to_default(it: VItem) -> None:
     their default values."""
     for anim in it.active_animations.copy():
         anim.stop()
-    scale(it, target=1, duration=25, ease=QEasingCurve.InOutQuad)
+    scale(it, target=1, duration=250, ease=QEasingCurve.InOutQuad)
 
 
