@@ -81,6 +81,9 @@ class GraphView(QGraphicsView):
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
 
+    def update_graph(self, g: GraphT) -> None:
+        self.graph_scene.update_graph(g)
+
     def mousePressEvent(self, e: QMouseEvent) -> None:
         super().mousePressEvent(e)
 

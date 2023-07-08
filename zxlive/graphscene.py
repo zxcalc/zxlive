@@ -15,17 +15,17 @@
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Optional, Iterator, Iterable, Any, Dict
+from typing import Optional, Iterator, Iterable, Dict
 
-from PySide6.QtCore import Qt, Signal, QObject
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QTransform
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent
 
-from pyzx.graph.base import VertexType, EdgeType
+from pyzx.graph.base import EdgeType
+from pyzx.graph import GraphDiff
 
 from .common import VT, ET, GraphT, SCALE
-from .vitem import VItem, EITEM_Z, VITEM_SELECTED_Z, VITEM_UNSELECTED_Z, PHASE_ITEM_Z
+from .vitem import VItem
 from .eitem import EItem, EDragItem
 
 
@@ -73,8 +73,7 @@ class GraphScene(QGraphicsScene):
                 vs.remove(it.v)
 
     def set_graph(self, g: GraphT) -> None:
-        """Set the PyZX graph for the scene
-
+        """Set the PyZX graph for the scene.
         If the scene already contains a graph, it will be replaced."""
 
         self.g = g
@@ -86,6 +85,63 @@ class GraphScene(QGraphicsScene):
         self.clear()
         self.add_items()
         self.invalidate()
+
+    def update_graph(self, new: GraphT) -> None:
+        """Update the PyZX graph for the scene.
+        This will update the scene to match the given graph. It will
+        try to reuse existing QGraphicsItem's as much as possible."""
+        diff = GraphDiff(self.g, new)
+
+        for v in diff.removed_verts:
+            v_item = self.vertex_map[v]
+            if v_item.phase_item:
+                self.removeItem(v_item.phase_item)
+            for anim in v_item.active_animations.copy():
+                anim.stop()
+            self.removeItem(v_item)
+
+        for e in diff.removed_edges:
+            e_item = self.edge_map[e]
+            if e_item.selection_node:
+                self.removeItem(e_item.selection_node)
+            self.removeItem(e_item)
+
+        self.g = diff.apply_diff(self.g)
+        # g now contains the new graph,
+        # but we still need to update the scene
+        # However, the new vertices and edges automatically follow the new graph structure
+        
+        for v in diff.new_verts:
+            v_item = VItem(self, v)
+            self.vertex_map[v] = v_item
+            self.addItem(v_item)
+            self.addItem(v_item.phase_item)
+
+        for e in diff.new_edges:
+            s, t = self.g.edge_st(e)
+            e_item = EItem(self.g, e, self.vertex_map[s], self.vertex_map[t])
+            self.edge_map[e] = e_item
+            self.addItem(e_item)
+            self.addItem(e_item.selection_node)
+
+        # So we only have to make sure that the existing vertices and edges
+        # are updated to match the new graph structure
+        for v in diff.changed_vertex_types:
+            self.vertex_map[v].refresh()
+
+        for v in diff.changed_phases:
+            self.vertex_map[v].refresh()
+
+        for v in diff.changed_pos:
+            v_item = self.vertex_map[v]
+            for anim in v_item.active_animations.copy():
+                anim.stop()
+            v_item.set_pos_from_graph()
+
+        for e in diff.changed_edge_types:
+            self.edge_map[e].refresh()
+
+
 
     def add_items(self) -> None:
         """Add QGraphicsItem's for all vertices and edges in the graph"""

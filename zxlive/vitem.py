@@ -16,18 +16,16 @@
 from __future__ import annotations
 from enum import Enum
 
-from typing import Optional, Set, Iterator, Iterable, Any, Dict, TYPE_CHECKING
+from typing import Optional, Set, Any, TYPE_CHECKING
 
-from PySide6.QtCore import Qt, QPointF, Signal, QObject, \
-    QVariantAnimation, QAbstractAnimation
-from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, \
-    QMouseEvent, QPixmap, QFont
-from PySide6.QtWidgets import QWidget, QGraphicsEllipseItem, QGraphicsTextItem, QGraphicsPathItem, QGraphicsItem, \
-    QGraphicsScene, QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
+from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation
+from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont
+from PySide6.QtWidgets import QWidget, QGraphicsEllipseItem, QGraphicsTextItem, QGraphicsItem, \
+     QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 
 
 
-from pyzx.graph.base import VertexType, EdgeType
+from pyzx.graph.base import VertexType
 from pyzx.utils import phase_to_s
 
 from .common import VT, ET, GraphT, SCALE
@@ -156,6 +154,9 @@ class VItem(QGraphicsEllipseItem):
 
         for e_item in self.adj_items:
             e_item.refresh()
+
+    def set_pos_from_graph(self) -> None:
+       self.setPos(self.g.row(self.v) * SCALE, self.g.qubit(self.v) * SCALE)
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.

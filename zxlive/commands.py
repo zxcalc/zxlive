@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Optional, Iterable, Union
+import copy
+
 from PySide6.QtGui import QUndoCommand
 
 from pyzx import basicrules
@@ -25,12 +27,8 @@ class BaseCommand(QUndoCommand):
         # dataclasses don't call modified super constructors. Thus, we
         # hook it into `__post_init__`.
         super().__init__()
-
-    @property
-    def g(self) -> GraphT:
-        """The graph this command modifies."""
-        return self.graph_view.graph_scene.g
-
+        self.g = copy.deepcopy(self.graph_view.graph_scene.g)
+        
     def update_graph_view(self) -> None:
         """Notifies the graph view that graph needs to be redrawn.
         
@@ -42,7 +40,7 @@ class BaseCommand(QUndoCommand):
         new_verts = self.g.vertex_set()
         new_selection = [v for v in selection if v in new_verts]
         # self.graph_view.graph_scene.clearSelection()
-        self.graph_view.set_graph(self.g)
+        self.graph_view.update_graph(self.g)
         self.graph_view.graph_scene.select_vertices(new_selection)
 
 

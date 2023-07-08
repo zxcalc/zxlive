@@ -18,8 +18,9 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication
 import sys
 
-from .mainwindow import MainWindow
+sys.path.insert(0,'../pyzx') # So that it can find a local copy of pyzx
 
+from .mainwindow import MainWindow
 
 class ZXLive(QApplication):
     """The main ZX Live application
