@@ -165,11 +165,6 @@ class GraphScene(QGraphicsScene):
         for it in self.items():
             it.setSelected(True)
 
-    def get_vitem(self, v: VT) -> VItem:
-        """Returns the VItem corresponding to a vertex in the pyzx graph."""
-        # TODO: We should save those in a dict
-        return next(it for it in self.items() if isinstance(it, VItem) and it.v == v)
-
 
 class EditGraphScene(GraphScene):
     """A graph scene tracking additional mouse events for graph editing."""

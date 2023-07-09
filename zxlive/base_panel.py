@@ -12,6 +12,8 @@ from .graphview import GraphView
 from .vitem import DragState
 from .commands import SetGraph
 from .dialogs import FileFormat
+from .animations import AnimatedUndoStack
+
 import zxlive.animations as anims
 
 import copy
@@ -49,7 +51,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     graph_view: GraphView
 
     toolbar: QToolBar
-    undo_stack: QUndoStack
+    undo_stack: AnimatedUndoStack
     file_path: Optional[str]
     file_type: Optional[FileFormat]
 
@@ -57,7 +59,7 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
         super().__init__()
         self.graph_scene = graph_scene
         self.graph_view = GraphView(self.graph_scene)
-        self.undo_stack = QUndoStack(self)
+        self.undo_stack = AnimatedUndoStack(self)
 
         # Use box layout that fills the entire tab
         self.setLayout(QVBoxLayout())
@@ -106,23 +108,25 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
     def _vertex_dragged(self, state: DragState, v: VT, w: VT) -> None:
         if state == DragState.Onto:
             if pyzx.basicrules.check_fuse(self.graph, v, w):
-                anims.anticipate_fuse(self.graph_scene.get_vitem(w))
+                anims.anticipate_fuse(self.graph_scene.vertex_map[w])
             elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
-                anims.anticipate_strong_comp(self.graph_scene.get_vitem(w))
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
-            anims.back_to_default(self.graph_scene.get_vitem(w))
+            anims.back_to_default(self.graph_scene.vertex_map[w])
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
-        rule = None
-        if pyzx.basicrules.check_fuse(self.graph,v,w):
-            rule = pyzx.basicrules.fuse
-        elif pyzx.basicrules.check_strong_comp(self.graph,v,w):
-            rule = pyzx.basicrules.strong_comp
-        if rule is not None:
+        if pyzx.basicrules.check_fuse(self.graph, v, w):
             g = copy.deepcopy(self.graph)
-            rule(g,w,v)
+            pyzx.basicrules.fuse(g, w, v)
+            anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
             cmd = SetGraph(self.graph_view, g)
-            self.undo_stack.push(cmd)
+            self.undo_stack.push(cmd, anim_before=anim)
+        elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
+            g = copy.deepcopy(self.graph)
+            pyzx.basicrules.strong_comp(g, w, v)
+            anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
+            cmd = SetGraph(self.graph_view, g)
+            self.undo_stack.push(cmd, anim_after=anim)
 
     def copy_selection(self) -> GraphT:
         selection = list(self.graph_scene.selected_vertices)

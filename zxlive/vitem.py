@@ -16,7 +16,7 @@
 from __future__ import annotations
 from enum import Enum
 
-from typing import Optional, Set, Any, TYPE_CHECKING
+from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation
 from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont
@@ -78,6 +78,7 @@ class VItem(QGraphicsEllipseItem):
         """Properties of a VItem that can be animated."""
         Position = 0
         Scale = 1
+        Rect = 2
 
     def __init__(self, graph_scene: GraphScene, v: VT):
         super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -263,18 +264,37 @@ class VItemAnimation(QVariantAnimation):
     ensures that it's not garbage collected until the animation is finished, so there is
     no need to hold onto a reference of this class."""
 
-    it: VItem
+    _it: Optional[VItem]
     property: VItem.Properties
     refresh: bool  # Whether the item is refreshed at each frame
 
-    def __init__(self, item: VItem, property: VItem.Properties, refresh: bool = False) -> None:
+    v: Optional[VT]
+    scene = Optional["GraphScene"]
+
+    def __init__(self, item: Union[VItem, VT], property: VItem.Properties,
+                 scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
         super().__init__()
         if refresh and property != VItem.Properties.Position:
             raise ValueError("Only position animations require refresh")
-        self.it = item
+        if isinstance(item, VItem):
+            self._it = item
+            self.v = None
+            self.scene = None
+        else:
+            if scene is None:
+                raise ValueError("Scene is required to obtain VItem from vertex id")
+            self.v = item
+            self.scene = scene
+            self._it = None
         self.property = property
         self.refresh = refresh
         self.stateChanged.connect(self._on_state_changed)
+
+    @property
+    def it(self) -> VItem:
+        if self._it is None:
+            self._it = self.scene.vertex_map[self.v]
+        return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
@@ -293,11 +313,16 @@ class VItemAnimation(QVariantAnimation):
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
+        if self.state() != QAbstractAnimation.State.Running:
+            return
+
         match self.property:
             case VItem.Properties.Position:
                 self.it.setPos(value)
             case VItem.Properties.Scale:
                 self.it.setScale(value)
+            case VItem.Properties.Rect:
+                self.it.setRect(value)
 
         if self.refresh:
             self.it.refresh()

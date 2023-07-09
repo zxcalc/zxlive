@@ -1,22 +1,19 @@
 import copy
-from typing import Iterator, Optional
+from typing import Iterator
 
-from PySide6.QtCore import QPointF, QPoint, QEasingCurve, QVariantAnimation, \
-    QPropertyAnimation
+from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from pyzx import VertexType, basicrules
-import pyzx
 
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
-from .commands import MoveNode, SetGraph, AddIdentity, ChangeColor, BaseCommand
+from .commands import MoveNode, SetGraph
 from .graphscene import GraphScene
-from .rules import bialgebra
-from .graphview import WandTrace, GraphTool
-from .vitem import VItem, VItemAnimation
-from  . import proof_actions
+from .graphview import GraphTool
+from .vitem import VItem
+from . import proof_actions
+from . import animations as anims
 
-SPIDER_UNFUSE_TIME = 700  # Time in ms for how long the unfuse animation takes when using magic wand.
 
 class ProofPanel(BasePanel):
     """Panel for the proof mode of ZX live."""
@@ -30,7 +27,7 @@ class ProofPanel(BasePanel):
 
         self.init_action_groups()
 
-        self.graph_view.wand_trace_finished.connect(self._unfuse_slice)
+        self.graph_view.wand_trace_finished.connect(self._magic_slice)
 
 
 
@@ -84,21 +81,17 @@ class ProofPanel(BasePanel):
         cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
 
-    def _unfuse_slice(self, trace):
+    def _magic_slice(self, trace):
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
             return
         item = filtered[0]
-        old_pos = item.pos()
         vertex = item.v
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
             return
         
         if basicrules.check_remove_id(self.graph, vertex):
-            new_g = copy.deepcopy(self.graph)
-            basicrules.remove_id(new_g, vertex)
-            cmd = SetGraph(self.graph_view, new_g)
-            self.undo_stack.push(cmd)
+            self._remove_id(vertex)
             return
 
         if trace.end.y() > trace.start.y():
@@ -115,28 +108,25 @@ class ProofPanel(BasePanel):
                 left.append(neighbor)
             else:
                 right.append(neighbor)
+        self._unfuse(vertex, left)
 
+    def _remove_id(self, v: VT) -> None:
         new_g = copy.deepcopy(self.graph)
-        left_vert = new_g.add_vertex(self.graph.type(vertex), qubit = pos.y(), row = pos.x() - 0.25)
-        new_g.set_row(vertex, pos.x() + 0.25)
-        for neighbor in left:
-            new_g.add_edge((neighbor, left_vert), self.graph.edge_type((vertex, neighbor)))
-            new_g.remove_edge((vertex, neighbor))
-        new_g.add_edge((vertex, left_vert))
-
+        basicrules.remove_id(new_g, v)
+        anim = anims.remove_id(self.graph_scene.vertex_map[v])
         cmd = SetGraph(self.graph_view, new_g)
-        self.undo_stack.push(cmd)
+        self.undo_stack.push(cmd, anim_before=anim)
 
-        def animate(it: VItem, start_pos: QPointF, end_pos: QPointF) -> None:
-            it.setPos(start_pos)
-            anim = VItemAnimation(it, VItem.Properties.Position, refresh=True)
-            anim.setDuration(SPIDER_UNFUSE_TIME)
-            anim.setStartValue(start_pos)
-            anim.setEndValue(end_pos)
-            anim.setEasingCurve(QEasingCurve.OutElastic)
-            anim.start()
-
-        item1 = self.graph_scene.vertex_map[vertex]
-        item2 = self.graph_scene.vertex_map[left_vert]
-        animate(item1, old_pos, item1.pos())
-        animate(item2, old_pos, item2.pos())
+    def _unfuse(self, v: VT, left_neighbours: list[VT]) -> None:
+        new_g = copy.deepcopy(self.graph)
+        left_vert = new_g.add_vertex(self.graph.type(v), qubit=self.graph.qubit(v),
+                                     row=self.graph.row(v) - 0.25)
+        new_g.set_row(v, self.graph.row(v) + 0.25)
+        for neighbor in left_neighbours:
+            new_g.add_edge((neighbor, left_vert),
+                           self.graph.edge_type((v, neighbor)))
+            new_g.remove_edge((v, neighbor))
+        new_g.add_edge((v, left_vert))
+        anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
+        cmd = SetGraph(self.graph_view, new_g)
+        self.undo_stack.push(cmd, anim_after=anim)
