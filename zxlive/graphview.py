@@ -44,7 +44,7 @@ class WandTrace:
 WAND_COLOR = "#500050"
 WAND_WIDTH = 3.0
 
-ZOOMFACTOR = 0.05 # Specifies how sensitive zooming with the mousewheel is
+ZOOMFACTOR = 0.005 # Specifies how sensitive zooming with the mousewheel is
 
 class GraphView(QGraphicsView):
     """QtWidget containing a graph
@@ -152,32 +152,26 @@ class GraphView(QGraphicsView):
     def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
         # We do this to allow for zooming
-        # Zoom Factor
-        zoomInFactor = ZOOMFACTOR
-        zoomOutFactor = 1 / zoomInFactor
 
         # Set Anchors
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
-
         # Save the scene pos
-        p = event.position()
-        oldPos = self.mapToScene(QPoint(int(p.x()),int(p.y())))
+        old_pos = self.mapToScene(event.position().toPoint())
 
         # Zoom
-        ydelta = event.angleDelta().y()/10
-        zoomfactor = 1.0
+        ydelta = event.angleDelta().y()
+        zoom_factor = 1.0
         if ydelta > 0:
-            zoomFactor = 1 + zoomInFactor * ydelta
+            zoom_factor = 1 + ZOOMFACTOR * ydelta
         elif ydelta < 0:
-            zoomFactor = 1/(1 + zoomInFactor *(-ydelta))
-        self.scale(zoomFactor, zoomFactor)
+            zoom_factor = 1/(1 - ZOOMFACTOR * ydelta)
+        self.scale(zoom_factor, zoom_factor)
 
         # Get the new position
-        p = event.position()
-        newPos = self.mapToScene(QPoint(int(p.x()),int(p.y())))
+        new_pos = self.mapToScene(event.position().toPoint())
 
         # Move scene to old position
-        delta = newPos - oldPos
+        delta = new_pos - old_pos
         self.translate(delta.x(), delta.y())
