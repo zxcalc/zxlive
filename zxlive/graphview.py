@@ -15,20 +15,22 @@
 
 from typing import Optional
 
-from PySide6.QtCore import QRect, QSize, QPoint, QPointF, Signal, Qt
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsRectItem, QGraphicsLineItem, QGraphicsPathItem, QRubberBand
-from PySide6.QtGui import QPen, QBrush, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent
+import math
+from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF
+from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand
+from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent
 
-from .graphscene import GraphScene, VItem, EItem
+from .graphscene import GraphScene, VItem
 
-from enum import Enum
 from dataclasses import dataclass
 
-from .common import VT, ET, GraphT
+from .common import  GraphT, SCALE
+
 
 class GraphTool:
     Selection = 1
     MagicWand = 2
+
 
 @dataclass
 class WandTrace:
@@ -41,10 +43,14 @@ class WandTrace:
         self.hit = set()
         self.end = start
 
+
 WAND_COLOR = "#500050"
 WAND_WIDTH = 3.0
 
 ZOOMFACTOR = 0.005 # Specifies how sensitive zooming with the mousewheel is
+
+GRID_SCALE = SCALE / 2
+
 
 class GraphView(QGraphicsView):
     """QtWidget containing a graph
@@ -175,3 +181,30 @@ class GraphView(QGraphicsView):
         # Move scene to old position
         delta = new_pos - old_pos
         self.translate(delta.x(), delta.y())
+
+    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
+        # First draw blank white background
+        painter.setBrush(QColor(255, 255, 255, 255))
+        painter.setPen(QPen(Qt.NoPen))
+        painter.drawRect(rect)
+
+        # Calculate grid lines
+        lines, thick_lines = [], []
+        for x in range(int(rect.left() / GRID_SCALE), math.ceil(rect.right() / GRID_SCALE) + 1):
+            line = QLineF(x * GRID_SCALE, rect.top(), x * GRID_SCALE, rect.bottom())
+            if x % 4 == 0:
+                thick_lines.append(line)
+            else:
+                lines.append(line)
+        for y in range(int(rect.top() / GRID_SCALE), math.ceil(rect.bottom() / GRID_SCALE) + 1):
+            line = QLineF(rect.left(), y * GRID_SCALE, rect.right(), y * GRID_SCALE)
+            if y % 4 == 0:
+                thick_lines.append(line)
+            else:
+                lines.append(line)
+
+        # Draw grid lines
+        painter.setPen(QPen(QColor(240, 240, 240), 1, Qt.SolidLine))
+        painter.drawLines(lines)
+        painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.SolidLine))
+        painter.drawLines(thick_lines)
