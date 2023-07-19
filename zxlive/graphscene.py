@@ -158,7 +158,7 @@ class GraphScene(QGraphicsScene):
             v_item.set_pos_from_graph()
 
         for e in diff.changed_edge_types:
-            self.edge_map[e].refresh()
+            self.edge_map[e].refresh(new)
 
         self.select_vertices(selected_vertices)
 

@@ -53,9 +53,10 @@ class EItem(QGraphicsPathItem):
 
         self.refresh()
 
-    def refresh(self) -> None:
+    def refresh(self, g=None) -> None:
         """Call whenever source or target moves or edge data changes"""
-
+        if g is not None:
+            self.g = g
         # set color/style according to edge type
         pen = QPen()
         pen.setWidthF(3)
