@@ -16,15 +16,17 @@
 from typing import Optional
 
 import math
-from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF
-from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand
-from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent
+import random
+from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QTimeLine
+from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem
+from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
 
 from .graphscene import GraphScene, VItem, EItem
 
 from dataclasses import dataclass
 
 from .common import  GraphT, SCALE
+from .vitem import PHASE_ITEM_Z
 from . import animations as anims
 
 
@@ -85,6 +87,12 @@ class GraphView(QGraphicsView):
 
         self.centerOn(0, 0)
 
+        self.sparkle_mode = False
+        QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
+
+    def _toggle_sparkles(self):
+        self.sparkle_mode = not self.sparkle_mode
+
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
 
@@ -110,6 +118,8 @@ class GraphView(QGraphicsView):
                 path.moveTo(pos)
                 self.wand_path.setPath(path)
                 self.wand_path.show()
+                if self.sparkle_mode:
+                    self._emit_sparkles(pos, 10)
         else:
             e.ignore()
 
@@ -130,12 +140,15 @@ class GraphView(QGraphicsView):
                 for i in range(10):
                     t = i / 9
                     ipos = QPointF(t * pos + (1.0 - t) * prev)
+                    if self.sparkle_mode:
+                        self._emit_sparkles(ipos, 1)
                     items = self.graph_scene.items(ipos)
                     for item in items:
                         if isinstance(item, VItem) and item not in self.wand_trace.hit:
                             anims.anticipate_fuse(item)
                         if item is not self.wand_path and isinstance(item, (VItem, EItem)):
                             self.wand_trace.hit[item] = ipos
+
         else:
             e.ignore()
 
@@ -217,3 +230,51 @@ class GraphView(QGraphicsView):
         painter.drawLines(lines)
         painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.SolidLine))
         painter.drawLines(thick_lines)
+    
+    def _emit_sparkles(self, pos, mult):
+        for _ in range(mult * SPARKLE_COUNT):
+            angle = random.random() * 2 * math.pi
+            speed = random.random() * (SPARKLE_MAX_SPEED - SPARKLE_MIN_SPEED) + SPARKLE_MIN_SPEED
+            x = speed * math.cos(angle)
+            y = speed * math.sin(angle)
+            Sparkle(pos.x(), pos.y(), x, y, SPARKLE_FADE, self.graph_scene)
+
+SPARKLE_COLOR = "#900090"
+SPARKLE_COUNT = 1
+SPARKLE_MAX_SPEED = 200.0
+SPARKLE_MIN_SPEED = 100.0
+SPARKLE_FADE = 20.0
+
+class Sparkle(QGraphicsEllipseItem):
+    def __init__(self, x, y, vx, vy, vo, scene):
+        super().__init__(
+            -0.05 * SCALE, -0.05 * SCALE, 0.1 * SCALE, 0.1 * SCALE
+        )
+
+        self.vx, self.vy, self.vo = vx, vy, vo
+        self.prev_value = 0.0
+
+        self.setPos(x, y)
+        self.setZValue(PHASE_ITEM_Z)
+        self.setFlag(QGraphicsItem.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, False)
+        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, False)
+        self.setBrush(QBrush(QColor(SPARKLE_COLOR)))
+        self.setPen(QPen(Qt.PenStyle.NoPen))
+        
+        scene.addItem(self)
+
+        self.timer = QTimeLine(1000)
+        self.timer.valueChanged.connect(self._timer_step)
+        self.timer.start()
+        self.show()
+        
+    def _timer_step(self, value):
+        dt = value - self.prev_value
+        self.prev_value = value
+        self.setX(self.x() + dt * self.vx)
+        self.setY(self.y() + dt * self.vy)
+        self.setOpacity(max(self.opacity() - dt * self.vo, 0.0))
+
+        if value == 1.0:
+            self.scene().removeItem(self)
