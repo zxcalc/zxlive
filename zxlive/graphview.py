@@ -47,7 +47,7 @@ class WandTrace:
 WAND_COLOR = "#500050"
 WAND_WIDTH = 3.0
 
-ZOOMFACTOR = 0.005 # Specifies how sensitive zooming with the mousewheel is
+ZOOMFACTOR = 0.002 # Specifies how sensitive zooming with the mousewheel is
 
 GRID_SCALE = SCALE / 2
 
