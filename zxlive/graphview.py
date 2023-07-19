@@ -24,7 +24,7 @@ from .graphscene import GraphScene, VItem
 
 from dataclasses import dataclass
 
-from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y
+from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM
 
 
 class GraphTool:
@@ -173,6 +173,12 @@ class GraphView(QGraphicsView):
             zoom_factor = 1 + ZOOMFACTOR * ydelta
         elif ydelta < 0:
             zoom_factor = 1/(1 - ZOOMFACTOR * ydelta)
+
+        current_zoom = self.transform().m11()
+        if current_zoom * zoom_factor < MIN_ZOOM:
+            return
+        elif current_zoom * zoom_factor > MAX_ZOOM:
+            return
         self.scale(zoom_factor, zoom_factor)
 
         # Get the new position
