@@ -10,7 +10,7 @@ from .common import VT, ET, GraphT
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .vitem import DragState
-from .commands import UpdateGraph
+from .commands import SetGraph, UpdateGraph
 from .dialogs import FileFormat
 from .animations import AnimatedUndoStack
 

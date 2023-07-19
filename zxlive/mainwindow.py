@@ -25,7 +25,6 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QH
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .commands import SetGraph
 from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
