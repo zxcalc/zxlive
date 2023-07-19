@@ -45,11 +45,13 @@ class GraphEditPanel(BasePanel):
         # Toolbar section for picking a vertex type
         self.select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
         self.select_x = QToolButton(self, text="X Spider", checkable=True)
+        self.select_h = QToolButton(self, text="H box", checkable=True)
         self.select_boundary = QToolButton(self, text="Boundary", checkable=True)
         self.select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
         self.select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
+        self.select_h.clicked.connect(lambda: self._vty_clicked(VertexType.H_BOX))
         self.select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
-        yield ToolbarSection(self.select_z, self.select_x, self.select_boundary, exclusive=True)
+        yield ToolbarSection(self.select_z, self.select_x, self.select_h, self.select_boundary, exclusive=True)
         QShortcut("x",self).activated.connect(self.cycle_vertex_type_selection)
 
         # Toolbar section for picking an edge type
