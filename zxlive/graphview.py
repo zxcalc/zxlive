@@ -158,22 +158,30 @@ class GraphView(QGraphicsView):
     def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
         # We do this to allow for zooming
-
+        
+        # If control is pressed, we want to zoom
+        if event.modifiers() == Qt.ControlModifier:
+            ydelta = event.angleDelta().y()
+            self.zoom(ydelta)
+        else:
+            super().wheelEvent(event)
+        
+        
+    def zoom(self, ydelta: float) -> None:
         # Set Anchors
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
         # Save the scene pos
-        old_pos = self.mapToScene(event.position().toPoint())
+        old_pos = self.mapToScene(self.viewport().rect().center())
 
-        # Zoom
-        ydelta = event.angleDelta().y()
         zoom_factor = 1.0
         if ydelta > 0:
             zoom_factor = 1 + ZOOMFACTOR * ydelta
         elif ydelta < 0:
             zoom_factor = 1/(1 - ZOOMFACTOR * ydelta)
 
+        # Zoom
         current_zoom = self.transform().m11()
         if current_zoom * zoom_factor < MIN_ZOOM:
             return
@@ -182,7 +190,7 @@ class GraphView(QGraphicsView):
         self.scale(zoom_factor, zoom_factor)
 
         # Get the new position
-        new_pos = self.mapToScene(event.position().toPoint())
+        new_pos = self.mapToScene(self.viewport().rect().center())
 
         # Move scene to old position
         delta = new_pos - old_pos
