@@ -147,7 +147,9 @@ class GraphView(QGraphicsView):
                         if isinstance(item, VItem) and item not in self.wand_trace.hit:
                             anims.anticipate_fuse(item)
                         if item is not self.wand_path and isinstance(item, (VItem, EItem)):
-                            self.wand_trace.hit[item] = ipos
+                            if item not in self.wand_trace.hit:
+                                self.wand_trace.hit[item] = []
+                            self.wand_trace.hit[item].append(ipos)
 
         else:
             e.ignore()

@@ -3,6 +3,7 @@ from typing import Iterator
 
 from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
+from PySide6.QtGui import QVector2D
 from pyzx import VertexType, basicrules
 
 from .common import VT, GraphT, SCALE
@@ -97,7 +98,7 @@ class ProofPanel(BasePanel):
             return False
 
         item = next(iter(trace.hit))
-        pos = trace.hit[item]
+        pos = trace.hit[item][-1]
         s = self.graph.edge_s(item.e)
         t = self.graph.edge_t(item.e)
 
@@ -117,6 +118,8 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _magic_slice(self, trace):
+        def cross(a, b):
+            return a.y() * b.x() - a.x() * b.y()
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
             return False
@@ -128,22 +131,24 @@ class ProofPanel(BasePanel):
         if basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
             return False
-
-        if trace.end.y() > trace.start.y():
-            dir = trace.end - trace.start
-        else:
-            dir = trace.start - trace.end
-        normal = QPointF(-dir.y(), dir.x())
-        pos = QPointF(self.graph.row(vertex), self.graph.qubit(vertex))
+        
+        start = trace.hit[item][0]
+        end = trace.hit[item][-1]
+        if start.y() > end.y():
+            start, end = end, start
+        pos = QPointF(SCALE * self.graph.row(vertex), SCALE * self.graph.qubit(vertex))
         left, right = [], []
         for neighbor in self.graph.neighbors(vertex):
-            npos = QPointF(self.graph.row(neighbor), self.graph.qubit(neighbor))
-            dot = QPointF.dotProduct(pos - npos, normal)
-            if dot <= 0:
+            npos = QPointF(SCALE * self.graph.row(neighbor), SCALE * self.graph.qubit(neighbor))
+            # Compute whether each neighbor is inside the entry and exit points
+            i1 = cross(start - pos, npos - pos) * cross(start - pos, end - pos) >= 0
+            i2 = cross(end - pos, npos - pos) * cross(end - pos, start - pos) >= 0
+            inside = i1 and i2
+            if inside:
                 left.append(neighbor)
             else:
                 right.append(neighbor)
-        self._unfuse(vertex, left, trace.end.y() > trace.start.y())
+        self._unfuse(vertex, left)
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -153,19 +158,52 @@ class ProofPanel(BasePanel):
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], move_phase: bool) -> None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT]) -> None:
+        def snap_vector(v):
+            if abs(v.x()) > abs(v.y()):
+                v.setY(0.0)
+            else:
+                v.setX(0.0)
+            if not v.isNull():
+                v.normalize()
+
+        # Compute the average position of left vectors
+        pos = QPointF(self.graph.row(v), self.graph.qubit(v))
+        avg_left = QVector2D()
+        for n in left_neighbours:
+            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
+            dir = QVector2D(npos - pos).normalized()
+            avg_left += dir
+        avg_left.normalize()
+        # And snap it to the grid
+        snap_vector(avg_left)
+        # Same for right vectors
+        avg_right = QVector2D()
+        for n in self.graph.neighbors(v):
+            if n in left_neighbours: continue
+            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
+            dir = QVector2D(npos - pos).normalized()
+            avg_right += dir
+        avg_right.normalize()
+        snap_vector(avg_right)
+        if avg_right.isNull():
+            avg_right = -avg_left
+        elif avg_left.isNull():
+            avg_left = -avg_right
+        
+        dist = 0.25 if QVector2D.dotProduct(avg_left, avg_right) != 0 else 0.35
+
         new_g = copy.deepcopy(self.graph)
-        left_vert = new_g.add_vertex(self.graph.type(v), qubit=self.graph.qubit(v),
-                                     row=self.graph.row(v) - 0.25)
-        new_g.set_row(v, self.graph.row(v) + 0.25)
+        left_vert = new_g.add_vertex(self.graph.type(v), 
+                                     qubit=self.graph.qubit(v) + dist*avg_left.y(),
+                                     row=self.graph.row(v) + dist*avg_left.x())
+        new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
+        new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
         for neighbor in left_neighbours:
             new_g.add_edge((neighbor, left_vert),
                            self.graph.edge_type((v, neighbor)))
             new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
-        if move_phase:
-            new_g.set_phase(left_vert, new_g.phase(v))
-            new_g.set_phase(v, 0)
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_after=anim)
