@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QToolButton, QInputDialog
 from PySide6.QtGui import QShortcut
 from pyzx import EdgeType, VertexType
+from pyzx.editor import s_to_phase
 
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
@@ -101,7 +102,7 @@ class GraphEditPanel(BasePanel):
         if not ok:
             return
         try:
-            new_phase = Fraction(input_)
+            new_phase = s_to_phase(input_)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return
