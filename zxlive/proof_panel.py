@@ -7,7 +7,7 @@ from pyzx import VertexType, basicrules
 
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
-from .commands import MoveNode, SetGraph
+from .commands import MoveNode, UpdateGraph
 from .graphscene import GraphScene
 from .graphview import GraphTool
 from .vitem import VItem
@@ -116,7 +116,7 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph)
         basicrules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = SetGraph(self.graph_view, new_g)
+        cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_before=anim)
 
     def _unfuse(self, v: VT, left_neighbours: list[VT]) -> None:
@@ -130,7 +130,7 @@ class ProofPanel(BasePanel):
             new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        cmd = SetGraph(self.graph_view, new_g)
+        cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_after=anim)
         
     def _vert_double_clicked(self, v: VT) -> None:
@@ -139,5 +139,5 @@ class ProofPanel(BasePanel):
 
         new_g = copy.deepcopy(self.graph)
         basicrules.color_change(new_g, v)
-        cmd = SetGraph(self.graph_view, new_g)
+        cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)

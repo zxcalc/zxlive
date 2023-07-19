@@ -10,7 +10,7 @@ from .common import VT, ET, GraphT
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .vitem import DragState
-from .commands import SetGraph
+from .commands import SetGraph, UpdateGraph
 from .dialogs import FileFormat
 from .animations import AnimatedUndoStack
 
@@ -119,13 +119,13 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
             g = copy.deepcopy(self.graph)
             pyzx.basicrules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = SetGraph(self.graph_view, g)
+            cmd = UpdateGraph(self.graph_view, g)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
             g = copy.deepcopy(self.graph)
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = SetGraph(self.graph_view, g)
+            cmd = UpdateGraph(self.graph_view, g)
             self.undo_stack.push(cmd, anim_after=anim)
 
     def copy_selection(self) -> GraphT:

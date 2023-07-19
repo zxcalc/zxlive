@@ -11,7 +11,7 @@ from sympy import sympify
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
-    AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor,
+    AddEdge, AddNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
@@ -46,11 +46,13 @@ class GraphEditPanel(BasePanel):
         # Toolbar section for picking a vertex type
         self.select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
         self.select_x = QToolButton(self, text="X Spider", checkable=True)
+        self.select_h = QToolButton(self, text="H box", checkable=True)
         self.select_boundary = QToolButton(self, text="Boundary", checkable=True)
         self.select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
         self.select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
+        self.select_h.clicked.connect(lambda: self._vty_clicked(VertexType.H_BOX))
         self.select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
-        yield ToolbarSection(self.select_z, self.select_x, self.select_boundary, exclusive=True)
+        yield ToolbarSection(self.select_z, self.select_x, self.select_h, self.select_boundary, exclusive=True)
         QShortcut("x",self).activated.connect(self.cycle_vertex_type_selection)
 
         # Toolbar section for picking an edge type
@@ -140,7 +142,7 @@ class GraphEditPanel(BasePanel):
         if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5,0.5))
-        cmd = SetGraph(self.graph_view,new_g)
+        cmd = UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
 
@@ -152,7 +154,10 @@ class GraphEditPanel(BasePanel):
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(selection)
-        cmd = SetGraph(self.graph_view,new_g)
+        if len(selection) > 128:
+            cmd = SetGraph(self.graph_view,new_g)
+        else:
+            cmd = UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
     def _start_derivation(self) -> None:

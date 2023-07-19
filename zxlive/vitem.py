@@ -18,9 +18,9 @@ from enum import Enum
 
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
-from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation
-from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont
-from PySide6.QtWidgets import QWidget, QGraphicsEllipseItem, QGraphicsTextItem, QGraphicsItem, \
+from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
+from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont, QPainterPath
+from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
      QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 
 
@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsEllipseItem, QGraphicsTextItem, 
 from pyzx.graph.base import VertexType
 from pyzx.utils import phase_to_s
 
-from .common import VT, ET, GraphT, SCALE
+from .common import VT, ET, GraphT, SCALE, pos_to_view, pos_from_view
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -39,6 +39,8 @@ ZX_GREEN = "#ccffcc"
 ZX_GREEN_PRESSED = "#64BC90"
 ZX_RED = "#ff8888"
 ZX_RED_PRESSED = "#bb0f0f"
+H_YELLOW = "#ffff00"
+H_YELLOW_PRESSED = "#f1c232"
 
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
@@ -55,7 +57,7 @@ class DragState(Enum):
         OffOf = 1
 
 
-class VItem(QGraphicsEllipseItem):
+class VItem(QGraphicsPathItem):
     """A QGraphicsItem representing a single vertex"""
 
     v: VT
@@ -81,12 +83,12 @@ class VItem(QGraphicsEllipseItem):
         Rect = 2
 
     def __init__(self, graph_scene: GraphScene, v: VT):
-        super().__init__(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        super().__init__()
         self.setZValue(VITEM_UNSELECTED_Z)
 
         self.graph_scene = graph_scene
         self.v = v
-        self.setPos(self.g.row(v) * SCALE, self.g.qubit(v) * SCALE)
+        self.setPos(*pos_to_view(self.g.row(v), self.g.qubit(v)))
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
         self.active_animations = set()
@@ -102,6 +104,13 @@ class VItem(QGraphicsEllipseItem):
         pen.setWidthF(3)
         pen.setColor(QColor("black"))
         self.setPen(pen)
+
+        path = QPainterPath()
+        if self.g.type(self.v) == VertexType.H_BOX:
+            path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        else: 
+            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        self.setPath(path)
         self.refresh()
 
     @property
@@ -124,6 +133,8 @@ class VItem(QGraphicsEllipseItem):
                 self.setBrush(QBrush(QColor(ZX_GREEN)))
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED)))
+            elif t == VertexType.H_BOX:
+                self.setBrush(QBrush(QColor(H_YELLOW)))
             else:
                 self.setBrush(QBrush(QColor("#000000")))
             pen = QPen()
@@ -143,6 +154,10 @@ class VItem(QGraphicsEllipseItem):
                 brush = QBrush(QColor(ZX_RED_PRESSED))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
+            elif t == VertexType.H_BOX:
+                brush = QBrush(QColor(H_YELLOW_PRESSED))
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+                self.setBrush(brush)
             else:
                 brush = QBrush(QColor("#444444"))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
@@ -157,7 +172,7 @@ class VItem(QGraphicsEllipseItem):
             e_item.refresh()
 
     def set_pos_from_graph(self) -> None:
-       self.setPos(self.g.row(self.v) * SCALE, self.g.qubit(self.v) * SCALE)
+        self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
@@ -165,7 +180,7 @@ class VItem(QGraphicsEllipseItem):
         # we intercept the selected option here.
         option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
-
+        
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Snap items to grid on movement by intercepting the position-change
         # event and returning a new position
@@ -247,7 +262,7 @@ class VItem(QGraphicsEllipseItem):
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
                     scene.vertices_moved.emit([
-                        (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
+                        (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
                         for it in scene.selectedItems() if isinstance(it, VItem)
                     ])
                 self._dragged_on = None
@@ -344,6 +359,6 @@ class PhaseItem(QGraphicsTextItem):
 
         phase = self.v_item.g.phase(self.v_item.v)
         # phase = self.v_item.v
-        self.setPlainText(phase_to_s(phase))
+        self.setPlainText(phase_to_s(phase, self.v_item.g.type(self.v_item.v)))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)

@@ -22,10 +22,11 @@ from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, 
 from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
 
+from .commands import SetGraph
+
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .commands import SetGraph
 from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
@@ -76,11 +77,11 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = self._new_action("&New...",self.new_graph,QKeySequence.StandardKey.New,
+        new_graph = self._new_action("&New",self.new_graph,QKeySequence.StandardKey.New,
             "Reinitialize with an empty graph")
         open_file = self._new_action("&Open...", self.open_file,QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close...", self.close_action,QKeySequence.StandardKey.Close,
+        close_action = self._new_action("Close", self.close_action,QKeySequence.StandardKey.Close,
             "Closes the window")
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
@@ -130,6 +131,19 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(select_all)
         edit_menu.addAction(deselect_all)
 
+        zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount")
+        zoom_out = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
+        zoom_in.setShortcuts([QKeySequence(QKeySequence.StandardKey.ZoomIn), QKeySequence("Ctrl+=")])
+        fit_view = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
+        self.addAction(zoom_in)
+        self.addAction(zoom_out)
+        self.addAction(fit_view)
+
+        view_menu = menu.addMenu("&View")
+        view_menu.addAction(zoom_in)
+        view_menu.addAction(zoom_out)
+        view_menu.addAction(fit_view)
+
         transform_actions = []
         for simp in simplifications.values():
             transform_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp["function"]), None, simp["tool_tip"]))
@@ -137,7 +151,7 @@ class MainWindow(QMainWindow):
         for action in transform_actions:
             transform_menu.addAction(action)
 
-    def _new_action(self, name:str, trigger:Callable, shortcut:QKeySequence | QKeySequence.StandardKey, tooltip:str) -> QAction:
+    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
         action = QAction(name, self)
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
@@ -276,7 +290,18 @@ class MainWindow(QMainWindow):
 
     def deselect_all(self) -> None:
         self.active_panel.deselect_all()
-        
+
+    def zoom_in(self) -> None:
+        print("Zooming in")
+        self.active_panel.graph_view.zoom_in()
+
+    def zoom_out(self) -> None:
+        print("Zooming out")
+        self.active_panel.graph_view.zoom_out()
+
+    def fit_view(self) -> None:
+        self.active_panel.graph_view.fit_view()
+
     def apply_pyzx_reduction(self, reduction) -> Callable[[],None]:
         def reduce() -> None:
             old_graph = self.active_panel.graph

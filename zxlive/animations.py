@@ -6,7 +6,7 @@ from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup, QRectF
 from PySide6.QtGui import QUndoStack, QUndoCommand
 
-from .common import VT, GraphT, SCALE
+from .common import VT, GraphT, pos_to_view
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z
 
@@ -98,8 +98,8 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
     for v, start_pos, end_pos in moves:
         anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
         anim.setDuration(duration)
-        anim.setStartValue(QPointF(start.row(start_pos) * SCALE, start.qubit(start_pos) * SCALE))
-        anim.setEndValue(QPointF(end.row(end_pos) * SCALE, end.qubit(end_pos) * SCALE))
+        anim.setStartValue(QPointF(*pos_to_view(start.row(start_pos), start.qubit(start_pos))))
+        anim.setEndValue(QPointF(*pos_to_view(end.row(end_pos), end.qubit(end_pos))))
         anim.setEasingCurve(ease)
         group.addAnimation(anim)
     return group

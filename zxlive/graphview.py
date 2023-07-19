@@ -24,7 +24,7 @@ from .graphscene import GraphScene, VItem
 
 from dataclasses import dataclass
 
-from .common import  GraphT, SCALE
+from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM
 
 
 class GraphTool:
@@ -47,7 +47,7 @@ class WandTrace:
 WAND_COLOR = "#500050"
 WAND_WIDTH = 3.0
 
-ZOOMFACTOR = 0.005 # Specifies how sensitive zooming with the mousewheel is
+ZOOMFACTOR = 0.002 # Specifies how sensitive zooming with the mousewheel is
 
 GRID_SCALE = SCALE / 2
 
@@ -82,15 +82,17 @@ class GraphView(QGraphicsView):
         self.wand_trace: Optional[WandTrace] = None
         self.wand_path: Optional[QGraphicsPathItem] = None
 
-        self.centerOn(0, 0)
+        self.centerOn(OFFSET_X,OFFSET_Y)
 
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
 
-    def update_graph(self, g: GraphT) -> None:
-        self.graph_scene.update_graph(g)
+    def update_graph(self, g: GraphT, select_new: bool = False) -> None:
+        self.graph_scene.update_graph(g, select_new)
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
+        if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+            e.setModifiers(e.modifiers() | Qt.KeyboardModifier.ControlModifier)
         super().mousePressEvent(e)
 
         if e.button() == Qt.MouseButton.LeftButton and not self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform()):
@@ -134,16 +136,20 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+        if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+            e.setModifiers(e.modifiers() | Qt.KeyboardModifier.ControlModifier)
         super().mouseReleaseEvent(e)
         if e.button() == Qt.MouseButton.LeftButton:
             if self.tool == GraphTool.Selection:
                 if self.rubberband.isVisible():
                     self.rubberband.hide()
-                    self.graph_scene.clearSelection()
+                    key_modifiers = e.modifiers()
+                    if not(Qt.KeyboardModifier.ShiftModifier & key_modifiers or Qt.KeyboardModifier.ControlModifier & key_modifiers):
+                        self.graph_scene.clearSelection()
                     rect = self.rubberband.geometry()
-                    for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()):
-                        if isinstance(it, VItem):
-                            it.setSelected(True)
+                    items = [it for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()) if isinstance(it, VItem)]
+                    for it in items:
+                        it.setSelected(not (len(items) == 1 or e.modifiers() & Qt.KeyboardModifier.ShiftModifier) or not it.isSelected())
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
                     assert self.wand_path is not None
@@ -158,29 +164,58 @@ class GraphView(QGraphicsView):
     def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
         # We do this to allow for zooming
-
+        
+        # If control is pressed, we want to zoom
+        if event.modifiers() == Qt.ControlModifier:
+            ydelta = event.angleDelta().y()
+            self.zoom(ydelta)
+        else:
+            super().wheelEvent(event)
+        
+        
+    def zoom(self, ydelta: float) -> None:
         # Set Anchors
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
 
         # Save the scene pos
-        old_pos = self.mapToScene(event.position().toPoint())
+        old_pos = self.mapToScene(self.viewport().rect().center())
 
-        # Zoom
-        ydelta = event.angleDelta().y()
         zoom_factor = 1.0
         if ydelta > 0:
             zoom_factor = 1 + ZOOMFACTOR * ydelta
         elif ydelta < 0:
             zoom_factor = 1/(1 - ZOOMFACTOR * ydelta)
+
+        current_zoom = self.transform().m11()
+        if current_zoom * zoom_factor < MIN_ZOOM:
+            return
+        elif current_zoom * zoom_factor > MAX_ZOOM:
+            return
         self.scale(zoom_factor, zoom_factor)
 
         # Get the new position
-        new_pos = self.mapToScene(event.position().toPoint())
+        new_pos = self.mapToScene(self.viewport().rect().center())
 
         # Move scene to old position
         delta = new_pos - old_pos
         self.translate(delta.x(), delta.y())
+
+    def zoom_out(self) -> None:
+        self.zoom(-100)
+
+    def zoom_in(self) -> None:
+        self.zoom(100)
+
+    def fit_view(self) -> None:
+        self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+        current_zoom = self.transform().m11()
+        print(current_zoom)
+        if current_zoom < MIN_ZOOM:
+            self.scale(MIN_ZOOM / current_zoom, MIN_ZOOM / current_zoom)
+        else:
+            if current_zoom > MAX_ZOOM:
+                self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
     def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
         # First draw blank white background
