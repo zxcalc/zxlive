@@ -25,6 +25,7 @@ from .graphscene import GraphScene, VItem, EItem
 from dataclasses import dataclass
 
 from .common import  GraphT, SCALE
+from . import animations as anims
 
 
 class GraphTool:
@@ -131,9 +132,10 @@ class GraphView(QGraphicsView):
                     ipos = QPointF(t * pos + (1.0 - t) * prev)
                     items = self.graph_scene.items(ipos)
                     for item in items:
+                        if isinstance(item, VItem) and item not in self.wand_trace.hit:
+                            anims.anticipate_fuse(item)
                         if item is not self.wand_path and isinstance(item, (VItem, EItem)):
                             self.wand_trace.hit[item] = ipos
-                        
         else:
             e.ignore()
 
@@ -151,6 +153,9 @@ class GraphView(QGraphicsView):
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
                     assert self.wand_path is not None
+                    for item in self.wand_trace.hit:
+                        if isinstance(item, VItem):
+                            anims.back_to_default(item)
                     self.wand_path.hide()
                     self.graph_scene.removeItem(self.wand_path)
                     self.wand_path = None
