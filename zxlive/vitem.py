@@ -316,13 +316,12 @@ class VItemAnimation(QVariantAnimation):
         if self.state() != QAbstractAnimation.State.Running:
             return
 
-        match self.property:
-            case VItem.Properties.Position:
-                self.it.setPos(value)
-            case VItem.Properties.Scale:
-                self.it.setScale(value)
-            case VItem.Properties.Rect:
-                self.it.setRect(value)
+        if self.property == VItem.Properties.Position:
+            self.it.setPos(value)
+        elif self.property == VItem.Properties.Scale:
+            self.it.setScale(value)
+        elif self.property == VItem.Properties.Rect:
+            self.it.setRect(value)
 
         if self.refresh:
             self.it.refresh()
