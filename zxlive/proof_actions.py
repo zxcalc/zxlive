@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QPushButton, QButtonGroup
 import pyzx
 
 from .common import VT,ET, GraphT
-from .commands import SetGraph
+from .commands import UpdateGraph
 
 operations = pyzx.editor.operations
 
@@ -42,10 +42,9 @@ class ProofAction(object):
         g.remove_edges(rem_edges)
         g.remove_vertices(rem_verts)
         g.add_edge_table(etab)
-        cmd = SetGraph(panel.graph_view,g)
+
+        cmd = UpdateGraph(panel.graph_view, new_g=g)
         panel.undo_stack.push(cmd)
-        new_verts = g.vertex_set()
-        panel.graph_scene.select_vertices(v for v in verts if v in new_verts)
 
     def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]):
         if self.match_type == MATCHES_VERTICES:
