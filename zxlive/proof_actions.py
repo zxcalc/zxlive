@@ -8,6 +8,7 @@ import pyzx
 
 from .common import VT,ET, GraphT
 from .commands import UpdateGraph
+from . import animations as anims
 
 operations = pyzx.editor.operations
 
@@ -44,7 +45,24 @@ class ProofAction(object):
         g.add_edge_table(etab)
 
         cmd = UpdateGraph(panel.graph_view, new_g=g)
-        panel.undo_stack.push(cmd)
+
+        if self.name == operations['spider']['text']:
+            print('To do: animate ' + self.name)
+        elif self.name == operations['to_z']['text']:
+            print('To do: animate ' + self.name)
+        elif self.name == operations['to_x']['text']:
+            print('To do: animate ' + self.name)
+        elif self.name == operations['rem_id']['text']:
+            anim = anims.remove_id(panel.graph_scene.vertex_map[verts[0]])
+            panel.undo_stack.push(cmd, anim_before=anim)
+        elif self.name == operations['copy']['text']:
+            print('To do: animate ' + self.name)
+        elif self.name == operations['pauli']['text']:
+            print('To do: animate ' + self.name)
+        elif self.name == operations['bialgebra']['text']:
+            print('To do: animate ' + self.name)
+        else:
+            panel.undo_stack.push(cmd)
 
     def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]):
         if self.match_type == MATCHES_VERTICES:
