@@ -24,7 +24,7 @@ from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent
 from pyzx.graph.base import EdgeType
 from pyzx.graph import GraphDiff
 
-from .common import VT, ET, GraphT, SCALE
+from .common import VT, ET, GraphT, SCALE, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
 from .eitem import EItem, EDragItem
 
@@ -49,7 +49,7 @@ class GraphScene(QGraphicsScene):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setSceneRect(-100, -100, 4000, 4000)
+        self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
         self.vertex_map: Dict[VT, VItem] = {}
         self.edge_map: Dict[ET, EItem] = {}
@@ -239,6 +239,6 @@ class EditGraphScene(GraphScene):
             # Or a click on a free spot to add a new vertex
             else:
                 p = e.scenePos()
-                self.vertex_added.emit(p.x() / SCALE, p.y() / SCALE)
+                self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
         else:
             e.ignore()

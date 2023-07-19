@@ -129,6 +129,19 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(select_all)
         edit_menu.addAction(deselect_all)
 
+        zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount")
+        zoom_out = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
+        zoom_in.setShortcuts([QKeySequence(QKeySequence.StandardKey.ZoomIn), QKeySequence("Ctrl+=")])
+        fit_view = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
+        self.addAction(zoom_in)
+        self.addAction(zoom_out)
+        self.addAction(fit_view)
+
+        view_menu = menu.addMenu("&View")
+        view_menu.addAction(zoom_in)
+        view_menu.addAction(zoom_out)
+        view_menu.addAction(fit_view)
+
     def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
         action = QAction(name, self)
         action.setStatusTip(tooltip)
@@ -267,3 +280,14 @@ class MainWindow(QMainWindow):
 
     def deselect_all(self) -> None:
         self.active_panel.deselect_all()
+
+    def zoom_in(self) -> None:
+        print("Zooming in")
+        self.active_panel.graph_view.zoom_in()
+
+    def zoom_out(self) -> None:
+        print("Zooming out")
+        self.active_panel.graph_view.zoom_out()
+
+    def fit_view(self) -> None:
+        self.active_panel.graph_view.fit_view()
