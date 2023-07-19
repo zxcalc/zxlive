@@ -75,11 +75,11 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = self._new_action("&New...",self.new_graph,QKeySequence.StandardKey.New,
+        new_graph = self._new_action("&New",self.new_graph,QKeySequence.StandardKey.New,
             "Reinitialize with an empty graph")
         open_file = self._new_action("&Open...", self.open_file,QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close...", self.close_action,QKeySequence.StandardKey.Close,
+        close_action = self._new_action("Close", self.close_action,QKeySequence.StandardKey.Close,
             "Closes the window")
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
