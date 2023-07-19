@@ -30,6 +30,7 @@ from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_ms
 from .common import GraphT
 
 from pyzx import Graph
+from pyzx import simplify
 
 
 class MainWindow(QMainWindow):
@@ -129,11 +130,19 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(select_all)
         edit_menu.addAction(deselect_all)
 
-    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
+        transform_actions = []
+        for simp in simplifications.values():
+            transform_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp["function"]), None, simp["tool_tip"]))
+        transform_menu = menu.addMenu("&Transform")
+        for action in transform_actions:
+            transform_menu.addAction(action)
+
+    def _new_action(self, name:str, trigger:Callable, shortcut:QKeySequence | QKeySequence.StandardKey, tooltip:str) -> QAction:
         action = QAction(name, self)
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
-        action.setShortcut(shortcut)
+        if shortcut:
+            action.setShortcut(shortcut)
         return action
 
     @property
@@ -267,3 +276,34 @@ class MainWindow(QMainWindow):
 
     def deselect_all(self) -> None:
         self.active_panel.deselect_all()
+        
+    def apply_pyzx_reduction(self, reduction) -> Callable[[],None]:
+        def reduce() -> None:
+            old_graph = self.active_panel.graph
+            new_graph = copy.deepcopy(old_graph)
+            reduction(new_graph)
+            cmd = SetGraph(self.active_panel.graph_view, new_graph)
+            self.active_panel.undo_stack.push(cmd)
+        return reduce
+    
+
+simplifications = {
+    'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp,},
+    'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp},
+    'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp},
+    'phase_free_simp': {"text": "phase_free_simp", "tool_tip":"phase_free_simp", "function": simplify.phase_free_simp},
+    'pivot_simp': {"text": "pivot_simp", "tool_tip":"pivot_simp", "function": simplify.pivot_simp},
+    'pivot_gadget_simp': {"text": "pivot_gadget_simp", "tool_tip":"pivot_gadget_simp", "function": simplify.pivot_gadget_simp},
+    'pivot_boundary_simp': {"text": "pivot_boundary_simp", "tool_tip":"pivot_boundary_simp", "function": simplify.pivot_boundary_simp},
+    'gadget_simp': {"text": "gadget_simp", "tool_tip":"gadget_simp", "function": simplify.gadget_simp},
+    'lcomp_simp': {"text": "lcomp_simp", "tool_tip":"lcomp_simp", "function": simplify.lcomp_simp},
+    'clifford_simp': {"text": "clifford_simp", "tool_tip":"clifford_simp", "function": simplify.clifford_simp},
+    'tcount': {"text": "tcount", "tool_tip":"tcount", "function": simplify.tcount},
+    'to_gh': {"text": "to_gh", "tool_tip":"to_gh", "function": simplify.to_gh},
+    'to_rg': {"text": "to_rg", "tool_tip":"to_rg", "function": simplify.to_rg},
+    'full_reduce': {"text": "full_reduce", "tool_tip":"full_reduce", "function": simplify.full_reduce},
+    'teleport_reduce': {"text": "teleport_reduce", "tool_tip":"teleport_reduce", "function": simplify.teleport_reduce},
+    'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar},
+    'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp},
+    'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph},
+}
