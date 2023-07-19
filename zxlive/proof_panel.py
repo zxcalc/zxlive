@@ -143,7 +143,7 @@ class ProofPanel(BasePanel):
                 left.append(neighbor)
             else:
                 right.append(neighbor)
-        self._unfuse(vertex, left)
+        self._unfuse(vertex, left, trace.end.y() > trace.start.y())
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -153,7 +153,7 @@ class ProofPanel(BasePanel):
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT]) -> None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT], move_phase: bool) -> None:
         new_g = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v), qubit=self.graph.qubit(v),
                                      row=self.graph.row(v) - 0.25)
@@ -163,6 +163,9 @@ class ProofPanel(BasePanel):
                            self.graph.edge_type((v, neighbor)))
             new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
+        if move_phase:
+            new_g.set_phase(left_vert, new_g.phase(v))
+            new_g.set_phase(v, 0)
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_after=anim)
