@@ -24,7 +24,7 @@ from .graphscene import GraphScene, VItem
 
 from dataclasses import dataclass
 
-from .common import  GraphT, SCALE
+from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y
 
 
 class GraphTool:
@@ -82,7 +82,7 @@ class GraphView(QGraphicsView):
         self.wand_trace: Optional[WandTrace] = None
         self.wand_path: Optional[QGraphicsPathItem] = None
 
-        self.centerOn(0, 0)
+        self.centerOn(OFFSET_X,OFFSET_Y)
 
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
