@@ -32,7 +32,9 @@ setuptools.setup(
     install_requires=[
         "PySide6",
         "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
-        "qt-material>=2.14"],
+        "qt-material>=2.14",
+        "sympy>=1.12"
+    ],
     python_requires=">=3.9",
     entry_points={'console_scripts': 'zxlive=zxlive.app:main'},
 )
