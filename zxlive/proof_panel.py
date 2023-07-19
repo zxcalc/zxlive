@@ -5,12 +5,13 @@ from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from pyzx import VertexType, basicrules
 
-from .common import VT, GraphT
+from .common import VT, GraphT, SCALE
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, SetGraph
 from .graphscene import GraphScene
 from .graphview import GraphTool
 from .vitem import VItem
+from .eitem import EItem
 from . import proof_actions
 from . import animations as anims
 
@@ -27,18 +28,22 @@ class ProofPanel(BasePanel):
 
         self.init_action_groups()
 
-        self.graph_view.wand_trace_finished.connect(self._magic_slice)
+        self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
 
 
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         self.selection = QToolButton(self, text="Selection", checkable=True, checked=True)
         self.magic_wand = QToolButton(self, text="Magic Wand", checkable=True)
-
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
         self.selection.clicked.connect(self._selection_clicked)
-
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
+
+        self.identity_choice = [
+            QToolButton(self, text="Z", checkable=True, checked=True),
+            QToolButton(self, text="X", checkable=True)
+        ]
+        yield ToolbarSection(*self.identity_choice, exclusive=True)
 
     def init_action_groups(self):
         self.action_groups = [proof_actions.actions_basic.copy()]
@@ -71,28 +76,58 @@ class ProofPanel(BasePanel):
         for group in self.action_groups:
             group.update_active(g,selection,edges)
 
+    def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
+        cmd = MoveNode(self.graph_view, vs)
+        self.undo_stack.push(cmd)
+
     def _selection_clicked(self):
         self.graph_view.tool = GraphTool.Selection
 
     def _magic_wand_clicked(self):
         self.graph_view.tool = GraphTool.MagicWand
 
-    def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(self.graph_view, vs)
-        self.undo_stack.push(cmd)
+    def _wand_trace_finished(self, trace):
+        if self._magic_slice(trace):
+            return
+        elif self._magic_identity(trace):
+            return
+
+    def _magic_identity(self, trace):
+        if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
+            return False
+
+        item = next(iter(trace.hit))
+        pos = trace.hit[item]
+        s = self.graph.edge_s(item.e)
+        t = self.graph.edge_t(item.e)
+
+        if self.identity_choice[0].isChecked():
+            vty = VertexType.Z
+        elif self.identity_choice[1].isChecked():
+            vty = VertexType.X
+
+        new_g = copy.deepcopy(self.graph)
+        v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
+        new_g.add_edge(self.graph.edge(s, v), self.graph.edge_type(item.e))
+        new_g.add_edge(self.graph.edge(v, t))
+        new_g.remove_edge(item.e)
+
+        anim = anims.add_id(v, self.graph_scene)
+        cmd = SetGraph(self.graph_view, new_g)
+        self.undo_stack.push(cmd, anim_after=anim)
 
     def _magic_slice(self, trace):
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
-            return
+            return False
         item = filtered[0]
         vertex = item.v
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
-            return
+            return False
         
         if basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
-            return
+            return False
 
         if trace.end.y() > trace.start.y():
             dir = trace.end - trace.start
@@ -109,6 +144,7 @@ class ProofPanel(BasePanel):
             else:
                 right.append(neighbor)
         self._unfuse(vertex, left)
+        return True
 
     def _remove_id(self, v: VT) -> None:
         new_g = copy.deepcopy(self.graph)

@@ -20,7 +20,7 @@ from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent
 
-from .graphscene import GraphScene, VItem
+from .graphscene import GraphScene, VItem, EItem
 
 from dataclasses import dataclass
 
@@ -36,11 +36,11 @@ class GraphTool:
 class WandTrace:
     start: QPointF
     end: QPointF
-    hit: set[VItem]
+    hit: dict[VItem, QPointF]
 
     def __init__(self, start: QPointF) -> None:
         self.start = start
-        self.hit = set()
+        self.hit = {}
         self.end = start
 
 
@@ -121,15 +121,19 @@ class GraphView(QGraphicsView):
             if self.wand_trace is not None:
                 assert self.wand_path is not None
                 pos = self.mapToScene(e.pos())
+                prev = self.wand_trace.end
                 self.wand_trace.end = pos
                 path = self.wand_path.path()
                 path.lineTo(pos)
                 self.wand_path.setPath(path)
-                items = self.graph_scene.items(pos)
-                for item in items:
-                    if item is not self.wand_path and isinstance(item, VItem):
-                        self.wand_trace.hit.add(item)
-                        break
+                for i in range(10):
+                    t = i / 9
+                    ipos = QPointF(t * pos + (1.0 - t) * prev)
+                    items = self.graph_scene.items(ipos)
+                    for item in items:
+                        if item is not self.wand_path and isinstance(item, (VItem, EItem)):
+                            self.wand_trace.hit[item] = ipos
+                        
         else:
             e.ignore()
 

@@ -182,6 +182,15 @@ def remove_id(it: VItem) -> VItemAnimation:
     anim.setEasingCurve(QEasingCurve.InBack)
     return anim
 
+def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
+    """Animation that is played when an identity spider is added using
+    the magic wand."""
+    anim = VItemAnimation(v, VItem.Properties.Scale, scene)
+    anim.setDuration(500)
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setEasingCurve(QEasingCurve.OutElastic)
+    return anim
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused using the magic wand."""

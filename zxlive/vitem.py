@@ -274,8 +274,8 @@ class VItemAnimation(QVariantAnimation):
     def __init__(self, item: Union[VItem, VT], property: VItem.Properties,
                  scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
         super().__init__()
-        if refresh and property != VItem.Properties.Position:
-            raise ValueError("Only position animations require refresh")
+        # if refresh and property != VItem.Properties.Position:
+        #     raise ValueError("Only position animations require refresh")
         if isinstance(item, VItem):
             self._it = item
             self.v = None
