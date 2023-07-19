@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 from pyzx.graph.base import VertexType
 from pyzx.utils import phase_to_s
 
-from .common import VT, ET, GraphT, SCALE
+from .common import VT, ET, GraphT, SCALE, pos_to_view, pos_from_view
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -88,7 +88,7 @@ class VItem(QGraphicsPathItem):
 
         self.graph_scene = graph_scene
         self.v = v
-        self.setPos(self.g.row(v) * SCALE, self.g.qubit(v) * SCALE)
+        self.setPos(*pos_to_view(self.g.row(v), self.g.qubit(v)))
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
         self.active_animations = set()
@@ -172,7 +172,7 @@ class VItem(QGraphicsPathItem):
             e_item.refresh()
 
     def set_pos_from_graph(self) -> None:
-       self.setPos(self.g.row(self.v) * SCALE, self.g.qubit(self.v) * SCALE)
+        self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
@@ -262,7 +262,7 @@ class VItem(QGraphicsPathItem):
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
                     scene.vertices_moved.emit([
-                        (it.v,  it.pos().x() / SCALE, it.pos().y() / SCALE)
+                        (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
                         for it in scene.selectedItems() if isinstance(it, VItem)
                     ])
                 self._dragged_on = None
@@ -331,13 +331,12 @@ class VItemAnimation(QVariantAnimation):
         if self.state() != QAbstractAnimation.State.Running:
             return
 
-        match self.property:
-            case VItem.Properties.Position:
-                self.it.setPos(value)
-            case VItem.Properties.Scale:
-                self.it.setScale(value)
-            case VItem.Properties.Rect:
-                self.it.setRect(value)
+        if self.property == VItem.Properties.Position:
+            self.it.setPos(value)
+        elif self.property == VItem.Properties.Scale:
+            self.it.setScale(value)
+        elif self.property == VItem.Properties.Rect:
+            self.it.setRect(value)
 
         if self.refresh:
             self.it.refresh()

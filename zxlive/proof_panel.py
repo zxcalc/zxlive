@@ -23,6 +23,8 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
         self.graph_scene.selectionChanged.connect(self.update_on_selection)
+        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+
         super().__init__(graph, self.graph_scene)
 
         self.init_action_groups()
@@ -130,3 +132,12 @@ class ProofPanel(BasePanel):
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = SetGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_after=anim)
+        
+    def _vert_double_clicked(self, v: VT) -> None:
+        if self.graph.type(v) == VertexType.BOUNDARY:
+            return
+
+        new_g = copy.deepcopy(self.graph)
+        basicrules.color_change(new_g, v)
+        cmd = SetGraph(self.graph_view, new_g)
+        self.undo_stack.push(cmd)

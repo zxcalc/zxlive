@@ -6,6 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QToolButton, QInputDialog
 from PySide6.QtGui import QShortcut
 from pyzx import EdgeType, VertexType
+from sympy import sympify
 
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
@@ -103,7 +104,7 @@ class GraphEditPanel(BasePanel):
         if not ok:
             return
         try:
-            new_phase = Fraction(input_)
+            new_phase = string_to_phase(input_)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return
@@ -158,3 +159,23 @@ class GraphEditPanel(BasePanel):
 
     def _start_derivation(self) -> None:
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
+
+def string_to_phase(string: str) -> Fraction:
+    if not string: 
+        return Fraction(0)
+    try:
+        s = string.lower().replace(' ', '')
+        s = s.replace('\u03c0', '').replace('pi', '')
+        if '.' in s or 'e' in s:
+            return Fraction(float(s))
+        elif '/' in s:
+            a, b = s.split("/", 2)
+            if not a:
+                return Fraction(1, int(b))
+            if a == '-':
+                a = '-1'
+            return Fraction(int(a), int(b))
+        else:
+            return Fraction(int(s))
+    except ValueError:
+        return sympify(string)
