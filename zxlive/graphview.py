@@ -196,6 +196,12 @@ class GraphView(QGraphicsView):
         delta = new_pos - old_pos
         self.translate(delta.x(), delta.y())
 
+    def zoom_out(self) -> None:
+        self.zoom(-100)
+
+    def zoom_in(self) -> None:
+        self.zoom(100)
+
     def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
         # First draw blank white background
         painter.setBrush(QColor(255, 255, 255, 255))
