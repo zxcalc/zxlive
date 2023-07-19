@@ -181,7 +181,6 @@ class GraphView(QGraphicsView):
         elif ydelta < 0:
             zoom_factor = 1/(1 - ZOOMFACTOR * ydelta)
 
-        # Zoom
         current_zoom = self.transform().m11()
         if current_zoom * zoom_factor < MIN_ZOOM:
             return
@@ -201,6 +200,16 @@ class GraphView(QGraphicsView):
 
     def zoom_in(self) -> None:
         self.zoom(100)
+
+    def fit_view(self) -> None:
+        self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+        current_zoom = self.transform().m11()
+        print(current_zoom)
+        if current_zoom < MIN_ZOOM:
+            self.scale(MIN_ZOOM / current_zoom, MIN_ZOOM / current_zoom)
+        else:
+            if current_zoom > MAX_ZOOM:
+                self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
     def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
         # First draw blank white background

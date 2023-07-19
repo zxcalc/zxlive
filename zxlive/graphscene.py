@@ -223,6 +223,6 @@ class EditGraphScene(GraphScene):
             # Or a click on a free spot to add a new vertex
             else:
                 p = e.scenePos()
-                self.vertex_added.emit(pos_from_view(p.x(), p.y()))
+                self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
         else:
             e.ignore()
