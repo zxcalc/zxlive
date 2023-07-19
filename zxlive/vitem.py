@@ -247,7 +247,7 @@ class VItem(QGraphicsEllipseItem):
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
                     scene.vertices_moved.emit([
-                        (it.v, pos_from_view(it.pos().x(),it.pos().y()))
+                        (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
                         for it in scene.selectedItems() if isinstance(it, VItem)
                     ])
                 self._dragged_on = None
