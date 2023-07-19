@@ -91,6 +91,8 @@ class GraphView(QGraphicsView):
         self.graph_scene.update_graph(g, select_new)
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
+        if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+            e.setModifiers(e.modifiers() | Qt.KeyboardModifier.ControlModifier)
         super().mousePressEvent(e)
 
         if e.button() == Qt.MouseButton.LeftButton and not self.graph_scene.items(self.mapToScene(e.pos()), deviceTransform=QTransform()):
@@ -134,16 +136,20 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+        if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+            e.setModifiers(e.modifiers() | Qt.KeyboardModifier.ControlModifier)
         super().mouseReleaseEvent(e)
         if e.button() == Qt.MouseButton.LeftButton:
             if self.tool == GraphTool.Selection:
                 if self.rubberband.isVisible():
                     self.rubberband.hide()
-                    self.graph_scene.clearSelection()
+                    key_modifiers = e.modifiers()
+                    if not(Qt.KeyboardModifier.ShiftModifier & key_modifiers or Qt.KeyboardModifier.ControlModifier & key_modifiers):
+                        self.graph_scene.clearSelection()
                     rect = self.rubberband.geometry()
-                    for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()):
-                        if isinstance(it, VItem):
-                            it.setSelected(True)
+                    items = [it for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()) if isinstance(it, VItem)]
+                    for it in items:
+                        it.setSelected(not (len(items) == 1 or e.modifiers() & Qt.KeyboardModifier.ShiftModifier) or not it.isSelected())
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
                     assert self.wand_path is not None
