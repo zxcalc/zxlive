@@ -16,14 +16,14 @@
 from __future__ import annotations
 from typing import Callable, Optional
 
-from enum import IntEnum
-
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
 from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
+from pyzx.graph.graph_s import GraphS
 
 from .commands import SetGraph
 
+from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
@@ -160,8 +160,10 @@ class MainWindow(QMainWindow):
         return action
 
     @property
-    def active_panel(self) -> QWidget:
-        return self.tab_widget.currentWidget()
+    def active_panel(self) -> BasePanel:
+        current_widget = self.tab_widget.currentWidget()
+        assert isinstance(current_widget, BasePanel)
+        return current_widget
 
 
     def closeEvent(self, e: QCloseEvent) -> None:
@@ -263,7 +265,7 @@ class MainWindow(QMainWindow):
         self.copied_graph = self.active_panel.copy_selection()
 
     def paste_graph(self) -> None:
-        if isinstance(self.active_panel, GraphEditPanel):
+        if isinstance(self.active_panel, GraphEditPanel) and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
 
     def delete_graph(self) -> None:
@@ -302,7 +304,7 @@ class MainWindow(QMainWindow):
     def fit_view(self) -> None:
         self.active_panel.graph_view.fit_view()
 
-    def apply_pyzx_reduction(self, reduction) -> Callable[[],None]:
+    def apply_pyzx_reduction(self, reduction: Callable[[GraphS], int]) -> Callable[[], None]:
         def reduce() -> None:
             old_graph = self.active_panel.graph
             new_graph = copy.deepcopy(old_graph)

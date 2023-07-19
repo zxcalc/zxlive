@@ -23,8 +23,8 @@ class GraphEditPanel(BasePanel):
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
 
-    _curr_ety: EdgeType
-    _curr_vty: VertexType
+    _curr_ety: EdgeType.Type
+    _curr_vty: VertexType.Type
 
     def __init__(self, graph: GraphT) -> None:
         self.graph_scene = EditGraphScene()
@@ -67,14 +67,14 @@ class GraphEditPanel(BasePanel):
         reset.clicked.connect(self._reset_clicked)
         yield ToolbarSection(reset)
 
-    def _vty_clicked(self, vty: VertexType) -> None:
+    def _vty_clicked(self, vty: VertexType.Type) -> None:
         self._curr_vty = vty
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) > 0:
             cmd = ChangeNodeColor(self.graph_view, selected, vty)
             self.undo_stack.push(cmd)
 
-    def _ety_clicked(self, ety: EdgeType) -> None:
+    def _ety_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
         selected = list(self.graph_scene.selected_edges)
@@ -115,7 +115,7 @@ class GraphEditPanel(BasePanel):
         while self.undo_stack.canUndo():
             self.undo_stack.undo()
 
-    def cycle_vertex_type_selection(self):
+    def cycle_vertex_type_selection(self) -> None:
         if self.select_z.isChecked():
             self.select_x.setChecked(True)
             self._curr_vty = VertexType.X
@@ -128,7 +128,7 @@ class GraphEditPanel(BasePanel):
         else:
             raise ValueError("Something is wrong with the state of the vertex type selectors")
 
-    def cycle_edge_type_selection(self):
+    def cycle_edge_type_selection(self) -> None:
         if self.select_simple.isChecked():
             self.select_had.setChecked(True)
             self._curr_ety = EdgeType.HADAMARD
@@ -146,7 +146,7 @@ class GraphEditPanel(BasePanel):
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
 
-    def delete_selection(self):
+    def delete_selection(self) -> None:
         selection = list(self.graph_scene.selected_vertices)
         selected_edges = list(self.graph_scene.selected_edges)
         if not selection and not selected_edges: return

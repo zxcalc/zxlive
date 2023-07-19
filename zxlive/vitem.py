@@ -82,7 +82,7 @@ class VItem(QGraphicsPathItem):
         Scale = 1
         Rect = 2
 
-    def __init__(self, graph_scene: GraphScene, v: VT):
+    def __init__(self, graph_scene: GraphScene, v: VT) -> None:
         super().__init__()
         self.setZValue(VITEM_UNSELECTED_Z)
 
@@ -280,42 +280,42 @@ class VItemAnimation(QVariantAnimation):
     no need to hold onto a reference of this class."""
 
     _it: Optional[VItem]
-    property: VItem.Properties
+    prop: VItem.Properties
     refresh: bool  # Whether the item is refreshed at each frame
 
     v: Optional[VT]
-    scene = Optional["GraphScene"]
 
     def __init__(self, item: Union[VItem, VT], property: VItem.Properties,
                  scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
         super().__init__()
+        self.v = None
+        self._it = None
+        self.scene: Optional[GraphScene] = None
         if refresh and property != VItem.Properties.Position:
             raise ValueError("Only position animations require refresh")
         if isinstance(item, VItem):
             self._it = item
-            self.v = None
-            self.scene = None
+        elif scene is None:
+            raise ValueError("Scene is required to obtain VItem from vertex id")
         else:
-            if scene is None:
-                raise ValueError("Scene is required to obtain VItem from vertex id")
             self.v = item
             self.scene = scene
-            self._it = None
-        self.property = property
+        self.prop = property
         self.refresh = refresh
         self.stateChanged.connect(self._on_state_changed)
 
     @property
     def it(self) -> VItem:
-        if self._it is None:
+        if self._it is None and self.scene is not None and self.v is not None:
             self._it = self.scene.vertex_map[self.v]
+        assert self._it is not None
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
             # Stop all animations that target the same property
             for anim in self.it.active_animations.copy():
-                if anim.property == self.property:
+                if anim.prop == self.prop:
                     anim.stop()
             self.it.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
@@ -331,12 +331,12 @@ class VItemAnimation(QVariantAnimation):
         if self.state() != QAbstractAnimation.State.Running:
             return
 
-        if self.property == VItem.Properties.Position:
+        if self.prop == VItem.Properties.Position:
             self.it.setPos(value)
-        elif self.property == VItem.Properties.Scale:
+        elif self.prop == VItem.Properties.Scale:
             self.it.setScale(value)
-        elif self.property == VItem.Properties.Rect:
-            self.it.setRect(value)
+        elif self.prop == VItem.Properties.Rect:
+            self.it.setPath(value)
 
         if self.refresh:
             self.it.refresh()
@@ -345,7 +345,7 @@ class VItemAnimation(QVariantAnimation):
 class PhaseItem(QGraphicsTextItem):
     """A QGraphicsItem representing a phase label"""
 
-    def __init__(self, v_item: VItem):
+    def __init__(self, v_item: VItem) -> None:
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
 

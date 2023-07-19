@@ -1,35 +1,41 @@
 import copy
 from dataclasses import dataclass, field, replace
-from typing import Callable, Literal, List, Optional
+from typing import Callable, Literal, List, Optional, Final, TYPE_CHECKING
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
+from PySide6.QtCore import QObject
 
 import pyzx
 
+from .base_panel import BasePanel
 from .common import VT,ET, GraphT
 from .commands import UpdateGraph
 
+if TYPE_CHECKING:
+    from .proof_panel import ProofPanel
+
 operations = pyzx.editor.operations
 
+MatchType = Literal[1, 2]
 
 # Copied from pyzx.editor_actions
-MATCHES_VERTICES = 1
-MATCHES_EDGES = 2
+MATCHES_VERTICES: MatchType = 1
+MATCHES_EDGES: MatchType = 2
 
 @dataclass
 class ProofAction(object):
     name: str
     matcher: Callable[[GraphT,Callable],List]
     rule: Callable[[GraphT,List],pyzx.rules.RewriteOutputType[ET,VT]]
-    match_type: Literal[MATCHES_VERTICES,MATCHES_EDGES]
+    match_type: MatchType
     tooltip: str
     button: Optional[QPushButton] = field(default=None, init=False)
 
     @classmethod
-    def from_dict(cls,d):
+    def from_dict(cls, d: dict) -> "ProofAction":
           return cls(d['text'],d['matcher'],d['rule'],d['type'],d['tooltip'])
 
-    def do_rewrite(self,panel: 'BasePanel'):
+    def do_rewrite(self,panel: "ProofPanel") -> None:
         verts, edges = panel.parse_selection()
         g = copy.deepcopy(panel.graph_scene.g)
 
@@ -46,7 +52,7 @@ class ProofAction(object):
         cmd = UpdateGraph(panel.graph_view, new_g=g)
         panel.undo_stack.push(cmd)
 
-    def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]):
+    def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
         if self.match_type == MATCHES_VERTICES:
             matches = self.matcher(g, lambda v: v in verts)
         else:
@@ -60,12 +66,12 @@ class ProofAction(object):
 
 
 class ProofActionGroup(object):
-    def __init__(self, *actions):
+    def __init__(self, *actions: ProofAction) -> None:
         self.actions = actions
         self.btn_group: Optional[QButtonGroup] = None
         self.parent_panel = None
 
-    def copy(self):
+    def copy(self) -> "ProofActionGroup":
         copied_actions = []
         for action in self.actions:
             action_copy = replace(action)
@@ -73,10 +79,10 @@ class ProofActionGroup(object):
             copied_actions.append(action_copy)
         return ProofActionGroup(*copied_actions)
 
-    def init_buttons(self, parent):
+    def init_buttons(self, parent: "ProofPanel") -> None:
         self.btn_group = QButtonGroup(parent, exclusive=False)
-        def create_rewrite(action,parent): # Needed to prevent weird bug with closures in signals
-            def rewriter():
+        def create_rewrite(action: ProofAction, parent: "ProofPanel") -> Callable[[], None]: # Needed to prevent weird bug with closures in signals
+            def rewriter() -> None:
                 action.do_rewrite(parent)
             return rewriter
         for action in self.actions:
@@ -89,7 +95,7 @@ class ProofActionGroup(object):
             self.btn_group.addButton(btn)
             action.button = btn
 
-    def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]):
+    def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
         for action in self.actions:
             action.update_active(g,verts,edges)
 

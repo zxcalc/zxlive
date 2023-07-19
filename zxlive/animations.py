@@ -105,7 +105,7 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
     return group
 
 
-def shake(it: VItem, amount: float, duration: float):
+def shake(it: VItem, amount: float, duration: int) -> None:
     center = it.pos()
     anim = VItemAnimation(it, VItem.Properties.Position, refresh=False)
     anim.setLoopCount(-1)  # Infinite looping
@@ -176,8 +176,8 @@ def remove_id(it: VItem) -> VItemAnimation:
     the magic wand."""
     anim = VItemAnimation(it, VItem.Properties.Rect)
     anim.setDuration(200)
-    anim.setStartValue(it.rect())
-    center = it.rect().center()
+    anim.setStartValue(it.boundingRect())
+    center = it.boundingRect().center()
     anim.setEndValue(QRectF(center.x(), center.y(), 0, 0))
     anim.setEasingCurve(QEasingCurve.InBack)
     return anim

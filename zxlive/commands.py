@@ -63,7 +63,7 @@ class UpdateGraph(BaseCommand):
     old_selected: Optional[Set[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
-        assert self.old_g is not None
+        assert self.old_g is not None and self.old_selected is not None
         self.g = self.old_g
         self.update_graph_view()
         self.graph_view.graph_scene.select_vertices(self.old_selected)
@@ -99,7 +99,7 @@ class ChangeNodeColor(BaseCommand):
 class ChangeEdgeColor(BaseCommand):
     """Changes the color of a set of edges"""
     es: Iterable[ET]
-    ety: EdgeType
+    ety: EdgeType.Type
 
     _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
 

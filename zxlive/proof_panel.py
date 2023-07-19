@@ -5,11 +5,11 @@ from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from pyzx import VertexType, basicrules
 
-from .common import VT, GraphT
+from .common import ET, VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, UpdateGraph
 from .graphscene import GraphScene
-from .graphview import GraphTool
+from .graphview import GraphTool, WandTrace
 from .vitem import VItem
 from . import proof_actions
 from . import animations as anims
@@ -42,7 +42,7 @@ class ProofPanel(BasePanel):
 
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
-    def init_action_groups(self):
+    def init_action_groups(self) -> None:
         self.action_groups = [proof_actions.actions_basic.copy()]
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
@@ -55,7 +55,7 @@ class ProofPanel(BasePanel):
             widget.setLayout(hlayout)
             self.layout().insertWidget(1,widget)
 
-    def parse_selection(self):
+    def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
         g = self.graph_scene.g
         edges = []
@@ -66,24 +66,24 @@ class ProofPanel(BasePanel):
 
         return selection, edges
 
-    def update_on_selection(self):
+    def update_on_selection(self) -> None:
         selection, edges = self.parse_selection()
         g = self.graph_scene.g
 
         for group in self.action_groups:
             group.update_active(g,selection,edges)
 
-    def _selection_clicked(self):
+    def _selection_clicked(self) -> None:
         self.graph_view.tool = GraphTool.Selection
 
-    def _magic_wand_clicked(self):
+    def _magic_wand_clicked(self) -> None:
         self.graph_view.tool = GraphTool.MagicWand
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
 
-    def _magic_slice(self, trace):
+    def _magic_slice(self, trace: WandTrace) -> None:
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
             return
