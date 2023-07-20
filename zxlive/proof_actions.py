@@ -53,20 +53,28 @@ class ProofAction(object):
         cmd = UpdateGraph(panel.graph_view, new_g=g)
 
         if self.name == operations['spider']['text']:
-            print('To do: animate ' + self.name)
+            anim = anims.fuse(panel.graph_scene.vertex_map[verts[0]], panel.graph_scene.vertex_map[verts[1]])
+            panel.undo_stack.push(cmd, anim_before=anim)
         elif self.name == operations['to_z']['text']:
             print('To do: animate ' + self.name)
+            panel.undo_stack.push(cmd)
         elif self.name == operations['to_x']['text']:
             print('To do: animate ' + self.name)
+            panel.undo_stack.push(cmd)
         elif self.name == operations['rem_id']['text']:
             anim = anims.remove_id(panel.graph_scene.vertex_map[verts[0]])
             panel.undo_stack.push(cmd, anim_before=anim)
         elif self.name == operations['copy']['text']:
-            print('To do: animate ' + self.name)
+            anim = anims.strong_comp(panel.graph, g, verts[0], panel.graph_scene)
+            panel.undo_stack.push(cmd, anim_after=anim)
+            # print('To do: animate ' + self.name)
+            # panel.undo_stack.push(cmd)
         elif self.name == operations['pauli']['text']:
             print('To do: animate ' + self.name)
+            panel.undo_stack.push(cmd)
         elif self.name == operations['bialgebra']['text']:
-            print('To do: animate ' + self.name)
+            anim = anims.strong_comp(panel.graph, g, verts[0], panel.graph_scene)
+            panel.undo_stack.push(cmd, anim_after=anim)
         else:
             panel.undo_stack.push(cmd)
 
