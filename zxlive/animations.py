@@ -3,7 +3,7 @@ import random
 from typing import Optional, Callable
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
-    QParallelAnimationGroup, QRectF
+    QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
 
 from .common import VT, GraphT, pos_to_view
@@ -174,14 +174,22 @@ def back_to_default(it: VItem) -> None:
 def remove_id(it: VItem) -> VItemAnimation:
     """Animation that is played when an identity spider is removed using
     the magic wand."""
-    anim = VItemAnimation(it, VItem.Properties.Rect)
+    anim = VItemAnimation(it, VItem.Properties.Scale)
     anim.setDuration(200)
-    anim.setStartValue(it.boundingRect())
-    center = it.boundingRect().center()
-    anim.setEndValue(QRectF(center.x(), center.y(), 0, 0))
+    anim.setStartValue(it.scale())
+    anim.setEndValue(0.0)
     anim.setEasingCurve(QEasingCurve.InBack)
     return anim
 
+def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
+    """Animation that is played when an identity spider is added using
+    the magic wand."""
+    anim = VItemAnimation(v, VItem.Properties.Scale, scene)
+    anim.setDuration(500)
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setEasingCurve(QEasingCurve.OutElastic)
+    return anim
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused using the magic wand."""
