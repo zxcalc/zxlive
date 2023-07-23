@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QPushButton, QButtonGroup
 import pyzx
 
 from .common import VT,ET, GraphT
-from .commands import SetGraph
+from .commands import AddRewriteStep
 
 operations = pyzx.editor.operations
 
@@ -15,6 +15,7 @@ operations = pyzx.editor.operations
 # Copied from pyzx.editor_actions
 MATCHES_VERTICES = 1
 MATCHES_EDGES = 2
+
 
 @dataclass
 class ProofAction(object):
@@ -29,7 +30,7 @@ class ProofAction(object):
     def from_dict(cls,d):
           return cls(d['text'],d['matcher'],d['rule'],d['type'],d['tooltip'])
 
-    def do_rewrite(self,panel: 'BasePanel'):
+    def do_rewrite(self, panel: 'ProofPanel'):
         verts, edges = panel.parse_selection()
         g = copy.deepcopy(panel.graph_scene.g)
 
@@ -42,7 +43,7 @@ class ProofAction(object):
         g.remove_edges(rem_edges)
         g.remove_vertices(rem_verts)
         g.add_edge_table(etab)
-        cmd = SetGraph(panel.graph_view,g)
+        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         panel.undo_stack.push(cmd)
         new_verts = g.vertex_set()
         panel.graph_scene.select_vertices(v for v in verts if v in new_verts)

@@ -1,15 +1,21 @@
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Optional, Iterable, Union
+from typing import Optional, Iterable, Union, List, Any
 import copy
 
+from PySide6.QtCore import QItemSelection, QModelIndex, QItemSelectionModel, \
+    QSignalBlocker
 from PySide6.QtGui import QUndoCommand
+from PySide6.QtWidgets import QListView
 
 from pyzx import basicrules
+from pyzx.graph import GraphDiff
 from pyzx.utils import EdgeType, VertexType
 
 from .common import VT, ET, GraphT
 from .graphview import GraphView
+from .proof import ProofModel, Rewrite
+
 
 @dataclass
 class BaseCommand(QUndoCommand):
@@ -238,3 +244,92 @@ class ChangeColor(BaseCommand):
         self.update_graph_view()
 
     undo = redo = toggle
+
+
+@dataclass
+class AddRewriteStep(SetGraph):
+    """Adds a new rewrite to the proof.
+
+    The rewrite is inserted after the currently selected step. In particular, it
+    replaces all rewrites that were previously after the current selection.
+    """
+    step_view: QListView
+    name: str
+    diff: Optional[GraphDiff] = None
+
+    _old_selected: Optional[int] = field(default=None, init=False)
+    _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
+
+    @property
+    def proof_model(self) -> ProofModel:
+        model = self.step_view.model()
+        assert isinstance(model, ProofModel)
+        return model
+
+    def redo(self) -> None:
+        # Remove steps from the proof model until we're at the currently selected step
+        self._old_selected = self.step_view.currentIndex().row()
+        self._old_steps = []
+        for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
+            self._old_steps.append(self.proof_model.pop_rewrite())
+
+        diff = self.diff or GraphDiff(self.g, self.new_g)
+        self.proof_model.add_rewrite(Rewrite(self.name, diff), self.new_g)
+
+        # Select the added vertex
+        idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
+        self.step_view.selectionModel().blockSignals(True)
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
+        super().redo()
+
+    def undo(self) -> None:
+        # Undo the rewrite
+        self.proof_model.pop_rewrite()
+
+        # Add back steps that were previously removed
+        for rewrite, graph in reversed(self._old_steps):
+            self.proof_model.add_rewrite(rewrite, graph)
+
+        # Select the previously selected step
+        assert self._old_selected is not None
+        self.step_view.selectionModel().blockSignals(True)
+        idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
+        super().undo()
+
+
+@dataclass
+class GoToRewriteStep(SetGraph):
+    """Shows the graph at some step in the proof.
+
+    Undoing returns to the previously selected proof step.
+    """
+
+    def __init__(self, graph_view: GraphView, step_view: QListView, old_step: int, step: int) -> None:
+        proof_model = step_view.model()
+        assert isinstance(proof_model, ProofModel)
+        SetGraph.__init__(self, graph_view, proof_model.get_graph(step))
+        self.step_view = step_view
+        self.step = step
+        self.old_step = old_step
+
+    def redo(self) -> None:
+        idx = self.step_view.model().index(self.step, 0, QModelIndex())
+        self.step_view.clearSelection()
+        self.step_view.selectionModel().blockSignals(True)
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
+        self.step_view.update(idx)
+        super().redo()
+
+    def undo(self) -> None:
+        idx = self.step_view.model().index(self.old_step, 0, QModelIndex())
+        self.step_view.clearSelection()
+        self.step_view.selectionModel().blockSignals(True)
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
+        self.step_view.update(idx)
+        super().undo()
+
