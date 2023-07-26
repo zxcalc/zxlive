@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout
 from PySide6.QtGui import QVector2D
 from pyzx import VertexType, basicrules
 
-from .common import ET, VT, GraphT, SCALE, pos_from_view
+from .common import ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, UpdateGraph
 from .graphscene import GraphScene
@@ -140,10 +140,10 @@ class ProofPanel(BasePanel):
         end = trace.hit[item][-1]
         if start.y() > end.y():
             start, end = end, start
-        pos = QPointF(SCALE * self.graph.row(vertex), SCALE * self.graph.qubit(vertex))
+        pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
         left, right = [], []
         for neighbor in self.graph.neighbors(vertex):
-            npos = QPointF(SCALE * self.graph.row(neighbor), SCALE * self.graph.qubit(neighbor))
+            npos = QPointF(*pos_to_view(self.graph.row(neighbor), self.graph.qubit(neighbor)))
             # Compute whether each neighbor is inside the entry and exit points
             i1 = cross(start - pos, npos - pos) * cross(start - pos, end - pos) >= 0
             i2 = cross(end - pos, npos - pos) * cross(end - pos, start - pos) >= 0
@@ -152,7 +152,8 @@ class ProofPanel(BasePanel):
                 left.append(neighbor)
             else:
                 right.append(neighbor)
-        self._unfuse(vertex, left)
+        mouse_dir = ((start + end) / 2) - pos
+        self._unfuse(vertex, left, mouse_dir)
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -162,7 +163,7 @@ class ProofPanel(BasePanel):
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT]) -> None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
         def snap_vector(v):
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
@@ -196,6 +197,10 @@ class ProofPanel(BasePanel):
             avg_left = -avg_right
         
         dist = 0.25 if QVector2D.dotProduct(avg_left, avg_right) != 0 else 0.35
+        # Put the phase on the left hand side if the mouse direction is further 
+        # away from the average direction of the left neighbours than the right.
+        phase_left = QVector2D.dotProduct(QVector2D(mouse_dir), avg_left) \
+            <= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
 
         new_g = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v), 
@@ -208,6 +213,10 @@ class ProofPanel(BasePanel):
                            self.graph.edge_type((v, neighbor)))
             new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
+        if phase_left:
+            new_g.set_phase(left_vert, new_g.phase(v))
+            new_g.set_phase(v, 0)
+
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd, anim_after=anim)
