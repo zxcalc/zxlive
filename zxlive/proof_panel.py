@@ -152,7 +152,6 @@ class ProofPanel(BasePanel):
             vty = VertexType.X
 
         new_g = copy.deepcopy(self.graph)
-        print(pos)
         v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
         new_g.add_edge(self.graph.edge(s, v), self.graph.edge_type(item.e))
         new_g.add_edge(self.graph.edge(v, t))
@@ -274,7 +273,6 @@ class ProofPanel(BasePanel):
     def _proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
-        print("x")
         cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
         self.undo_stack.push(cmd)
 
