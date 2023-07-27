@@ -303,7 +303,9 @@ class AddRewriteStep(SetGraph):
 
     def undo(self) -> None:
         # Undo the rewrite
+        self.step_view.selectionModel().blockSignals(True)
         self.proof_model.pop_rewrite()
+        self.step_view.selectionModel().blockSignals(False)
 
         # Add back steps that were previously removed
         for rewrite, graph in reversed(self._old_steps):
