@@ -160,10 +160,12 @@ class MainWindow(QMainWindow):
         return action
 
     @property
-    def active_panel(self) -> BasePanel:
+    def active_panel(self) -> Optional[BasePanel]:
         current_widget = self.tab_widget.currentWidget()
-        assert isinstance(current_widget, BasePanel)
-        return current_widget
+        if current_widget is not None:
+            assert isinstance(current_widget, BasePanel)
+            return current_widget
+        return None
 
 
     def closeEvent(self, e: QCloseEvent) -> None:
