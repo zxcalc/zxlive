@@ -300,7 +300,6 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setPen(Qt.GlobalColor.transparent)
         if option.state & QStyle.State_Selected:
             painter.setBrush(QColor(204, 232, 255))
-        # TODO: Why is hover not working?
         elif option.state & QStyle.State_MouseOver:
             painter.setBrush(QColor(229, 243, 255))
         else:
