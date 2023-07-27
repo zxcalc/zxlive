@@ -185,7 +185,7 @@ class MoveNode(BaseCommand):
         for (v, _, _), (x, y) in zip(self.vs, self._old_positions):
             self.g.set_row(v, x)
             self.g.set_qubit(v, y)
-            self.update_graph_view()
+        self.update_graph_view()
 
     def redo(self) -> None:
         self._old_positions = []
@@ -353,3 +353,19 @@ class GoToRewriteStep(SetGraph):
         self.step_view.update(idx)
         super().undo()
 
+
+@dataclass
+class MoveNodeInStep(MoveNode):
+    step_view: QListView
+
+    def redo(self) -> None:
+        super().redo()
+        model = self.step_view.model()
+        assert isinstance(model, ProofModel)
+        model.graphs[self.step_view.currentIndex().row()] = self.g
+
+    def undo(self) -> None:
+        super().undo()
+        model = self.step_view.model()
+        assert isinstance(model, ProofModel)
+        model.graphs[self.step_view.currentIndex().row()] = self.g

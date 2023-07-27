@@ -11,7 +11,7 @@ from pyzx import VertexType, basicrules
 
 from .common import ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
 from .base_panel import BasePanel, ToolbarSection
-from .commands import MoveNode, AddRewriteStep, GoToRewriteStep
+from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .graphscene import GraphScene
 from .graphview import WandTrace, GraphTool
 from .eitem import EItem
@@ -98,7 +98,7 @@ class ProofPanel(BasePanel):
             group.update_active(g,selection,edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(self.graph_view, vs)
+        cmd = MoveNodeInStep(self.graph_view, vs, self.step_view)
         self.undo_stack.push(cmd)
 
     def _selection_clicked(self) -> None:
