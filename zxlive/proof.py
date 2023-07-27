@@ -86,7 +86,7 @@ class ProofModel(QAbstractListModel):
     def pop_rewrite(self) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
-        Returns the rewrite and the grap that previously resulted from this rewrite.
+        Returns the rewrite and the graph that previously resulted from this rewrite.
         """
         self.beginRemoveRows(QModelIndex(), len(self.graphs) - 1, len(self.graphs) - 1)
         rewrite = self.steps.pop()

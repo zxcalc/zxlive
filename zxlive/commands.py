@@ -294,7 +294,7 @@ class AddRewriteStep(SetGraph):
         diff = self.diff or GraphDiff(self.g, self.new_g)
         self.proof_model.add_rewrite(Rewrite(self.name, diff), self.new_g)
 
-        # Select the added vertex
+        # Select the added step
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
