@@ -158,7 +158,7 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _magic_slice(self, trace: WandTrace) -> None:
