@@ -138,7 +138,7 @@ class GraphScene(QGraphicsScene):
 
         for e in diff.new_edges:
             s, t = self.g.edge_st(e)
-            e_item = EItem(self.g, e, self.vertex_map[s], self.vertex_map[t])
+            e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
             self.edge_map[e] = e_item
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
@@ -174,7 +174,7 @@ class GraphScene(QGraphicsScene):
         self.edge_map = {}
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
-            ei = EItem(self.g, e, self.vertex_map[s], self.vertex_map[t])
+            ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
             self.addItem(ei)
             self.addItem(ei.selection_node)
             self.edge_map[e] = ei

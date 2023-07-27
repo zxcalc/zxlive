@@ -26,18 +26,21 @@ from pyzx import EdgeType
 from .common import SCALE, VT, ET, GraphT
 from .vitem import VItem, EITEM_Z
 
+if TYPE_CHECKING:
+    from .graphscene import GraphScene
+
 HAD_EDGE_BLUE = "#0077ff"
 
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(self, g: GraphT, e: ET, s_item: VItem, t_item: VItem) -> None:
+    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
-        self.g = g
+        self.graph_scene = graph_scene
         self.e = e
         self.s_item = s_item
         self.t_item = t_item
@@ -52,6 +55,10 @@ class EItem(QGraphicsPathItem):
         # self.selection_node.setVisible(False)
 
         self.refresh()
+
+    @property
+    def g(self) -> GraphT:
+        return self.graph_scene.g
 
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
