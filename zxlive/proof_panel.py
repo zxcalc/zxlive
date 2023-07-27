@@ -49,6 +49,7 @@ class ProofPanel(BasePanel):
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
+        self.step_view.viewport().setAttribute(Qt.WA_Hover)
 
         self.panel_widget.layout().addWidget(self.step_view)
 
