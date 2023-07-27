@@ -16,20 +16,22 @@
 from __future__ import annotations
 from typing import Callable, Optional
 
-from enum import IntEnum
-
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
 from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
+from pyzx.graph.graph_s import GraphS
 
+from .commands import SetGraph
+
+from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .commands import SetGraph
 from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph
+from pyzx import simplify
 
 
 class MainWindow(QMainWindow):
@@ -75,11 +77,11 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = self._new_action("&New...",self.new_graph,QKeySequence.StandardKey.New,
+        new_graph = self._new_action("&New",self.new_graph,QKeySequence.StandardKey.New,
             "Reinitialize with an empty graph")
         open_file = self._new_action("&Open...", self.open_file,QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close...", self.close_action,QKeySequence.StandardKey.Close,
+        close_action = self._new_action("Close", self.close_action,QKeySequence.StandardKey.Close,
             "Closes the window")
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
@@ -129,16 +131,39 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(select_all)
         edit_menu.addAction(deselect_all)
 
+        zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount")
+        zoom_out = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
+        zoom_in.setShortcuts([QKeySequence(QKeySequence.StandardKey.ZoomIn), QKeySequence("Ctrl+=")])
+        fit_view = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
+        self.addAction(zoom_in)
+        self.addAction(zoom_out)
+        self.addAction(fit_view)
+
+        view_menu = menu.addMenu("&View")
+        view_menu.addAction(zoom_in)
+        view_menu.addAction(zoom_out)
+        view_menu.addAction(fit_view)
+
+        transform_actions = []
+        for simp in simplifications.values():
+            transform_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp["function"]), None, simp["tool_tip"]))
+        transform_menu = menu.addMenu("&Transform")
+        for action in transform_actions:
+            transform_menu.addAction(action)
+
     def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
         action = QAction(name, self)
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
-        action.setShortcut(shortcut)
+        if shortcut:
+            action.setShortcut(shortcut)
         return action
 
     @property
-    def active_panel(self) -> QWidget:
-        return self.tab_widget.currentWidget()
+    def active_panel(self) -> BasePanel:
+        current_widget = self.tab_widget.currentWidget()
+        assert isinstance(current_widget, BasePanel)
+        return current_widget
 
 
     def closeEvent(self, e: QCloseEvent) -> None:
@@ -240,7 +265,7 @@ class MainWindow(QMainWindow):
         self.copied_graph = self.active_panel.copy_selection()
 
     def paste_graph(self) -> None:
-        if isinstance(self.active_panel, GraphEditPanel):
+        if isinstance(self.active_panel, GraphEditPanel) and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
 
     def delete_graph(self) -> None:
@@ -267,3 +292,45 @@ class MainWindow(QMainWindow):
 
     def deselect_all(self) -> None:
         self.active_panel.deselect_all()
+
+    def zoom_in(self) -> None:
+        print("Zooming in")
+        self.active_panel.graph_view.zoom_in()
+
+    def zoom_out(self) -> None:
+        print("Zooming out")
+        self.active_panel.graph_view.zoom_out()
+
+    def fit_view(self) -> None:
+        self.active_panel.graph_view.fit_view()
+
+    def apply_pyzx_reduction(self, reduction: Callable[[GraphS], int]) -> Callable[[], None]:
+        def reduce() -> None:
+            old_graph = self.active_panel.graph
+            new_graph = copy.deepcopy(old_graph)
+            reduction(new_graph)
+            cmd = SetGraph(self.active_panel.graph_view, new_graph)
+            self.active_panel.undo_stack.push(cmd)
+        return reduce
+    
+
+simplifications = {
+    'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp,},
+    'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp},
+    'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp},
+    'phase_free_simp': {"text": "phase_free_simp", "tool_tip":"phase_free_simp", "function": simplify.phase_free_simp},
+    'pivot_simp': {"text": "pivot_simp", "tool_tip":"pivot_simp", "function": simplify.pivot_simp},
+    'pivot_gadget_simp': {"text": "pivot_gadget_simp", "tool_tip":"pivot_gadget_simp", "function": simplify.pivot_gadget_simp},
+    'pivot_boundary_simp': {"text": "pivot_boundary_simp", "tool_tip":"pivot_boundary_simp", "function": simplify.pivot_boundary_simp},
+    'gadget_simp': {"text": "gadget_simp", "tool_tip":"gadget_simp", "function": simplify.gadget_simp},
+    'lcomp_simp': {"text": "lcomp_simp", "tool_tip":"lcomp_simp", "function": simplify.lcomp_simp},
+    'clifford_simp': {"text": "clifford_simp", "tool_tip":"clifford_simp", "function": simplify.clifford_simp},
+    'tcount': {"text": "tcount", "tool_tip":"tcount", "function": simplify.tcount},
+    'to_gh': {"text": "to_gh", "tool_tip":"to_gh", "function": simplify.to_gh},
+    'to_rg': {"text": "to_rg", "tool_tip":"to_rg", "function": simplify.to_rg},
+    'full_reduce': {"text": "full_reduce", "tool_tip":"full_reduce", "function": simplify.full_reduce},
+    'teleport_reduce': {"text": "teleport_reduce", "tool_tip":"teleport_reduce", "function": simplify.teleport_reduce},
+    'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar},
+    'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp},
+    'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph},
+}

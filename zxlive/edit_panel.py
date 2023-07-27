@@ -6,11 +6,12 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QToolButton, QInputDialog
 from PySide6.QtGui import QShortcut
 from pyzx import EdgeType, VertexType
+from sympy import sympify
 
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
-    AddEdge, AddNode, MoveNode, SetGraph, ChangePhase, ChangeNodeColor,
+    AddEdge, AddNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
@@ -22,8 +23,8 @@ class GraphEditPanel(BasePanel):
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
 
-    _curr_ety: EdgeType
-    _curr_vty: VertexType
+    _curr_ety: EdgeType.Type
+    _curr_vty: VertexType.Type
 
     def __init__(self, graph: GraphT) -> None:
         self.graph_scene = EditGraphScene()
@@ -45,11 +46,13 @@ class GraphEditPanel(BasePanel):
         # Toolbar section for picking a vertex type
         self.select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
         self.select_x = QToolButton(self, text="X Spider", checkable=True)
+        self.select_h = QToolButton(self, text="H box", checkable=True)
         self.select_boundary = QToolButton(self, text="Boundary", checkable=True)
         self.select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
         self.select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
+        self.select_h.clicked.connect(lambda: self._vty_clicked(VertexType.H_BOX))
         self.select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
-        yield ToolbarSection(self.select_z, self.select_x, self.select_boundary, exclusive=True)
+        yield ToolbarSection(self.select_z, self.select_x, self.select_h, self.select_boundary, exclusive=True)
         QShortcut("x",self).activated.connect(self.cycle_vertex_type_selection)
 
         # Toolbar section for picking an edge type
@@ -64,14 +67,14 @@ class GraphEditPanel(BasePanel):
         reset.clicked.connect(self._reset_clicked)
         yield ToolbarSection(reset)
 
-    def _vty_clicked(self, vty: VertexType) -> None:
+    def _vty_clicked(self, vty: VertexType.Type) -> None:
         self._curr_vty = vty
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) > 0:
             cmd = ChangeNodeColor(self.graph_view, selected, vty)
             self.undo_stack.push(cmd)
 
-    def _ety_clicked(self, ety: EdgeType) -> None:
+    def _ety_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
         selected = list(self.graph_scene.selected_edges)
@@ -101,7 +104,7 @@ class GraphEditPanel(BasePanel):
         if not ok:
             return
         try:
-            new_phase = Fraction(input_)
+            new_phase = string_to_phase(input_)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return
@@ -112,7 +115,7 @@ class GraphEditPanel(BasePanel):
         while self.undo_stack.canUndo():
             self.undo_stack.undo()
 
-    def cycle_vertex_type_selection(self):
+    def cycle_vertex_type_selection(self) -> None:
         if self.select_z.isChecked():
             self.select_x.setChecked(True)
             self._curr_vty = VertexType.X
@@ -125,7 +128,7 @@ class GraphEditPanel(BasePanel):
         else:
             raise ValueError("Something is wrong with the state of the vertex type selectors")
 
-    def cycle_edge_type_selection(self):
+    def cycle_edge_type_selection(self) -> None:
         if self.select_simple.isChecked():
             self.select_had.setChecked(True)
             self._curr_ety = EdgeType.HADAMARD
@@ -139,11 +142,11 @@ class GraphEditPanel(BasePanel):
         if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5,0.5))
-        cmd = SetGraph(self.graph_view,new_g)
+        cmd = UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
 
-    def delete_selection(self):
+    def delete_selection(self) -> None:
         selection = list(self.graph_scene.selected_vertices)
         selected_edges = list(self.graph_scene.selected_edges)
         if not selection and not selected_edges: return
@@ -151,8 +154,31 @@ class GraphEditPanel(BasePanel):
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(selection)
-        cmd = SetGraph(self.graph_view,new_g)
+        if len(selection) > 128:
+            cmd = SetGraph(self.graph_view,new_g)
+        else:
+            cmd = UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
     def _start_derivation(self) -> None:
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
+
+def string_to_phase(string: str) -> Fraction:
+    if not string: 
+        return Fraction(0)
+    try:
+        s = string.lower().replace(' ', '')
+        s = s.replace('\u03c0', '').replace('pi', '')
+        if '.' in s or 'e' in s:
+            return Fraction(float(s))
+        elif '/' in s:
+            a, b = s.split("/", 2)
+            if not a:
+                return Fraction(1, int(b))
+            if a == '-':
+                a = '-1'
+            return Fraction(int(a), int(b))
+        else:
+            return Fraction(int(s))
+    except ValueError:
+        return sympify(string)

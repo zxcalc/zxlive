@@ -1,12 +1,12 @@
-from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from typing import Iterator, Sequence, Optional
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup, \
     QHBoxLayout
 from pyzx.graph import Graph
+from pyzx.graph.graph_s import GraphS
 
-from .common import  GraphT
+from .common import GraphT
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .commands import SetGraph
@@ -24,21 +24,12 @@ class ToolbarSection:
     buttons: Sequence[QToolButton]
     exclusive: bool = False
 
-    def __init__(self, *args: QToolButton, exclusive: bool = False):
+    def __init__(self, *args: QToolButton, exclusive: bool = False) -> None:
         self.buttons = args
         self.exclusive = exclusive
 
 
-class BasePanelMeta(type(QWidget), type(ABC)):
-    """Dummy metaclass to enable `BasePanel` to inherit from both `QWidget`
-    and `ABC`.
-
-    This avoids Python's infamous metaclass conflict issue.
-    See http://www.phyast.pitt.edu/~micheles/python/metatype.html """
-    pass
-
-
-class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
+class BasePanel(QWidget):
     """Base class implementing functionality shared between the edit and
     proof panels."""
 
@@ -87,22 +78,23 @@ class BasePanel(QWidget, ABC, metaclass=BasePanelMeta):
                 group.addButton(btn)
             self.toolbar.addSeparator()
 
-    @abstractmethod
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
-        pass
+        raise NotImplementedError
 
-    def clear_graph(self):
+    def clear_graph(self) -> None:
         empty_graph = Graph()
+        assert isinstance(empty_graph, GraphS)
         cmd = SetGraph(self.graph_view, empty_graph)
         self.undo_stack.push(cmd)
 
-    def select_all(self):
+    def select_all(self) -> None:
         self.graph_scene.select_all()
 
-    def deselect_all(self):
+    def deselect_all(self) -> None:
         self.graph_scene.clearSelection()
 
     def copy_selection(self) -> GraphT:
         selection = list(self.graph_scene.selected_vertices)
         copied_graph = self.graph.subgraph_from_vertices(selection)
+        assert isinstance(copied_graph, GraphS)
         return copied_graph

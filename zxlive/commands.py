@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Optional, Iterable, Union, List, Any
+from typing import Optional, Iterable, Set, Union, List, Any
 import copy
 
 from PySide6.QtCore import QItemSelection, QModelIndex, QItemSelectionModel, \
@@ -35,19 +35,15 @@ class BaseCommand(QUndoCommand):
         super().__init__()
         self.g = copy.deepcopy(self.graph_view.graph_scene.g)
         
-    def update_graph_view(self) -> None:
+    def update_graph_view(self, select_new: bool = False) -> None:
         """Notifies the graph view that graph needs to be redrawn.
-        
-        Also resets the current selection in the graph view."""
+
+        :param select_new: If True, add all new vertices to the selection set.
+        """
         # TODO: For performance reasons, we should track which parts
         #  of the graph have changed and only update those. For example
         #  we could store "dirty flags" for each node/edge.
-        selection = list(self.graph_view.graph_scene.selected_vertices)
-        new_verts = self.g.vertex_set()
-        new_selection = [v for v in selection if v in new_verts]
-        # self.graph_view.graph_scene.clearSelection()
-        self.graph_view.update_graph(self.g)
-        self.graph_view.graph_scene.select_vertices(new_selection)
+        self.graph_view.update_graph(self.g, select_new)
 
 
 @dataclass
@@ -63,6 +59,28 @@ class SetGraph(BaseCommand):
     def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
+
+
+@dataclass
+class UpdateGraph(BaseCommand):
+    """Updates the current graph with a modified one.
+    It will try to reuse existing QGraphicsItem's as much as possible."""
+    new_g: GraphT
+    old_g: Optional[GraphT] = field(default=None, init=False)
+    old_selected: Optional[Set[VT]] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self.old_g is not None and self.old_selected is not None
+        self.g = self.old_g
+        self.update_graph_view()
+        self.graph_view.graph_scene.select_vertices(self.old_selected)
+
+    def redo(self) -> None:
+        self.old_g = self.graph_view.graph_scene.g
+        self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
+        self.g = self.new_g
+        self.update_graph_view(True)
+
 
 @dataclass
 class ChangeNodeColor(BaseCommand):
@@ -89,7 +107,7 @@ class ChangeNodeColor(BaseCommand):
 class ChangeEdgeColor(BaseCommand):
     """Changes the color of a set of edges"""
     es: Iterable[ET]
-    ety: EdgeType
+    ety: EdgeType.Type
 
     _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
 
@@ -293,8 +311,8 @@ class AddRewriteStep(SetGraph):
 
         # Select the previously selected step
         assert self._old_selected is not None
-        self.step_view.selectionModel().blockSignals(True)
         idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
+        self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
         super().undo()

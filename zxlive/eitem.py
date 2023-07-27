@@ -31,7 +31,7 @@ HAD_EDGE_BLUE = "#0077ff"
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(self, g: GraphT, e: ET, s_item: VItem, t_item: VItem):
+    def __init__(self, g: GraphT, e: ET, s_item: VItem, t_item: VItem) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -105,7 +105,7 @@ class EItem(QGraphicsPathItem):
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
-    def __init__(self, g: GraphT, ety: EdgeType.Type, start: VItem, mouse_pos: QPointF):
+    def __init__(self, g: GraphT, ety: EdgeType.Type, start: VItem, mouse_pos: QPointF) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.g = g

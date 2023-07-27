@@ -3,10 +3,10 @@ import random
 from typing import Optional, Callable
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
-    QParallelAnimationGroup, QRectF
+    QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
 
-from .common import VT, GraphT, SCALE
+from .common import VT, GraphT, pos_to_view
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z
 
@@ -98,14 +98,14 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
     for v, start_pos, end_pos in moves:
         anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
         anim.setDuration(duration)
-        anim.setStartValue(QPointF(start.row(start_pos) * SCALE, start.qubit(start_pos) * SCALE))
-        anim.setEndValue(QPointF(end.row(end_pos) * SCALE, end.qubit(end_pos) * SCALE))
+        anim.setStartValue(QPointF(*pos_to_view(start.row(start_pos), start.qubit(start_pos))))
+        anim.setEndValue(QPointF(*pos_to_view(end.row(end_pos), end.qubit(end_pos))))
         anim.setEasingCurve(ease)
         group.addAnimation(anim)
     return group
 
 
-def shake(it: VItem, amount: float, duration: float):
+def shake(it: VItem, amount: float, duration: int) -> None:
     center = it.pos()
     anim = VItemAnimation(it, VItem.Properties.Position, refresh=False)
     anim.setLoopCount(-1)  # Infinite looping
@@ -174,14 +174,22 @@ def back_to_default(it: VItem) -> None:
 def remove_id(it: VItem) -> VItemAnimation:
     """Animation that is played when an identity spider is removed using
     the magic wand."""
-    anim = VItemAnimation(it, VItem.Properties.Rect)
+    anim = VItemAnimation(it, VItem.Properties.Scale)
     anim.setDuration(200)
-    anim.setStartValue(it.rect())
-    center = it.rect().center()
-    anim.setEndValue(QRectF(center.x(), center.y(), 0, 0))
+    anim.setStartValue(it.scale())
+    anim.setEndValue(0.0)
     anim.setEasingCurve(QEasingCurve.InBack)
     return anim
 
+def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
+    """Animation that is played when an identity spider is added using
+    the magic wand."""
+    anim = VItemAnimation(v, VItem.Properties.Scale, scene)
+    anim.setDuration(500)
+    anim.setStartValue(0.0)
+    anim.setEndValue(1.0)
+    anim.setEasingCurve(QEasingCurve.OutElastic)
+    return anim
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused using the magic wand."""

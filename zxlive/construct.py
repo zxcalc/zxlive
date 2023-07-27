@@ -24,7 +24,7 @@ def construct_circuit() -> GraphT:
 
     ty: List[VertexType.Type] = [VertexType.BOUNDARY] * nvertices
 
-    nvlist = []
+    nvlist: list[tuple[int, int, VertexType.Type]] = []
     # Adding inputs nodes to the nvlist.
     for i in range(qubits):
         nvlist.append((i, i, VertexType.BOUNDARY))

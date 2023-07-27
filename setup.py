@@ -29,7 +29,12 @@ setuptools.setup(
     packages=["zxlive"],
     package_data={'': ['*.svg']},
     data_files=data_files,
-    install_requires=["PySide6", "pyzx>=0.7.3", "qt-material>=2.14"],
-    python_requires=">=3.10",
+    install_requires=[
+        "PySide6",
+        "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
+        "qt-material>=2.14",
+        "sympy>=1.12"
+    ],
+    python_requires=">=3.9",
     entry_points={'console_scripts': 'zxlive=zxlive.app:main'},
 )

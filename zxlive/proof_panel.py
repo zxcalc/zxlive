@@ -4,18 +4,19 @@ from typing import Iterator, Union
 import pyzx
 from PySide6.QtCore import QPointF, QPersistentModelIndex, Qt, \
     QModelIndex, QItemSelection, QRect, QSize
-from PySide6.QtGui import QFont, QColor, QPainter, QPen, QFontMetrics
+from PySide6.QtGui import QVector2D, QFont, QColor, QPainter, QPen, QFontMetrics
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout, QListView, \
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle
+    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QAbstractItemView
 from pyzx import VertexType, basicrules
 
-from .common import VT, GraphT
+from .common import ET, VT, GraphT, SCALE, pos_from_view
 from .base_panel import BasePanel, ToolbarSection
 from .commands import MoveNode, AddRewriteStep, GoToRewriteStep
 from .graphscene import GraphScene
-from .graphview import GraphTool
+from .graphview import WandTrace, GraphTool
+from .eitem import EItem
 from .proof import ProofModel
-from .vitem import VItem, DragState, ZX_GREEN
+from .vitem import VItem, ZX_GREEN, DragState
 from . import proof_actions
 from . import animations as anims
 
@@ -28,11 +29,13 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
         self.graph_scene.selectionChanged.connect(self.update_on_selection)
+        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+
         super().__init__(graph, self.graph_scene)
 
         self.init_action_groups()
 
-        self.graph_view.wand_trace_finished.connect(self._magic_slice)
+        self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
 
@@ -41,6 +44,8 @@ class ProofPanel(BasePanel):
         self.step_view.setModel(self.proof_model)
         self.step_view.setPalette(QColor(255, 255, 255))
         self.step_view.setSpacing(0)
+        self.step_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.step_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
@@ -50,13 +55,17 @@ class ProofPanel(BasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         self.selection = QToolButton(self, text="Selection", checkable=True, checked=True)
         self.magic_wand = QToolButton(self, text="Magic Wand", checkable=True)
-
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
         self.selection.clicked.connect(self._selection_clicked)
-
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
-    def init_action_groups(self):
+        self.identity_choice = [
+            QToolButton(self, text="Z", checkable=True, checked=True),
+            QToolButton(self, text="X", checkable=True)
+        ]
+        yield ToolbarSection(*self.identity_choice, exclusive=True)
+
+    def init_action_groups(self) -> None:
         self.action_groups = [proof_actions.actions_basic.copy()]
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
@@ -69,7 +78,7 @@ class ProofPanel(BasePanel):
             widget.setLayout(hlayout)
             self.layout().insertWidget(1,widget)
 
-    def parse_selection(self):
+    def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
         g = self.graph_scene.g
         edges = []
@@ -80,22 +89,22 @@ class ProofPanel(BasePanel):
 
         return selection, edges
 
-    def update_on_selection(self):
+    def update_on_selection(self) -> None:
         selection, edges = self.parse_selection()
         g = self.graph_scene.g
 
         for group in self.action_groups:
             group.update_active(g,selection,edges)
 
-    def _selection_clicked(self):
-        self.graph_view.tool = GraphTool.Selection
-
-    def _magic_wand_clicked(self):
-        self.graph_view.tool = GraphTool.MagicWand
-
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNode(self.graph_view, vs)
         self.undo_stack.push(cmd)
+
+    def _selection_clicked(self) -> None:
+        self.graph_view.tool = GraphTool.Selection
+
+    def _magic_wand_clicked(self) -> None:
+        self.graph_view.tool = GraphTool.MagicWand
 
     def _vertex_dragged(self, state: DragState, v: VT, w: VT) -> None:
         if state == DragState.Onto:
@@ -120,34 +129,71 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.undo_stack.push(cmd, anim_after=anim)
 
-    def _magic_slice(self, trace):
+    def _wand_trace_finished(self, trace):
+        if self._magic_slice(trace):
+            return
+        elif self._magic_identity(trace):
+            return
+
+    def _magic_identity(self, trace):
+        if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
+            return False
+
+        item = next(iter(trace.hit))
+        pos = trace.hit[item][-1]
+        pos = SCALE * QPointF(*pos_from_view(pos.x(), pos.y()))
+        s = self.graph.edge_s(item.e)
+        t = self.graph.edge_t(item.e)
+
+        if self.identity_choice[0].isChecked():
+            vty = VertexType.Z
+        elif self.identity_choice[1].isChecked():
+            vty = VertexType.X
+
+        new_g = copy.deepcopy(self.graph)
+        print(pos)
+        v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
+        new_g.add_edge(self.graph.edge(s, v), self.graph.edge_type(item.e))
+        new_g.add_edge(self.graph.edge(v, t))
+        new_g.remove_edge(item.e)
+
+        anim = anims.add_id(v, self.graph_scene)
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
+        self.undo_stack.push(cmd, anim_after=anim)
+
+    def _magic_slice(self, trace: WandTrace) -> None:
+        def cross(a, b):
+            return a.y() * b.x() - a.x() * b.y()
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
-            return
+            return False
         item = filtered[0]
         vertex = item.v
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
-            return
+            return False
         
         if basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
-            return
+            return True
 
-        if trace.end.y() > trace.start.y():
-            dir = trace.end - trace.start
-        else:
-            dir = trace.start - trace.end
-        normal = QPointF(-dir.y(), dir.x())
-        pos = QPointF(self.graph.row(vertex), self.graph.qubit(vertex))
+        start = trace.hit[item][0]
+        end = trace.hit[item][-1]
+        if start.y() > end.y():
+            start, end = end, start
+        pos = QPointF(SCALE * self.graph.row(vertex), SCALE * self.graph.qubit(vertex))
         left, right = [], []
         for neighbor in self.graph.neighbors(vertex):
-            npos = QPointF(self.graph.row(neighbor), self.graph.qubit(neighbor))
-            dot = QPointF.dotProduct(pos - npos, normal)
-            if dot <= 0:
+            npos = QPointF(SCALE * self.graph.row(neighbor), SCALE * self.graph.qubit(neighbor))
+            # Compute whether each neighbor is inside the entry and exit points
+            i1 = cross(start - pos, npos - pos) * cross(start - pos, end - pos) >= 0
+            i2 = cross(end - pos, npos - pos) * cross(end - pos, start - pos) >= 0
+            inside = i1 and i2
+            if inside:
                 left.append(neighbor)
             else:
                 right.append(neighbor)
         self._unfuse(vertex, left)
+        return True
 
     def _remove_id(self, v: VT) -> None:
         new_g = copy.deepcopy(self.graph)
@@ -157,10 +203,46 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_before=anim)
 
     def _unfuse(self, v: VT, left_neighbours: list[VT]) -> None:
+        def snap_vector(v):
+            if abs(v.x()) > abs(v.y()):
+                v.setY(0.0)
+            else:
+                v.setX(0.0)
+            if not v.isNull():
+                v.normalize()
+
+        # Compute the average position of left vectors
+        pos = QPointF(self.graph.row(v), self.graph.qubit(v))
+        avg_left = QVector2D()
+        for n in left_neighbours:
+            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
+            dir = QVector2D(npos - pos).normalized()
+            avg_left += dir
+        avg_left.normalize()
+        # And snap it to the grid
+        snap_vector(avg_left)
+        # Same for right vectors
+        avg_right = QVector2D()
+        for n in self.graph.neighbors(v):
+            if n in left_neighbours: continue
+            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
+            dir = QVector2D(npos - pos).normalized()
+            avg_right += dir
+        avg_right.normalize()
+        snap_vector(avg_right)
+        if avg_right.isNull():
+            avg_right = -avg_left
+        elif avg_left.isNull():
+            avg_left = -avg_right
+
+        dist = 0.25 if QVector2D.dotProduct(avg_left, avg_right) != 0 else 0.35
+
         new_g = copy.deepcopy(self.graph)
-        left_vert = new_g.add_vertex(self.graph.type(v), qubit=self.graph.qubit(v),
-                                     row=self.graph.row(v) - 0.25)
-        new_g.set_row(v, self.graph.row(v) + 0.25)
+        left_vert = new_g.add_vertex(self.graph.type(v),
+                                     qubit=self.graph.qubit(v) + dist*avg_left.y(),
+                                     row=self.graph.row(v) + dist*avg_left.x())
+        new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
+        new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
         for neighbor in left_neighbours:
             new_g.add_edge((neighbor, left_vert),
                            self.graph.edge_type((v, neighbor)))
@@ -170,9 +252,19 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
         self.undo_stack.push(cmd, anim_after=anim)
 
+    def _vert_double_clicked(self, v: VT) -> None:
+        if self.graph.type(v) == VertexType.BOUNDARY:
+            return
+
+        new_g = copy.deepcopy(self.graph)
+        basicrules.color_change(new_g, v)
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
+        self.undo_stack.push(cmd)
+
     def _proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
+        print("x")
         cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
         self.undo_stack.push(cmd)
 
