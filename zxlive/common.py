@@ -9,8 +9,10 @@ GraphT: TypeAlias = pyzx.graph.graph_s.GraphS
 from pyzx.graph.graph_s import GraphS as Graph
 
 SCALE: Final = 60.0
-OFFSET_X: Final = 20000.0
-OFFSET_Y: Final = 20000.0
+
+# Offsets should be a multiple of SCALE for grid snapping to work properly
+OFFSET_X: Final = 300 * SCALE
+OFFSET_Y: Final = 300 * SCALE
 
 MIN_ZOOM = 0.05
 MAX_ZOOM = 10.0
