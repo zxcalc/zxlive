@@ -51,7 +51,7 @@ class ProofPanel(BasePanel):
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.viewport().setAttribute(Qt.WA_Hover)
 
-        self.panel_widget.layout().addWidget(self.step_view)
+        self.splitter.addWidget(self.step_view)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         self.selection = QToolButton(self, text="Selection", checkable=True, checked=True)

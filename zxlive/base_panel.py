@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterator, Sequence, Optional
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup, \
-    QHBoxLayout
+    QHBoxLayout, QSplitter
 from pyzx.graph import Graph
 from pyzx.graph.graph_s import GraphS
 
@@ -53,12 +53,9 @@ class BasePanel(QWidget):
         self.toolbar = QToolBar()
         self.layout().addWidget(self.toolbar)
 
-        self.panel_widget = QWidget()
-        self.panel_widget.setLayout(QHBoxLayout())
-        self.panel_widget.layout().setContentsMargins(0, 0, 0, 0)
-        self.panel_widget.layout().setSpacing(0)
-        self.panel_widget.layout().addWidget(self.graph_view)
-        self.layout().addWidget(self.panel_widget)
+        self.splitter = QSplitter(self)
+        self.layout().addWidget(self.splitter)
+        self.splitter.addWidget(self.graph_view)
 
         self.graph_view.set_graph(graph)
         self.file_path = None
