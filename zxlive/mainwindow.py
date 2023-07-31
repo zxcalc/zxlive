@@ -14,14 +14,14 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
 from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
 from pyzx.graph.graph_s import GraphS
 
-from .commands import SetGraph
+from .commands import AddRewriteStep
 
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
@@ -142,13 +142,13 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
 
-        transform_actions = []
+        simplify_actions = []
         for simp in simplifications.values():
-            transform_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp["function"]), None, simp["tool_tip"]))
-        self.transform_menu = menu.addMenu("&Transform")
-        for action in transform_actions:
-            self.transform_menu.addAction(action)
-        self.transform_menu.menuAction().setVisible(False)
+            simplify_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp), None, simp["tool_tip"]))
+        self.simplify_menu = menu.addMenu("&Simplify")
+        for action in simplify_actions:
+            self.simplify_menu.addAction(action)
+        self.simplify_menu.menuAction().setVisible(False)
 
         graph = construct_circuit()
         self.new_graph(graph)
@@ -199,9 +199,9 @@ class MainWindow(QMainWindow):
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
-            self.transform_menu.menuAction().setVisible(True)
+            self.simplify_menu.menuAction().setVisible(True)
         else:
-            self.transform_menu.menuAction().setVisible(False)
+            self.simplify_menu.menuAction().setVisible(False)
 
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
@@ -314,12 +314,12 @@ class MainWindow(QMainWindow):
     def fit_view(self) -> None:
         self.active_panel.graph_view.fit_view()
 
-    def apply_pyzx_reduction(self, reduction: Callable[[GraphS], int]) -> Callable[[], None]:
+    def apply_pyzx_reduction(self, reduction:Dict[str,Any]) -> Callable[[],None]:
         def reduce() -> None:
             old_graph = self.active_panel.graph
             new_graph = copy.deepcopy(old_graph)
-            reduction(new_graph)
-            cmd = SetGraph(self.active_panel.graph_view, new_graph)
+            reduction["function"](new_graph)
+            cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
             self.active_panel.undo_stack.push(cmd)
         return reduce
     
