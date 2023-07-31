@@ -65,11 +65,9 @@ class MainWindow(QMainWindow):
         tab_widget = QTabWidget()
         w.layout().addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
+        tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(lambda i: tab_widget.removeTab(i))
         self.tab_widget = tab_widget
-
-        graph = construct_circuit()
-        self.new_graph(graph)
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
         # We could do this by using pyperclip.
@@ -77,11 +75,11 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = self._new_action("&New",self.new_graph,QKeySequence.StandardKey.New,
+        new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
             "Reinitialize with an empty graph")
-        open_file = self._new_action("&Open...", self.open_file,QKeySequence.StandardKey.Open,
+        open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close", self.close_action,QKeySequence.StandardKey.Close,
+        close_action = self._new_action("Close", self.close_action, QKeySequence.StandardKey.Close,
             "Closes the window")
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
@@ -147,9 +145,13 @@ class MainWindow(QMainWindow):
         transform_actions = []
         for simp in simplifications.values():
             transform_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp["function"]), None, simp["tool_tip"]))
-        transform_menu = menu.addMenu("&Transform")
+        self.transform_menu = menu.addMenu("&Transform")
         for action in transform_actions:
-            transform_menu.addAction(action)
+            self.transform_menu.addAction(action)
+        self.transform_menu.menuAction().setVisible(False)
+
+        graph = construct_circuit()
+        self.new_graph(graph)
 
     def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
         action = QAction(name, self)
@@ -194,6 +196,12 @@ class MainWindow(QMainWindow):
         if name.endswith("*"): name = name[:-1]
         if not clean: name += "*"
         self.tab_widget.setTabText(i,name)
+
+    def tab_changed(self, i: int) -> None:
+        if isinstance(self.active_panel, ProofPanel):
+            self.transform_menu.menuAction().setVisible(True)
+        else:
+            self.transform_menu.menuAction().setVisible(False)
 
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
