@@ -3,13 +3,11 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Literal, List, Optional, Final, TYPE_CHECKING
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
-from PySide6.QtCore import QObject
 
 import pyzx
 
-from .base_panel import BasePanel
+from .commands import AddRewriteStep
 from .common import VT,ET, GraphT
-from .commands import UpdateGraph
 from . import animations as anims
 
 if TYPE_CHECKING:
@@ -22,6 +20,7 @@ MatchType = Literal[1, 2]
 # Copied from pyzx.editor_actions
 MATCHES_VERTICES: MatchType = 1
 MATCHES_EDGES: MatchType = 2
+
 
 @dataclass
 class ProofAction(object):
@@ -50,7 +49,7 @@ class ProofAction(object):
         g.remove_vertices(rem_verts)
         g.add_edge_table(etab)
 
-        cmd = UpdateGraph(panel.graph_view, new_g=g)
+        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
 
         if self.name == operations['spider']['text']:
             anim = anims.fuse(panel.graph_scene.vertex_map[verts[0]], panel.graph_scene.vertex_map[verts[1]])
