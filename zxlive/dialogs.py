@@ -14,11 +14,12 @@ from .common import VT,ET, GraphT, Graph
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
 
-    All = "zxg *.json *.qasm *.tikz", "All Supported Formats"
+    All = "zxg *.json *.qasm *.tikz *.zxp", "All Supported Formats"
     QGraph = "zxg", "QGraph"  # "file extension", "format name"
     QASM = "qasm", "QASM"
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
+    ZXProof = "zxp", "ZXProof"
 
     def __new__(cls, *args, **kwds):  # type: ignore
         obj = object.__new__(cls)
@@ -146,7 +147,7 @@ def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[Tuple[str
 
 def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
     selected_format = None
-    file_path, selected_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat]))
+    file_path, selected_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat if f != FileFormat.ZXProof]))
     if not file_path:
         return None
 
@@ -170,7 +171,7 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,
 
 
 def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
-    file_path, selected_format = get_file_path_and_format(parent, FileFormat.Json.filter)
+    file_path, selected_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
     if not file_path:
         return None
     data = proof_model.to_json()
