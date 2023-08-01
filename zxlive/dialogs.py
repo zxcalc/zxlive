@@ -90,6 +90,11 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput or Impo
     data = stream.readAll()
     file.close()
 
+    ext = file_path.split(".")[-1]
+    selected_format = next(f for f in FileFormat if f.filter == selected_filter)
+    if selected_format == FileFormat.All:
+        selected_format = next(f for f in FileFormat if f.extension == ext)
+
     # TODO: This would be nicer with match statements...
     try:
         if selected_format == FileFormat.ZXProof:
