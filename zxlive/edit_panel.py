@@ -7,6 +7,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QToolButton
 from pyzx import EdgeType, VertexType
+from .poly import new_var
 
 from .base_panel import ToolbarSection
 from .common import GraphT
