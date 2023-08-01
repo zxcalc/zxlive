@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
                 proof_panel = self.active_panel
                 proof_panel.proof_model = out.p
                 proof_panel.step_view.setModel(proof_panel.proof_model)
-                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(0, 0))
+                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
                 proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
