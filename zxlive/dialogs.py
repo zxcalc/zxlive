@@ -6,6 +6,8 @@ from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox
 from pyzx import Circuit, extract_circuit
 
+from zxlive.proof import ProofModel
+
 from .common import VT,ET, GraphT, Graph
 
 
@@ -110,15 +112,22 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
         show_error_msg(f"Failed to import {selected_format.name} file", str(e))
         return None
 
+def write_to_file(file_path: str, data: str) -> bool:
+    file = QFile(file_path)
+    if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
+        show_error_msg("Could not write to file")
+        return False
+    out = QTextStream(file)
+    out << data
+    file.close()
+    return True
 
-def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,FileFormat]]:
-    """Shows a dialog to export the given diagram to disk.
 
-    Returns `True` if the diagram was successfully saved."""
+def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[Tuple[str, FileFormat]]:
     file_path, selected_filter = QFileDialog.getSaveFileName(
         parent=parent,
         caption="Save File",
-        filter=";;".join([f.filter for f in FileFormat]),
+        filter=filter,
     )
     if selected_filter == "":
         # This happens if the user clicks on cancel
@@ -133,6 +142,14 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,
     if file_path.split(".")[-1].lower() != selected_format.extension:
         file_path += "." + selected_format.extension
 
+    return file_path, selected_format
+
+def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+    selected_format = None
+    file_path, selected_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat]))
+    if not file_path:
+        return None
+
     if selected_format in (FileFormat.QGraph, FileFormat.Json):
         data = graph.to_json()
     elif selected_format == FileFormat.QASM:
@@ -146,11 +163,17 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,
         assert selected_format == FileFormat.TikZ
         data = graph.to_tikz()
 
-    file = QFile(file_path)
-    if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
-        show_error_msg("Could not write to file")
+    if not write_to_file(file_path, data):
         return None
-    out = QTextStream(file)
-    out << data
-    file.close()
+
+    return file_path, selected_format
+
+
+def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+    file_path, selected_format = get_file_path_and_format(parent, FileFormat.Json.filter)
+    if not file_path:
+        return None
+    data = proof_model.to_json()
+    if not write_to_file(file_path, data):
+        return None
     return file_path, selected_format

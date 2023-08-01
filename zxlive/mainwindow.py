@@ -27,7 +27,7 @@ from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph
@@ -84,9 +84,9 @@ class MainWindow(QMainWindow):
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
         # and give an open to overwrite this file with a Save action
-        save_file = self._new_action("&Save", self.save_file,QKeySequence.StandardKey.Save,
+        save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
-        save_as = self._new_action("Save &as...", self.save_as,QKeySequence.StandardKey.SaveAs,
+        save_as = self._new_action("Save &as...", self.save_as, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         
         file_menu = menu.addMenu("&File")
@@ -235,13 +235,15 @@ class MainWindow(QMainWindow):
                 "You imported this file from a circuit description. You can currently only save it in a graph format.")
             return self.save_as()
 
-        if self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
+        if isinstance(self.active_panel, ProofPanel):
+            data = self.active_panel.proof_model.to_json()
+        elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
             data = self.active_panel.graph.to_tikz()
         else:
             raise TypeError("Unknown file format", self.active_panel.file_type)
-        
+
         file = QFile(self.active_panel.file_path)
         if not file.open(QIODevice.WriteOnly | QIODevice.Text):
             show_error_msg("Could not write to file")
@@ -254,7 +256,10 @@ class MainWindow(QMainWindow):
 
 
     def save_as(self) -> bool:
-        out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
+        if isinstance(self.active_panel, ProofPanel):
+            out = export_proof_dialog(self.active_panel.proof_model, self)
+        else:
+            out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
         file_path, file_type = out
         self.active_panel.file_path = file_path
