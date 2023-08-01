@@ -109,5 +109,14 @@ class Poly:
                 other = Poly([(other, Term([]))])
         return set(self.terms) == set(other.terms)
 
+    @property
+    def is_pauli(self):
+        for c, t in self.terms:
+            if not all(v.is_bool for v, _ in t.vars):
+                return False
+            if c % 1 != 0:
+                return False
+        return True
+
 def new_var(name, is_bool):
     return Poly([(1, Term([(Var(name, is_bool), 1)]))])
