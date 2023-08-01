@@ -50,11 +50,16 @@ class FileFormat(Enum):
         return f"{self.name} (*.{self.extension})"
 
 @dataclass
-class ImportOutput:
+class ImportGraphOutput:
     file_type: FileFormat
     file_path: str
     g: GraphT
 
+@dataclass
+class ImportProofOutput:
+    file_type: FileFormat
+    file_path: str
+    p: ProofModel
 
 def show_error_msg(title: str, description: Optional[str] = None) -> None:
     """Displays an error message box."""
@@ -63,8 +68,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
         msg.setInformativeText(description)
     msg.exec()
 
-
-def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
+def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput or ImportProofOutput]:
     """Shows a dialog to import a diagram from disk.
 
     Returns the imported graph or `None` if the import failed."""
@@ -88,23 +92,25 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportOutput]:
 
     # TODO: This would be nicer with match statements...
     try:
-        if selected_format in (FileFormat.QGraph, FileFormat.Json):
-            return ImportOutput(selected_format, file_path, Graph.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
+        if selected_format == FileFormat.ZXProof:
+            return ImportProofOutput(selected_format, file_path, ProofModel.from_json(data))
+        elif selected_format in (FileFormat.QGraph, FileFormat.Json):
+            return ImportGraphOutput(selected_format, file_path, Graph.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
-            return ImportOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph()) # type: ignore
+            return ImportGraphOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph()) # type: ignore
         elif selected_format == FileFormat.TikZ:
-            return ImportOutput(selected_format, file_path, Graph.from_tikz(data))  # type: ignore
+            return ImportGraphOutput(selected_format, file_path, Graph.from_tikz(data))  # type: ignore
         else:
             assert selected_format == FileFormat.All
             try:
                 circ = Circuit.load(file_path)
-                return ImportOutput(FileFormat.QASM, file_path, circ.to_graph())  # type: ignore
+                return ImportGraphOutput(FileFormat.QASM, file_path, circ.to_graph())  # type: ignore
             except TypeError:
                 try:
-                    return ImportOutput(FileFormat.QGraph, file_path, Graph.from_json(data))  # type: ignore
+                    return ImportGraphOutput(FileFormat.QGraph, file_path, Graph.from_json(data))  # type: ignore
                 except Exception:
                     try:
-                        return ImportOutput(FileFormat.TikZ, file_path, Graph.from_tikz(data))  # type: ignore
+                        return ImportGraphOutput(FileFormat.TikZ, file_path, Graph.from_tikz(data))  # type: ignore
                     except:
                         show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
                         return None

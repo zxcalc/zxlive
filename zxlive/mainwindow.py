@@ -27,7 +27,7 @@ from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph
@@ -207,7 +207,16 @@ class MainWindow(QMainWindow):
         out = import_diagram_dialog(self)
         if out is not None:
             name = QFileInfo(out.file_path).baseName()
-            self.new_graph(out.g, name)
+            if isinstance(out, ImportGraphOutput):
+                self.new_graph(out.g, name)
+            else:
+                graph = out.p.graphs[-1]
+                self.new_deriv(graph, name)
+                proof_panel = self.active_panel
+                proof_panel.proof_model = out.p
+                proof_panel.step_view.setModel(proof_panel.proof_model)
+                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(0, 0))
+                proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
@@ -296,9 +305,10 @@ class MainWindow(QMainWindow):
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
-    def new_deriv(self, graph:GraphT) -> None:
+    def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
         panel = ProofPanel(graph)
-        self.tab_widget.addTab(panel, "New Proof")
+        if name is None: name = "New Proof"
+        self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
