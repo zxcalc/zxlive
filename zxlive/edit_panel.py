@@ -6,7 +6,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QToolButton, QInputDialog
 from PySide6.QtGui import QShortcut
 from pyzx import EdgeType, VertexType
-from sympy import sympify
+from .poly import new_var
 
 from .common import VT, GraphT
 from .base_panel import BasePanel, ToolbarSection
@@ -181,4 +181,4 @@ def string_to_phase(string: str) -> Fraction:
         else:
             return Fraction(int(s))
     except ValueError:
-        return sympify(string)
+        return new_var(string, is_bool=True)
