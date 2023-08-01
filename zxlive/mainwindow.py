@@ -27,7 +27,7 @@ from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph
@@ -84,9 +84,9 @@ class MainWindow(QMainWindow):
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
         # and give an open to overwrite this file with a Save action
-        save_file = self._new_action("&Save", self.save_file,QKeySequence.StandardKey.Save,
+        save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
-        save_as = self._new_action("Save &as...", self.save_as,QKeySequence.StandardKey.SaveAs,
+        save_as = self._new_action("Save &as...", self.save_as, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         
         file_menu = menu.addMenu("&File")
@@ -207,7 +207,16 @@ class MainWindow(QMainWindow):
         out = import_diagram_dialog(self)
         if out is not None:
             name = QFileInfo(out.file_path).baseName()
-            self.new_graph(out.g, name)
+            if isinstance(out, ImportGraphOutput):
+                self.new_graph(out.g, name)
+            else:
+                graph = out.p.graphs[-1]
+                self.new_deriv(graph, name)
+                proof_panel = self.active_panel
+                proof_panel.proof_model = out.p
+                proof_panel.step_view.setModel(proof_panel.proof_model)
+                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
+                proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
@@ -235,13 +244,15 @@ class MainWindow(QMainWindow):
                 "You imported this file from a circuit description. You can currently only save it in a graph format.")
             return self.save_as()
 
-        if self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
+        if isinstance(self.active_panel, ProofPanel):
+            data = self.active_panel.proof_model.to_json()
+        elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
             data = self.active_panel.graph.to_tikz()
         else:
             raise TypeError("Unknown file format", self.active_panel.file_type)
-        
+
         file = QFile(self.active_panel.file_path)
         if not file.open(QIODevice.WriteOnly | QIODevice.Text):
             show_error_msg("Could not write to file")
@@ -254,7 +265,10 @@ class MainWindow(QMainWindow):
 
 
     def save_as(self) -> bool:
-        out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
+        if isinstance(self.active_panel, ProofPanel):
+            out = export_proof_dialog(self.active_panel.proof_model, self)
+        else:
+            out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
         file_path, file_type = out
         self.active_panel.file_path = file_path
@@ -291,9 +305,10 @@ class MainWindow(QMainWindow):
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
-    def new_deriv(self, graph:GraphT) -> None:
+    def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
         panel = ProofPanel(graph)
-        self.tab_widget.addTab(panel, "New Proof")
+        if name is None: name = "New Proof"
+        self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
