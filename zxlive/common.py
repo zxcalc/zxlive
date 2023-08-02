@@ -1,10 +1,16 @@
-from typing import Tuple, Final
+from typing import Literal, Tuple, Final
 from typing_extensions import TypeAlias
 import pyzx
 
 VT: TypeAlias = int
 ET: TypeAlias = Tuple[int,int]
 GraphT: TypeAlias = pyzx.graph.graph_s.GraphS
+
+class ToolType:
+    Type = Literal[0, 1, 2]
+    SELECT = 0
+    VERTEX = 1
+    EDGE = 2
 
 from pyzx.graph.graph_s import GraphS as Graph
 

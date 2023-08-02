@@ -1,14 +1,14 @@
 import copy
 from fractions import Fraction
 from typing import Iterator
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QSize
 
 from PySide6.QtWidgets import QToolButton, QInputDialog
-from PySide6.QtGui import QShortcut
+from PySide6.QtGui import QShortcut, QIcon
 from pyzx import EdgeType, VertexType
 from sympy import sympify
 
-from .common import VT, GraphT
+from .common import VT, GraphT, ToolType
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
     AddEdge, AddNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
@@ -38,6 +38,27 @@ class GraphEditPanel(BasePanel):
         super().__init__(graph, self.graph_scene)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
+        # Toolbar section for select, node, edge
+        icon_size = QSize(32, 32)
+        self.select = QToolButton(self, checkable=True, checked=True)  # Selected by default
+        self.vertex = QToolButton(self, checkable=True)
+        self.edge = QToolButton(self, checkable=True)
+        self.select.setToolTip("Select (s)")
+        self.vertex.setToolTip("Add Vertex (v)")
+        self.edge.setToolTip("Add Edge (e)")
+        self.select.setIcon(QIcon("./zxlive/icons/tikzit-tool-select.svg"))
+        self.vertex.setIcon(QIcon("./zxlive/icons/tikzit-tool-node.svg"))
+        self.edge.setIcon(QIcon("./zxlive/icons/tikzit-tool-edge.svg"))
+        self.select.setShortcut("s")
+        self.vertex.setShortcut("v")
+        self.edge.setShortcut("e")
+        self.select.setIconSize(icon_size)
+        self.vertex.setIconSize(icon_size)
+        self.edge.setIconSize(icon_size)
+        self.select.clicked.connect(lambda: self._tool_clicked(ToolType.SELECT))
+        self.vertex.clicked.connect(lambda: self._tool_clicked(ToolType.VERTEX))
+        self.edge.clicked.connect(lambda: self._tool_clicked(ToolType.EDGE))
+        yield ToolbarSection(self.select, self.vertex, self.edge, exclusive=True)
         # Toolbar section for Starting Derivation
         self.start_derivation = QToolButton(self, text="Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
@@ -61,11 +82,14 @@ class GraphEditPanel(BasePanel):
         self.select_simple.clicked.connect(lambda _: self._ety_clicked(EdgeType.SIMPLE))
         self.select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
         yield ToolbarSection(self.select_simple, self.select_had, exclusive=True)
-        QShortcut("e",self).activated.connect(self.cycle_edge_type_selection)
+        QShortcut("Shift+E", self).activated.connect(self.cycle_edge_type_selection)
 
         reset = QToolButton(self, text="Reset")
         reset.clicked.connect(self._reset_clicked)
         yield ToolbarSection(reset)
+
+    def _tool_clicked(self, tool: ToolType) -> None:
+        self.graph_scene.curr_tool = tool
 
     def _vty_clicked(self, vty: VertexType.Type) -> None:
         self._curr_vty = vty
