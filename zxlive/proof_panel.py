@@ -4,7 +4,7 @@ from typing import Iterator, Union
 import pyzx
 from PySide6.QtCore import QPointF, QPersistentModelIndex, Qt, \
     QModelIndex, QItemSelection, QRect, QSize
-from PySide6.QtGui import QVector2D, QFont, QColor, QPainter, QPen, QFontMetrics
+from PySide6.QtGui import QVector2D, QFont, QColor, QPainter, QPen, QFontMetrics, QIcon
 from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout, QListView, \
     QStyledItemDelegate, QStyleOptionViewItem, QStyle, QAbstractItemView
 from pyzx import VertexType, basicrules
@@ -54,10 +54,19 @@ class ProofPanel(BasePanel):
         self.splitter.addWidget(self.step_view)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
-        self.selection = QToolButton(self, text="Selection", checkable=True, checked=True)
-        self.magic_wand = QToolButton(self, text="Magic Wand", checkable=True)
-        self.magic_wand.clicked.connect(self._magic_wand_clicked)
+        icon_size = QSize(32, 32)
+        self.selection = QToolButton(self, checkable=True, checked=True)
+        self.magic_wand = QToolButton(self, checkable=True)
+        self.selection.setIcon(QIcon("./zxlive/icons/tikzit-tool-select.svg"))
+        self.magic_wand.setIcon(QIcon("./zxlive/icons/magic-wand.svg"))
+        self.selection.setIconSize(icon_size)
+        self.magic_wand.setIconSize(icon_size)
+        self.selection.setToolTip("Select (s)")
+        self.magic_wand.setToolTip("Magic Wand (w)")
+        self.selection.setShortcut("s")
+        self.magic_wand.setShortcut("w")
         self.selection.clicked.connect(self._selection_clicked)
+        self.magic_wand.clicked.connect(self._magic_wand_clicked)
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
         self.identity_choice = [
