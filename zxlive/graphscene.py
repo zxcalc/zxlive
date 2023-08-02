@@ -19,13 +19,13 @@ from typing import Optional, Iterator, Iterable, Dict
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QTransform
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
 
 from pyzx.graph.base import EdgeType
 from pyzx.graph import GraphDiff
 from pyzx.graph.graph_s import GraphS
 
-from .common import VT, ET, GraphT, SCALE, pos_from_view, OFFSET_X, OFFSET_Y
+from .common import VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
 from .eitem import EItem, EDragItem
 
@@ -197,51 +197,68 @@ class EditGraphScene(GraphScene):
     # Currently selected edge type for preview when dragging
     # to add a new edge
     curr_ety: EdgeType.Type
+    curr_tool: ToolType.Type
 
     # The vertex a right mouse button drag was initiated on
-    _right_drag: Optional[EDragItem]
+    _drag: Optional[EDragItem]
 
     def __init__(self) -> None:
         super().__init__()
         self.curr_ety = EdgeType.SIMPLE
-        self._right_drag = None
+        self.curr_tool = ToolType.SELECT
+        self._drag = None
+        self._is_dragging = False
+        self._is_mouse_pressed = False
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Right-press on a vertex means the start of a drag for edge adding
         super().mousePressEvent(e)
-        if e.button() == Qt.MouseButton.RightButton:
+        if (self.curr_tool == ToolType.EDGE) or \
+            (self.curr_tool == ToolType.SELECT and e.button() == Qt.MouseButton.RightButton):
             if self.items(e.scenePos(), deviceTransform=QTransform()):
                 for it in self.items(e.scenePos(), deviceTransform=QTransform()):
                     if isinstance(it, VItem):
-                        self._right_drag = EDragItem(self.g, self.curr_ety, it, e.scenePos())
-                        self.addItem(self._right_drag)
+                        self._drag = EDragItem(self.g, self.curr_ety, it, e.scenePos())
+                        self._drag.start.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                        self.addItem(self._drag)
         else:
             e.ignore()
+        self._is_mouse_pressed = True
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
-        if self._right_drag:
-            self._right_drag.mouse_pos = e.scenePos()
-            self._right_drag.refresh()
+        if self._drag:
+            self._drag.mouse_pos = e.scenePos()
+            self._drag.refresh()
         else:
             e.ignore()
+        if self._is_mouse_pressed:
+            self._is_dragging = True
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(e)
-        if e.button() == Qt.MouseButton.RightButton:
-            # It's either a drag to add an edge
-            if self._right_drag:
-                self.removeItem(self._right_drag)
-                for it in self.items(e.scenePos(), deviceTransform=QTransform()):
-                    # TODO: Think about if we want to allow self loops here?
-                    #  For example, if had edge is selected this would mean that
-                    #  right clicking adds pi to the phase...
-                    if isinstance(it, VItem) and it != self._right_drag.start:
-                        self.edge_added.emit(self._right_drag.start.v, it.v)
-                self._right_drag = None
-            # Or a click on a free spot to add a new vertex
-            else:
-                p = e.scenePos()
-                self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
+        isRightClickOnSelectTool = (self.curr_tool == ToolType.SELECT and \
+                                    e.button() == Qt.MouseButton.RightButton)
+        if self._drag and (self.curr_tool == ToolType.EDGE or isRightClickOnSelectTool):
+            self._drag.start.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
+            self.add_edge(e)
+        elif not self._is_dragging and (self.curr_tool == ToolType.VERTEX or isRightClickOnSelectTool):
+            self.add_vertex(e)
         else:
             e.ignore()
+        self._is_mouse_pressed = False
+        self._is_dragging = False
+
+    def add_vertex(self, e):
+        p = e.scenePos()
+        self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
+
+    def add_edge(self, e):
+        self.removeItem(self._drag)
+        for it in self.items(e.scenePos(), deviceTransform=QTransform()):
+            # TODO: Think about if we want to allow self loops here?
+            #  For example, if had edge is selected this would mean that
+            #  right clicking adds pi to the phase...
+            if isinstance(it, VItem) and it != self._drag.start:
+                self.edge_added.emit(self._drag.start.v, it.v)
+        self._drag = None

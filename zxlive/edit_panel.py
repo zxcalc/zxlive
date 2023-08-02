@@ -83,7 +83,7 @@ class GraphEditPanel(BasePanel):
         yield ToolbarSection(reset)
 
     def _tool_clicked(self, tool: ToolType) -> None:
-        pass
+        self.graph_scene.curr_tool = tool
 
     def _vty_clicked(self, vty: VertexType.Type) -> None:
         self._curr_vty = vty
