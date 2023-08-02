@@ -2,7 +2,6 @@ from collections import Counter
 from fractions import Fraction
 from typing import Union
 
-
 class Var:
     name: str
     is_bool: bool
@@ -120,3 +119,6 @@ class Poly:
 
 def new_var(name, is_bool):
     return Poly([(1, Term([(Var(name, is_bool), 1)]))])
+
+def new_const(coeff):
+    return Poly([(coeff, Term([]))])
