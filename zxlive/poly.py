@@ -1,4 +1,3 @@
-from collections import Counter
 from fractions import Fraction
 from typing import Union
 
@@ -40,9 +39,10 @@ class Term:
         return '*'.join(vs)
 
     def __mul__(self, other):
-        vs = Counter()
+        vs = dict()
         for v, c in self.vars + other.vars:
-            vs[v] += c
+            if v not in vs: vs[v] = c
+            else: vs[v] += c
             # TODO deal with fractional / symbolic powers
             if v.is_bool and c > 1:
                 vs[v] = 1
@@ -64,9 +64,10 @@ class Poly:
     def __add__(self, other):
         if isinstance(other, (int, float, Fraction)):
             other = Poly([(other, Term([]))])
-        counter = Counter()
+        counter = dict()
         for c, t in self.terms + other.terms:
-            counter[t] += c
+            if t not in counter: counter[t] = c
+            else: counter[t] += c
             if all(tt[0].is_bool for tt in t.vars):
                 counter[t] = counter[t] % 2
 
