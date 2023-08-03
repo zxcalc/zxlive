@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 from typing import Optional
 
@@ -90,7 +91,7 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = False
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
 
-    def _toggle_sparkles(self):
+    def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
@@ -190,7 +191,7 @@ class GraphView(QGraphicsView):
         # We do this to allow for zooming
         
         # If control is pressed, we want to zoom
-        if event.modifiers() == Qt.ControlModifier:
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             ydelta = event.angleDelta().y()
             self.zoom(ydelta)
         else:
@@ -232,7 +233,7 @@ class GraphView(QGraphicsView):
         self.zoom(100)
 
     def fit_view(self) -> None:
-        self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+        self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
         current_zoom = self.transform().m11()
         print(current_zoom)
         if current_zoom < MIN_ZOOM:
@@ -241,10 +242,10 @@ class GraphView(QGraphicsView):
             if current_zoom > MAX_ZOOM:
                 self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
-    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
+    def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
         # First draw blank white background
         painter.setBrush(QColor(255, 255, 255, 255))
-        painter.setPen(QPen(Qt.NoPen))
+        painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
 
         # Calculate grid lines
@@ -263,9 +264,9 @@ class GraphView(QGraphicsView):
                 lines.append(line)
 
         # Draw grid lines
-        painter.setPen(QPen(QColor(240, 240, 240), 1, Qt.SolidLine))
+        painter.setPen(QPen(QColor(240, 240, 240), 1, Qt.PenStyle.SolidLine))
         painter.drawLines(lines)
-        painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.SolidLine))
+        painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
     
     def _emit_sparkles(self, pos, mult):
@@ -293,9 +294,9 @@ class Sparkle(QGraphicsEllipseItem):
 
         self.setPos(x, y)
         self.setZValue(PHASE_ITEM_Z)
-        self.setFlag(QGraphicsItem.ItemIsMovable, False)
-        self.setFlag(QGraphicsItem.ItemIsSelectable, False)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
         self.setBrush(QBrush(QColor(SPARKLE_COLOR)))
         self.setPen(QPen(Qt.PenStyle.NoPen))
         

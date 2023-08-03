@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram")
         delete_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Delete),QKeySequence("Backspace")])
-        new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.AddTab,
+        new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.StandardKey.AddTab,
             "Create a new tab")
         self.addAction(new_tab)
         select_all = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
@@ -228,9 +228,9 @@ class MainWindow(QMainWindow):
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes", 
                             f"Do you wish to save your changes to {name} before closing?",
-                            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
-            if answer == QMessageBox.Cancel: return False
-            if answer == QMessageBox.Yes:
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            if answer == QMessageBox.StandardButton.Cancel: return False
+            if answer == QMessageBox.StandardButton.Yes:
                 val = self.save_file()
                 if not val: return False
         self.tab_widget.tabCloseRequested.emit(i)
@@ -254,7 +254,7 @@ class MainWindow(QMainWindow):
             raise TypeError("Unknown file format", self.active_panel.file_type)
 
         file = QFile(self.active_panel.file_path)
-        if not file.open(QIODevice.WriteOnly | QIODevice.Text):
+        if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
             show_error_msg("Could not write to file")
             return False
         out = QTextStream(file)

@@ -1,4 +1,5 @@
-from typing import Literal, Tuple, Final
+from enum import IntEnum
+from typing import Tuple, Final
 from typing_extensions import TypeAlias
 import pyzx
 
@@ -6,8 +7,7 @@ VT: TypeAlias = int
 ET: TypeAlias = Tuple[int,int]
 GraphT: TypeAlias = pyzx.graph.graph_s.GraphS
 
-class ToolType:
-    Type = Literal[0, 1, 2]
+class ToolType(IntEnum):
     SELECT = 0
     VERTEX = 1
     EDGE = 2

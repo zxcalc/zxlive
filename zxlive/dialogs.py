@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Optional, Tuple
 from dataclasses import dataclass
@@ -68,7 +70,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
         msg.setInformativeText(description)
     msg.exec()
 
-def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput or ImportProofOutput]:
+def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput]:
     """Shows a dialog to import a diagram from disk.
 
     Returns the imported graph or `None` if the import failed."""

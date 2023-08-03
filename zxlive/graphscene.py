@@ -197,7 +197,7 @@ class EditGraphScene(GraphScene):
     # Currently selected edge type for preview when dragging
     # to add a new edge
     curr_ety: EdgeType.Type
-    curr_tool: ToolType.Type
+    curr_tool: ToolType
 
     # The vertex a right mouse button drag was initiated on
     _drag: Optional[EDragItem]
@@ -249,11 +249,11 @@ class EditGraphScene(GraphScene):
         self._is_mouse_pressed = False
         self._is_dragging = False
 
-    def add_vertex(self, e):
+    def add_vertex(self, e: QGraphicsSceneMouseEvent) -> None:
         p = e.scenePos()
         self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
 
-    def add_edge(self, e):
+    def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
         self.removeItem(self._drag)
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             # TODO: Think about if we want to allow self loops here?

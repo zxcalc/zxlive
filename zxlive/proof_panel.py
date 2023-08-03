@@ -49,7 +49,7 @@ class ProofPanel(BasePanel):
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
-        self.step_view.viewport().setAttribute(Qt.WA_Hover)
+        self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
 
         self.splitter.addWidget(self.step_view)
 
@@ -305,9 +305,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
-        if option.state & QStyle.State_Selected:
+        if option.state & QStyle.StateFlag.State_Selected:
             painter.setBrush(QColor(204, 232, 255))
-        elif option.state & QStyle.State_MouseOver:
+        elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setBrush(QColor(229, 243, 255))
         else:
             painter.setBrush(Qt.GlobalColor.white)
@@ -327,7 +327,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Draw circle
         painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
         painter.setBrush(QColor(ZX_GREEN))
-        circle_radius = self.circle_radius_selected if option.state & QStyle.State_Selected else self.circle_radius
+        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
         painter.drawEllipse(
             QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),
             circle_radius,
@@ -335,7 +335,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         )
 
         # Draw text
-        text = index.data(Qt.DisplayRole)
+        text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()
         text_rect = QRect(
             option.rect.x() + self.line_width + 2 * self.line_padding,
@@ -344,11 +344,11 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             text_height
         )
         if option.state & QStyle.State_Selected:
-            option.font.setWeight(QFont.Bold)
+            option.font.setWeight(QFont.Weight.Bold)
         painter.setFont(option.font)
         painter.setPen(Qt.GlobalColor.black)
         painter.setBrush(Qt.GlobalColor.black)
-        painter.drawText(text_rect, Qt.AlignLeft, text)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
         painter.restore()
 
