@@ -40,7 +40,7 @@ class GraphTool:
 class WandTrace:
     start: QPointF
     end: QPointF
-    hit: dict[VItem, QPointF]
+    hit: dict[VItem | EItem, list[QPointF]]
 
     def __init__(self, start: QPointF) -> None:
         self.start = start
@@ -142,7 +142,7 @@ class GraphView(QGraphicsView):
                 self.wand_path.setPath(path)
                 for i in range(10):
                     t = i / 9
-                    ipos = QPointF(t * pos + (1.0 - t) * prev)
+                    ipos = QPointF(pos * t + prev * (1.0 - t))
                     if self.sparkle_mode:
                         self._emit_sparkles(ipos, 1)
                     items = self.graph_scene.items(ipos)
@@ -269,7 +269,7 @@ class GraphView(QGraphicsView):
         painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
     
-    def _emit_sparkles(self, pos, mult):
+    def _emit_sparkles(self, pos: QPointF, mult: int) -> None:
         for _ in range(mult * SPARKLE_COUNT):
             angle = random.random() * 2 * math.pi
             speed = random.random() * (SPARKLE_MAX_SPEED - SPARKLE_MIN_SPEED) + SPARKLE_MIN_SPEED
@@ -284,7 +284,7 @@ SPARKLE_MIN_SPEED = 100.0
 SPARKLE_FADE = 20.0
 
 class Sparkle(QGraphicsEllipseItem):
-    def __init__(self, x, y, vx, vy, vo, scene):
+    def __init__(self, x: float, y: float, vx: float, vy: float, vo: float, scene: GraphScene) -> None:
         super().__init__(
             -0.05 * SCALE, -0.05 * SCALE, 0.1 * SCALE, 0.1 * SCALE
         )
@@ -307,7 +307,7 @@ class Sparkle(QGraphicsEllipseItem):
         self.timer.start()
         self.show()
         
-    def _timer_step(self, value):
+    def _timer_step(self, value: float) -> None:
         dt = value - self.prev_value
         self.prev_value = value
         self.setX(self.x() + dt * self.vx)

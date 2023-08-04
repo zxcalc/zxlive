@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox
 from pyzx import Circuit, extract_circuit
+from pyzx.graph.base import BaseGraph
 
 from zxlive.proof import ProofModel
 
@@ -22,6 +23,7 @@ class FileFormat(Enum):
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
     ZXProof = "zxp", "ZXProof"
+    _value_: str
 
     def __new__(cls, *args, **kwds):  # type: ignore
         obj = object.__new__(cls)
@@ -159,10 +161,10 @@ def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[Tuple[str
     return file_path, selected_format
 
 def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
-    selected_format = None
-    file_path, selected_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat if f != FileFormat.ZXProof]))
-    if not file_path:
+    file_path_and_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat if f != FileFormat.ZXProof]))
+    if file_path_and_format is None or not file_path_and_format[0]:
         return None
+    file_path, selected_format = file_path_and_format
 
     if selected_format in (FileFormat.QGraph, FileFormat.Json):
         data = graph.to_json()
@@ -184,9 +186,10 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,
 
 
 def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
-    file_path, selected_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
-    if not file_path:
+    file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
+    if file_path_and_format is None or not file_path_and_format[0]:
         return None
+    file_path, selected_format = file_path_and_format
     data = proof_model.to_json()
     if not write_to_file(file_path, data):
         return None
