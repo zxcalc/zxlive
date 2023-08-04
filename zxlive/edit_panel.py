@@ -179,10 +179,8 @@ class GraphEditPanel(BasePanel):
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(selection)
-        if len(selection) > 128:
-            cmd = SetGraph(self.graph_view,new_g)
-        else:
-            cmd = UpdateGraph(self.graph_view,new_g)
+        cmd = SetGraph(self.graph_view,new_g) if len(selection) > 128 \
+            else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
     def _start_derivation(self) -> None:

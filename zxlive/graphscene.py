@@ -254,6 +254,7 @@ class EditGraphScene(GraphScene):
         self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
 
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
+        assert self._drag is not None
         self.removeItem(self._drag)
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             # TODO: Think about if we want to allow self loops here?

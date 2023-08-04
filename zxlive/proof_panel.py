@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import copy
-from typing import Iterator, Union
+from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import QPointF, QPersistentModelIndex, Qt, \
@@ -70,10 +72,10 @@ class ProofPanel(BasePanel):
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
-        self.identity_choice = [
+        self.identity_choice = (
             QToolButton(self, text="Z", checkable=True, checked=True),
             QToolButton(self, text="X", checkable=True)
-        ]
+        )
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
     def init_action_groups(self) -> None:
@@ -82,6 +84,7 @@ class ProofPanel(BasePanel):
             hlayout = QHBoxLayout()
             group.init_buttons(self)
             for action in group.actions:
+                assert action.button is not None
                 hlayout.addWidget(action.button)
             hlayout.addStretch()
 
@@ -140,26 +143,28 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.undo_stack.push(cmd, anim_after=anim)
 
-    def _wand_trace_finished(self, trace):
+    def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
             return
         elif self._magic_identity(trace):
             return
 
-    def _magic_identity(self, trace):
+    def _magic_identity(self, trace: WandTrace) -> bool:
         if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
             return False
-
-        item = next(iter(trace.hit))
+        # We know that the type of `item` is `EItem` because of the check above
+        item = cast(EItem, next(iter(trace.hit)))
         pos = trace.hit[item][-1]
-        pos = SCALE * QPointF(*pos_from_view(pos.x(), pos.y()))
+        pos = QPointF(*pos_from_view(pos.x(), pos.y())) * SCALE
         s = self.graph.edge_s(item.e)
         t = self.graph.edge_t(item.e)
 
         if self.identity_choice[0].isChecked():
-            vty = VertexType.Z
+            vty: VertexType.Type = VertexType.Z
         elif self.identity_choice[1].isChecked():
             vty = VertexType.X
+        else:
+            raise ValueError("Neither of the spider types are checked.")
 
         new_g = copy.deepcopy(self.graph)
         v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
@@ -170,9 +175,10 @@ class ProofPanel(BasePanel):
         anim = anims.add_id(v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
         self.undo_stack.push(cmd, anim_after=anim)
+        return True
 
-    def _magic_slice(self, trace: WandTrace) -> None:
-        def cross(a, b):
+    def _magic_slice(self, trace: WandTrace) -> bool:
+        def cross(a: QPointF, b: QPointF) -> float:
             return a.y() * b.x() - a.x() * b.y()
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
@@ -202,7 +208,7 @@ class ProofPanel(BasePanel):
                 left.append(neighbor)
             else:
                 right.append(neighbor)
-        mouse_dir = ((start + end) / 2) - pos
+        mouse_dir = ((start + end) * (1/2)) - pos
         self._unfuse(vertex, left, mouse_dir)
         return True
 
@@ -214,7 +220,7 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_before=anim)
 
     def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
-        def snap_vector(v):
+        def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
             else:
@@ -353,10 +359,10 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         size = super().sizeHint(option, index)
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> bool:
-        return False
+    # def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QWidget:
+    #     return False
 
