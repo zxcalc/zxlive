@@ -16,6 +16,7 @@ from .graphscene import GraphScene
 from .graphview import WandTrace, GraphTool
 from .eitem import EItem
 from .proof import ProofModel
+from .utils import get_data
 from .vitem import VItem, ZX_GREEN, DragState
 from . import proof_actions
 from . import animations as anims
@@ -57,8 +58,8 @@ class ProofPanel(BasePanel):
         icon_size = QSize(32, 32)
         self.selection = QToolButton(self, checkable=True, checked=True)
         self.magic_wand = QToolButton(self, checkable=True)
-        self.selection.setIcon(QIcon("./zxlive/icons/tikzit-tool-select.svg"))
-        self.magic_wand.setIcon(QIcon("./zxlive/icons/magic-wand.svg"))
+        self.selection.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
+        self.magic_wand.setIcon(QIcon(get_data("icons/magic-wand.svg")))
         self.selection.setIconSize(icon_size)
         self.magic_wand.setIconSize(icon_size)
         self.selection.setToolTip("Select (s)")

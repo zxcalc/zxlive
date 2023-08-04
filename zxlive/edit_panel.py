@@ -8,6 +8,7 @@ from PySide6.QtGui import QShortcut, QIcon
 from pyzx import EdgeType, VertexType
 from sympy import sympify
 
+from .utils import get_data
 from .common import VT, GraphT, ToolType
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
@@ -46,9 +47,9 @@ class GraphEditPanel(BasePanel):
         self.select.setToolTip("Select (s)")
         self.vertex.setToolTip("Add Vertex (v)")
         self.edge.setToolTip("Add Edge (e)")
-        self.select.setIcon(QIcon("./zxlive/icons/tikzit-tool-select.svg"))
-        self.vertex.setIcon(QIcon("./zxlive/icons/tikzit-tool-node.svg"))
-        self.edge.setIcon(QIcon("./zxlive/icons/tikzit-tool-edge.svg"))
+        self.select.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
+        self.vertex.setIcon(QIcon(get_data("icons/tikzit-tool-node.svg")))
+        self.edge.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
         self.select.setShortcut("s")
         self.vertex.setShortcut("v")
         self.edge.setShortcut("e")
