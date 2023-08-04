@@ -1,9 +1,9 @@
 import copy
 from fractions import Fraction
 from typing import Iterator
-from PySide6.QtCore import Signal, QSize
+from PySide6.QtCore import Signal, QSize, Qt
 
-from PySide6.QtWidgets import QToolButton, QInputDialog
+from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter
 from PySide6.QtGui import QShortcut, QIcon
 from pyzx import EdgeType, VertexType
 from sympy import sympify
@@ -37,6 +37,10 @@ class GraphEditPanel(BasePanel):
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
         super().__init__(graph, self.graph_scene)
+
+        self.sidebar = QSplitter(self)
+        self.sidebar.setOrientation(Qt.Vertical)
+        self.splitter.addWidget(self.sidebar)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         # Toolbar section for select, node, edge
