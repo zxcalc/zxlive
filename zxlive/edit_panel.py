@@ -102,7 +102,6 @@ class GraphEditPanel(BasePanel):
         icon.addPixmap(pixmap)
         return icon
 
-
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         # Toolbar section for select, node, edge
         icon_size = QSize(32, 32)
@@ -125,7 +124,7 @@ class GraphEditPanel(BasePanel):
         self.vertex.clicked.connect(lambda: self._tool_clicked(ToolType.VERTEX))
         self.edge.clicked.connect(lambda: self._tool_clicked(ToolType.EDGE))
         yield ToolbarSection(self.select, self.vertex, self.edge, exclusive=True)
-        # Toolbar section for Starting Derivation
+
         self.start_derivation = QToolButton(self, text="Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
@@ -184,29 +183,6 @@ class GraphEditPanel(BasePanel):
     def _reset_clicked(self) -> None:
         while self.undo_stack.canUndo():
             self.undo_stack.undo()
-
-    def cycle_vertex_type_selection(self) -> None:
-        if self.select_z.isChecked():
-            self.select_x.setChecked(True)
-            self._curr_vty = VertexType.X
-        elif self.select_x.isChecked():
-            self.select_boundary.setChecked(True)
-            self._curr_vty = VertexType.BOUNDARY
-        elif self.select_boundary.isChecked():
-            self.select_z.setChecked(True)
-            self._curr_vty = VertexType.Z
-        else:
-            raise ValueError("Something is wrong with the state of the vertex type selectors")
-
-    def cycle_edge_type_selection(self) -> None:
-        if self.select_simple.isChecked():
-            self.select_had.setChecked(True)
-            self._curr_ety = EdgeType.HADAMARD
-        elif self.select_had.isChecked():
-            self.select_simple.setChecked(True)
-            self._curr_ety = EdgeType.SIMPLE
-        else:
-            raise ValueError("Something is wrong with the state of the edge type selectors")
 
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
