@@ -93,10 +93,9 @@ class GraphEditPanel(BasePanel):
         elif shape == "square":
             painter.drawRect(4, 4, 56, 56)
         elif shape == "line":
-            painter.setPen(QPen(QColor(color), 4))
             painter.drawLine(0, 32, 64, 32)
         elif shape == "dashed_line":
-            painter.setPen(QPen(QColor(color), 4, Qt.DashLine))
+            painter.setPen(QPen(QColor(color), 6, Qt.DashLine))
             painter.drawLine(0, 32, 64, 32)
         painter.end()
         icon.addPixmap(pixmap)
