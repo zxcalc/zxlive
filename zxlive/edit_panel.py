@@ -3,8 +3,8 @@ from fractions import Fraction
 from typing import Iterator
 from PySide6.QtCore import Signal, QSize, Qt
 
-from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter
-from PySide6.QtGui import QShortcut, QIcon
+from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
+from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
 from pyzx import EdgeType, VertexType
 from sympy import sympify
 
@@ -16,6 +16,20 @@ from .commands import (
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
+
+
+VERTICES = {
+    "Z": {"text": "Z spider", "type": VertexType.Z},
+    "X": {"text": "X spider", "type": VertexType.X},
+    "H": {"text": "H box", "type": VertexType.H_BOX},
+    "T": {"text": "boundary", "type": VertexType.BOUNDARY},
+}
+
+EDGES = {
+    "SIMPLE": {"text": "Simple", "type": EdgeType.SIMPLE},
+    "HADAMARD": {"text": "Hadamard", "type": EdgeType.HADAMARD},
+}
+
 
 
 class GraphEditPanel(BasePanel):
@@ -41,6 +55,28 @@ class GraphEditPanel(BasePanel):
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Vertical)
         self.splitter.addWidget(self.sidebar)
+        self.vertex_list = self.create_list_widget(VERTICES, self._vty_clicked)
+        self.edge_list = self.create_list_widget(EDGES, self._ety_clicked)
+        self.sidebar.addWidget(self.vertex_list)
+        self.sidebar.addWidget(self.edge_list)
+
+    def create_list_widget(self, data, onclick):
+        list_widget = QListWidget(self)
+        list_widget.setResizeMode(QListView.Adjust)
+        list_widget.setViewMode(QListView.IconMode)
+        list_widget.setMovement(QListView.Static)
+        list_widget.setUniformItemSizes(True)
+        list_widget.setGridSize(QSize(60, 64))
+        list_widget.setWordWrap(True)
+        list_widget.setIconSize(QSize(24, 24))
+        for value in data.values():
+            item = QListWidgetItem(value["text"])
+            item.setData(Qt.UserRole, value["type"])
+            list_widget.addItem(item)
+        list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.UserRole)))
+        list_widget.setCurrentItem(list_widget.item(0))
+        return list_widget
+
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         # Toolbar section for select, node, edge
@@ -68,26 +104,6 @@ class GraphEditPanel(BasePanel):
         self.start_derivation = QToolButton(self, text="Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
-
-        # Toolbar section for picking a vertex type
-        self.select_z = QToolButton(self, text="Z Spider", checkable=True, checked=True)  # Selected by default
-        self.select_x = QToolButton(self, text="X Spider", checkable=True)
-        self.select_h = QToolButton(self, text="H box", checkable=True)
-        self.select_boundary = QToolButton(self, text="Boundary", checkable=True)
-        self.select_z.clicked.connect(lambda: self._vty_clicked(VertexType.Z))
-        self.select_x.clicked.connect(lambda: self._vty_clicked(VertexType.X))
-        self.select_h.clicked.connect(lambda: self._vty_clicked(VertexType.H_BOX))
-        self.select_boundary.clicked.connect(lambda: self._vty_clicked(VertexType.BOUNDARY))
-        yield ToolbarSection(self.select_z, self.select_x, self.select_h, self.select_boundary, exclusive=True)
-        QShortcut("x",self).activated.connect(self.cycle_vertex_type_selection)
-
-        # Toolbar section for picking an edge type
-        self.select_simple = QToolButton(self, text="Simple Edge", checkable=True, checked=True)  # Selected by default
-        self.select_had = QToolButton(self, text="Had Edge", checkable=True)
-        self.select_simple.clicked.connect(lambda _: self._ety_clicked(EdgeType.SIMPLE))
-        self.select_had.clicked.connect(lambda _: self._ety_clicked(EdgeType.HADAMARD))
-        yield ToolbarSection(self.select_simple, self.select_had, exclusive=True)
-        QShortcut("Shift+E", self).activated.connect(self.cycle_edge_type_selection)
 
         reset = QToolButton(self, text="Reset")
         reset.clicked.connect(self._reset_clicked)
