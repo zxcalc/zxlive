@@ -1,6 +1,6 @@
 import copy
 from fractions import Fraction
-from typing import Iterator
+from typing import Iterator, TypedDict, Callable
 from PySide6.QtCore import Signal, QSize, Qt
 
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
@@ -21,14 +21,20 @@ from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
 
 
-VERTICES = {
+class DrawPanelNodeType(TypedDict):
+    text: str
+    type: VertexType.Type
+    icon: tuple[str, str]
+
+
+VERTICES: dict[str, DrawPanelNodeType] = {
     "Z": {"text": "Z spider", "type": VertexType.Z, "icon": ("circle", ZX_GREEN)},
     "X": {"text": "X spider", "type": VertexType.X, "icon": ("circle", ZX_RED)},
     "H": {"text": "H box", "type": VertexType.H_BOX, "icon": ("square", H_YELLOW)},
     "T": {"text": "boundary", "type": VertexType.BOUNDARY, "icon": ("circle", "black")},
 }
 
-EDGES = {
+EDGES: dict[str, DrawPanelNodeType] = {
     "SIMPLE": {"text": "Simple", "type": EdgeType.SIMPLE, "icon": ("line", "black")},
     "HADAMARD": {"text": "Hadamard", "type": EdgeType.HADAMARD, "icon": ("dashed_line", HAD_EDGE_BLUE)},
 }
@@ -62,11 +68,11 @@ class GraphEditPanel(BasePanel):
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
 
-    def create_list_widget(self, data, onclick):
+    def create_list_widget(self, data: dict[str, DrawPanelNodeType], onclick: Callable[[EdgeType.Type], None]) -> QListWidget:
         list_widget = QListWidget(self)
-        list_widget.setResizeMode(QListView.Adjust)
-        list_widget.setViewMode(QListView.IconMode)
-        list_widget.setMovement(QListView.Static)
+        list_widget.setResizeMode(QListView.ResizeMode.Adjust)
+        list_widget.setViewMode(QListView.ViewMode.IconMode)
+        list_widget.setMovement(QListView.Movement.Static)
         list_widget.setUniformItemSizes(True)
         list_widget.setGridSize(QSize(60, 64))
         list_widget.setWordWrap(True)
@@ -80,7 +86,7 @@ class GraphEditPanel(BasePanel):
         list_widget.setCurrentItem(list_widget.item(0))
         return list_widget
 
-    def create_icon(self, shape, color):
+    def create_icon(self, shape: str, color: str) -> QIcon:
         icon = QIcon()
         pixmap = QPixmap(64, 64)
         pixmap.fill(Qt.transparent)

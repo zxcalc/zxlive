@@ -67,7 +67,9 @@ class ImportProofOutput:
 
 def show_error_msg(title: str, description: Optional[str] = None) -> None:
     """Displays an error message box."""
-    msg = QMessageBox(icon=QMessageBox.Icon.Critical, text=title)
+    msg = QMessageBox()
+    msg.setText(title)
+    msg.setIcon(QMessageBox.Icon.Critical)
     if description is not None:
         msg.setInformativeText(description)
     msg.exec()
