@@ -1,3 +1,4 @@
+import json
 from typing import NamedTuple, Union, Any
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt
@@ -13,6 +14,21 @@ class Rewrite(NamedTuple):
     rule: str  # Name of the rule that was applied to get to this step
     diff: GraphDiff  # Diff from the last step to this step
 
+    def to_json(self) -> str:
+        """Serializes the rewrite to JSON."""
+        return json.dumps({
+            "rule": self.rule,
+            "diff": self.diff.to_json()
+        })
+
+    @staticmethod
+    def from_json(json_str: str) -> "Rewrite":
+        """Deserializes the rewrite from JSON."""
+        d = json.loads(json_str)
+        return Rewrite(
+            rule=d["rule"],
+            diff=GraphDiff.from_json(d["diff"])
+        )
 
 class ProofModel(QAbstractListModel):
     """List model capturing the individual steps in a proof.
@@ -97,3 +113,25 @@ class ProofModel(QAbstractListModel):
     def get_graph(self, index: int) -> GraphT:
         """Returns the grap at a given position in the proof."""
         return self.graphs[index].copy()
+
+    def to_json(self) -> str:
+        """Serializes the model to JSON."""
+        initial_graph_tikz = self.graphs[0].to_tikz()
+        proof_steps = []
+        for step in self.steps:
+            proof_steps.append(step.to_json())
+        return json.dumps({
+            "initial_graph": initial_graph_tikz,
+            "proof_steps": proof_steps
+        })
+    
+    @staticmethod
+    def from_json(json_str: str) -> "ProofModel":
+        """Deserializes the model from JSON."""
+        d = json.loads(json_str)
+        initial_graph = GraphT.from_tikz(d["initial_graph"])
+        model = ProofModel(initial_graph)
+        for step in d["proof_steps"]:
+            rewrite = Rewrite.from_json(step)
+            model.add_rewrite(rewrite, rewrite.diff.apply_diff(model.graphs[-1]))
+        return model

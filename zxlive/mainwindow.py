@@ -14,20 +14,20 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
 from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
 from pyzx.graph.graph_s import GraphS
 
-from .commands import SetGraph
+from .commands import AddRewriteStep
 
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph
@@ -65,11 +65,9 @@ class MainWindow(QMainWindow):
         tab_widget = QTabWidget()
         w.layout().addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
+        tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(lambda i: tab_widget.removeTab(i))
         self.tab_widget = tab_widget
-
-        graph = construct_circuit()
-        self.new_graph(graph)
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
         # We could do this by using pyperclip.
@@ -77,18 +75,18 @@ class MainWindow(QMainWindow):
 
         menu = self.menuBar()
 
-        new_graph = self._new_action("&New",self.new_graph,QKeySequence.StandardKey.New,
+        new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
             "Reinitialize with an empty graph")
-        open_file = self._new_action("&Open...", self.open_file,QKeySequence.StandardKey.Open,
+        open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close", self.close_action,QKeySequence.StandardKey.Close,
+        close_action = self._new_action("Close", self.close_action, QKeySequence.StandardKey.Close,
             "Closes the window")
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
         # TODO: We should remember if we have saved the diagram before, 
         # and give an open to overwrite this file with a Save action
-        save_file = self._new_action("&Save", self.save_file,QKeySequence.StandardKey.Save,
+        save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
-        save_as = self._new_action("Save &as...", self.save_as,QKeySequence.StandardKey.SaveAs,
+        save_as = self._new_action("Save &as...", self.save_as, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         
         file_menu = menu.addMenu("&File")
@@ -144,12 +142,16 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
 
-        transform_actions = []
+        simplify_actions = []
         for simp in simplifications.values():
-            transform_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp["function"]), None, simp["tool_tip"]))
-        transform_menu = menu.addMenu("&Transform")
-        for action in transform_actions:
-            transform_menu.addAction(action)
+            simplify_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp), None, simp["tool_tip"]))
+        self.simplify_menu = menu.addMenu("&Simplify")
+        for action in simplify_actions:
+            self.simplify_menu.addAction(action)
+        self.simplify_menu.menuAction().setVisible(False)
+
+        graph = construct_circuit()
+        self.new_graph(graph)
 
     def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
         action = QAction(name, self)
@@ -195,11 +197,26 @@ class MainWindow(QMainWindow):
         if not clean: name += "*"
         self.tab_widget.setTabText(i,name)
 
+    def tab_changed(self, i: int) -> None:
+        if isinstance(self.active_panel, ProofPanel):
+            self.simplify_menu.menuAction().setVisible(True)
+        else:
+            self.simplify_menu.menuAction().setVisible(False)
+
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
         if out is not None:
             name = QFileInfo(out.file_path).baseName()
-            self.new_graph(out.g, name)
+            if isinstance(out, ImportGraphOutput):
+                self.new_graph(out.g, name)
+            else:
+                graph = out.p.graphs[-1]
+                self.new_deriv(graph, name)
+                proof_panel = self.active_panel
+                proof_panel.proof_model = out.p
+                proof_panel.step_view.setModel(proof_panel.proof_model)
+                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
+                proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
@@ -227,13 +244,15 @@ class MainWindow(QMainWindow):
                 "You imported this file from a circuit description. You can currently only save it in a graph format.")
             return self.save_as()
 
-        if self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
+        if isinstance(self.active_panel, ProofPanel):
+            data = self.active_panel.proof_model.to_json()
+        elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
             data = self.active_panel.graph.to_tikz()
         else:
             raise TypeError("Unknown file format", self.active_panel.file_type)
-        
+
         file = QFile(self.active_panel.file_path)
         if not file.open(QIODevice.WriteOnly | QIODevice.Text):
             show_error_msg("Could not write to file")
@@ -246,7 +265,10 @@ class MainWindow(QMainWindow):
 
 
     def save_as(self) -> bool:
-        out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
+        if isinstance(self.active_panel, ProofPanel):
+            out = export_proof_dialog(self.active_panel.proof_model, self)
+        else:
+            out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
         file_path, file_type = out
         self.active_panel.file_path = file_path
@@ -283,9 +305,10 @@ class MainWindow(QMainWindow):
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
-    def new_deriv(self, graph:GraphT) -> None:
+    def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
         panel = ProofPanel(graph)
-        self.tab_widget.addTab(panel, "New Proof")
+        if name is None: name = "New Proof"
+        self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
@@ -306,12 +329,12 @@ class MainWindow(QMainWindow):
     def fit_view(self) -> None:
         self.active_panel.graph_view.fit_view()
 
-    def apply_pyzx_reduction(self, reduction: Callable[[GraphS], int]) -> Callable[[], None]:
+    def apply_pyzx_reduction(self, reduction:Dict[str,Any]) -> Callable[[],None]:
         def reduce() -> None:
             old_graph = self.active_panel.graph
             new_graph = copy.deepcopy(old_graph)
-            reduction(new_graph)
-            cmd = SetGraph(self.active_panel.graph_view, new_graph)
+            reduction["function"](new_graph)
+            cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
             self.active_panel.undo_stack.push(cmd)
         return reduce
     
