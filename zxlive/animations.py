@@ -109,7 +109,7 @@ def shake(it: VItem, amount: float, duration: int) -> None:
     center = it.pos()
     anim = VItemAnimation(it, VItem.Properties.Position, refresh=False)
     anim.setLoopCount(-1)  # Infinite looping
-    anim.setEasingCurve(QEasingCurve.InOutExpo)
+    anim.setEasingCurve(QEasingCurve.Type.InOutExpo)
     anim.setDuration(duration)
 
     def set_random_params() -> None:
@@ -130,14 +130,14 @@ def shake(it: VItem, amount: float, duration: int) -> None:
 
 def anticipate_fuse(it: VItem) -> None:
     """Animation that is played when a fuseable spider is dragged onto a vertex."""
-    scale(it, target=1.25, duration=100, ease=QEasingCurve.OutInQuad).start()
+    scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
 
 
 def fuse(dragged: VItem, target: VItem) -> QAbstractAnimation:
     """Animation that is played when a fuseable spider is dropped onto a vertex."""
     group = QParallelAnimationGroup()
-    group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve.OutQuad))
-    group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve.InBack))
+    group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+    group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))
 
     def set_z(state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running:
@@ -152,7 +152,7 @@ def fuse(dragged: VItem, target: VItem) -> QAbstractAnimation:
 def anticipate_strong_comp(it: VItem) -> None:
     """Animation that is played when a bialgebra-capable spider is dragged onto a
     vertex."""
-    scale(it, target=1.25, duration=100, ease=QEasingCurve.OutInQuad).start()
+    scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
     # shake(it, amount=1.0, duration=70)  # TODO: This could be improved...
 
 
@@ -160,7 +160,7 @@ def strong_comp(before: GraphT, after: GraphT, target: VT, scene: GraphScene) ->
     """Animation that is played when a bialgebra-capable spider is dropped onto a
     vertex."""
     return morph_graph(before, after, scene, to_start=lambda _: target,
-                       to_end=lambda _: None, duration=150, ease=QEasingCurve.OutQuad)
+                       to_end=lambda _: None, duration=150, ease=QEasingCurve(QEasingCurve.Type.OutQuad))
 
 
 def back_to_default(it: VItem) -> None:
@@ -168,7 +168,7 @@ def back_to_default(it: VItem) -> None:
     their default values."""
     for anim in it.active_animations.copy():
         anim.stop()
-    scale(it, target=1, duration=250, ease=QEasingCurve.InOutQuad).start()
+    scale(it, target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
 
 
 def remove_id(it: VItem) -> VItemAnimation:
@@ -178,7 +178,7 @@ def remove_id(it: VItem) -> VItemAnimation:
     anim.setDuration(200)
     anim.setStartValue(it.scale())
     anim.setEndValue(0.0)
-    anim.setEasingCurve(QEasingCurve.InBack)
+    anim.setEasingCurve(QEasingCurve.Type.InBack)
     return anim
 
 def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
@@ -188,11 +188,11 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     anim.setDuration(500)
     anim.setStartValue(0.0)
     anim.setEndValue(1.0)
-    anim.setEasingCurve(QEasingCurve.OutElastic)
+    anim.setEasingCurve(QEasingCurve.Type.OutElastic)
     return anim
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused using the magic wand."""
     return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
-                       duration=700, ease=QEasingCurve.OutElastic)
+                       duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 

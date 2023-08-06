@@ -14,12 +14,14 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, TypedDict
+
+import copy
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
 from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
-from pyzx.graph.graph_s import GraphS
+from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
 
@@ -30,8 +32,7 @@ from .construct import *
 from .dialogs import ImportGraphOutput, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
-from pyzx import Graph
-from pyzx import simplify
+from pyzx import Graph, simplify, Circuit
 
 
 class MainWindow(QMainWindow):
@@ -110,7 +111,7 @@ class MainWindow(QMainWindow):
         delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram")
         delete_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Delete),QKeySequence("Backspace")])
-        new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.AddTab,
+        new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.StandardKey.AddTab,
             "Create a new tab")
         self.addAction(new_tab)
         select_all = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
@@ -153,7 +154,7 @@ class MainWindow(QMainWindow):
         graph = construct_circuit()
         self.new_graph(graph)
 
-    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey,tooltip:str) -> QAction:
+    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey | None,tooltip:str) -> QAction:
         action = QAction(name, self)
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
@@ -206,13 +207,14 @@ class MainWindow(QMainWindow):
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
         if out is not None:
+            assert self.active_panel is not None
             name = QFileInfo(out.file_path).baseName()
             if isinstance(out, ImportGraphOutput):
                 self.new_graph(out.g, name)
             else:
                 graph = out.p.graphs[-1]
                 self.new_deriv(graph, name)
-                proof_panel = self.active_panel
+                proof_panel: BasePanel = self.active_panel
                 proof_panel.proof_model = out.p
                 proof_panel.step_view.setModel(proof_panel.proof_model)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
@@ -221,6 +223,7 @@ class MainWindow(QMainWindow):
             self.active_panel.file_type = out.file_type
 
     def close_action(self) -> bool:
+        assert self.active_panel is not None
         i = self.tab_widget.currentIndex()
         if i == -1: # no tabs open
             self.close()
@@ -228,15 +231,16 @@ class MainWindow(QMainWindow):
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes", 
                             f"Do you wish to save your changes to {name} before closing?",
-                            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
-            if answer == QMessageBox.Cancel: return False
-            if answer == QMessageBox.Yes:
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+            if answer == QMessageBox.StandardButton.Cancel: return False
+            if answer == QMessageBox.StandardButton.Yes:
                 val = self.save_file()
                 if not val: return False
         self.tab_widget.tabCloseRequested.emit(i)
         return True
 
     def save_file(self) -> bool:
+        assert self.active_panel is not None
         if self.active_panel.file_path is None:
             return self.save_as()
         if self.active_panel.file_type == FileFormat.QASM:
@@ -254,7 +258,7 @@ class MainWindow(QMainWindow):
             raise TypeError("Unknown file format", self.active_panel.file_type)
 
         file = QFile(self.active_panel.file_path)
-        if not file.open(QIODevice.WriteOnly | QIODevice.Text):
+        if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
             show_error_msg("Could not write to file")
             return False
         out = QTextStream(file)
@@ -265,6 +269,7 @@ class MainWindow(QMainWindow):
 
 
     def save_as(self) -> bool:
+        assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
             out = export_proof_dialog(self.active_panel.proof_model, self)
         else:
@@ -281,18 +286,22 @@ class MainWindow(QMainWindow):
 
 
     def cut_graph(self) -> None:
+        assert self.active_panel is not None
         if isinstance(self.active_panel, GraphEditPanel):
             self.copied_graph = self.active_panel.copy_selection()
             self.active_panel.delete_selection()
 
     def copy_graph(self) -> None:
+        assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
 
     def paste_graph(self) -> None:
+        assert self.active_panel is not None
         if isinstance(self.active_panel, GraphEditPanel) and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
 
     def delete_graph(self) -> None:
+        assert self.active_panel is not None
         if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.delete_selection()
 
@@ -313,24 +322,28 @@ class MainWindow(QMainWindow):
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
     def select_all(self) -> None:
+        assert self.active_panel is not None
         self.active_panel.select_all()
 
     def deselect_all(self) -> None:
+        assert self.active_panel is not None
         self.active_panel.deselect_all()
 
     def zoom_in(self) -> None:
-        print("Zooming in")
+        assert self.active_panel is not None
         self.active_panel.graph_view.zoom_in()
 
     def zoom_out(self) -> None:
-        print("Zooming out")
+        assert self.active_panel is not None
         self.active_panel.graph_view.zoom_out()
 
     def fit_view(self) -> None:
+        assert self.active_panel is not None
         self.active_panel.graph_view.fit_view()
 
-    def apply_pyzx_reduction(self, reduction:Dict[str,Any]) -> Callable[[],None]:
+    def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:
+            assert self.active_panel is not None
             old_graph = self.active_panel.graph
             new_graph = copy.deepcopy(old_graph)
             reduction["function"](new_graph)
@@ -339,7 +352,12 @@ class MainWindow(QMainWindow):
         return reduce
     
 
-simplifications = {
+class SimpEntry(TypedDict):
+    text: str
+    tool_tip: str
+    function: Callable[[BaseGraph], int | None | BaseGraph] | Callable[[BaseGraph | Circuit], int]
+
+simplifications: dict[str, SimpEntry] = {
     'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp,},
     'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp},
     'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp},

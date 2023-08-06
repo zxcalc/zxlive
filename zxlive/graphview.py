@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 from typing import Optional
 
@@ -39,7 +40,7 @@ class GraphTool:
 class WandTrace:
     start: QPointF
     end: QPointF
-    hit: dict[VItem, QPointF]
+    hit: dict[VItem | EItem, list[QPointF]]
 
     def __init__(self, start: QPointF) -> None:
         self.start = start
@@ -90,7 +91,7 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = False
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
 
-    def _toggle_sparkles(self):
+    def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
@@ -141,7 +142,7 @@ class GraphView(QGraphicsView):
                 self.wand_path.setPath(path)
                 for i in range(10):
                     t = i / 9
-                    ipos = QPointF(t * pos + (1.0 - t) * prev)
+                    ipos = QPointF(pos * t + prev * (1.0 - t))
                     if self.sparkle_mode:
                         self._emit_sparkles(ipos, 1)
                     items = self.graph_scene.items(ipos)
@@ -190,7 +191,7 @@ class GraphView(QGraphicsView):
         # We do this to allow for zooming
         
         # If control is pressed, we want to zoom
-        if event.modifiers() == Qt.ControlModifier:
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             ydelta = event.angleDelta().y()
             self.zoom(ydelta)
         else:
@@ -232,7 +233,7 @@ class GraphView(QGraphicsView):
         self.zoom(100)
 
     def fit_view(self) -> None:
-        self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+        self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
         current_zoom = self.transform().m11()
         print(current_zoom)
         if current_zoom < MIN_ZOOM:
@@ -241,10 +242,10 @@ class GraphView(QGraphicsView):
             if current_zoom > MAX_ZOOM:
                 self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
-    def drawBackground(self, painter: QPainter, rect: QRectF) -> None:
+    def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
         # First draw blank white background
         painter.setBrush(QColor(255, 255, 255, 255))
-        painter.setPen(QPen(Qt.NoPen))
+        painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
 
         # Calculate grid lines
@@ -263,12 +264,12 @@ class GraphView(QGraphicsView):
                 lines.append(line)
 
         # Draw grid lines
-        painter.setPen(QPen(QColor(240, 240, 240), 1, Qt.SolidLine))
+        painter.setPen(QPen(QColor(240, 240, 240), 1, Qt.PenStyle.SolidLine))
         painter.drawLines(lines)
-        painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.SolidLine))
+        painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
     
-    def _emit_sparkles(self, pos, mult):
+    def _emit_sparkles(self, pos: QPointF, mult: int) -> None:
         for _ in range(mult * SPARKLE_COUNT):
             angle = random.random() * 2 * math.pi
             speed = random.random() * (SPARKLE_MAX_SPEED - SPARKLE_MIN_SPEED) + SPARKLE_MIN_SPEED
@@ -283,7 +284,7 @@ SPARKLE_MIN_SPEED = 100.0
 SPARKLE_FADE = 20.0
 
 class Sparkle(QGraphicsEllipseItem):
-    def __init__(self, x, y, vx, vy, vo, scene):
+    def __init__(self, x: float, y: float, vx: float, vy: float, vo: float, scene: GraphScene) -> None:
         super().__init__(
             -0.05 * SCALE, -0.05 * SCALE, 0.1 * SCALE, 0.1 * SCALE
         )
@@ -293,9 +294,9 @@ class Sparkle(QGraphicsEllipseItem):
 
         self.setPos(x, y)
         self.setZValue(PHASE_ITEM_Z)
-        self.setFlag(QGraphicsItem.ItemIsMovable, False)
-        self.setFlag(QGraphicsItem.ItemIsSelectable, False)
-        self.setFlag(QGraphicsItem.ItemSendsGeometryChanges, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
         self.setBrush(QBrush(QColor(SPARKLE_COLOR)))
         self.setPen(QPen(Qt.PenStyle.NoPen))
         
@@ -306,7 +307,7 @@ class Sparkle(QGraphicsEllipseItem):
         self.timer.start()
         self.show()
         
-    def _timer_step(self, value):
+    def _timer_step(self, value: float) -> None:
         dt = value - self.prev_value
         self.prev_value = value
         self.setX(self.x() + dt * self.vx)

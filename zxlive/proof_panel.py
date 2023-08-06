@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import copy
-from typing import Iterator, Union
+from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import QPointF, QPersistentModelIndex, Qt, \
@@ -16,6 +18,7 @@ from .graphscene import GraphScene
 from .graphview import WandTrace, GraphTool
 from .eitem import EItem
 from .proof import ProofModel
+from .utils import get_data
 from .vitem import VItem, ZX_GREEN, DragState
 from . import proof_actions
 from . import animations as anims
@@ -49,7 +52,7 @@ class ProofPanel(BasePanel):
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
-        self.step_view.viewport().setAttribute(Qt.WA_Hover)
+        self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
 
         self.splitter.addWidget(self.step_view)
 
@@ -57,8 +60,8 @@ class ProofPanel(BasePanel):
         icon_size = QSize(32, 32)
         self.selection = QToolButton(self, checkable=True, checked=True)
         self.magic_wand = QToolButton(self, checkable=True)
-        self.selection.setIcon(QIcon("./zxlive/icons/tikzit-tool-select.svg"))
-        self.magic_wand.setIcon(QIcon("./zxlive/icons/magic-wand.svg"))
+        self.selection.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
+        self.magic_wand.setIcon(QIcon(get_data("icons/magic-wand.svg")))
         self.selection.setIconSize(icon_size)
         self.magic_wand.setIconSize(icon_size)
         self.selection.setToolTip("Select (s)")
@@ -69,10 +72,10 @@ class ProofPanel(BasePanel):
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
-        self.identity_choice = [
+        self.identity_choice = (
             QToolButton(self, text="Z", checkable=True, checked=True),
             QToolButton(self, text="X", checkable=True)
-        ]
+        )
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
     def init_action_groups(self) -> None:
@@ -81,6 +84,7 @@ class ProofPanel(BasePanel):
             hlayout = QHBoxLayout()
             group.init_buttons(self)
             for action in group.actions:
+                assert action.button is not None
                 hlayout.addWidget(action.button)
             hlayout.addStretch()
 
@@ -139,26 +143,28 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.undo_stack.push(cmd, anim_after=anim)
 
-    def _wand_trace_finished(self, trace):
+    def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
             return
         elif self._magic_identity(trace):
             return
 
-    def _magic_identity(self, trace):
+    def _magic_identity(self, trace: WandTrace) -> bool:
         if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
             return False
-
-        item = next(iter(trace.hit))
+        # We know that the type of `item` is `EItem` because of the check above
+        item = cast(EItem, next(iter(trace.hit)))
         pos = trace.hit[item][-1]
-        pos = SCALE * QPointF(*pos_from_view(pos.x(), pos.y()))
+        pos = QPointF(*pos_from_view(pos.x(), pos.y())) * SCALE
         s = self.graph.edge_s(item.e)
         t = self.graph.edge_t(item.e)
 
         if self.identity_choice[0].isChecked():
-            vty = VertexType.Z
+            vty: VertexType.Type = VertexType.Z
         elif self.identity_choice[1].isChecked():
             vty = VertexType.X
+        else:
+            raise ValueError("Neither of the spider types are checked.")
 
         new_g = copy.deepcopy(self.graph)
         v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
@@ -169,9 +175,10 @@ class ProofPanel(BasePanel):
         anim = anims.add_id(v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
         self.undo_stack.push(cmd, anim_after=anim)
+        return True
 
-    def _magic_slice(self, trace: WandTrace) -> None:
-        def cross(a, b):
+    def _magic_slice(self, trace: WandTrace) -> bool:
+        def cross(a: QPointF, b: QPointF) -> float:
             return a.y() * b.x() - a.x() * b.y()
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
@@ -201,7 +208,7 @@ class ProofPanel(BasePanel):
                 left.append(neighbor)
             else:
                 right.append(neighbor)
-        mouse_dir = ((start + end) / 2) - pos
+        mouse_dir = ((start + end) * (1/2)) - pos
         self._unfuse(vertex, left, mouse_dir)
         return True
 
@@ -213,7 +220,7 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_before=anim)
 
     def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
-        def snap_vector(v):
+        def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
             else:
@@ -305,9 +312,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
-        if option.state & QStyle.State_Selected:
+        if option.state & QStyle.StateFlag.State_Selected:
             painter.setBrush(QColor(204, 232, 255))
-        elif option.state & QStyle.State_MouseOver:
+        elif option.state & QStyle.StateFlag.State_MouseOver:
             painter.setBrush(QColor(229, 243, 255))
         else:
             painter.setBrush(Qt.GlobalColor.white)
@@ -327,7 +334,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Draw circle
         painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
         painter.setBrush(QColor(ZX_GREEN))
-        circle_radius = self.circle_radius_selected if option.state & QStyle.State_Selected else self.circle_radius
+        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
         painter.drawEllipse(
             QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),
             circle_radius,
@@ -335,7 +342,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         )
 
         # Draw text
-        text = index.data(Qt.DisplayRole)
+        text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()
         text_rect = QRect(
             option.rect.x() + self.line_width + 2 * self.line_padding,
@@ -344,18 +351,18 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             text_height
         )
         if option.state & QStyle.State_Selected:
-            option.font.setWeight(QFont.Bold)
+            option.font.setWeight(QFont.Weight.Bold)
         painter.setFont(option.font)
         painter.setPen(Qt.GlobalColor.black)
         painter.setBrush(Qt.GlobalColor.black)
-        painter.drawText(text_rect, Qt.AlignLeft, text)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
         painter.restore()
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         size = super().sizeHint(option, index)
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> bool:
-        return False
+    # def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QWidget:
+    #     return False
 
