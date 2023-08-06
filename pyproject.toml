@@ -30,7 +30,6 @@ classifiers = [
 dependencies = [
     "PySide6",
     "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
-    "qt-material>=2.14",
     "sympy>=1.12",
 ]
 
