@@ -128,10 +128,6 @@ class GraphEditPanel(BasePanel):
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
 
-        reset = QToolButton(self, text="Reset")
-        reset.clicked.connect(self._reset_clicked)
-        yield ToolbarSection(reset)
-
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene.curr_tool = tool
 
@@ -178,10 +174,6 @@ class GraphEditPanel(BasePanel):
             return
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
-
-    def _reset_clicked(self) -> None:
-        while self.undo_stack.canUndo():
-            self.undo_stack.undo()
 
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
