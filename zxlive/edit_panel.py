@@ -1,12 +1,14 @@
 import copy
 from fractions import Fraction
-from typing import Iterator, TypedDict, Callable
+from typing import Iterator, Optional, TypedDict, Callable
 from PySide6.QtCore import Signal, QSize, Qt
 
-from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
-from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
+from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem, QScrollArea, QWidget, QGridLayout, QLabel, QComboBox, QFrame, QSizePolicy, QApplication, QSpacerItem
+from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap, QPalette
 from pyzx import EdgeType, VertexType
-from .poly import new_var
+from .poly import new_var, Poly
+from .parse_poly import parse
+
 
 from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
@@ -68,6 +70,10 @@ class GraphEditPanel(BasePanel):
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
 
+        self._populate_variables()
+        self.variable_viewer = VariableViewer(self.variable_types)
+        self.sidebar.addWidget(self.variable_viewer)
+
     def create_list_widget(self, data: dict[str, DrawPanelNodeType], onclick: Callable[[EdgeType.Type], None]) -> QListWidget:
         list_widget = QListWidget(self)
         list_widget.setResizeMode(QListView.ResizeMode.Adjust)
@@ -106,6 +112,14 @@ class GraphEditPanel(BasePanel):
         painter.end()
         icon.addPixmap(pixmap)
         return icon
+
+    def _populate_variables(self) -> None:
+        self.variable_types = {}
+        for vert in self.graph.vertices():
+            phase = self.graph.phase(vert)
+            if isinstance(phase, Poly):
+                for var in phase.free_vars():
+                    self.variable_types[var.name] = var.is_bool
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         # Toolbar section for select, node, edge
@@ -174,12 +188,18 @@ class GraphEditPanel(BasePanel):
         if not ok:
             return
         try:
-            new_phase = string_to_phase(input_)
+            new_phase = parse(input_, self._new_var)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
+        
+    def _new_var(self, name: str) -> Poly:
+        if name not in self.variable_types:
+            self.variable_types[name] = False
+            self.variable_viewer.add_item(name)
+        return new_var(name, self.variable_types)
 
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
@@ -202,24 +222,101 @@ class GraphEditPanel(BasePanel):
         self.undo_stack.push(cmd)
 
     def _start_derivation(self) -> None:
-        self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
+        new_g: GraphT = copy.deepcopy(self.graph_scene.g)
+        for vert in new_g.vertices():
+            phase = new_g.phase(vert)
+            if isinstance(phase, Poly):
+                phase.freeze()
+        self.start_derivation_signal.emit(new_g)
 
-def string_to_phase(string: str) -> Fraction:
-    if not string: 
-        return Fraction(0)
-    try:
-        s = string.lower().replace(' ', '')
-        s = s.replace('\u03c0', '').replace('pi', '')
-        if '.' in s or 'e' in s:
-            return Fraction(float(s))
-        elif '/' in s:
-            a, b = s.split("/", 2)
-            if not a:
-                return Fraction(1, int(b))
-            if a == '-':
-                a = '-1'
-            return Fraction(int(a), int(b))
+class VariableViewer(QScrollArea):
+
+    def __init__(self, variable_types: dict[str, bool]) -> None:
+        super().__init__()
+
+        self._variable_types = variable_types
+
+        self._widget = QWidget()
+        lpal = QApplication.palette("QListWidget")
+        palette = QPalette()
+        palette.setBrush(QPalette.ColorRole.Window, lpal.base())
+        self._widget.setAutoFillBackground(True)
+        self._widget.setPalette(palette)
+        self._layout = QGridLayout(self._widget)
+        self._layout.setColumnStretch(0, 1)
+        self._layout.setColumnStretch(1, 0)
+        self._layout.setColumnStretch(2, 0)
+        cb = QComboBox()
+        cb.insertItems(0, ["Parametric", "Boolean"])
+        self._layout.setColumnMinimumWidth(2, cb.minimumSizeHint().width())
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._items = 0
+
+        vline = QFrame()
+        vline.setFrameShape(QFrame.Shape.VLine)
+        vline.setFixedWidth(3)
+        vline.setLineWidth(1)
+        vline.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        self._layout.addWidget(vline, 0, 1, -1, 1)
+
+        hline = QFrame()
+        hline.setFrameShape(QFrame.Shape.HLine)
+        hline.setFixedHeight(3)
+        hline.setLineWidth(1)
+        hline.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._layout.addWidget(hline, 1, 0, 1, -1)
+
+        vlabel = QLabel("Variable")
+        vlabel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._layout.addWidget(vlabel, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+        tlabel = QLabel("Type")
+        tlabel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._layout.addWidget(tlabel, 0, 2, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+
+        self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
+
+        for name in variable_types.keys():
+            self.add_item(name)
+
+        self.setWidget(self._widget)
+        self.setWidgetResizable(True)
+    
+    def minimumSizeHint(self) -> QSize:
+        if self._items == 0:
+            return QSize(0, 0)
         else:
-            return Fraction(int(s))
-    except ValueError:
-        return new_var(string, is_bool=True)
+            return super().minimumSizeHint()
+        
+    def sizeHint(self) -> QSize:
+        if self._items == 0:
+            return QSize(0, 0)
+        else:
+            return super().sizeHint()
+
+    def add_item(self, name: str) -> None:
+        combobox = QComboBox()
+        combobox.insertItems(0, ["Parametric", "Boolean"])
+        if self._variable_types[name]:
+            combobox.setCurrentIndex(1)
+        else:
+            combobox.setCurrentIndex(0)
+        combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
+        item = self._layout.itemAtPosition(2 + self._items, 2)
+        self._layout.removeItem(item)
+        self._layout.addWidget(QLabel(f"<pre>{name}</pre>"), 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+        self._layout.addWidget(combobox, 2 + self._items, 2, Qt.AlignmentFlag.AlignCenter)
+        self._layout.setRowStretch(2 + self._items, 0)
+        self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 3 + self._items, 2)
+        self._layout.setRowStretch(3 + self._items, 1)
+        self._layout.update()
+        self._items += 1
+        self._widget.updateGeometry()
+
+        if self._items == 1:
+            self.updateGeometry()
+
+    def _text_changed(self, name: str, text: str) -> None:
+        if text == "Parametric":
+            self._variable_types[name] = False
+        elif text == "Boolean":
+            self._variable_types[name] = True
