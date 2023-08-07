@@ -5,9 +5,23 @@ class Var:
     name: str
     is_bool: bool
 
-    def __init__(self, name, is_bool=True):
+    def __init__(self, name, data: bool | dict[str, bool]):
         self.name = name
-        self.is_bool = is_bool
+        if isinstance(data, dict):
+            self._types_dict = data
+            self._frozen = False
+            self._is_bool = False
+        else:
+            self._types_dict = None
+            self._frozen = True
+            self._is_bool = data
+
+    @property
+    def is_bool(self) -> bool:
+        if self._frozen:
+            return self._is_bool
+        else:
+            return self._types_dict[self.name]
 
     def __repr__(self):
         return self.name
@@ -18,10 +32,28 @@ class Var:
         return int(self.is_bool) < int(other.is_bool)
 
     def __hash__(self):
-        return hash((self.name, self.is_bool))
+        # Variables with the same name map to the same type
+        # within the same graph, so no need to include is_bool
+        # in the hash.
+        return hash(self.name)
 
     def __eq__(self, other) -> bool:
         return self.__hash__() == other.__hash__()
+
+    def freeze(self) -> None:
+        if not self._frozen:
+            self._is_bool = self._types_dict[self.name]
+            self._frozen = True
+            self._types_dict = None
+
+    def __copy__(self):
+        if self._frozen:
+            return Var(self.name, self.is_bool)
+        else:
+            return Var(self.name, self._types_dict)
+
+    def __deepcopy__(self, _memo):
+        return self.__copy__()
 
 class Term:
     vars: list[tuple[Var, int]]
@@ -29,13 +61,20 @@ class Term:
     def __init__(self, vars):
         self.vars = vars
 
+    def freeze(self) -> None:
+        for var, _ in self.vars:
+            var.freeze()
+
+    def free_vars(self) -> set[Var]:
+        return set(var for var, _ in self.vars)
+
     def __repr__(self) -> str:
         vs = []
         for v, c in self.vars:
             if c == 1:
-                vs.append(f'{v.name}')
+                vs.append(f'{v}')
             else:
-                vs.append(f'{v.name}^{c}')
+                vs.append(f'{v}^{c}')
         return '*'.join(vs)
 
     def __mul__(self, other):
@@ -60,6 +99,16 @@ class Poly:
 
     def __init__(self, terms):
         self.terms = terms
+
+    def freeze(self) -> None:
+        for _, term in self.terms:
+            term.freeze()
+
+    def free_vars(self) -> set[Var]:
+        output = set()
+        for _, term in self.terms:
+            output.update(term.free_vars())
+        return output
 
     def __add__(self, other):
         if isinstance(other, (int, float, Fraction)):
@@ -118,8 +167,8 @@ class Poly:
                 return False
         return True
 
-def new_var(name, is_bool):
-    return Poly([(1, Term([(Var(name, is_bool), 1)]))])
+def new_var(name, types_dict):
+    return Poly([(1, Term([(Var(name, types_dict), 1)]))])
 
 def new_const(coeff):
     return Poly([(coeff, Term([]))])
