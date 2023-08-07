@@ -28,4 +28,4 @@ jobs:
           pip install nuitka==1.5.4
       - name: Deploy
         run: |
-          pyside6-deploy ${{ env.SRC_DIR }}/__main__.py
+          pyside6-deploy --name zxlive --force ${{ env.SRC_DIR }}/__main__.py
