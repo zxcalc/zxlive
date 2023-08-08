@@ -229,7 +229,7 @@ class MainWindow(QMainWindow):
             self.close()
         if not self.active_panel.undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*","")
-            answer = QMessageBox.question(self, "Save Changes", 
+            answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if answer == QMessageBox.StandardButton.Cancel: return False

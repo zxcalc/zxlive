@@ -1,15 +1,17 @@
 import copy
 from dataclasses import dataclass, field, replace
-from typing import Callable, Literal, List, Optional, Final, TYPE_CHECKING
+from typing import Callable, Literal, List, Optional, TYPE_CHECKING
 
-from PySide6.QtWidgets import QPushButton, QButtonGroup
-
+import networkx as nx
+from networkx.algorithms import isomorphism
 import pyzx
 from pyzx.utils import VertexType, EdgeType
 
-from .commands import AddRewriteStep
-from .common import VT,ET, GraphT, Graph
+from PySide6.QtWidgets import QPushButton, QButtonGroup
+
 from . import animations as anims
+from .commands import AddRewriteStep
+from .common import ET, Graph, GraphT, VT
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -26,15 +28,15 @@ MATCHES_EDGES: MatchType = 2
 @dataclass
 class ProofAction(object):
     name: str
-    matcher: Callable[[GraphT,Callable],List]
-    rule: Callable[[GraphT,List],pyzx.rules.RewriteOutputType[ET,VT]]
+    matcher: Callable[[GraphT,Callable], List]
+    rule: Callable[[GraphT,List], pyzx.rules.RewriteOutputType[ET,VT]]
     match_type: MatchType
     tooltip: str
     button: Optional[QPushButton] = field(default=None, init=False)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ProofAction":
-          return cls(d['text'],d['matcher'],d['rule'],d['type'],d['tooltip'])
+          return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'])
 
     def do_rewrite(self,panel: "ProofPanel") -> None:
         verts, edges = panel.parse_selection()
@@ -113,21 +115,20 @@ class ProofActionGroup(object):
             return rewriter
         for action in self.actions:
             if action.button is not None: continue
-            btn = QPushButton(action.name,parent)
+            btn = QPushButton(action.name, parent)
             btn.setMaximumWidth(150)
             btn.setStatusTip(action.tooltip)
             btn.setEnabled(False)
-            btn.clicked.connect(create_rewrite(action,parent))
+            btn.clicked.connect(create_rewrite(action, parent))
             self.btn_group.addButton(btn)
             action.button = btn
 
     def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
         for action in self.actions:
-            action.update_active(g,verts,edges)
+            action.update_active(g, verts, edges)
 
 
-import networkx as nx
-from networkx.algorithms import isomorphism
+
 
 def to_networkx(graph: Graph):
     G = nx.Graph()
@@ -135,47 +136,38 @@ def to_networkx(graph: Graph):
                   "phase": graph.phase(v),
                   "boundary_index": graph.vdata(v, "boundary_index", default=-1),}
               for v in graph.vertices()}
-    G.add_nodes_from([(v, v_data[v]) for v in  graph.vertices()])
+    G.add_nodes_from([(v, v_data[v]) for v in graph.vertices()])
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
-def custom_matcher(g, if_vertex_in_selection, left):
-    verts = [v for v in g.vertices() if if_vertex_in_selection(v)]
-    bialg1_nx = to_networkx(left)
-    g_nx = to_networkx(g)
-    subgraph_nx = nx.Graph(g_nx.subgraph(verts))
+def create_subgraph(graph, verts):
+    graph_nx = to_networkx(graph)
+    subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
     for v in verts:
-        for vn in g.neighbors(v):
+        for vn in graph.neighbors(v):
             if vn not in verts:
                 subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
                 subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
-    GM = isomorphism.GraphMatcher(bialg1_nx, subgraph_nx,\
-        node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
-    if GM.is_isomorphic():
-        return verts
-    else:
-        return False
+    return subgraph_nx
 
-def custom_rule(g, verts, left, right):
-    g_nx = to_networkx(g)
+def custom_matcher(graph, if_vertex_in_selection, left):
+    verts = [v for v in graph.vertices() if if_vertex_in_selection(v)]
+    left_nx = to_networkx(left)
+    subgraph_nx = create_subgraph(graph, verts)
+    graph_matcher = isomorphism.GraphMatcher(left_nx, subgraph_nx,\
+        node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
+    if graph_matcher.is_isomorphic():
+        return verts
+    return False
+
+def custom_rule(graph, vertices, left, right):
     left_nx = to_networkx(left)
     right_nx = to_networkx(right)
-    subgraph_nx = nx.Graph(g_nx.subgraph(verts))
-    for v in verts:
-        for vn in g.neighbors(v):
-            if vn not in verts:
-                subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
-                subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
-    GM = isomorphism.GraphMatcher(left_nx, subgraph_nx,\
+    subgraph_nx = create_subgraph(graph, vertices)
+
+    graph_matcher = isomorphism.GraphMatcher(left_nx, subgraph_nx,\
         node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
-
-    matching = list(GM.match())[0]
-
-    for v in verts:
-        for vn in g.neighbors(v):
-            if vn not in verts:
-                subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
-                subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
+    matching = list(graph_matcher.match())[0]
 
     vertices_to_remove = []
     for v in matching:
@@ -192,7 +184,7 @@ def custom_rule(g, verts, left, right):
                     boundary_mapping[v] = matching[x]
                     break
         else:
-            new_vertices_mapping[v] = g.add_vertex(right_nx.nodes()[v]['type'])
+            new_vertices_mapping[v] = graph.add_vertex(right_nx.nodes()[v]['type'])
 
     # create etab to add edges
     etab = {}
