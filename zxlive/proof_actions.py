@@ -5,9 +5,10 @@ from typing import Callable, Literal, List, Optional, Final, TYPE_CHECKING
 from PySide6.QtWidgets import QPushButton, QButtonGroup
 
 import pyzx
+from pyzx.utils import VertexType, EdgeType
 
 from .commands import AddRewriteStep
-from .common import VT,ET, GraphT
+from .common import VT,ET, GraphT, Graph
 from . import animations as anims
 
 if TYPE_CHECKING:
@@ -125,6 +126,108 @@ class ProofActionGroup(object):
             action.update_active(g,verts,edges)
 
 
+import networkx as nx
+from networkx.algorithms import isomorphism
+
+def to_networkx(graph: Graph, b_order = None):
+    G = nx.Graph()
+    if b_order is None:
+        b_order = {v: -1 for v in graph.vertices()}
+    G.add_nodes_from([(v, {"type": graph.type(v), "b_order": b_order[v]}) for v in  graph.vertices()])
+    G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
+    return G
+
+def bialg_test_matcher(g, if_vertex_in_selection):
+    verts = [v for v in g.vertices() if if_vertex_in_selection(v)]
+    bialg1 = get_graph_from_file("bialg1.tikz")
+    bialg1_nx = to_networkx(bialg1)
+    g_nx = to_networkx(g)
+    subgraph_nx = nx.Graph(g_nx.subgraph(verts))
+    for v in verts:
+        for vn in g.neighbors(v):
+            if vn not in verts:
+                subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
+                subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
+    GM = isomorphism.GraphMatcher(bialg1_nx, subgraph_nx,\
+        node_match=isomorphism.categorical_node_match(['type'],[1]))
+    if GM.is_isomorphic():
+        return verts
+    else:
+        return False
+
+def bialg_test_rule(g, verts):
+    bialg1 = get_graph_from_file("bialg1.tikz")
+    b1_order = {v: -1 for v in bialg1.vertices()}
+    i = 0
+    for v in bialg1.vertices():
+        if bialg1.type(v) == VertexType.BOUNDARY:
+            b1_order[v] = i
+            i += 1
+    bialg2 = get_graph_from_file("bialg2.tikz")
+    b2_order = {v: -1 for v in bialg2.vertices()}
+    i = 0
+    for v in bialg2.vertices():
+        if bialg2.type(v) == VertexType.BOUNDARY:
+            b2_order[v] = i
+            i += 1
+    g_nx = to_networkx(g)
+    bialg1_nx = to_networkx(bialg1, b1_order)
+    bialg2_nx = to_networkx(bialg2, b2_order)
+    subgraph_nx = nx.Graph(g_nx.subgraph(verts))
+    for v in verts:
+        for vn in g.neighbors(v):
+            if vn not in verts:
+                subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
+                subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
+    GM = isomorphism.GraphMatcher(bialg1_nx, subgraph_nx,\
+        node_match=isomorphism.categorical_node_match(['type'],[1]))
+
+    matching = list(GM.match())[0]
+
+    for v in verts:
+        for vn in g.neighbors(v):
+            if vn not in verts:
+                subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
+                subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
+
+    vertices_to_remove = []
+    for v in matching:
+        if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
+            vertices_to_remove.append(matching[v])
+
+    boundary_mapping = {}
+    new_vertices_mapping = {}
+    for v in bialg2_nx.nodes():
+        if bialg2_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
+            for x, data in bialg1_nx.nodes(data=True):
+                if data['type'] == VertexType.BOUNDARY and data['b_order'] == bialg2_nx.nodes()[v]['b_order']:
+                    boundary_mapping[v] = matching[x]
+                    break
+        else:
+            new_vertices_mapping[v] = g.add_vertex(bialg2_nx.nodes()[v]['type'])
+
+    # create etab to add edges
+    etab = {}
+    for v1, v2, data in bialg2_nx.edges(data=True):
+        if bialg2_nx.nodes()[v1]['type'] == VertexType.BOUNDARY:
+            v1 = boundary_mapping[v1]
+        else:
+            v1 = new_vertices_mapping[v1]
+        if bialg2_nx.nodes()[v2]['type'] == VertexType.BOUNDARY:
+            v2 = boundary_mapping[v2]
+        else:
+            v2 = new_vertices_mapping[v2]
+        if (v1, v2) not in etab: etab[(v1, v2)] = [0,0]
+        etab[(v1, v2)][data['type']-1] += 1
+
+    return etab, vertices_to_remove, [], True
+
+def get_graph_from_file(file_path):
+    with open(file_path, 'r') as f:
+        data = f.read()
+    graph = Graph.from_tikz(data)
+    return graph
+
 spider_fuse = ProofAction.from_dict(operations['spider'])
 to_z = ProofAction.from_dict(operations['to_z'])
 to_x = ProofAction.from_dict(operations['to_x'])
@@ -132,6 +235,12 @@ rem_id = ProofAction.from_dict(operations['rem_id'])
 copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
+bialg_test = ProofAction.from_dict({"text": "bialg_test",
+                                    "tooltip": "bialg_test",
+                                    "matcher": bialg_test_matcher,
+                                    "rule": bialg_test_rule,
+                                    "type": MATCHES_VERTICES})
 
-actions_basic = ProofActionGroup(spider_fuse,to_z,to_x,rem_id,copy_action,pauli,bialgebra)
+
+actions_basic = ProofActionGroup(spider_fuse,to_z,to_x,rem_id,copy_action,pauli,bialgebra, bialg_test)
 
