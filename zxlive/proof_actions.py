@@ -129,11 +129,13 @@ class ProofActionGroup(object):
 import networkx as nx
 from networkx.algorithms import isomorphism
 
-def to_networkx(graph: Graph, b_order = None):
+def to_networkx(graph: Graph):
     G = nx.Graph()
-    if b_order is None:
-        b_order = {v: -1 for v in graph.vertices()}
-    G.add_nodes_from([(v, {"type": graph.type(v), "b_order": b_order[v]}) for v in  graph.vertices()])
+    v_data = {v: {"type": graph.type(v),
+                  "phase": graph.type(v),
+                  "boundary_order": graph.vdata(v, "boundary_order", default=-1),}
+              for v in graph.vertices()}
+    G.add_nodes_from([(v, v_data[v]) for v in  graph.vertices()])
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
@@ -157,22 +159,20 @@ def bialg_test_matcher(g, if_vertex_in_selection):
 
 def bialg_test_rule(g, verts):
     bialg1 = get_graph_from_file("bialg1.tikz")
-    b1_order = {v: -1 for v in bialg1.vertices()}
     i = 0
     for v in bialg1.vertices():
         if bialg1.type(v) == VertexType.BOUNDARY:
-            b1_order[v] = i
+            bialg1.set_vdata(v, "boundary_order", i)
             i += 1
     bialg2 = get_graph_from_file("bialg2.tikz")
-    b2_order = {v: -1 for v in bialg2.vertices()}
     i = 0
     for v in bialg2.vertices():
         if bialg2.type(v) == VertexType.BOUNDARY:
-            b2_order[v] = i
+            bialg2.set_vdata(v, "boundary_order", i)
             i += 1
     g_nx = to_networkx(g)
-    bialg1_nx = to_networkx(bialg1, b1_order)
-    bialg2_nx = to_networkx(bialg2, b2_order)
+    bialg1_nx = to_networkx(bialg1)
+    bialg2_nx = to_networkx(bialg2)
     subgraph_nx = nx.Graph(g_nx.subgraph(verts))
     for v in verts:
         for vn in g.neighbors(v):
@@ -200,7 +200,8 @@ def bialg_test_rule(g, verts):
     for v in bialg2_nx.nodes():
         if bialg2_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
             for x, data in bialg1_nx.nodes(data=True):
-                if data['type'] == VertexType.BOUNDARY and data['b_order'] == bialg2_nx.nodes()[v]['b_order']:
+                if data['type'] == VertexType.BOUNDARY and \
+                    data['boundary_order'] == bialg2_nx.nodes()[v]['boundary_order']:
                     boundary_mapping[v] = matching[x]
                     break
         else:
