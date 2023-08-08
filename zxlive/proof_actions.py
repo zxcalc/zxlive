@@ -141,7 +141,7 @@ def to_networkx(graph: Graph):
 
 def bialg_test_matcher(g, if_vertex_in_selection):
     verts = [v for v in g.vertices() if if_vertex_in_selection(v)]
-    bialg1 = get_graph_from_file("bialg1.tikz")
+    bialg1 = get_graph_from_file("bialg1.json")
     bialg1_nx = to_networkx(bialg1)
     g_nx = to_networkx(g)
     subgraph_nx = nx.Graph(g_nx.subgraph(verts))
@@ -158,18 +158,8 @@ def bialg_test_matcher(g, if_vertex_in_selection):
         return False
 
 def bialg_test_rule(g, verts):
-    bialg1 = get_graph_from_file("bialg1.tikz")
-    i = 0
-    for v in bialg1.vertices():
-        if bialg1.type(v) == VertexType.BOUNDARY:
-            bialg1.set_vdata(v, "boundary_index", i)
-            i += 1
-    bialg2 = get_graph_from_file("bialg2.tikz")
-    i = 0
-    for v in bialg2.vertices():
-        if bialg2.type(v) == VertexType.BOUNDARY:
-            bialg2.set_vdata(v, "boundary_index", i)
-            i += 1
+    bialg1 = get_graph_from_file("bialg1.json")
+    bialg2 = get_graph_from_file("bialg2.json")
     g_nx = to_networkx(g)
     bialg1_nx = to_networkx(bialg1)
     bialg2_nx = to_networkx(bialg2)
@@ -226,7 +216,7 @@ def bialg_test_rule(g, verts):
 def get_graph_from_file(file_path):
     with open(file_path, 'r') as f:
         data = f.read()
-    graph = Graph.from_tikz(data)
+    graph = Graph.from_json(data)
     return graph
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
