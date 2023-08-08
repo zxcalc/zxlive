@@ -132,7 +132,7 @@ from networkx.algorithms import isomorphism
 def to_networkx(graph: Graph):
     G = nx.Graph()
     v_data = {v: {"type": graph.type(v),
-                  "phase": graph.type(v),
+                  "phase": graph.phase(v),
                   "boundary_index": graph.vdata(v, "boundary_index", default=-1),}
               for v in graph.vertices()}
     G.add_nodes_from([(v, v_data[v]) for v in  graph.vertices()])
@@ -151,7 +151,7 @@ def bialg_test_matcher(g, if_vertex_in_selection):
                 subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
                 subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
     GM = isomorphism.GraphMatcher(bialg1_nx, subgraph_nx,\
-        node_match=isomorphism.categorical_node_match(['type'],[1]))
+        node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
     if GM.is_isomorphic():
         return verts
     else:
@@ -170,7 +170,7 @@ def bialg_test_rule(g, verts):
                 subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
                 subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
     GM = isomorphism.GraphMatcher(bialg1_nx, subgraph_nx,\
-        node_match=isomorphism.categorical_node_match(['type'],[1]))
+        node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
 
     matching = list(GM.match())[0]
 
