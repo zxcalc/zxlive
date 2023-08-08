@@ -139,10 +139,9 @@ def to_networkx(graph: Graph):
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
-def bialg_test_matcher(g, if_vertex_in_selection):
+def custom_matcher(g, if_vertex_in_selection, left):
     verts = [v for v in g.vertices() if if_vertex_in_selection(v)]
-    bialg1 = get_graph_from_file("bialg1.json")
-    bialg1_nx = to_networkx(bialg1)
+    bialg1_nx = to_networkx(left)
     g_nx = to_networkx(g)
     subgraph_nx = nx.Graph(g_nx.subgraph(verts))
     for v in verts:
@@ -157,19 +156,17 @@ def bialg_test_matcher(g, if_vertex_in_selection):
     else:
         return False
 
-def bialg_test_rule(g, verts):
-    bialg1 = get_graph_from_file("bialg1.json")
-    bialg2 = get_graph_from_file("bialg2.json")
+def custom_rule(g, verts, left, right):
     g_nx = to_networkx(g)
-    bialg1_nx = to_networkx(bialg1)
-    bialg2_nx = to_networkx(bialg2)
+    left_nx = to_networkx(left)
+    right_nx = to_networkx(right)
     subgraph_nx = nx.Graph(g_nx.subgraph(verts))
     for v in verts:
         for vn in g.neighbors(v):
             if vn not in verts:
                 subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
                 subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
-    GM = isomorphism.GraphMatcher(bialg1_nx, subgraph_nx,\
+    GM = isomorphism.GraphMatcher(left_nx, subgraph_nx,\
         node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
 
     matching = list(GM.match())[0]
@@ -187,24 +184,24 @@ def bialg_test_rule(g, verts):
 
     boundary_mapping = {}
     new_vertices_mapping = {}
-    for v in bialg2_nx.nodes():
-        if bialg2_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
-            for x, data in bialg1_nx.nodes(data=True):
+    for v in right_nx.nodes():
+        if right_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
+            for x, data in left_nx.nodes(data=True):
                 if data['type'] == VertexType.BOUNDARY and \
-                    data['boundary_index'] == bialg2_nx.nodes()[v]['boundary_index']:
+                    data['boundary_index'] == right_nx.nodes()[v]['boundary_index']:
                     boundary_mapping[v] = matching[x]
                     break
         else:
-            new_vertices_mapping[v] = g.add_vertex(bialg2_nx.nodes()[v]['type'])
+            new_vertices_mapping[v] = g.add_vertex(right_nx.nodes()[v]['type'])
 
     # create etab to add edges
     etab = {}
-    for v1, v2, data in bialg2_nx.edges(data=True):
-        if bialg2_nx.nodes()[v1]['type'] == VertexType.BOUNDARY:
+    for v1, v2, data in right_nx.edges(data=True):
+        if right_nx.nodes()[v1]['type'] == VertexType.BOUNDARY:
             v1 = boundary_mapping[v1]
         else:
             v1 = new_vertices_mapping[v1]
-        if bialg2_nx.nodes()[v2]['type'] == VertexType.BOUNDARY:
+        if right_nx.nodes()[v2]['type'] == VertexType.BOUNDARY:
             v2 = boundary_mapping[v2]
         else:
             v2 = new_vertices_mapping[v2]
@@ -219,6 +216,14 @@ def get_graph_from_file(file_path):
     graph = Graph.from_json(data)
     return graph
 
+
+def create_custom_matcher(left):
+    return lambda g, selection: custom_matcher(g, selection, left)
+
+def create_custom_rule(left, right):
+    return lambda g, verts: custom_rule(g, verts, left, right)
+
+
 spider_fuse = ProofAction.from_dict(operations['spider'])
 to_z = ProofAction.from_dict(operations['to_z'])
 to_x = ProofAction.from_dict(operations['to_x'])
@@ -226,10 +231,12 @@ rem_id = ProofAction.from_dict(operations['rem_id'])
 copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
+left = get_graph_from_file("bialg1.json")
+right = get_graph_from_file("bialg2.json")
 bialg_test = ProofAction.from_dict({"text": "bialg_test",
                                     "tooltip": "bialg_test",
-                                    "matcher": bialg_test_matcher,
-                                    "rule": bialg_test_rule,
+                                    "matcher": create_custom_matcher(left),
+                                    "rule": create_custom_rule(left, right),
                                     "type": MATCHES_VERTICES})
 
 
