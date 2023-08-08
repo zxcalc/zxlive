@@ -223,14 +223,8 @@ rem_id = ProofAction.from_dict(operations['rem_id'])
 copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
-left = get_graph_from_file("bialg1.json")
-right = get_graph_from_file("bialg2.json")
-bialg_test = ProofAction.from_dict({"text": "bialg_test",
-                                    "tooltip": "bialg_test",
-                                    "matcher": create_custom_matcher(left),
-                                    "rule": create_custom_rule(left, right),
-                                    "type": MATCHES_VERTICES})
 
+rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli,bialgebra]
 
-actions_basic = ProofActionGroup(spider_fuse,to_z,to_x,rem_id,copy_action,pauli,bialgebra, bialg_test)
+actions_basic = ProofActionGroup(*rewrites)
 
