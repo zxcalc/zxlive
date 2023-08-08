@@ -133,7 +133,7 @@ def to_networkx(graph: Graph):
     G = nx.Graph()
     v_data = {v: {"type": graph.type(v),
                   "phase": graph.type(v),
-                  "boundary_order": graph.vdata(v, "boundary_order", default=-1),}
+                  "boundary_index": graph.vdata(v, "boundary_index", default=-1),}
               for v in graph.vertices()}
     G.add_nodes_from([(v, v_data[v]) for v in  graph.vertices()])
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
@@ -162,13 +162,13 @@ def bialg_test_rule(g, verts):
     i = 0
     for v in bialg1.vertices():
         if bialg1.type(v) == VertexType.BOUNDARY:
-            bialg1.set_vdata(v, "boundary_order", i)
+            bialg1.set_vdata(v, "boundary_index", i)
             i += 1
     bialg2 = get_graph_from_file("bialg2.tikz")
     i = 0
     for v in bialg2.vertices():
         if bialg2.type(v) == VertexType.BOUNDARY:
-            bialg2.set_vdata(v, "boundary_order", i)
+            bialg2.set_vdata(v, "boundary_index", i)
             i += 1
     g_nx = to_networkx(g)
     bialg1_nx = to_networkx(bialg1)
@@ -201,7 +201,7 @@ def bialg_test_rule(g, verts):
         if bialg2_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
             for x, data in bialg1_nx.nodes(data=True):
                 if data['type'] == VertexType.BOUNDARY and \
-                    data['boundary_order'] == bialg2_nx.nodes()[v]['boundary_order']:
+                    data['boundary_index'] == bialg2_nx.nodes()[v]['boundary_index']:
                     boundary_mapping[v] = matching[x]
                     break
         else:
