@@ -64,7 +64,7 @@ class VItem(QGraphicsPathItem):
     phase_item: PhaseItem
     adj_items: Set[EItem]  # Connected edges
     graph_scene: GraphScene
-    
+
     halftone = "1000100010001000" #QPixmap("images/halftone.png")
 
     # Set of animations that are currently running on this vertex
@@ -108,7 +108,7 @@ class VItem(QGraphicsPathItem):
         path = QPainterPath()
         if self.g.type(self.v) == VertexType.H_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        else: 
+        else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         self.setPath(path)
         self.refresh()
@@ -180,7 +180,7 @@ class VItem(QGraphicsPathItem):
         # we intercept the selected option here.
         option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
-        
+
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Snap items to grid on movement by intercepting the position-change
         # event and returning a new position
@@ -360,5 +360,7 @@ class PhaseItem(QGraphicsTextItem):
         phase = self.v_item.g.phase(self.v_item.v)
         # phase = self.v_item.v
         self.setPlainText(phase_to_s(phase, self.v_item.g.type(self.v_item.v)))
+        if self.v_item.g.type(self.v_item.v) == VertexType.BOUNDARY:
+            self.setPlainText(str(self.v_item.g.vdata(self.v_item.v, "boundary_index", "")))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)

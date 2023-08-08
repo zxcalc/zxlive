@@ -197,7 +197,7 @@ def custom_rule(graph, vertices, left, right):
             v2 = boundary_mapping[v2]
         else:
             v2 = new_vertices_mapping[v2]
-        if (v1, v2) not in etab: etab[(v1, v2)] = [0,0]
+        if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
         etab[(v1, v2)][data['type']-1] += 1
 
     return etab, vertices_to_remove, [], True
@@ -224,7 +224,7 @@ copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
 
-rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli,bialgebra]
+rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
 
 actions_basic = ProofActionGroup(*rewrites)
 
