@@ -5,9 +5,10 @@ from typing import Optional, Tuple
 from dataclasses import dataclass
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
-from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox, QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, QDialogButtonBox
 from pyzx import Circuit, extract_circuit
 from pyzx.graph.base import BaseGraph
+from zxlive import proof_actions
 
 from zxlive.proof import ProofModel
 
@@ -186,7 +187,6 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,
 
     return file_path, selected_format
 
-
 def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
@@ -196,3 +196,44 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tu
     if not write_to_file(file_path, data):
         return None
     return file_path, selected_format
+
+def create_new_rewrite(parent) -> None:
+    dialog = QDialog()
+    parent.rewrite_form = QFormLayout(dialog)
+    name = QLineEdit()
+    parent.rewrite_form.addRow("Name", name)
+    description = QTextEdit()
+    parent.rewrite_form.addRow("Description", description)
+    left_button = QPushButton("Left-hand side of the rule")
+    right_button = QPushButton("Right-hand side of the rule")
+    parent.left_graph = None
+    parent.right_graph = None
+    def get_file(self, button, side) -> None:
+        out = import_diagram_dialog(self)
+        if out is not None:
+            button.setText(out.file_path)
+            if side == "left":
+                self.left_graph = out.g
+            else:
+                self.right_graph = out.g
+    left_button.clicked.connect(lambda: get_file(parent, left_button, "left"))
+    right_button.clicked.connect(lambda: get_file(parent, right_button, "right"))
+    parent.rewrite_form.addRow(left_button)
+    parent.rewrite_form.addRow(right_button)
+    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    parent.rewrite_form.addRow(button_box)
+    def add_rewrite() -> None:
+        if parent.left_graph is None or parent.right_graph is None:
+            return
+        rewrite = proof_actions.ProofAction.from_dict({
+            "text":name.text(),
+            "tooltip":description.toPlainText(),
+            "matcher": proof_actions.create_custom_matcher(parent.left_graph),
+            "rule": proof_actions.create_custom_rule(parent.left_graph, parent.right_graph),
+            "type": proof_actions.MATCHES_VERTICES,
+        })
+        proof_actions.rewrites.append(rewrite)
+        dialog.accept()
+    button_box.accepted.connect(add_rewrite)
+    button_box.rejected.connect(dialog.reject)
+    if not dialog.exec(): return

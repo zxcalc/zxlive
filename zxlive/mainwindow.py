@@ -19,19 +19,16 @@ from typing import Callable, Optional, TypedDict
 import copy
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
-from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
-from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, QDialogButtonBox
+from PySide6.QtGui import QAction, QKeySequence, QCloseEvent
+from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QTabWidget
 from pyzx.graph.base import BaseGraph
 
-from zxlive import proof_actions
-
 from .commands import AddRewriteStep
-
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import ImportGraphOutput, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph, simplify, Circuit
@@ -145,9 +142,9 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
 
-        create_new_rewrite = self._new_action("Create new rewrite", self.create_new_rewrite, None, "Create a new rewrite")
+        new_rewrite = self._new_action("Create new rewrite", lambda: create_new_rewrite(self), None, "Create a new rewrite")
         rewrite_menu = menu.addMenu("&Rewrite")
-        rewrite_menu.addAction(create_new_rewrite)
+        rewrite_menu.addAction(new_rewrite)
 
         simplify_actions = []
         for simp in simplifications.values():
@@ -357,46 +354,6 @@ class MainWindow(QMainWindow):
             self.active_panel.undo_stack.push(cmd)
         return reduce
 
-    def create_new_rewrite(self) -> None:
-        dialog = QDialog()
-        self.rewrite_form = QFormLayout(dialog)
-        name = QLineEdit()
-        self.rewrite_form.addRow("Name", name)
-        description = QTextEdit()
-        self.rewrite_form.addRow("Description", description)
-        left_button = QPushButton("Left hand side of the rule")
-        right_button = QPushButton("Right hand side of the rule")
-        self.left_graph = None
-        self.right_graph = None
-        def get_file(self, button, side) -> None:
-            out = import_diagram_dialog(self)
-            if out is not None:
-                button.setText(out.file_path)
-                if side == "left":
-                    self.left_graph = out.g
-                else:
-                    self.right_graph = out.g
-        left_button.clicked.connect(lambda: get_file(self, left_button, "left"))
-        right_button.clicked.connect(lambda: get_file(self, right_button, "right"))
-        self.rewrite_form.addRow(left_button)
-        self.rewrite_form.addRow(right_button)
-        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        self.rewrite_form.addRow(button_box)
-        def add_rewrite() -> None:
-            if self.left_graph is None or self.right_graph is None:
-                return
-            rewrite = proof_actions.ProofAction.from_dict({
-                "text":name.text(),
-                "tooltip":description.toPlainText(),
-                "matcher": proof_actions.create_custom_matcher(self.left_graph),
-                "rule": proof_actions.create_custom_rule(self.left_graph, self.right_graph),
-                "type": proof_actions.MATCHES_VERTICES,
-            })
-            proof_actions.rewrites.append(rewrite)
-            dialog.accept()
-        button_box.accepted.connect(add_rewrite)
-        button_box.rejected.connect(dialog.reject)
-        if not dialog.exec(): return
 
 class SimpEntry(TypedDict):
     text: str
