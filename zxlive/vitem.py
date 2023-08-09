@@ -361,6 +361,6 @@ class PhaseItem(QGraphicsTextItem):
         # phase = self.v_item.v
         self.setPlainText(phase_to_s(phase, self.v_item.g.type(self.v_item.v)))
         if self.v_item.g.type(self.v_item.v) == VertexType.BOUNDARY:
-            self.setPlainText(str(self.v_item.g.vdata(self.v_item.v, "boundary_index", "")))
+            self.setPlainText(str(int(self.v_item.g.qubit(self.v_item.v))))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
