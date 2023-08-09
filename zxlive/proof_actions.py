@@ -174,29 +174,22 @@ def custom_rule(graph, vertices, left, right):
         if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
             vertices_to_remove.append(matching[v])
 
-    boundary_mapping = {}
-    new_vertices_mapping = {}
+    vertex_map = {}
     for v in right_nx.nodes():
         if right_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
             for x, data in left_nx.nodes(data=True):
                 if data['type'] == VertexType.BOUNDARY and \
                     data['boundary_index'] == right_nx.nodes()[v]['boundary_index']:
-                    boundary_mapping[v] = matching[x]
+                    vertex_map[v] = matching[x]
                     break
         else:
-            new_vertices_mapping[v] = graph.add_vertex(right_nx.nodes()[v]['type'])
+            vertex_map[v] = graph.add_vertex(right_nx.nodes()[v]['type'])
 
     # create etab to add edges
     etab = {}
     for v1, v2, data in right_nx.edges(data=True):
-        if right_nx.nodes()[v1]['type'] == VertexType.BOUNDARY:
-            v1 = boundary_mapping[v1]
-        else:
-            v1 = new_vertices_mapping[v1]
-        if right_nx.nodes()[v2]['type'] == VertexType.BOUNDARY:
-            v2 = boundary_mapping[v2]
-        else:
-            v2 = new_vertices_mapping[v2]
+        v1 = vertex_map[v1]
+        v2 = vertex_map[v2]
         if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
         etab[(v1, v2)][data['type']-1] += 1
 
