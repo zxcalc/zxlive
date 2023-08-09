@@ -141,16 +141,21 @@ def to_networkx(graph: Graph) -> nx.Graph:
 def create_subgraph(graph: Graph, verts: List[VT]) -> nx.Graph:
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
+    boundary_mapping = {}
+    i = 0
     for v in verts:
         for vn in graph.neighbors(v):
             if vn not in verts:
-                subgraph_nx.add_node(vn, type=VertexType.BOUNDARY)
-                subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
-    return subgraph_nx
+                boundary_node = 'b' + str(i)
+                boundary_mapping[boundary_node] = vn
+                subgraph_nx.add_node(boundary_node, type=VertexType.BOUNDARY)
+                subgraph_nx.add_edge(v, boundary_node, type=EdgeType.SIMPLE)
+                i += 1
+    return subgraph_nx, boundary_mapping
 
 def custom_matcher(graph: Graph, in_selection: Callable[[VT], bool], lhs_graph: nx.Graph) -> List[VT]:
     verts = [v for v in graph.vertices() if in_selection(v)]
-    subgraph_nx = create_subgraph(graph, verts)
+    subgraph_nx, _ = create_subgraph(graph, verts)
     graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
         node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
     if graph_matcher.is_isomorphic():
@@ -158,7 +163,7 @@ def custom_matcher(graph: Graph, in_selection: Callable[[VT], bool], lhs_graph: 
     return []
 
 def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph: nx.Graph) -> pyzx.rules.RewriteOutputType[ET,VT]:
-    subgraph_nx = create_subgraph(graph, vertices)
+    subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
     graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
         node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
     matching = list(graph_matcher.match())[0]
@@ -174,7 +179,7 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
             for x, data in lhs_graph.nodes(data=True):
                 if data['type'] == VertexType.BOUNDARY and \
                     data['boundary_index'] == rhs_graph.nodes()[v]['boundary_index']:
-                    vertex_map[v] = matching[x]
+                    vertex_map[v] = boundary_mapping[matching[x]]
                     break
         else:
             vertex_map[v] = graph.add_vertex(rhs_graph.nodes()[v]['type'])
