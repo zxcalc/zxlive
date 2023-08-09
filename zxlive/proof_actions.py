@@ -131,9 +131,12 @@ class ProofActionGroup(object):
 def to_networkx(graph: Graph) -> nx.Graph:
     G = nx.Graph()
     v_data = {v: {"type": graph.type(v),
-                  "phase": graph.phase(v),
-                  "boundary_index": graph.vdata(v, "boundary_index", default=-1),}
+                  "phase": graph.phase(v),}
               for v in graph.vertices()}
+    for i, input_vertex in enumerate(graph.inputs()):
+        v_data[input_vertex]["boundary_index"] = f'input_{i}'
+    for i, output_vertex in enumerate(graph.outputs()):
+        v_data[output_vertex]["boundary_index"] = f'output_{i}'
     G.add_nodes_from([(v, v_data[v]) for v in graph.vertices()])
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
@@ -195,9 +198,12 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
     return etab, vertices_to_remove, [], True
 
 def create_custom_matcher(lhs_graph: Graph) -> Callable[[Graph, Callable[[VT], bool]], List[VT]]:
+    lhs_graph.auto_detect_io()
     return lambda g, selection: custom_matcher(g, selection, to_networkx(lhs_graph))
 
 def create_custom_rule(lhs_graph: Graph,rhs_graph: Graph) -> Callable[[Graph, List[VT]], pyzx.rules.RewriteOutputType[ET,VT]]:
+    lhs_graph.auto_detect_io()
+    rhs_graph.auto_detect_io()
     return lambda g, verts: custom_rule(g, verts, to_networkx(lhs_graph), to_networkx(rhs_graph))
 
 
