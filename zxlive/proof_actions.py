@@ -38,7 +38,7 @@ class ProofAction(object):
     def from_dict(cls, d: dict) -> "ProofAction":
           return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'])
 
-    def do_rewrite(self,panel: "ProofPanel") -> None:
+    def do_rewrite(self, panel: "ProofPanel") -> None:
         verts, edges = panel.parse_selection()
         g = copy.deepcopy(panel.graph_scene.g)
 
