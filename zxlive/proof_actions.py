@@ -3,7 +3,7 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Literal, List, Optional, TYPE_CHECKING
 
 import networkx as nx
-from networkx.algorithms import isomorphism
+from networkx.algorithms.isomorphism import GraphMatcher, categorical_node_match
 import pyzx
 from pyzx.utils import VertexType, EdgeType
 
@@ -28,8 +28,8 @@ MATCHES_EDGES: MatchType = 2
 @dataclass
 class ProofAction(object):
     name: str
-    matcher: Callable[[GraphT,Callable], List]
-    rule: Callable[[GraphT,List], pyzx.rules.RewriteOutputType[ET,VT]]
+    matcher: Callable[[GraphT, Callable], List]
+    rule: Callable[[GraphT, List], pyzx.rules.RewriteOutputType[ET,VT]]
     match_type: MatchType
     tooltip: str
     button: Optional[QPushButton] = field(default=None, init=False)
@@ -128,9 +128,7 @@ class ProofActionGroup(object):
             action.update_active(g, verts, edges)
 
 
-
-
-def to_networkx(graph: Graph):
+def to_networkx(graph: Graph) -> nx.Graph:
     G = nx.Graph()
     v_data = {v: {"type": graph.type(v),
                   "phase": graph.phase(v),
@@ -140,7 +138,7 @@ def to_networkx(graph: Graph):
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
-def create_subgraph(graph, verts):
+def create_subgraph(graph: Graph, verts: List[VT]) -> nx.Graph:
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
     for v in verts:
@@ -150,23 +148,19 @@ def create_subgraph(graph, verts):
                 subgraph_nx.add_edge(v, vn, type=EdgeType.SIMPLE)
     return subgraph_nx
 
-def custom_matcher(graph, if_vertex_in_selection, left):
-    verts = [v for v in graph.vertices() if if_vertex_in_selection(v)]
-    left_nx = to_networkx(left)
+def custom_matcher(graph: Graph, in_selection: Callable[[VT], bool], lhs_graph: nx.Graph) -> List[VT]:
+    verts = [v for v in graph.vertices() if in_selection(v)]
     subgraph_nx = create_subgraph(graph, verts)
-    graph_matcher = isomorphism.GraphMatcher(left_nx, subgraph_nx,\
-        node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
+    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
+        node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
     if graph_matcher.is_isomorphic():
         return verts
-    return False
+    return []
 
-def custom_rule(graph, vertices, left, right):
-    left_nx = to_networkx(left)
-    right_nx = to_networkx(right)
+def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph: nx.Graph) -> pyzx.rules.RewriteOutputType[ET,VT]:
     subgraph_nx = create_subgraph(graph, vertices)
-
-    graph_matcher = isomorphism.GraphMatcher(left_nx, subgraph_nx,\
-        node_match=isomorphism.categorical_node_match(['type', 'phase'],[1, 0]))
+    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
+        node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
     matching = list(graph_matcher.match())[0]
 
     vertices_to_remove = []
@@ -175,19 +169,19 @@ def custom_rule(graph, vertices, left, right):
             vertices_to_remove.append(matching[v])
 
     vertex_map = {}
-    for v in right_nx.nodes():
-        if right_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
-            for x, data in left_nx.nodes(data=True):
+    for v in rhs_graph.nodes():
+        if rhs_graph.nodes()[v]['type'] == VertexType.BOUNDARY:
+            for x, data in lhs_graph.nodes(data=True):
                 if data['type'] == VertexType.BOUNDARY and \
-                    data['boundary_index'] == right_nx.nodes()[v]['boundary_index']:
+                    data['boundary_index'] == rhs_graph.nodes()[v]['boundary_index']:
                     vertex_map[v] = matching[x]
                     break
         else:
-            vertex_map[v] = graph.add_vertex(right_nx.nodes()[v]['type'])
+            vertex_map[v] = graph.add_vertex(rhs_graph.nodes()[v]['type'])
 
     # create etab to add edges
     etab = {}
-    for v1, v2, data in right_nx.edges(data=True):
+    for v1, v2, data in rhs_graph.edges(data=True):
         v1 = vertex_map[v1]
         v2 = vertex_map[v2]
         if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
@@ -195,18 +189,11 @@ def custom_rule(graph, vertices, left, right):
 
     return etab, vertices_to_remove, [], True
 
-def get_graph_from_file(file_path):
-    with open(file_path, 'r') as f:
-        data = f.read()
-    graph = Graph.from_json(data)
-    return graph
+def create_custom_matcher(lhs_graph: Graph) -> Callable[[Graph, Callable[[VT], bool]], List[VT]]:
+    return lambda g, selection: custom_matcher(g, selection, to_networkx(lhs_graph))
 
-
-def create_custom_matcher(left):
-    return lambda g, selection: custom_matcher(g, selection, left)
-
-def create_custom_rule(left, right):
-    return lambda g, verts: custom_rule(g, verts, left, right)
+def create_custom_rule(lhs_graph: Graph,rhs_graph: Graph) -> Callable[[Graph, List[VT]], pyzx.rules.RewriteOutputType[ET,VT]]:
+    return lambda g, verts: custom_rule(g, verts, to_networkx(lhs_graph), to_networkx(rhs_graph))
 
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
@@ -218,6 +205,3 @@ pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
 
 rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
-
-actions_basic = ProofActionGroup(*rewrites)
-
