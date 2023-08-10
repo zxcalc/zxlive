@@ -6,3 +6,6 @@ build
 .venv
 .vscode
 .idea
+*.zxg
+*.json
+*.zxp
