@@ -142,6 +142,25 @@ class AddNode(BaseCommand):
         self._added_vert = self.g.add_vertex(self.vty, self.y, self.x)
         self.update_graph_view()
 
+@dataclass
+class AddNonFlexNode(BaseCommand):
+    """Adds a new non-flexsymmetric node at a given position."""
+    x: float
+    y: float
+
+    _added_input_vert: Optional[VT] = field(default=None, init=False)
+    _added_output_vert: Optional[VT] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._added_vert is not None
+        self.g.remove_vertex(self._added_vert)
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, self.y, self.x-0.3)
+        self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, self.y, self.x+0.3)
+        self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
+        self.update_graph_view()
 
 @dataclass
 class AddEdge(BaseCommand):
