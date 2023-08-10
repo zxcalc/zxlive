@@ -8,6 +8,8 @@ from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
 from pyzx import EdgeType, VertexType
 from sympy import sympify
 
+from zxlive.w_node import is_w_edge_type, is_w_vertex_type
+
 from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
 
@@ -179,6 +181,8 @@ class GraphEditPanel(BasePanel):
             except ValueError:
                 show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
             return
+        elif is_w_vertex_type(self.graph.type(v)):
+            return
 
         input_, ok = QInputDialog.getText(
             self, "Input Dialog", "Enter Desired Phase Value:"
@@ -206,13 +210,12 @@ class GraphEditPanel(BasePanel):
         selected_edges = list(self.graph_scene.selected_edges)
         rem_vertices = selection.copy()
         for v in selection:
-            if self.graph_scene.g.type(v) == VertexType.W_INPUT \
-                or self.graph_scene.g.type(v) == VertexType.W_OUTPUT:
+            if is_w_vertex_type(self.graph_scene.g.type(v)):
                 for n in self.graph_scene.g.neighbors(v):
-                    if self.graph_scene.g.edge_type((v, n)) == EdgeType.W_IO:
+                    if is_w_edge_type(self.graph_scene.g.edge_type((v, n))):
                         rem_vertices.append(n)
         for v1, v2 in selected_edges:
-            if self.graph_scene.g.edge_type((v1, v2)) == EdgeType.W_IO:
+            if is_w_edge_type(self.graph_scene.g.edge_type((v1, v2))):
                 rem_vertices.extend([v1, v2])
         if not rem_vertices and not selected_edges: return
         new_g = copy.deepcopy(self.graph_scene.g)

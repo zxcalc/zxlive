@@ -12,6 +12,8 @@ from pyzx import basicrules
 from pyzx.graph import GraphDiff
 from pyzx.utils import EdgeType, VertexType
 
+from zxlive.w_node import get_w_partner, is_w_edge_type, is_w_vertex_type
+
 from .common import VT, ET, GraphT
 from .graphview import GraphView
 from .proof import ProofModel, Rewrite
@@ -34,7 +36,7 @@ class BaseCommand(QUndoCommand):
         # hook it into `__post_init__`.
         super().__init__()
         self.g = copy.deepcopy(self.graph_view.graph_scene.g)
-        
+
     def update_graph_view(self, select_new: bool = False) -> None:
         """Notifies the graph view that graph needs to be redrawn.
 
@@ -145,7 +147,7 @@ class ChangeEdgeColor(BaseCommand):
     def redo(self) -> None:
         self._old_etys = [self.g.edge_type(e) for e in self.es]
         for e in self.es:
-            if self.g.edge_type(e) == EdgeType.W_IO:
+            if is_w_edge_type(self.g.edge_type(e)):
                 continue
             self.g.set_edge_type(e, self.ety)
         self.update_graph_view()
@@ -415,13 +417,3 @@ class MoveNodeInStep(MoveNode):
         model = self.step_view.model()
         assert isinstance(model, ProofModel)
         model.graphs[self.step_view.currentIndex().row()] = self.g
-
-def is_w_vertex_type(vertex_type) -> bool:
-    return vertex_type == VertexType.W_INPUT or vertex_type == VertexType.W_OUTPUT
-
-def get_w_partner(g: GraphT, v: VT) -> VT:
-    assert is_w_vertex_type(g.type(v))
-    for u in g.neighbors(v):
-        if g.edge_type((u, v)) == EdgeType.W_IO:
-            return u
-    assert False
