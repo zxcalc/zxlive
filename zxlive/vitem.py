@@ -135,6 +135,10 @@ class VItem(QGraphicsPathItem):
                 self.setBrush(QBrush(QColor(ZX_RED)))
             elif t == VertexType.H_BOX:
                 self.setBrush(QBrush(QColor(H_YELLOW)))
+            elif t == VertexType.W_INPUT:
+                self.setBrush(QBrush(QColor("white")))
+            elif t == VertexType.W_OUTPUT:
+                self.setBrush(QBrush(QColor("orange")))
             else:
                 self.setBrush(QBrush(QColor("#000000")))
             pen = QPen()

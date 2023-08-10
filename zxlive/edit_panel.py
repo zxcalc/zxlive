@@ -15,7 +15,7 @@ from .utils import get_data
 from .common import VT, GraphT, ToolType
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
-    AddEdge, AddNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
+    AddEdge, AddNode, AddNonFlexNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
@@ -31,7 +31,8 @@ VERTICES: dict[str, DrawPanelNodeType] = {
     "Z": {"text": "Z spider", "type": VertexType.Z, "icon": ("circle", ZX_GREEN)},
     "X": {"text": "X spider", "type": VertexType.X, "icon": ("circle", ZX_RED)},
     "H": {"text": "H box", "type": VertexType.H_BOX, "icon": ("square", H_YELLOW)},
-    "T": {"text": "boundary", "type": VertexType.BOUNDARY, "icon": ("circle", "black")},
+    "B": {"text": "boundary", "type": VertexType.BOUNDARY, "icon": ("circle", "black")},
+    "W": {"text": "W node", "type": VertexType.W_OUTPUT, "icon": ("circle", "orange")},
 }
 
 EDGES: dict[str, DrawPanelNodeType] = {
@@ -153,7 +154,10 @@ class GraphEditPanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def _add_vert(self, x: float, y: float) -> None:
-        cmd = AddNode(self.graph_view, x, y, self._curr_vty)
+        if self._curr_vty == VertexType.W_OUTPUT:
+            cmd = AddNonFlexNode(self.graph_view, x, y)
+        else:
+            cmd = AddNode(self.graph_view, x, y, self._curr_vty)
         self.undo_stack.push(cmd)
 
     def _add_edge(self, u: VT, v: VT) -> None:
