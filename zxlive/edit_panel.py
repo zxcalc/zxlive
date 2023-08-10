@@ -204,12 +204,22 @@ class GraphEditPanel(BasePanel):
     def delete_selection(self) -> None:
         selection = list(self.graph_scene.selected_vertices)
         selected_edges = list(self.graph_scene.selected_edges)
-        if not selection and not selected_edges: return
+        rem_vertices = selection.copy()
+        for v in selection:
+            if self.graph_scene.g.type(v) == VertexType.W_INPUT \
+                or self.graph_scene.g.type(v) == VertexType.W_OUTPUT:
+                for n in self.graph_scene.g.neighbors(v):
+                    if self.graph_scene.g.edge_type((v, n)) == EdgeType.W_IO:
+                        rem_vertices.append(n)
+        for v1, v2 in selected_edges:
+            if self.graph_scene.g.edge_type((v1, v2)) == EdgeType.W_IO:
+                rem_vertices.extend([v1, v2])
+        if not rem_vertices and not selected_edges: return
         new_g = copy.deepcopy(self.graph_scene.g)
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
-        new_g.remove_vertices(selection)
-        cmd = SetGraph(self.graph_view,new_g) if len(selection) > 128 \
+        new_g.remove_vertices(rem_vertices)
+        cmd = SetGraph(self.graph_view,new_g) if len(rem_vertices) > 128 \
             else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
@@ -217,7 +227,7 @@ class GraphEditPanel(BasePanel):
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
 
 def string_to_phase(string: str) -> Fraction:
-    if not string: 
+    if not string:
         return Fraction(0)
     try:
         s = string.lower().replace(' ', '')
