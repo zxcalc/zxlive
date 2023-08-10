@@ -223,7 +223,7 @@ def create_custom_matcher(lhs_graph: Graph) -> Callable[[Graph, Callable[[VT], b
     lhs_graph.auto_detect_io()
     return lambda g, selection: custom_matcher(g, selection, to_networkx(lhs_graph))
 
-def create_custom_rule(lhs_graph: Graph,rhs_graph: Graph) -> Callable[[Graph, List[VT]], pyzx.rules.RewriteOutputType[ET,VT]]:
+def create_custom_rule(lhs_graph: Graph, rhs_graph: Graph) -> Callable[[Graph, List[VT]], pyzx.rules.RewriteOutputType[ET,VT]]:
     lhs_graph.auto_detect_io()
     rhs_graph.auto_detect_io()
     return lambda g, verts: custom_rule(g, verts, to_networkx(lhs_graph), to_networkx(rhs_graph))
