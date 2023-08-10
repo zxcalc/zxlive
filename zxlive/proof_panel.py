@@ -79,7 +79,7 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
     def init_action_groups(self) -> None:
-        self.action_groups = [proof_actions.actions_basic.copy()]
+        self.action_groups = [proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()]
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
             group.init_buttons(self)
@@ -90,7 +90,7 @@ class ProofPanel(BasePanel):
 
             widget = QWidget()
             widget.setLayout(hlayout)
-            self.layout().insertWidget(1,widget)
+            self.layout().insertWidget(1, widget)
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)

@@ -1,14 +1,19 @@
 import copy
 from dataclasses import dataclass, field, replace
-from typing import Callable, Literal, List, Optional, Final, TYPE_CHECKING
+from typing import Callable, Literal, List, Optional, TYPE_CHECKING
+
+import networkx as nx
+from networkx.algorithms.isomorphism import GraphMatcher, categorical_node_match
+import numpy as np
+import pyzx
+from pyzx.utils import VertexType, EdgeType
+from shapely import Polygon
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
 
-import pyzx
-
-from .commands import AddRewriteStep
-from .common import VT,ET, GraphT
 from . import animations as anims
+from .commands import AddRewriteStep
+from .common import ET, Graph, GraphT, VT
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -25,17 +30,17 @@ MATCHES_EDGES: MatchType = 2
 @dataclass
 class ProofAction(object):
     name: str
-    matcher: Callable[[GraphT,Callable],List]
-    rule: Callable[[GraphT,List],pyzx.rules.RewriteOutputType[ET,VT]]
+    matcher: Callable[[GraphT, Callable], List]
+    rule: Callable[[GraphT, List], pyzx.rules.RewriteOutputType[ET,VT]]
     match_type: MatchType
     tooltip: str
     button: Optional[QPushButton] = field(default=None, init=False)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ProofAction":
-          return cls(d['text'],d['matcher'],d['rule'],d['type'],d['tooltip'])
+          return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'])
 
-    def do_rewrite(self,panel: "ProofPanel") -> None:
+    def do_rewrite(self, panel: "ProofPanel") -> None:
         verts, edges = panel.parse_selection()
         g = copy.deepcopy(panel.graph_scene.g)
 
@@ -112,17 +117,116 @@ class ProofActionGroup(object):
             return rewriter
         for action in self.actions:
             if action.button is not None: continue
-            btn = QPushButton(action.name,parent)
+            btn = QPushButton(action.name, parent)
             btn.setMaximumWidth(150)
             btn.setStatusTip(action.tooltip)
             btn.setEnabled(False)
-            btn.clicked.connect(create_rewrite(action,parent))
+            btn.clicked.connect(create_rewrite(action, parent))
             self.btn_group.addButton(btn)
             action.button = btn
 
     def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
         for action in self.actions:
-            action.update_active(g,verts,edges)
+            action.update_active(g, verts, edges)
+
+
+def to_networkx(graph: Graph) -> nx.Graph:
+    G = nx.Graph()
+    v_data = {v: {"type": graph.type(v),
+                  "phase": graph.phase(v),}
+              for v in graph.vertices()}
+    for i, input_vertex in enumerate(graph.inputs()):
+        v_data[input_vertex]["boundary_index"] = f'input_{i}'
+    for i, output_vertex in enumerate(graph.outputs()):
+        v_data[output_vertex]["boundary_index"] = f'output_{i}'
+    G.add_nodes_from([(v, v_data[v]) for v in graph.vertices()])
+    G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
+    return G
+
+def create_subgraph(graph: Graph, verts: List[VT]) -> nx.Graph:
+    graph_nx = to_networkx(graph)
+    subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
+    boundary_mapping = {}
+    i = 0
+    for v in verts:
+        for vn in graph.neighbors(v):
+            if vn not in verts:
+                boundary_node = 'b' + str(i)
+                boundary_mapping[boundary_node] = vn
+                subgraph_nx.add_node(boundary_node, type=VertexType.BOUNDARY)
+                subgraph_nx.add_edge(v, boundary_node, type=EdgeType.SIMPLE)
+                i += 1
+    return subgraph_nx, boundary_mapping
+
+def custom_matcher(graph: Graph, in_selection: Callable[[VT], bool], lhs_graph: nx.Graph) -> List[VT]:
+    verts = [v for v in graph.vertices() if in_selection(v)]
+    subgraph_nx, _ = create_subgraph(graph, verts)
+    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
+        node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
+    if graph_matcher.is_isomorphic():
+        return verts
+    return []
+
+def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph: nx.Graph) -> pyzx.rules.RewriteOutputType[ET,VT]:
+    subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
+    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
+        node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
+    matching = list(graph_matcher.match())[0]
+
+    vertices_to_remove = []
+    for v in matching:
+        if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
+            vertices_to_remove.append(matching[v])
+
+    boundary_vertex_map = {}
+    for v in rhs_graph.nodes():
+        if rhs_graph.nodes()[v]['type'] == VertexType.BOUNDARY:
+            for x, data in lhs_graph.nodes(data=True):
+                if data['type'] == VertexType.BOUNDARY and \
+                    data['boundary_index'] == rhs_graph.nodes()[v]['boundary_index']:
+                    boundary_vertex_map[v] = boundary_mapping[matching[x]]
+                    break
+
+    vertex_positions = get_vertex_positions(graph, rhs_graph, boundary_vertex_map)
+    vertex_map = boundary_vertex_map
+    for v in rhs_graph.nodes():
+        if rhs_graph.nodes()[v]['type'] != VertexType.BOUNDARY:
+            vertex_map[v] = graph.add_vertex(ty = rhs_graph.nodes()[v]['type'],
+                                             row = vertex_positions[v][0],
+                                             qubit = vertex_positions[v][1],
+                                             phase = rhs_graph.nodes()[v]['phase'],)
+
+    # create etab to add edges
+    etab = {}
+    for v1, v2, data in rhs_graph.edges(data=True):
+        v1 = vertex_map[v1]
+        v2 = vertex_map[v2]
+        if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
+        etab[(v1, v2)][data['type']-1] += 1
+
+    return etab, vertices_to_remove, [], True
+
+def get_vertex_positions(graph, rhs_graph, boundary_vertex_map):
+    pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
+    coords = np.array(list(pos_dict.values()))
+    center = np.mean(coords, axis=0)
+    angles = np.arctan2(coords[:,1]-center[1], coords[:,0]-center[0])
+    coords = coords[np.argsort(-angles)]
+    try:
+        area = Polygon(coords).area
+    except:
+        area = 1
+    k = (area ** 0.5) / len(rhs_graph)
+    return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
+
+def create_custom_matcher(lhs_graph: Graph) -> Callable[[Graph, Callable[[VT], bool]], List[VT]]:
+    lhs_graph.auto_detect_io()
+    return lambda g, selection: custom_matcher(g, selection, to_networkx(lhs_graph))
+
+def create_custom_rule(lhs_graph: Graph, rhs_graph: Graph) -> Callable[[Graph, List[VT]], pyzx.rules.RewriteOutputType[ET,VT]]:
+    lhs_graph.auto_detect_io()
+    rhs_graph.auto_detect_io()
+    return lambda g, verts: custom_rule(g, verts, to_networkx(lhs_graph), to_networkx(rhs_graph))
 
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
@@ -133,5 +237,4 @@ copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
 
-actions_basic = ProofActionGroup(spider_fuse,to_z,to_x,rem_id,copy_action,pauli,bialgebra)
-
+rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]

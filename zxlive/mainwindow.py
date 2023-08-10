@@ -19,17 +19,16 @@ from typing import Callable, Optional, TypedDict
 import copy
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
-from PySide6.QtGui import QAction, QShortcut, QKeySequence, QCloseEvent
-from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QFileDialog, QSizePolicy
+from PySide6.QtGui import QAction, QKeySequence, QCloseEvent
+from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QTabWidget
 from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
-
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import ImportGraphOutput, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph, simplify, Circuit
@@ -83,13 +82,13 @@ class MainWindow(QMainWindow):
         close_action = self._new_action("Close", self.close_action, QKeySequence.StandardKey.Close,
             "Closes the window")
         close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
-        # TODO: We should remember if we have saved the diagram before, 
+        # TODO: We should remember if we have saved the diagram before,
         # and give an open to overwrite this file with a Save action
         save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
         save_as = self._new_action("Save &as...", self.save_as, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
-        
+
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
         file_menu.addAction(open_file)
@@ -143,6 +142,10 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
 
+        new_rewrite = self._new_action("Create new rewrite", lambda: create_new_rewrite(self), None, "Create a new rewrite")
+        rewrite_menu = menu.addMenu("&Rewrite")
+        rewrite_menu.addAction(new_rewrite)
+
         simplify_actions = []
         for simp in simplifications.values():
             simplify_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp), None, simp["tool_tip"]))
@@ -174,7 +177,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, e: QCloseEvent) -> None:
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
             success = self.close_action()
-            if not success: 
+            if not success:
                 e.ignore()  # Abort the closing
                 return
 
@@ -229,7 +232,7 @@ class MainWindow(QMainWindow):
             self.close()
         if not self.active_panel.undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*","")
-            answer = QMessageBox.question(self, "Save Changes", 
+            answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
             if answer == QMessageBox.StandardButton.Cancel: return False
@@ -350,7 +353,7 @@ class MainWindow(QMainWindow):
             cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
             self.active_panel.undo_stack.push(cmd)
         return reduce
-    
+
 
 class SimpEntry(TypedDict):
     text: str
