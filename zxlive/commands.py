@@ -89,17 +89,42 @@ class ChangeNodeColor(BaseCommand):
     vty: VertexType.Type
 
     _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
+    _old_w_info: Optional[dict] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
         for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
+            if is_w_vertex_type(old_vty):
+                v2 = self._old_w_info[v]['partner']
+                self.g.add_vertex_indexed(v2)
+                self.g.set_type(v2, self._old_w_info[v]['partner_type'])
+                self.g.set_row(v2, self._old_w_info[v]['partner_pos'][0])
+                self.g.set_qubit(v2, self._old_w_info[v]['partner_pos'][1])
+                self.g.add_edge(self.g.edge(v,v2), edgetype=EdgeType.W_IO)
+                for v3 in self._old_w_info[v]['neighbors']:
+                    self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
+                    self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
         self.update_graph_view()
 
     def redo(self) -> None:
+        if self._old_w_info is None:
+            self._old_w_info = {}
+        if is_w_vertex_type(self.vty):
+            return
         self._old_vtys = [self.g.type(v) for v in self.vs]
-        for v in self.vs:
-            self.g.set_type(v, self.vty)
+        for v1 in self.vs:
+            if is_w_vertex_type(self.g.type(v1)):
+                v2 = get_w_partner(self.g, v1)
+                v2_neighbors = [v for v in self.g.neighbors(v2) if v != v1]
+                for v3 in v2_neighbors:
+                    self.g.add_edge(self.g.edge(v1,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
+                self._old_w_info[v1] = {'partner': v2,
+                                        'partner_type': self.g.type(v2),
+                                        'partner_pos': (self.g.row(v2), self.g.qubit(v2)),
+                                        'neighbors': v2_neighbors}
+                self.g.remove_vertex(v2)
+            self.g.set_type(v1, self.vty)
         self.update_graph_view()
 
 
@@ -120,6 +145,8 @@ class ChangeEdgeColor(BaseCommand):
     def redo(self) -> None:
         self._old_etys = [self.g.edge_type(e) for e in self.es]
         for e in self.es:
+            if self.g.edge_type(e) == EdgeType.W_IO:
+                continue
             self.g.set_edge_type(e, self.ety)
         self.update_graph_view()
 
@@ -388,3 +415,13 @@ class MoveNodeInStep(MoveNode):
         model = self.step_view.model()
         assert isinstance(model, ProofModel)
         model.graphs[self.step_view.currentIndex().row()] = self.g
+
+def is_w_vertex_type(vertex_type) -> bool:
+    return vertex_type == VertexType.W_INPUT or vertex_type == VertexType.W_OUTPUT
+
+def get_w_partner(g: GraphT, v: VT) -> VT:
+    assert is_w_vertex_type(g.type(v))
+    for u in g.neighbors(v):
+        if g.edge_type((u, v)) == EdgeType.W_IO:
+            return u
+    assert False
