@@ -191,10 +191,10 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
     vertex_map = boundary_vertex_map
     for v in rhs_graph.nodes():
         if rhs_graph.nodes()[v]['type'] != VertexType.BOUNDARY:
-            vertex_map[v] = graph.add_vertex(rhs_graph.nodes()[v]['type'],
-                                             vertex_positions[v][0],
-                                             vertex_positions[v][1],
-                                             rhs_graph.nodes()[v]['phase'],)
+            vertex_map[v] = graph.add_vertex(ty = rhs_graph.nodes()[v]['type'],
+                                             row = vertex_positions[v][0],
+                                             qubit = vertex_positions[v][1],
+                                             phase = rhs_graph.nodes()[v]['phase'],)
 
     # create etab to add edges
     etab = {}
@@ -207,7 +207,7 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
     return etab, vertices_to_remove, [], True
 
 def get_vertex_positions(graph, rhs_graph, boundary_vertex_map):
-    pos_dict = {v: (graph.qubit(m), graph.row(m)) for v, m in boundary_vertex_map.values()}
+    pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
     coords = np.array(list(pos_dict.values()))
     center = np.mean(coords, axis=0)
     angles = np.arctan2(coords[:,1]-center[1], coords[:,0]-center[0])
