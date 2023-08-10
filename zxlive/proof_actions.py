@@ -4,8 +4,10 @@ from typing import Callable, Literal, List, Optional, TYPE_CHECKING
 
 import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher, categorical_node_match
+import numpy as np
 import pyzx
 from pyzx.utils import VertexType, EdgeType
+from shapely import Polygon
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
 
@@ -176,16 +178,23 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
         if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
             vertices_to_remove.append(matching[v])
 
-    vertex_map = {}
+    boundary_vertex_map = {}
     for v in rhs_graph.nodes():
         if rhs_graph.nodes()[v]['type'] == VertexType.BOUNDARY:
             for x, data in lhs_graph.nodes(data=True):
                 if data['type'] == VertexType.BOUNDARY and \
                     data['boundary_index'] == rhs_graph.nodes()[v]['boundary_index']:
-                    vertex_map[v] = boundary_mapping[matching[x]]
+                    boundary_vertex_map[v] = boundary_mapping[matching[x]]
                     break
-        else:
-            vertex_map[v] = graph.add_vertex(rhs_graph.nodes()[v]['type'])
+
+    vertex_positions = get_vertex_positions(graph, rhs_graph, boundary_vertex_map)
+    vertex_map = boundary_vertex_map
+    for v in rhs_graph.nodes():
+        if rhs_graph.nodes()[v]['type'] != VertexType.BOUNDARY:
+            vertex_map[v] = graph.add_vertex(rhs_graph.nodes()[v]['type'],
+                                             vertex_positions[v][0],
+                                             vertex_positions[v][1],
+                                             rhs_graph.nodes()[v]['phase'],)
 
     # create etab to add edges
     etab = {}
@@ -196,6 +205,19 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
         etab[(v1, v2)][data['type']-1] += 1
 
     return etab, vertices_to_remove, [], True
+
+def get_vertex_positions(graph, rhs_graph, boundary_vertex_map):
+    pos_dict = {v: (graph.qubit(m), graph.row(m)) for v, m in boundary_vertex_map.values()}
+    coords = np.array(list(pos_dict.values()))
+    center = np.mean(coords, axis=0)
+    angles = np.arctan2(coords[:,1]-center[1], coords[:,0]-center[0])
+    coords = coords[np.argsort(-angles)]
+    try:
+        area = Polygon(coords).area
+    except:
+        area = 1
+    k = (area ** 0.5) / len(rhs_graph)
+    return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
 
 def create_custom_matcher(lhs_graph: Graph) -> Callable[[Graph, Callable[[VT], bool]], List[VT]]:
     lhs_graph.auto_detect_io()
