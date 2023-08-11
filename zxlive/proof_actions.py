@@ -201,6 +201,9 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
     for v1, v2, data in rhs_graph.edges(data=True):
         v1 = vertex_map[v1]
         v2 = vertex_map[v2]
+        if data['type'] == EdgeType.W_IO:
+            graph.add_edge(graph.edge(v1, v2), EdgeType.W_IO)
+            continue
         if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
         etab[(v1, v2)][data['type']-1] += 1
 
