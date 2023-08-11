@@ -226,7 +226,7 @@ class GraphEditPanel(BasePanel):
         new_g = copy.deepcopy(self.graph_scene.g)
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
-        new_g.remove_vertices(rem_vertices)
+        new_g.remove_vertices(list(set(rem_vertices)))
         cmd = SetGraph(self.graph_view,new_g) if len(rem_vertices) > 128 \
             else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
