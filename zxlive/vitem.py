@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 from enum import Enum
+import math
 
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
@@ -27,6 +28,8 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.graph.base import VertexType
 from pyzx.utils import phase_to_s
+
+from zxlive.w_node import get_w_partner
 
 from .common import VT, ET, GraphT, SCALE, pos_to_view, pos_from_view
 
@@ -136,6 +139,7 @@ class VItem(QGraphicsPathItem):
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
+        self.set_vitem_rotation()
         if not self.isSelected():
             t = self.g.type(self.v)
             if t == VertexType.Z:
@@ -188,9 +192,20 @@ class VItem(QGraphicsPathItem):
 
         if self.phase_item:
             self.phase_item.refresh()
+        if self.g.type(self.v) == VertexType.W_INPUT:
+            w_output = get_w_partner(self.g, self.v)
+            if w_output in self.graph_scene.vertex_map:
+                self.graph_scene.vertex_map[w_output].refresh()
 
         for e_item in self.adj_items:
             e_item.refresh()
+
+    def set_vitem_rotation(self):
+        if self.g.type(self.v) == VertexType.W_OUTPUT:
+            w_in = get_w_partner(self.g, self.v)
+            w_in = self.graph_scene.vertex_map[w_in].pos()
+            angle = math.atan2(self.pos().y() - w_in.y(), self.pos().x() - w_in.x())
+            self.setRotation(math.degrees(angle))
 
     def set_pos_from_graph(self) -> None:
         self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
