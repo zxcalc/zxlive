@@ -164,7 +164,8 @@ class GraphEditPanel(BasePanel):
 
     def _add_edge(self, u: VT, v: VT) -> None:
         if is_w_vertex_type(self.graph_scene.g.type(u)) and is_w_vertex_type(self.graph_scene.g.type(v)):
-            return
+            if self.graph_scene.g.edge_type(self.graph_scene.g.edge(u, v)) == EdgeType.W_IO:
+                return
         if self.graph_scene.g.type(u) == VertexType.W_INPUT and len(self.graph_scene.g.neighbors(u)) == 2 or \
            self.graph_scene.g.type(v) == VertexType.W_INPUT and len(self.graph_scene.g.neighbors(v)) == 2:
             return
