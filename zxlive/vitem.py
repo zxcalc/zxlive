@@ -108,6 +108,15 @@ class VItem(QGraphicsPathItem):
         path = QPainterPath()
         if self.g.type(self.v) == VertexType.H_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        elif self.g.type(self.v) == VertexType.W_OUTPUT:
+            #draw a triangle
+            path.moveTo(0, 0)
+            path.lineTo(0.3 * SCALE, 0.3 * SCALE)
+            path.lineTo(0.3 * SCALE, -0.3 * SCALE)
+            path.lineTo(0, 0)
+        elif self.g.type(self.v) == VertexType.W_INPUT:
+            scale = 0.5 * SCALE
+            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         self.setPath(path)
@@ -136,9 +145,9 @@ class VItem(QGraphicsPathItem):
             elif t == VertexType.H_BOX:
                 self.setBrush(QBrush(QColor(H_YELLOW)))
             elif t == VertexType.W_INPUT:
-                self.setBrush(QBrush(QColor("white")))
+                self.setBrush(QBrush(QColor("black")))
             elif t == VertexType.W_OUTPUT:
-                self.setBrush(QBrush(QColor("orange")))
+                self.setBrush(QBrush(QColor("black")))
             else:
                 self.setBrush(QBrush(QColor("#000000")))
             pen = QPen()
@@ -160,6 +169,14 @@ class VItem(QGraphicsPathItem):
                 self.setBrush(brush)
             elif t == VertexType.H_BOX:
                 brush = QBrush(QColor(H_YELLOW_PRESSED))
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+                self.setBrush(brush)
+            elif t == VertexType.W_INPUT:
+                brush = QBrush(QColor("black"))
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+                self.setBrush(brush)
+            elif t == VertexType.W_OUTPUT:
+                brush = QBrush(QColor("black"))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             else:
