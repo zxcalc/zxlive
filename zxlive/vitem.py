@@ -204,9 +204,10 @@ class VItem(QGraphicsPathItem):
     def set_vitem_rotation(self):
         if self.g.type(self.v) == VertexType.W_OUTPUT:
             w_in = get_w_partner(self.g, self.v)
+            if w_in not in self.graph_scene.vertex_map:
+                return
             w_in = self.graph_scene.vertex_map[w_in].pos()
             angle = math.atan2(self.pos().x() - w_in.x(), w_in.y() - self.pos().y())
-            # angle = math.atan2(self.pos().y() - w_in.y(), self.pos().x() - w_in.x())
             self.setRotation(math.degrees(angle))
 
     def set_pos_from_graph(self) -> None:
