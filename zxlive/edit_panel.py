@@ -1,7 +1,7 @@
 import copy
 from fractions import Fraction
 from typing import Iterator, TypedDict, Callable
-from PySide6.QtCore import Signal, QSize, Qt
+from PySide6.QtCore import Signal, QSize, Qt, QPoint
 
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
 from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
@@ -34,7 +34,7 @@ VERTICES: dict[str, DrawPanelNodeType] = {
     "X": {"text": "X spider", "type": VertexType.X, "icon": ("circle", ZX_RED)},
     "H": {"text": "H box", "type": VertexType.H_BOX, "icon": ("square", H_YELLOW)},
     "B": {"text": "boundary", "type": VertexType.BOUNDARY, "icon": ("circle", "black")},
-    "W": {"text": "W node", "type": VertexType.W_OUTPUT, "icon": ("circle", "orange")},
+    "W": {"text": "W node", "type": VertexType.W_OUTPUT, "icon": ("triangle", "black")},
 }
 
 EDGES: dict[str, DrawPanelNodeType] = {
@@ -101,6 +101,8 @@ class GraphEditPanel(BasePanel):
             painter.drawEllipse(4, 4, 56, 56)
         elif shape == "square":
             painter.drawRect(4, 4, 56, 56)
+        elif shape == "triangle":
+            painter.drawPolygon([QPoint(32, 10), QPoint(2, 60), QPoint(62, 60)])
         elif shape == "line":
             painter.drawLine(0, 32, 64, 32)
         elif shape == "dashed_line":

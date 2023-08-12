@@ -114,10 +114,10 @@ class VItem(QGraphicsPathItem):
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         elif self.g.type(self.v) == VertexType.W_OUTPUT:
             #draw a triangle
-            path.moveTo(-0.2 * SCALE, 0)
-            path.lineTo(0.1 * SCALE, 0.3 * SCALE)
-            path.lineTo(0.1 * SCALE, -0.3 * SCALE)
-            path.lineTo(-0.2 * SCALE, 0)
+            path.moveTo(0, 0.2 * SCALE)
+            path.lineTo(0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(0, 0.2 * SCALE)
         elif self.g.type(self.v) == VertexType.W_INPUT:
             scale = 0.3 * SCALE
             path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
@@ -205,7 +205,8 @@ class VItem(QGraphicsPathItem):
         if self.g.type(self.v) == VertexType.W_OUTPUT:
             w_in = get_w_partner(self.g, self.v)
             w_in = self.graph_scene.vertex_map[w_in].pos()
-            angle = math.atan2(self.pos().y() - w_in.y(), self.pos().x() - w_in.x())
+            angle = math.atan2(self.pos().x() - w_in.x(), w_in.y() - self.pos().y())
+            # angle = math.atan2(self.pos().y() - w_in.y(), self.pos().x() - w_in.x())
             self.setRotation(math.degrees(angle))
 
     def set_pos_from_graph(self) -> None:
@@ -313,7 +314,7 @@ class VItem(QGraphicsPathItem):
                     # set the position of w_in to next to w_out at the same angle
                     w_out = get_w_partner(self.g, self.v)
                     w_out = self.graph_scene.vertex_map[w_out]
-                    w_in_pos = w_out.pos() + QPointF(-0.3 *SCALE, 0)
+                    w_in_pos = w_out.pos() + QPointF(0, 0.3 *SCALE)
                     w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
                 self._dragged_on = None
