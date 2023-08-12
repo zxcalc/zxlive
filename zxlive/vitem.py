@@ -124,6 +124,7 @@ class VItem(QGraphicsPathItem):
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         self.setPath(path)
+        self.set_vitem_rotation()
         self.refresh()
 
     @property
@@ -140,7 +141,6 @@ class VItem(QGraphicsPathItem):
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
-        self.set_vitem_rotation()
         if not self.isSelected():
             t = self.g.type(self.v)
             if t == VertexType.Z:
@@ -194,21 +194,19 @@ class VItem(QGraphicsPathItem):
         if self.phase_item:
             self.phase_item.refresh()
         if self.g.type(self.v) == VertexType.W_INPUT:
-            w_output = get_w_partner(self.g, self.v)
-            if w_output in self.graph_scene.vertex_map:
-                self.graph_scene.vertex_map[w_output].refresh()
+            w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if w_out:
+                w_out.refresh()
 
         for e_item in self.adj_items:
             e_item.refresh()
 
     def set_vitem_rotation(self):
         if self.g.type(self.v) == VertexType.W_OUTPUT:
-            w_in = get_w_partner(self.g, self.v)
-            if w_in not in self.graph_scene.vertex_map:
-                return
-            w_in = self.graph_scene.vertex_map[w_in].pos()
-            angle = math.atan2(self.pos().x() - w_in.x(), w_in.y() - self.pos().y())
-            self.setRotation(math.degrees(angle))
+            w_in = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if w_in:
+                angle = math.atan2(self.pos().x() - w_in.pos().x(), w_in.pos().y() - self.pos().y())
+                self.setRotation(math.degrees(angle))
 
     def set_pos_from_graph(self) -> None:
         self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
@@ -268,12 +266,16 @@ class VItem(QGraphicsPathItem):
         scene = self.scene()
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
         if self.is_dragging and self.g.type(self.v) == VertexType.W_OUTPUT:
-            w_in = get_w_partner(self.g, self.v)
-            w_in = self.graph_scene.vertex_map[w_in]
+            w_in = get_w_partner_vitem(self.g, self.graph_scene, self.v)
             if self._last_pos is None:
                 self._last_pos = self.pos()
             w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
             self._last_pos = self.pos()
+        elif self.is_dragging and self.g.type(self.v) == VertexType.W_INPUT:
+            w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if w_out is None:
+                return
+            w_out.set_vitem_rotation()
         if self.is_dragging and len(scene.selectedItems()) == 1:
             reset = True
             for it in scene.items():
@@ -313,8 +315,7 @@ class VItem(QGraphicsPathItem):
                     ])
                 if self.g.type(self.v) == VertexType.W_INPUT:
                     # set the position of w_in to next to w_out at the same angle
-                    w_out = get_w_partner(self.g, self.v)
-                    w_out = self.graph_scene.vertex_map[w_out]
+                    w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
                     w_in_pos = w_out.pos() + QPointF(0, 0.3 *SCALE)
                     w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
@@ -322,14 +323,6 @@ class VItem(QGraphicsPathItem):
                 self._old_pos = None
         else:
             e.ignore()
-
-def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
-    """Rotate a point around an origin by an angle in degrees."""
-    angle = math.radians(angle)
-    return QPointF(
-        math.cos(angle) * (p.x() - origin.x()) - math.sin(angle) * (p.y() - origin.y()) + origin.x(),
-        math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
-    )
 
 
 class VItemAnimation(QVariantAnimation):
@@ -425,3 +418,20 @@ class PhaseItem(QGraphicsTextItem):
             self.setPlainText(str(int(self.v_item.g.qubit(self.v_item.v))))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
+
+
+def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
+    """Rotate a point around an origin by an angle in degrees."""
+    angle = math.radians(angle)
+    return QPointF(
+        math.cos(angle) * (p.x() - origin.x()) - math.sin(angle) * (p.y() - origin.y()) + origin.x(),
+        math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
+    )
+
+def get_w_partner_vitem(g: GraphT, graph_scene: GraphScene, v: VT) -> VItem:
+    """Get the VItem of the partner of a w_in or w_out vertex."""
+    assert g.type(v) in {VertexType.W_INPUT, VertexType.W_OUTPUT}
+    partner = get_w_partner(g, v)
+    if partner not in graph_scene.vertex_map:
+        return None
+    return graph_scene.vertex_map[partner]
