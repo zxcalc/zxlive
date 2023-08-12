@@ -181,8 +181,10 @@ class AddNonFlexNode(BaseCommand):
     _added_output_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self) -> None:
-        assert self._added_vert is not None
-        self.g.remove_vertex(self._added_vert)
+        assert self._added_input_vert is not None
+        assert self._added_output_vert is not None
+        self.g.remove_vertex(self._added_input_vert)
+        self.g.remove_vertex(self._added_output_vert)
         self.update_graph_view()
 
     def redo(self) -> None:
