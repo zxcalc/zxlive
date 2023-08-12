@@ -98,6 +98,7 @@ class VItem(QGraphicsPathItem):
 
         self._old_pos = None
         self._dragged_on = None
+        self._last_pos = None
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -118,7 +119,7 @@ class VItem(QGraphicsPathItem):
             path.lineTo(0.3 * SCALE, -0.3 * SCALE)
             path.lineTo(0, 0)
         elif self.g.type(self.v) == VertexType.W_INPUT:
-            scale = 0.5 * SCALE
+            scale = 0.3 * SCALE
             path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -264,6 +265,13 @@ class VItem(QGraphicsPathItem):
             return
         scene = self.scene()
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if self.is_dragging and self.g.type(self.v) == VertexType.W_OUTPUT:
+            w_in = get_w_partner(self.g, self.v)
+            w_in = self.graph_scene.vertex_map[w_in]
+            if self._last_pos is None:
+                self._last_pos = self.pos()
+            w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
+            self._last_pos = self.pos()
         if self.is_dragging and len(scene.selectedItems()) == 1:
             reset = True
             for it in scene.items():
