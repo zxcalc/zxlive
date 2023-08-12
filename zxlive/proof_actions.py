@@ -233,6 +233,7 @@ def create_custom_rule(lhs_graph: Graph, rhs_graph: Graph) -> Callable[[Graph, L
 
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
+w_fuse = ProofAction.from_dict(operations['fuse_w'])
 to_z = ProofAction.from_dict(operations['to_z'])
 to_x = ProofAction.from_dict(operations['to_x'])
 rem_id = ProofAction.from_dict(operations['rem_id'])
@@ -240,4 +241,4 @@ copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
 
-rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
+rewrites = [spider_fuse, w_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
