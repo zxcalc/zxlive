@@ -309,10 +309,25 @@ class VItem(QGraphicsPathItem):
                         (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
                         for it in scene.selectedItems() if isinstance(it, VItem)
                     ])
+                if self.g.type(self.v) == VertexType.W_INPUT:
+                    # set the position of w_in to next to w_out at the same angle
+                    w_out = get_w_partner(self.g, self.v)
+                    w_out = self.graph_scene.vertex_map[w_out]
+                    w_in_pos = w_out.pos() + QPointF(-0.1 *SCALE, 0)
+                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
+                    self.setPos(w_in_pos)
                 self._dragged_on = None
                 self._old_pos = None
         else:
             e.ignore()
+
+def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
+    """Rotate a point around an origin by an angle in degrees."""
+    angle = math.radians(angle)
+    return QPointF(
+        math.cos(angle) * (p.x() - origin.x()) - math.sin(angle) * (p.y() - origin.y()) + origin.x(),
+        math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
+    )
 
 
 class VItemAnimation(QVariantAnimation):
