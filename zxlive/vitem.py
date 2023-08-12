@@ -304,6 +304,12 @@ class VItem(QGraphicsPathItem):
             return
         if e.button() == Qt.MouseButton.LeftButton:
             if self._old_pos != self.pos():
+                if self.g.type(self.v) == VertexType.W_INPUT:
+                    # set the position of w_in to next to w_out at the same angle
+                    w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+                    w_in_pos = w_out.pos() + QPointF(0, 0.3 *SCALE)
+                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
+                    self.setPos(w_in_pos)
                 scene = self.scene()
                 if TYPE_CHECKING: assert isinstance(scene, GraphScene)
                 if self._dragged_on is not None and len(scene.selectedItems()) == 1:
@@ -313,12 +319,6 @@ class VItem(QGraphicsPathItem):
                         (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
                         for it in scene.selectedItems() if isinstance(it, VItem)
                     ])
-                if self.g.type(self.v) == VertexType.W_INPUT:
-                    # set the position of w_in to next to w_out at the same angle
-                    w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
-                    w_in_pos = w_out.pos() + QPointF(0, 0.3 *SCALE)
-                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
-                    self.setPos(w_in_pos)
                 self._dragged_on = None
                 self._old_pos = None
         else:
