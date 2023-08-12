@@ -69,8 +69,6 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
-        elif self.g.edge_type(self.e) == EdgeType.W_IO:
-            pen.setColor(QColor("pink"))
         else:
             pen.setColor(QColor("#000000"))
         self.setPen(QPen(pen))
