@@ -187,7 +187,7 @@ class AddNonFlexNode(BaseCommand):
 
     def redo(self) -> None:
         self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, self.y, self.x-0.3)
-        self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, self.y, self.x+0.3)
+        self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, self.y, self.x)
         self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
         self.update_graph_view()
 
