@@ -10,9 +10,7 @@ from PySide6.QtWidgets import QListView
 
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
-from pyzx.utils import EdgeType, VertexType
-
-from .w_node import get_w_partner, is_w_edge_type, is_w_vertex_type
+from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w
 
 from .common import VT, ET, GraphT
 from .graphview import GraphView
@@ -96,7 +94,7 @@ class ChangeNodeColor(BaseCommand):
     def undo(self) -> None:
         assert self._old_vtys is not None
         for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
-            if is_w_vertex_type(old_vty):
+            if vertex_is_w(old_vty):
                 v2 = self._old_w_info[v]['partner']
                 self.g.add_vertex_indexed(v2)
                 self.g.set_type(v2, self._old_w_info[v]['partner_type'])
@@ -112,11 +110,11 @@ class ChangeNodeColor(BaseCommand):
     def redo(self) -> None:
         if self._old_w_info is None:
             self._old_w_info = {}
-        if is_w_vertex_type(self.vty):
+        if vertex_is_w(self.vty):
             return
         self._old_vtys = [self.g.type(v) for v in self.vs]
         for v1 in self.vs:
-            if is_w_vertex_type(self.g.type(v1)):
+            if vertex_is_w(self.g.type(v1)):
                 v2 = get_w_partner(self.g, v1)
                 v2_neighbors = [v for v in self.g.neighbors(v2) if v != v1]
                 for v3 in v2_neighbors:
@@ -147,7 +145,7 @@ class ChangeEdgeColor(BaseCommand):
     def redo(self) -> None:
         self._old_etys = [self.g.edge_type(e) for e in self.es]
         for e in self.es:
-            if is_w_edge_type(self.g.edge_type(e)):
+            if self.g.edge_type(e) == EdgeType.W_IO:
                 continue
             self.g.set_edge_type(e, self.ety)
         self.update_graph_view()

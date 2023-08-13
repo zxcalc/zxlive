@@ -6,9 +6,8 @@ from PySide6.QtCore import Signal, QSize, Qt, QPoint
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
 from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
 from pyzx import EdgeType, VertexType
+from pyzx.utils import vertex_is_w
 from sympy import sympify
-
-from .w_node import is_w_edge_type, is_w_vertex_type
 
 from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
@@ -165,7 +164,7 @@ class GraphEditPanel(BasePanel):
         self.undo_stack.push(cmd)
 
     def _add_edge(self, u: VT, v: VT) -> None:
-        if is_w_vertex_type(self.graph_scene.g.type(u)) and is_w_vertex_type(self.graph_scene.g.type(v)):
+        if vertex_is_w(self.graph_scene.g.type(u)) and vertex_is_w(self.graph_scene.g.type(v)):
             if self.graph_scene.g.edge_type(self.graph_scene.g.edge(u, v)) == EdgeType.W_IO:
                 return
         if self.graph_scene.g.type(u) == VertexType.W_INPUT and len(self.graph_scene.g.neighbors(u)) == 2 or \
@@ -189,7 +188,7 @@ class GraphEditPanel(BasePanel):
             except ValueError:
                 show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
             return
-        elif is_w_vertex_type(self.graph.type(v)):
+        elif vertex_is_w(self.graph.type(v)):
             return
 
         input_, ok = QInputDialog.getText(
@@ -218,12 +217,12 @@ class GraphEditPanel(BasePanel):
         selected_edges = list(self.graph_scene.selected_edges)
         rem_vertices = selection.copy()
         for v in selection:
-            if is_w_vertex_type(self.graph_scene.g.type(v)):
+            if vertex_is_w(self.graph_scene.g.type(v)):
                 for n in self.graph_scene.g.neighbors(v):
-                    if is_w_edge_type(self.graph_scene.g.edge_type((v, n))):
+                    if self.graph_scene.g.edge_type((v, n)) == EdgeType.W_IO:
                         rem_vertices.append(n)
         for v1, v2 in selected_edges:
-            if is_w_edge_type(self.graph_scene.g.edge_type((v1, v2))):
+            if self.graph_scene.g.edge_type((v1, v2)) == EdgeType.W_IO:
                 rem_vertices.extend([v1, v2])
         if not rem_vertices and not selected_edges: return
         new_g = copy.deepcopy(self.graph_scene.g)
