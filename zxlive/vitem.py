@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.utils import VertexType, phase_to_s
 
-from zxlive.w_node import get_w_partner
+from .w_node import get_w_partner
 
 from .common import VT, ET, GraphT, SCALE, pos_to_view, pos_from_view
 

@@ -5,7 +5,7 @@ from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelInde
 from PySide6.QtGui import QFont
 from pyzx.graph import GraphDiff
 
-from zxlive.common import GraphT
+from .common import GraphT
 
 
 class Rewrite(NamedTuple):

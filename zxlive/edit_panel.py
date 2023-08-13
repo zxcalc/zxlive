@@ -8,7 +8,7 @@ from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
 from pyzx import EdgeType, VertexType
 from sympy import sympify
 
-from zxlive.w_node import is_w_edge_type, is_w_vertex_type
+from .w_node import is_w_edge_type, is_w_vertex_type
 
 from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE

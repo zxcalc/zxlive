@@ -11,7 +11,7 @@ from pyzx import Circuit, extract_circuit
 from pyzx.graph.base import BaseGraph
 from zxlive import proof_actions
 
-from zxlive.proof import ProofModel
+from .proof import ProofModel
 
 from .common import VT,ET, GraphT, Graph
 

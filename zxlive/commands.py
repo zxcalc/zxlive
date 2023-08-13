@@ -12,7 +12,7 @@ from pyzx import basicrules
 from pyzx.graph import GraphDiff
 from pyzx.utils import EdgeType, VertexType
 
-from zxlive.w_node import get_w_partner, is_w_edge_type, is_w_vertex_type
+from .w_node import get_w_partner, is_w_edge_type, is_w_vertex_type
 
 from .common import VT, ET, GraphT
 from .graphview import GraphView
