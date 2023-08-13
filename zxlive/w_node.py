@@ -15,4 +15,3 @@ def get_w_partner(g: GraphT, v: VT) -> VT:
     for u in g.neighbors(v):
         if g.edge_type((u, v)) == EdgeType.W_IO:
             return u
-    assert False

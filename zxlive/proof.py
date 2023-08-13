@@ -126,7 +126,7 @@ class ProofModel(QAbstractListModel):
             "initial_graph": initial_graph_tikz,
             "proof_steps": proof_steps
         })
-    
+
     @staticmethod
     def from_json(json_str: str) -> "ProofModel":
         """Deserializes the model from JSON."""
