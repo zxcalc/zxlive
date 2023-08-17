@@ -16,7 +16,7 @@ from .utils import get_data
 from .common import VT, GraphT, ToolType
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
-    AddEdge, AddNode, AddNonFlexNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
+    AddEdge, AddNode, AddNonFlexNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeType,
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
@@ -145,7 +145,7 @@ class GraphEditPanel(BasePanel):
         self._curr_vty = vty
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) > 0:
-            cmd = ChangeNodeColor(self.graph_view, selected, vty)
+            cmd = ChangeNodeType(self.graph_view, selected, vty)
             self.undo_stack.push(cmd)
 
     def _ety_clicked(self, ety: EdgeType.Type) -> None:

@@ -1,6 +1,7 @@
+from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Optional, Iterable, Set, Union, List, Any
+from typing import Dict, Optional, Iterable, Set, Union, List, Any
 import copy
 
 from PySide6.QtCore import QItemSelection, QModelIndex, QItemSelectionModel, \
@@ -83,25 +84,27 @@ class UpdateGraph(BaseCommand):
 
 
 @dataclass
-class ChangeNodeColor(BaseCommand):
+class ChangeNodeType(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: Iterable[VT]
     vty: VertexType.Type
 
+    WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
+
     _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
-    _old_w_info: Optional[dict] = field(default=None, init=False)
+    _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
         for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
             if vertex_is_w(old_vty):
-                v2 = self._old_w_info[v]['partner']
+                v2 = self._old_w_info[v].partner
                 self.g.add_vertex_indexed(v2)
-                self.g.set_type(v2, self._old_w_info[v]['partner_type'])
-                self.g.set_row(v2, self._old_w_info[v]['partner_pos'][0])
-                self.g.set_qubit(v2, self._old_w_info[v]['partner_pos'][1])
+                self.g.set_type(v2, self._old_w_info[v].partner_type)
+                self.g.set_row(v2, self._old_w_info[v].partner_pos[0])
+                self.g.set_qubit(v2, self._old_w_info[v].partner_pos[1])
                 self.g.add_edge(self.g.edge(v,v2), edgetype=EdgeType.W_IO)
-                for v3 in self._old_w_info[v]['neighbors']:
+                for v3 in self._old_w_info[v].neighbors:
                     self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
                     self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
@@ -119,10 +122,10 @@ class ChangeNodeColor(BaseCommand):
                 v2_neighbors = [v for v in self.g.neighbors(v2) if v != v1]
                 for v3 in v2_neighbors:
                     self.g.add_edge(self.g.edge(v1,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
-                self._old_w_info[v1] = {'partner': v2,
-                                        'partner_type': self.g.type(v2),
-                                        'partner_pos': (self.g.row(v2), self.g.qubit(v2)),
-                                        'neighbors': v2_neighbors}
+                self._old_w_info[v1] = self.WInfo(partner=v2,
+                                                  partner_type=self.g.type(v2),
+                                                  partner_pos=(self.g.row(v2), self.g.qubit(v2)),
+                                                  neighbors=v2_neighbors)
                 self.g.remove_vertex(v2)
             self.g.set_type(v1, self.vty)
         self.update_graph_view()
