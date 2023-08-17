@@ -173,11 +173,11 @@ class GraphEditPanel(BasePanel):
         self.undo_stack.push(cmd)
 
     def _add_edge(self, u: VT, v: VT) -> None:
-        if vertex_is_w(self.graph_scene.g.type(u)) and vertex_is_w(self.graph_scene.g.type(v)):
-            if self.graph_scene.g.edge_type(self.graph_scene.g.edge(u, v)) == EdgeType.W_IO:
-                return
-        if self.graph_scene.g.type(u) == VertexType.W_INPUT and len(self.graph_scene.g.neighbors(u)) == 2 or \
-           self.graph_scene.g.type(v) == VertexType.W_INPUT and len(self.graph_scene.g.neighbors(v)) == 2:
+        g = self.graph_scene.g
+        if vertex_is_w(g.type(u)) and get_w_partner(g, u) == v:
+            return
+        if g.type(u) == VertexType.W_INPUT and len(g.neighbors(u)) >= 2 or \
+           g.type(v) == VertexType.W_INPUT and len(g.neighbors(v)) >= 2:
             return
         cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
         self.undo_stack.push(cmd)
