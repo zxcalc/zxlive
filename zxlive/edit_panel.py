@@ -152,6 +152,8 @@ class GraphEditPanel(BasePanel):
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
         selected = list(self.graph_scene.selected_edges)
+        selected = [e for e in self.graph_scene.selected_edges \
+            if self.graph_scene.g.edge_type(e) != EdgeType.W_IO]
         if len(selected) > 0:
             cmd = ChangeEdgeColor(self.graph_view, selected, ety)
             self.undo_stack.push(cmd)

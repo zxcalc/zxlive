@@ -148,8 +148,6 @@ class ChangeEdgeColor(BaseCommand):
     def redo(self) -> None:
         self._old_etys = [self.g.edge_type(e) for e in self.es]
         for e in self.es:
-            if self.g.edge_type(e) == EdgeType.W_IO:
-                continue
             self.g.set_edge_type(e, self.ety)
         self.update_graph_view()
 
