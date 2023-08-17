@@ -91,9 +91,9 @@ class GraphScene(QGraphicsScene):
         """Update the PyZX graph for the scene.
         This will update the scene to match the given graph. It will
         try to reuse existing QGraphicsItem's as much as possible.
-        
+
         The selection is carried over to the updated graph.
-        
+
         :param new: The new graph to update to.
         :param select_new: If True, add all new vertices to the selection set."""
 
@@ -127,7 +127,7 @@ class GraphScene(QGraphicsScene):
         # g now contains the new graph,
         # but we still need to update the scene
         # However, the new vertices and edges automatically follow the new graph structure
-        
+
         for v in diff.new_verts:
             v_item = VItem(self, v)
             self.vertex_map[v] = v_item
@@ -170,7 +170,7 @@ class GraphScene(QGraphicsScene):
             self.vertex_map[v] = vi
             self.addItem(vi)  # add the vertex to the scene
             self.addItem(vi.phase_item)  # add the phase label to the scene
-        
+
         self.edge_map = {}
         for e in self.g.edges():
             s, t = self.g.edge_st(e)

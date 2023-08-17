@@ -7,7 +7,7 @@ from PySide6.QtCore import Signal, QSize, Qt, QPoint
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
 from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
 from pyzx import EdgeType, VertexType
-from pyzx.utils import vertex_is_w
+from pyzx.utils import vertex_is_w, get_w_partner
 from sympy import sympify
 
 from .vitem import BLACK, ZX_GREEN, ZX_RED, H_YELLOW
@@ -161,8 +161,6 @@ class GraphEditPanel(BasePanel):
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
         selected = list(self.graph_scene.selected_edges)
-        selected = [e for e in self.graph_scene.selected_edges \
-            if self.graph_scene.g.edge_type(e) != EdgeType.W_IO]
         if len(selected) > 0:
             cmd = ChangeEdgeColor(self.graph_view, selected, ety)
             self.undo_stack.push(cmd)
@@ -229,12 +227,7 @@ class GraphEditPanel(BasePanel):
         rem_vertices = selection.copy()
         for v in selection:
             if vertex_is_w(self.graph_scene.g.type(v)):
-                for n in self.graph_scene.g.neighbors(v):
-                    if self.graph_scene.g.edge_type((v, n)) == EdgeType.W_IO:
-                        rem_vertices.append(n)
-        for v1, v2 in selected_edges:
-            if self.graph_scene.g.edge_type((v1, v2)) == EdgeType.W_IO:
-                rem_vertices.extend([v1, v2])
+                rem_vertices.append(get_w_partner(self.graph_scene.g, v))
         if not rem_vertices and not selected_edges: return
         new_g = copy.deepcopy(self.graph_scene.g)
         self.graph_scene.clearSelection()

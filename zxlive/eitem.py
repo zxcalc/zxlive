@@ -39,6 +39,7 @@ class EItem(QGraphicsPathItem):
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, graph_scene.g.edge_type(e) != EdgeType.W_IO)
 
         self.graph_scene = graph_scene
         self.e = e
