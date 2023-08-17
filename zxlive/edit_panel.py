@@ -1,6 +1,7 @@
 import copy
+from enum import Enum
 from fractions import Fraction
-from typing import Iterator, TypedDict, Callable
+from typing import Dict, Iterator, TypedDict, Callable, Union
 from PySide6.QtCore import Signal, QSize, Qt, QPoint
 
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
@@ -9,7 +10,7 @@ from pyzx import EdgeType, VertexType
 from pyzx.utils import vertex_is_w
 from sympy import sympify
 
-from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
+from .vitem import BLACK, ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
 
 from .utils import get_data
@@ -22,23 +23,29 @@ from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
 
 
+class ShapeType(Enum):
+    CIRCLE = 1
+    SQUARE = 2
+    TRIANGLE = 3
+    LINE = 4
+    DASHED_LINE = 5
+
 class DrawPanelNodeType(TypedDict):
     text: str
-    type: VertexType.Type
-    icon: tuple[str, str]
+    icon: tuple[ShapeType, str]
 
 
-VERTICES: dict[str, DrawPanelNodeType] = {
-    "Z": {"text": "Z spider", "type": VertexType.Z, "icon": ("circle", ZX_GREEN)},
-    "X": {"text": "X spider", "type": VertexType.X, "icon": ("circle", ZX_RED)},
-    "H": {"text": "H box", "type": VertexType.H_BOX, "icon": ("square", H_YELLOW)},
-    "B": {"text": "boundary", "type": VertexType.BOUNDARY, "icon": ("circle", "black")},
-    "W": {"text": "W node", "type": VertexType.W_OUTPUT, "icon": ("triangle", "black")},
+VERTICES: dict[VertexType.Type, DrawPanelNodeType] = {
+    VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, ZX_GREEN)},
+    VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, ZX_RED)},
+    VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, H_YELLOW)},
+    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, BLACK)},
+    VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, BLACK)},
 }
 
-EDGES: dict[str, DrawPanelNodeType] = {
-    "SIMPLE": {"text": "Simple", "type": EdgeType.SIMPLE, "icon": ("line", "black")},
-    "HADAMARD": {"text": "Hadamard", "type": EdgeType.HADAMARD, "icon": ("dashed_line", HAD_EDGE_BLUE)},
+EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
+    EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
+    EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
 }
 
 
@@ -70,7 +77,9 @@ class GraphEditPanel(BasePanel):
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
 
-    def create_list_widget(self, data: dict[str, DrawPanelNodeType], onclick: Callable[[EdgeType.Type], None]) -> QListWidget:
+    def create_list_widget(self,
+                           data: Dict[Union[VertexType.Type, EdgeType.Type], DrawPanelNodeType],
+                           onclick: Callable[[Union[VertexType.Type, EdgeType.Type]], None]) -> QListWidget:
         list_widget = QListWidget(self)
         list_widget.setResizeMode(QListView.ResizeMode.Adjust)
         list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -79,10 +88,10 @@ class GraphEditPanel(BasePanel):
         list_widget.setGridSize(QSize(60, 64))
         list_widget.setWordWrap(True)
         list_widget.setIconSize(QSize(24, 24))
-        for value in data.values():
+        for typ, value in data.items():
             icon = self.create_icon(*value["icon"])
             item = QListWidgetItem(icon, value["text"])
-            item.setData(Qt.UserRole, value["type"])
+            item.setData(Qt.UserRole, typ)
             list_widget.addItem(item)
         list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.UserRole)))
         list_widget.setCurrentItem(list_widget.item(0))
@@ -94,17 +103,17 @@ class GraphEditPanel(BasePanel):
         pixmap.fill(Qt.transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.setPen(QPen(QColor("black"), 6))
+        painter.setPen(QPen(QColor(BLACK), 6))
         painter.setBrush(QColor(color))
-        if shape == "circle":
+        if shape == ShapeType.CIRCLE:
             painter.drawEllipse(4, 4, 56, 56)
-        elif shape == "square":
+        elif shape == ShapeType.SQUARE:
             painter.drawRect(4, 4, 56, 56)
-        elif shape == "triangle":
+        elif shape == ShapeType.TRIANGLE:
             painter.drawPolygon([QPoint(32, 10), QPoint(2, 60), QPoint(62, 60)])
-        elif shape == "line":
+        elif shape == ShapeType.LINE:
             painter.drawLine(0, 32, 64, 32)
-        elif shape == "dashed_line":
+        elif shape == ShapeType.DASHED_LINE:
             painter.setPen(QPen(QColor(color), 6, Qt.DashLine))
             painter.drawLine(0, 32, 64, 32)
         painter.end()

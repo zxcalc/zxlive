@@ -41,6 +41,7 @@ ZX_RED = "#ff8888"
 ZX_RED_PRESSED = "#bb0f0f"
 H_YELLOW = "#ffff00"
 H_YELLOW_PRESSED = "#f1c232"
+BLACK = "#000000"
 
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
@@ -103,7 +104,7 @@ class VItem(QGraphicsPathItem):
 
         pen = QPen()
         pen.setWidthF(3)
-        pen.setColor(QColor("black"))
+        pen.setColor(QColor(BLACK))
         self.setPen(pen)
 
         path = QPainterPath()
@@ -147,14 +148,14 @@ class VItem(QGraphicsPathItem):
             elif t == VertexType.H_BOX:
                 self.setBrush(QBrush(QColor(H_YELLOW)))
             elif t == VertexType.W_INPUT:
-                self.setBrush(QBrush(QColor("black")))
+                self.setBrush(QBrush(QColor(BLACK)))
             elif t == VertexType.W_OUTPUT:
-                self.setBrush(QBrush(QColor("black")))
+                self.setBrush(QBrush(QColor(BLACK)))
             else:
-                self.setBrush(QBrush(QColor("#000000")))
+                self.setBrush(QBrush(QColor(BLACK)))
             pen = QPen()
             pen.setWidthF(3)
-            pen.setColor(QColor("black"))
+            pen.setColor(QColor(BLACK))
             self.setPen(pen)
 
         if self.isSelected():
@@ -174,11 +175,11 @@ class VItem(QGraphicsPathItem):
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.W_INPUT:
-                brush = QBrush(QColor("black"))
+                brush = QBrush(QColor(BLACK))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.W_OUTPUT:
-                brush = QBrush(QColor("black"))
+                brush = QBrush(QColor(BLACK))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             else:
