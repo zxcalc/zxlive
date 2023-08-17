@@ -13,7 +13,7 @@ from pyzx import basicrules
 from pyzx.graph import GraphDiff
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w
 
-from .common import VT, ET, GraphT
+from .common import VT, ET, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
 from .proof import ProofModel, Rewrite
 
@@ -187,7 +187,7 @@ class AddWNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, self.y-0.3, self.x)
+        self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, self.y - W_INPUT_OFFSET, self.x)
         self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, self.y, self.x)
         self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
         self.update_graph_view()

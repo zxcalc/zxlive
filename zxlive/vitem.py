@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.utils import VertexType, phase_to_s, get_w_partner
 
-from .common import VT, ET, GraphT, SCALE, pos_to_view, pos_from_view
+from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -305,7 +305,7 @@ class VItem(QGraphicsPathItem):
                 if self.g.type(self.v) == VertexType.W_INPUT:
                     # set the position of w_in to next to w_out at the same angle
                     w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
-                    w_in_pos = w_out.pos() + QPointF(0, 0.3 *SCALE)
+                    w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
                     w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
                 scene = self.scene()
