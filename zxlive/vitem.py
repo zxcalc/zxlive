@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 
 
-from pyzx.utils import VertexType, phase_to_s, get_w_partner
+from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w
 
 from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 
@@ -279,6 +279,8 @@ class VItem(QGraphicsPathItem):
             for it in scene.items():
                 if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
                     continue
+                if isinstance(it, VItem) and vertex_is_w(self.g.type(self.v)) and get_w_partner(self.g, self.v) == it.v:
+                    continue
                 if it == self._dragged_on:
                     reset = False
                 elif isinstance(it, VItem) and it != self:
@@ -313,10 +315,16 @@ class VItem(QGraphicsPathItem):
                 if self._dragged_on is not None and len(scene.selectedItems()) == 1:
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
-                    scene.vertices_moved.emit([
-                        (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
-                        for it in scene.selectedItems() if isinstance(it, VItem)
-                    ])
+                    moved_vertices = []
+                    for it in scene.selectedItems():
+                        if not isinstance(it, VItem):
+                            continue
+                        moved_vertices.append(it)
+                        if vertex_is_w(self.g.type(it.v)):
+                            partner = get_w_partner_vitem(self.g, self.graph_scene, it.v)
+                            if partner:
+                                moved_vertices.append(partner)
+                    scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
                 self._dragged_on = None
                 self._old_pos = None
         else:
