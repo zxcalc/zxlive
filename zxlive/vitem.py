@@ -426,7 +426,7 @@ def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
         math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
     )
 
-def get_w_partner_vitem(g: GraphT, graph_scene: GraphScene, v: VT) -> VItem:
+def get_w_partner_vitem(g: GraphT, graph_scene: GraphScene, v: VT) -> Optional[VItem]:
     """Get the VItem of the partner of a w_in or w_out vertex."""
     assert g.type(v) in {VertexType.W_INPUT, VertexType.W_OUTPUT}
     partner = get_w_partner(g, v)

@@ -17,7 +17,7 @@ from .utils import get_data
 from .common import VT, GraphT, ToolType
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
-    AddEdge, AddNode, AddNonFlexNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeType,
+    AddEdge, AddNode, AddWNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeType,
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
@@ -169,7 +169,7 @@ class GraphEditPanel(BasePanel):
 
     def _add_vert(self, x: float, y: float) -> None:
         if self._curr_vty == VertexType.W_OUTPUT:
-            cmd = AddNonFlexNode(self.graph_view, x, y)
+            cmd = AddWNode(self.graph_view, x, y)
         else:
             cmd = AddNode(self.graph_view, x, y, self._curr_vty)
         self.undo_stack.push(cmd)
@@ -240,7 +240,7 @@ class GraphEditPanel(BasePanel):
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(list(set(rem_vertices)))
-        cmd = SetGraph(self.graph_view,new_g) if len(rem_vertices) > 128 \
+        cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
             else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 

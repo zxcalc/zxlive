@@ -171,8 +171,8 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
 @dataclass
-class AddNonFlexNode(BaseCommand):
-    """Adds a new non-flexsymmetric node at a given position."""
+class AddWNode(BaseCommand):
+    """Adds a new W node at a given position."""
     x: float
     y: float
 
