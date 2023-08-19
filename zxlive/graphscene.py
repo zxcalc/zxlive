@@ -143,8 +143,9 @@ class GraphScene(QGraphicsScene):
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
 
-        # So we only have to make sure that the existing vertices and edges
-        # are updated to match the new graph structure
+        for v in diff.new_verts:
+            self.vertex_map[v].set_vitem_rotation()
+
         for v in diff.changed_vertex_types:
             self.vertex_map[v].refresh()
 
@@ -156,6 +157,7 @@ class GraphScene(QGraphicsScene):
             for anim in v_item.active_animations.copy():
                 anim.stop()
             v_item.set_pos_from_graph()
+            v_item.set_vitem_rotation()
 
         for e in diff.changed_edge_types:
             self.edge_map[e].refresh()
