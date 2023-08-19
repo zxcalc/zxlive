@@ -39,7 +39,6 @@ class EItem(QGraphicsPathItem):
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, graph_scene.g.edge_type(e) != EdgeType.W_IO)
 
         self.graph_scene = graph_scene
         self.e = e
@@ -64,6 +63,8 @@ class EItem(QGraphicsPathItem):
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
 
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable,
+                     self.g.edge_type(self.e) != EdgeType.W_IO)
         # set color/style according to edge type
         pen = QPen()
         pen.setWidthF(3)
