@@ -7,3 +7,4 @@ Thanks for wanting to contribute to ZXLive! Here are a couple of things you migh
 - When doing any kind of GUI stuff, check whether the thing you want to implement has an implementation in Qt you can use.
 - We use the Model/View distinction. Try to separate out the logic of a Thing  (Model) and the way it is drawn (View) as much as possible. 
 - We aim to get to 100% type annotation coverage and to have no mypy complaints. If you contribute, consider including types as much as possible (although this is not a requirement).
+- If you are implementing a GUI feature that you think the user might want to use with any kind of regularity, consider adding an appropriate hotkey for it.
