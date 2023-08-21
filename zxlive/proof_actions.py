@@ -6,6 +6,7 @@ import networkx as nx
 from networkx.algorithms.isomorphism import GraphMatcher, categorical_node_match
 import numpy as np
 import pyzx
+from networkx.classes.reportviews import NodeView
 from pyzx.utils import VertexType, EdgeType
 from shapely import Polygon
 
@@ -143,7 +144,7 @@ def to_networkx(graph: Graph) -> nx.Graph:
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
-def create_subgraph(graph: Graph, verts: List[VT]) -> nx.Graph:
+def create_subgraph(graph: Graph, verts: List[VT]) -> tuple[nx.Graph, dict[str, int]]:
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
     boundary_mapping = {}
@@ -161,7 +162,7 @@ def create_subgraph(graph: Graph, verts: List[VT]) -> nx.Graph:
 def custom_matcher(graph: Graph, in_selection: Callable[[VT], bool], lhs_graph: nx.Graph) -> List[VT]:
     verts = [v for v in graph.vertices() if in_selection(v)]
     subgraph_nx, _ = create_subgraph(graph, verts)
-    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
+    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,
         node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
     if graph_matcher.is_isomorphic():
         return verts
@@ -169,7 +170,7 @@ def custom_matcher(graph: Graph, in_selection: Callable[[VT], bool], lhs_graph: 
 
 def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph: nx.Graph) -> pyzx.rules.RewriteOutputType[ET,VT]:
     subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
-    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,\
+    graph_matcher = GraphMatcher(lhs_graph, subgraph_nx,
         node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
     matching = list(graph_matcher.match())[0]
 
@@ -178,7 +179,7 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
         if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
             vertices_to_remove.append(matching[v])
 
-    boundary_vertex_map = {}
+    boundary_vertex_map: dict[NodeView, int] = {}
     for v in rhs_graph.nodes():
         if rhs_graph.nodes()[v]['type'] == VertexType.BOUNDARY:
             for x, data in lhs_graph.nodes(data=True):
@@ -209,16 +210,16 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
 
     return etab, vertices_to_remove, [], True
 
-def get_vertex_positions(graph, rhs_graph, boundary_vertex_map):
+def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, dict]:
     pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
     coords = np.array(list(pos_dict.values()))
     center = np.mean(coords, axis=0)
     angles = np.arctan2(coords[:,1]-center[1], coords[:,0]-center[0])
     coords = coords[np.argsort(-angles)]
     try:
-        area = Polygon(coords).area
+        area = float(Polygon(coords).area)
     except:
-        area = 1
+        area = 1.
     k = (area ** 0.5) / len(rhs_graph)
     return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
 

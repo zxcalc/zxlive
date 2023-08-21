@@ -11,14 +11,13 @@ from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout, QListView, \
     QStyledItemDelegate, QStyleOptionViewItem, QStyle, QAbstractItemView
 from pyzx import VertexType, basicrules
 
-from .common import ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
+from .common import get_data, ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .graphscene import GraphScene
 from .graphview import WandTrace, GraphTool
 from .eitem import EItem
 from .proof import ProofModel
-from .utils import get_data
 from .vitem import VItem, ZX_GREEN, DragState
 from . import proof_actions
 from . import animations as anims
@@ -350,7 +349,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             option.rect.width(),
             text_height
         )
-        if option.state & QStyle.State_Selected:
+        if option.state & QStyle.StateFlag.State_Selected:
             option.font.setWeight(QFont.Weight.Bold)
         painter.setFont(option.font)
         painter.setPen(Qt.GlobalColor.black)

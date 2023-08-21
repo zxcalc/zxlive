@@ -39,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "PySide6-stubs",
+    "shapely-stubs @ git+https://github.com/ciscorn/shapely-stubs.git",
     "mypy",
 ]
 
