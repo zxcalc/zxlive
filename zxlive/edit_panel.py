@@ -60,7 +60,7 @@ class GraphEditPanel(BasePanel):
         super().__init__(graph, self.graph_scene)
 
         self.sidebar = QSplitter(self)
-        self.sidebar.setOrientation(Qt.Vertical)
+        self.sidebar.setOrientation(Qt.Orientation.Vertical)
         self.splitter.addWidget(self.sidebar)
         self.vertex_list = self.create_list_widget(VERTICES, self._vty_clicked)
         self.edge_list = self.create_list_widget(EDGES, self._ety_clicked)
@@ -79,18 +79,18 @@ class GraphEditPanel(BasePanel):
         for value in data.values():
             icon = self.create_icon(*value["icon"])
             item = QListWidgetItem(icon, value["text"])
-            item.setData(Qt.UserRole, value["type"])
+            item.setData(Qt.ItemDataRole.UserRole, value["type"])
             list_widget.addItem(item)
-        list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.UserRole)))
+        list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
         list_widget.setCurrentItem(list_widget.item(0))
         return list_widget
 
     def create_icon(self, shape: str, color: str) -> QIcon:
         icon = QIcon()
         pixmap = QPixmap(64, 64)
-        pixmap.fill(Qt.transparent)
+        pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(QPen(QColor("black"), 6))
         painter.setBrush(QColor(color))
         if shape == "circle":
@@ -100,7 +100,7 @@ class GraphEditPanel(BasePanel):
         elif shape == "line":
             painter.drawLine(0, 32, 64, 32)
         elif shape == "dashed_line":
-            painter.setPen(QPen(QColor(color), 6, Qt.DashLine))
+            painter.setPen(QPen(QColor(color), 6, Qt.PenStyle.DashLine))
             painter.drawLine(0, 32, 64, 32)
         painter.end()
         icon.addPixmap(pixmap)
@@ -169,8 +169,7 @@ class GraphEditPanel(BasePanel):
                 self, "Input Dialog", "Enter Qubit Index:"
             )
             try:
-                input_ = int(input_.strip())
-                self.graph.set_qubit(v, input_)
+                self.graph.set_qubit(v, int(input_.strip()))
             except ValueError:
                 show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
             return

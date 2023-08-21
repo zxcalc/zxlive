@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
@@ -9,11 +9,15 @@ from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox, QDialog, QFormL
 import numpy as np
 from pyzx import Circuit, extract_circuit
 from pyzx.graph.base import BaseGraph
+
 from zxlive import proof_actions
 
 from zxlive.proof import ProofModel
 
 from .common import VT,ET, GraphT, Graph
+
+if TYPE_CHECKING:
+    from .mainwindow import MainWindow
 
 
 class FileFormat(Enum):
@@ -198,7 +202,7 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tu
         return None
     return file_path, selected_format
 
-def create_new_rewrite(parent) -> None:
+def create_new_rewrite(parent: MainWindow) -> None:
     dialog = QDialog()
     parent.rewrite_form = QFormLayout(dialog)
     name = QLineEdit()
@@ -209,14 +213,16 @@ def create_new_rewrite(parent) -> None:
     right_button = QPushButton("Right-hand side of the rule")
     parent.left_graph = None
     parent.right_graph = None
-    def get_file(self, button, side) -> None:
+
+    def get_file(self: MainWindow, button: QPushButton, side: str) -> None:
         out = import_diagram_dialog(self)
-        if out is not None:
+        if out is not None and isinstance(out, ImportGraphOutput):
             button.setText(out.file_path)
             if side == "left":
                 self.left_graph = out.g
             else:
                 self.right_graph = out.g
+
     left_button.clicked.connect(lambda: get_file(parent, left_button, "left"))
     right_button.clicked.connect(lambda: get_file(parent, right_button, "right"))
     parent.rewrite_form.addRow(left_button)

@@ -349,7 +349,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             option.rect.width(),
             text_height
         )
-        if option.state & QStyle.State_Selected:
+        if option.state & QStyle.StateFlag.State_Selected:
             option.font.setWeight(QFont.Weight.Bold)
         painter.setFont(option.font)
         painter.setPen(Qt.GlobalColor.black)
