@@ -8,3 +8,7 @@ Thanks for wanting to contribute to ZXLive! Here are a couple of things you migh
 - We use the Model/View distinction. Try to separate out the logic of a Thing  (Model) and the way it is drawn (View) as much as possible. 
 - We aim to get to 100% type annotation coverage and to have no mypy complaints. If you contribute, consider including types as much as possible (although this is not a requirement).
 - If you are implementing a GUI feature that you think the user might want to use with any kind of regularity, consider adding an appropriate hotkey for it.
+
+Overview of the different source files of ZXLive:
+
+![ZXLive file structure](ZXLive_file_overview.png "ZXLive file structure")
