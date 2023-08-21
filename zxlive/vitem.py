@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 from enum import Enum
+import math
 
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
@@ -25,10 +26,9 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 
 
-from pyzx.graph.base import VertexType
-from pyzx.utils import phase_to_s
+from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w
 
-from .common import VT, ET, GraphT, SCALE, pos_to_view, pos_from_view
+from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -41,6 +41,7 @@ ZX_RED = "#ff8888"
 ZX_RED_PRESSED = "#bb0f0f"
 H_YELLOW = "#ffff00"
 H_YELLOW_PRESSED = "#f1c232"
+BLACK = "#000000"
 
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
@@ -95,6 +96,7 @@ class VItem(QGraphicsPathItem):
 
         self._old_pos = None
         self._dragged_on = None
+        self._last_pos = None
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -102,15 +104,25 @@ class VItem(QGraphicsPathItem):
 
         pen = QPen()
         pen.setWidthF(3)
-        pen.setColor(QColor("black"))
+        pen.setColor(QColor(BLACK))
         self.setPen(pen)
 
         path = QPainterPath()
         if self.g.type(self.v) == VertexType.H_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        elif self.g.type(self.v) == VertexType.W_OUTPUT:
+            #draw a triangle
+            path.moveTo(0, 0.2 * SCALE)
+            path.lineTo(0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(0, 0.2 * SCALE)
+        elif self.g.type(self.v) == VertexType.W_INPUT:
+            scale = 0.3 * SCALE
+            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         self.setPath(path)
+        self.set_vitem_rotation()
         self.refresh()
 
     @property
@@ -135,11 +147,15 @@ class VItem(QGraphicsPathItem):
                 self.setBrush(QBrush(QColor(ZX_RED)))
             elif t == VertexType.H_BOX:
                 self.setBrush(QBrush(QColor(H_YELLOW)))
+            elif t == VertexType.W_INPUT:
+                self.setBrush(QBrush(QColor(BLACK)))
+            elif t == VertexType.W_OUTPUT:
+                self.setBrush(QBrush(QColor(BLACK)))
             else:
-                self.setBrush(QBrush(QColor("#000000")))
+                self.setBrush(QBrush(QColor(BLACK)))
             pen = QPen()
             pen.setWidthF(3)
-            pen.setColor(QColor("black"))
+            pen.setColor(QColor(BLACK))
             self.setPen(pen)
 
         if self.isSelected():
@@ -158,6 +174,14 @@ class VItem(QGraphicsPathItem):
                 brush = QBrush(QColor(H_YELLOW_PRESSED))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
+            elif t == VertexType.W_INPUT:
+                brush = QBrush(QColor(BLACK))
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+                self.setBrush(brush)
+            elif t == VertexType.W_OUTPUT:
+                brush = QBrush(QColor(BLACK))
+                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+                self.setBrush(brush)
             else:
                 brush = QBrush(QColor("#444444"))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
@@ -167,9 +191,20 @@ class VItem(QGraphicsPathItem):
 
         if self.phase_item:
             self.phase_item.refresh()
+        if self.g.type(self.v) == VertexType.W_INPUT:
+            w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if w_out:
+                w_out.refresh()
 
         for e_item in self.adj_items:
             e_item.refresh()
+
+    def set_vitem_rotation(self):
+        if self.g.type(self.v) == VertexType.W_OUTPUT:
+            w_in = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if w_in:
+                angle = math.atan2(self.pos().x() - w_in.pos().x(), w_in.pos().y() - self.pos().y())
+                self.setRotation(math.degrees(angle))
 
     def set_pos_from_graph(self) -> None:
         self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
@@ -228,10 +263,23 @@ class VItem(QGraphicsPathItem):
             return
         scene = self.scene()
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if self.is_dragging and self.g.type(self.v) == VertexType.W_OUTPUT:
+            w_in = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if self._last_pos is None:
+                self._last_pos = self.pos()
+            w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
+            self._last_pos = self.pos()
+        elif self.is_dragging and self.g.type(self.v) == VertexType.W_INPUT:
+            w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            if w_out is None:
+                return
+            w_out.set_vitem_rotation()
         if self.is_dragging and len(scene.selectedItems()) == 1:
             reset = True
             for it in scene.items():
                 if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
+                    continue
+                if isinstance(it, VItem) and vertex_is_w(self.g.type(self.v)) and get_w_partner(self.g, self.v) == it.v:
                     continue
                 if it == self._dragged_on:
                     reset = False
@@ -256,15 +304,27 @@ class VItem(QGraphicsPathItem):
             return
         if e.button() == Qt.MouseButton.LeftButton:
             if self._old_pos != self.pos():
+                if self.g.type(self.v) == VertexType.W_INPUT:
+                    # set the position of w_in to next to w_out at the same angle
+                    w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+                    w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
+                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
+                    self.setPos(w_in_pos)
                 scene = self.scene()
                 if TYPE_CHECKING: assert isinstance(scene, GraphScene)
                 if self._dragged_on is not None and len(scene.selectedItems()) == 1:
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
-                    scene.vertices_moved.emit([
-                        (it.v, *pos_from_view(it.pos().x(),it.pos().y()))
-                        for it in scene.selectedItems() if isinstance(it, VItem)
-                    ])
+                    moved_vertices = []
+                    for it in scene.selectedItems():
+                        if not isinstance(it, VItem):
+                            continue
+                        moved_vertices.append(it)
+                        if vertex_is_w(self.g.type(it.v)):
+                            partner = get_w_partner_vitem(self.g, self.graph_scene, it.v)
+                            if partner:
+                                moved_vertices.append(partner)
+                    scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
                 self._dragged_on = None
                 self._old_pos = None
         else:
@@ -364,3 +424,20 @@ class PhaseItem(QGraphicsTextItem):
             self.setPlainText(str(int(self.v_item.g.qubit(self.v_item.v))))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
+
+
+def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
+    """Rotate a point around an origin by an angle in degrees."""
+    angle = math.radians(angle)
+    return QPointF(
+        math.cos(angle) * (p.x() - origin.x()) - math.sin(angle) * (p.y() - origin.y()) + origin.x(),
+        math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
+    )
+
+def get_w_partner_vitem(g: GraphT, graph_scene: GraphScene, v: VT) -> Optional[VItem]:
+    """Get the VItem of the partner of a w_in or w_out vertex."""
+    assert g.type(v) in {VertexType.W_INPUT, VertexType.W_OUTPUT}
+    partner = get_w_partner(g, v)
+    if partner not in graph_scene.vertex_map:
+        return None
+    return graph_scene.vertex_map[partner]

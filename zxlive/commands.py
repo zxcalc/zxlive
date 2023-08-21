@@ -1,6 +1,7 @@
+from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Optional, Iterable, Set, Union, List, Any
+from typing import Dict, Optional, Iterable, Set, Union, List, Any
 import copy
 
 from PySide6.QtCore import QItemSelection, QModelIndex, QItemSelectionModel, \
@@ -10,9 +11,9 @@ from PySide6.QtWidgets import QListView
 
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
-from pyzx.utils import EdgeType, VertexType
+from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w
 
-from .common import VT, ET, GraphT
+from .common import VT, ET, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
 from .proof import ProofModel, Rewrite
 
@@ -34,7 +35,7 @@ class BaseCommand(QUndoCommand):
         # hook it into `__post_init__`.
         super().__init__()
         self.g = copy.deepcopy(self.graph_view.graph_scene.g)
-        
+
     def update_graph_view(self, select_new: bool = False) -> None:
         """Notifies the graph view that graph needs to be redrawn.
 
@@ -83,23 +84,50 @@ class UpdateGraph(BaseCommand):
 
 
 @dataclass
-class ChangeNodeColor(BaseCommand):
+class ChangeNodeType(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: Iterable[VT]
     vty: VertexType.Type
 
+    WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
+
     _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
+    _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
         for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
+            if vertex_is_w(old_vty):
+                v2 = self._old_w_info[v].partner
+                self.g.add_vertex_indexed(v2)
+                self.g.set_type(v2, self._old_w_info[v].partner_type)
+                self.g.set_row(v2, self._old_w_info[v].partner_pos[0])
+                self.g.set_qubit(v2, self._old_w_info[v].partner_pos[1])
+                self.g.add_edge(self.g.edge(v,v2), edgetype=EdgeType.W_IO)
+                for v3 in self._old_w_info[v].neighbors:
+                    self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
+                    self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
         self.update_graph_view()
 
     def redo(self) -> None:
+        if self._old_w_info is None:
+            self._old_w_info = {}
+        if vertex_is_w(self.vty):
+            return
         self._old_vtys = [self.g.type(v) for v in self.vs]
-        for v in self.vs:
-            self.g.set_type(v, self.vty)
+        for v1 in self.vs:
+            if vertex_is_w(self.g.type(v1)):
+                v2 = get_w_partner(self.g, v1)
+                v2_neighbors = [v for v in self.g.neighbors(v2) if v != v1]
+                for v3 in v2_neighbors:
+                    self.g.add_edge(self.g.edge(v1,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
+                self._old_w_info[v1] = self.WInfo(partner=v2,
+                                                  partner_type=self.g.type(v2),
+                                                  partner_pos=(self.g.row(v2), self.g.qubit(v2)),
+                                                  neighbors=v2_neighbors)
+                self.g.remove_vertex(v2)
+            self.g.set_type(v1, self.vty)
         self.update_graph_view()
 
 
@@ -142,6 +170,27 @@ class AddNode(BaseCommand):
         self._added_vert = self.g.add_vertex(self.vty, self.y, self.x)
         self.update_graph_view()
 
+@dataclass
+class AddWNode(BaseCommand):
+    """Adds a new W node at a given position."""
+    x: float
+    y: float
+
+    _added_input_vert: Optional[VT] = field(default=None, init=False)
+    _added_output_vert: Optional[VT] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._added_input_vert is not None
+        assert self._added_output_vert is not None
+        self.g.remove_vertex(self._added_input_vert)
+        self.g.remove_vertex(self._added_output_vert)
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, self.y - W_INPUT_OFFSET, self.x)
+        self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, self.y, self.x)
+        self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
+        self.update_graph_view()
 
 @dataclass
 class AddEdge(BaseCommand):

@@ -1,41 +1,50 @@
 import copy
+from enum import Enum
 from fractions import Fraction
-from typing import Iterator, TypedDict, Callable
-from PySide6.QtCore import Signal, QSize, Qt
+from typing import Dict, Iterator, TypedDict, Callable, Union
+from PySide6.QtCore import Signal, QSize, Qt, QPoint
 
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
 from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
 from pyzx import EdgeType, VertexType
+from pyzx.utils import vertex_is_w, get_w_partner
 from sympy import sympify
 
-from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
+from .vitem import BLACK, ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
 
 from .common import VT, GraphT, ToolType, get_data
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
-    AddEdge, AddNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,
+    AddEdge, AddNode, AddWNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeType,
     ChangeEdgeColor)
 from .dialogs import show_error_msg
 from .graphscene import EditGraphScene
 
 
+class ShapeType(Enum):
+    CIRCLE = 1
+    SQUARE = 2
+    TRIANGLE = 3
+    LINE = 4
+    DASHED_LINE = 5
+
 class DrawPanelNodeType(TypedDict):
     text: str
-    type: VertexType.Type
-    icon: tuple[str, str]
+    icon: tuple[ShapeType, str]
 
 
-VERTICES: dict[str, DrawPanelNodeType] = {
-    "Z": {"text": "Z spider", "type": VertexType.Z, "icon": ("circle", ZX_GREEN)},
-    "X": {"text": "X spider", "type": VertexType.X, "icon": ("circle", ZX_RED)},
-    "H": {"text": "H box", "type": VertexType.H_BOX, "icon": ("square", H_YELLOW)},
-    "T": {"text": "boundary", "type": VertexType.BOUNDARY, "icon": ("circle", "black")},
+VERTICES: dict[VertexType.Type, DrawPanelNodeType] = {
+    VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, ZX_GREEN)},
+    VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, ZX_RED)},
+    VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, H_YELLOW)},
+    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, BLACK)},
+    VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, BLACK)},
 }
 
-EDGES: dict[str, DrawPanelNodeType] = {
-    "SIMPLE": {"text": "Simple", "type": EdgeType.SIMPLE, "icon": ("line", "black")},
-    "HADAMARD": {"text": "Hadamard", "type": EdgeType.HADAMARD, "icon": ("dashed_line", HAD_EDGE_BLUE)},
+EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
+    EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
+    EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
 }
 
 
@@ -67,7 +76,9 @@ class GraphEditPanel(BasePanel):
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
 
-    def create_list_widget(self, data: dict[str, DrawPanelNodeType], onclick: Callable[[EdgeType.Type], None]) -> QListWidget:
+    def create_list_widget(self,
+                           data: Dict[Union[VertexType.Type, EdgeType.Type], DrawPanelNodeType],
+                           onclick: Callable[[Union[VertexType.Type, EdgeType.Type]], None]) -> QListWidget:
         list_widget = QListWidget(self)
         list_widget.setResizeMode(QListView.ResizeMode.Adjust)
         list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -76,10 +87,10 @@ class GraphEditPanel(BasePanel):
         list_widget.setGridSize(QSize(60, 64))
         list_widget.setWordWrap(True)
         list_widget.setIconSize(QSize(24, 24))
-        for value in data.values():
+        for typ, value in data.items():
             icon = self.create_icon(*value["icon"])
             item = QListWidgetItem(icon, value["text"])
-            item.setData(Qt.ItemDataRole.UserRole, value["type"])
+            item.setData(Qt.ItemDataRole.UserRole, typ)
             list_widget.addItem(item)
         list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
         list_widget.setCurrentItem(list_widget.item(0))
@@ -91,15 +102,17 @@ class GraphEditPanel(BasePanel):
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor("black"), 6))
+        painter.setPen(QPen(QColor(BLACK), 6))
         painter.setBrush(QColor(color))
-        if shape == "circle":
+        if shape == ShapeType.CIRCLE:
             painter.drawEllipse(4, 4, 56, 56)
-        elif shape == "square":
+        elif shape == ShapeType.SQUARE:
             painter.drawRect(4, 4, 56, 56)
-        elif shape == "line":
+        elif shape == ShapeType.TRIANGLE:
+            painter.drawPolygon([QPoint(32, 10), QPoint(2, 60), QPoint(62, 60)])
+        elif shape == ShapeType.LINE:
             painter.drawLine(0, 32, 64, 32)
-        elif shape == "dashed_line":
+        elif shape == ShapeType.DASHED_LINE:
             painter.setPen(QPen(QColor(color), 6, Qt.PenStyle.DashLine))
             painter.drawLine(0, 32, 64, 32)
         painter.end()
@@ -140,7 +153,7 @@ class GraphEditPanel(BasePanel):
         self._curr_vty = vty
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) > 0:
-            cmd = ChangeNodeColor(self.graph_view, selected, vty)
+            cmd = ChangeNodeType(self.graph_view, selected, vty)
             self.undo_stack.push(cmd)
 
     def _ety_clicked(self, ety: EdgeType.Type) -> None:
@@ -152,10 +165,19 @@ class GraphEditPanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def _add_vert(self, x: float, y: float) -> None:
-        cmd = AddNode(self.graph_view, x, y, self._curr_vty)
+        if self._curr_vty == VertexType.W_OUTPUT:
+            cmd = AddWNode(self.graph_view, x, y)
+        else:
+            cmd = AddNode(self.graph_view, x, y, self._curr_vty)
         self.undo_stack.push(cmd)
 
     def _add_edge(self, u: VT, v: VT) -> None:
+        g = self.graph_scene.g
+        if vertex_is_w(g.type(u)) and get_w_partner(g, u) == v:
+            return
+        if g.type(u) == VertexType.W_INPUT and len(g.neighbors(u)) >= 2 or \
+           g.type(v) == VertexType.W_INPUT and len(g.neighbors(v)) >= 2:
+            return
         cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
         self.undo_stack.push(cmd)
 
@@ -172,6 +194,8 @@ class GraphEditPanel(BasePanel):
                 self.graph.set_qubit(v, int(input_.strip()))
             except ValueError:
                 show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
+            return
+        elif vertex_is_w(self.graph.type(v)):
             return
 
         input_, ok = QInputDialog.getText(
@@ -198,12 +222,16 @@ class GraphEditPanel(BasePanel):
     def delete_selection(self) -> None:
         selection = list(self.graph_scene.selected_vertices)
         selected_edges = list(self.graph_scene.selected_edges)
-        if not selection and not selected_edges: return
+        rem_vertices = selection.copy()
+        for v in selection:
+            if vertex_is_w(self.graph_scene.g.type(v)):
+                rem_vertices.append(get_w_partner(self.graph_scene.g, v))
+        if not rem_vertices and not selected_edges: return
         new_g = copy.deepcopy(self.graph_scene.g)
         self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
-        new_g.remove_vertices(selection)
-        cmd = SetGraph(self.graph_view,new_g) if len(selection) > 128 \
+        new_g.remove_vertices(list(set(rem_vertices)))
+        cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
             else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
@@ -211,7 +239,7 @@ class GraphEditPanel(BasePanel):
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
 
 def string_to_phase(string: str) -> Fraction:
-    if not string: 
+    if not string:
         return Fraction(0)
     try:
         s = string.lower().replace(' ', '')

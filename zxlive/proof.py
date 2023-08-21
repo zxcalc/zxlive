@@ -5,7 +5,7 @@ from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelInde
 from PySide6.QtGui import QFont
 from pyzx.graph import GraphDiff
 
-from zxlive.common import GraphT
+from .common import GraphT
 
 
 class Rewrite(NamedTuple):
@@ -126,7 +126,7 @@ class ProofModel(QAbstractListModel):
             "initial_graph": initial_graph_tikz,
             "proof_steps": proof_steps
         })
-    
+
     @staticmethod
     def from_json(json_str: str) -> "ProofModel":
         """Deserializes the model from JSON."""

@@ -27,6 +27,8 @@ SCALE: Final = 60.0
 OFFSET_X: Final = 300 * SCALE
 OFFSET_Y: Final = 300 * SCALE
 
+W_INPUT_OFFSET: Final = 0.3
+
 MIN_ZOOM = 0.05
 MAX_ZOOM = 10.0
 

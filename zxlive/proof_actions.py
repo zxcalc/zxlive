@@ -202,6 +202,9 @@ def custom_rule(graph: Graph, vertices: List[VT], lhs_graph: nx.Graph, rhs_graph
     for v1, v2, data in rhs_graph.edges(data=True):
         v1 = vertex_map[v1]
         v2 = vertex_map[v2]
+        if data['type'] == EdgeType.W_IO:
+            graph.add_edge(graph.edge(v1, v2), EdgeType.W_IO)
+            continue
         if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
         etab[(v1, v2)][data['type']-1] += 1
 
@@ -231,6 +234,7 @@ def create_custom_rule(lhs_graph: Graph, rhs_graph: Graph) -> Callable[[Graph, L
 
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
+w_fuse = ProofAction.from_dict(operations['fuse_w'])
 to_z = ProofAction.from_dict(operations['to_z'])
 to_x = ProofAction.from_dict(operations['to_x'])
 rem_id = ProofAction.from_dict(operations['rem_id'])
@@ -238,4 +242,4 @@ copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
 
-rewrites = [spider_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
+rewrites = [spider_fuse, w_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
