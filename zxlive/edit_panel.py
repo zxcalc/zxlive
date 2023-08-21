@@ -11,8 +11,7 @@ from sympy import sympify
 from .vitem import ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
 
-from .utils import get_data
-from .common import VT, GraphT, ToolType
+from .common import VT, GraphT, ToolType, get_data
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (
     AddEdge, AddNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeColor,

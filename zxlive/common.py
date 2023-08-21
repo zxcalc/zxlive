@@ -1,7 +1,14 @@
+import os
 from enum import IntEnum
 from typing import Final
 from typing_extensions import TypeAlias
 import pyzx
+
+_ROOT = os.path.abspath(os.path.dirname(__file__))
+
+def get_data(path: str) -> str:
+    return os.path.join(_ROOT, path)
+
 
 VT: TypeAlias = int
 ET: TypeAlias = tuple[int,int]
@@ -37,3 +44,4 @@ def pos_from_view_int(x:float,y: float) -> tuple[int, int]:
 
 def view_to_length(width:float,height:float)-> tuple[float, float]:
     return (width / SCALE, height / SCALE)
+
