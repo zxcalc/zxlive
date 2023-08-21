@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import copy
 from enum import Enum
 from fractions import Fraction
-from typing import Dict, Iterator, TypedDict, Callable, Union
+from typing import Iterator, TypedDict, Callable
 from PySide6.QtCore import Signal, QSize, Qt, QPoint
 
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
@@ -77,8 +79,8 @@ class GraphEditPanel(BasePanel):
         self.sidebar.addWidget(self.edge_list)
 
     def create_list_widget(self,
-                           data: Dict[Union[VertexType.Type, EdgeType.Type], DrawPanelNodeType],
-                           onclick: Callable[[Union[VertexType.Type, EdgeType.Type]], None]) -> QListWidget:
+                           data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
+                           onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
         list_widget = QListWidget(self)
         list_widget.setResizeMode(QListView.ResizeMode.Adjust)
         list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -96,7 +98,7 @@ class GraphEditPanel(BasePanel):
         list_widget.setCurrentItem(list_widget.item(0))
         return list_widget
 
-    def create_icon(self, shape: str, color: str) -> QIcon:
+    def create_icon(self, shape: ShapeType, color: str) -> QIcon:
         icon = QIcon()
         pixmap = QPixmap(64, 64)
         pixmap.fill(Qt.GlobalColor.transparent)
@@ -165,11 +167,10 @@ class GraphEditPanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def _add_vert(self, x: float, y: float) -> None:
-        if self._curr_vty == VertexType.W_OUTPUT:
-            cmd = AddWNode(self.graph_view, x, y)
-        else:
-            cmd = AddNode(self.graph_view, x, y, self._curr_vty)
-        self.undo_stack.push(cmd)
+        self.undo_stack.push(
+            AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT
+            else AddNode(self.graph_view, x, y, self._curr_vty)
+        )
 
     def _add_edge(self, u: VT, v: VT) -> None:
         g = self.graph_scene.g

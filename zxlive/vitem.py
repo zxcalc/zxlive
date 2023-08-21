@@ -77,6 +77,8 @@ class VItem(QGraphicsPathItem):
     # Vertex we are currently dragged on top of
     _dragged_on: Optional[VItem]
 
+    _last_pos: Optional[QPointF]
+
     class Properties(Enum):
         """Properties of a VItem that can be animated."""
         Position = 0
@@ -199,7 +201,7 @@ class VItem(QGraphicsPathItem):
         for e_item in self.adj_items:
             e_item.refresh()
 
-    def set_vitem_rotation(self):
+    def set_vitem_rotation(self) -> None:
         if self.g.type(self.v) == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self.g, self.graph_scene, self.v)
             if w_in:
@@ -265,6 +267,7 @@ class VItem(QGraphicsPathItem):
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
         if self.is_dragging and self.g.type(self.v) == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+            assert w_in is not None
             if self._last_pos is None:
                 self._last_pos = self.pos()
             w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
@@ -307,6 +310,7 @@ class VItem(QGraphicsPathItem):
                 if self.g.type(self.v) == VertexType.W_INPUT:
                     # set the position of w_in to next to w_out at the same angle
                     w_out = get_w_partner_vitem(self.g, self.graph_scene, self.v)
+                    assert w_out is not None
                     w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
                     w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
@@ -437,7 +441,7 @@ def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
 def get_w_partner_vitem(g: GraphT, graph_scene: GraphScene, v: VT) -> Optional[VItem]:
     """Get the VItem of the partner of a w_in or w_out vertex."""
     assert g.type(v) in {VertexType.W_INPUT, VertexType.W_OUTPUT}
-    partner = get_w_partner(g, v)
+    partner: int = get_w_partner(g, v)
     if partner not in graph_scene.vertex_map:
         return None
     return graph_scene.vertex_map[partner]
