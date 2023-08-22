@@ -57,40 +57,34 @@ class ProofAction(object):
         g.add_edge_table(etab)
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
-
+        anim_before = None
+        anim_after = None
         if self.name == operations['spider']['text'] or self.name == operations['fuse_w']['text']:
-            group = QParallelAnimationGroup()
+            anim_before = QParallelAnimationGroup()
             for v1, v2 in matches:
                 if v1 in rem_verts:
                     v1, v2 = v2, v1
-                group.addAnimation(anims.fuse(panel.graph_scene.vertex_map[v2], panel.graph_scene.vertex_map[v1]))
-            panel.undo_stack.push(cmd, anim_before=group)
+                anim_before.addAnimation(anims.fuse(panel.graph_scene.vertex_map[v2], panel.graph_scene.vertex_map[v1]))
         elif self.name == operations['to_z']['text']:
             print('To do: animate ' + self.name)
-            panel.undo_stack.push(cmd)
         elif self.name == operations['to_x']['text']:
             print('To do: animate ' + self.name)
-            panel.undo_stack.push(cmd)
         elif self.name == operations['rem_id']['text']:
-            group = QParallelAnimationGroup()
+            anim_before = QParallelAnimationGroup()
             for m in matches:
-                group.addAnimation(anims.remove_id(panel.graph_scene.vertex_map[m[0]]))
-            panel.undo_stack.push(cmd, anim_before=group)
+                anim_before.addAnimation(anims.remove_id(panel.graph_scene.vertex_map[m[0]]))
         elif self.name == operations['copy']['text']:
-            group = QParallelAnimationGroup()
+            anim_after = QParallelAnimationGroup()
             for m in matches:
-                group.addAnimation(anims.strong_comp(panel.graph, g, m[1], panel.graph_scene))
-            panel.undo_stack.push(cmd, anim_after=group)
+                anim_after.addAnimation(anims.strong_comp(panel.graph, g, m[1], panel.graph_scene))
         elif self.name == operations['pauli']['text']:
             print('To do: animate ' + self.name)
-            panel.undo_stack.push(cmd)
         elif self.name == operations['bialgebra']['text']:
-            group = QParallelAnimationGroup()
+            anim_after = QParallelAnimationGroup()
             for v1, v2 in matches:
-                group.addAnimation(anims.strong_comp(panel.graph, g, v2, panel.graph_scene))
-            panel.undo_stack.push(cmd, anim_after=group)
-        else:
-            panel.undo_stack.push(cmd)
+                anim_after.addAnimation(anims.strong_comp(panel.graph, g, v2, panel.graph_scene))
+
+        panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
         if self.match_type == MATCHES_VERTICES:
