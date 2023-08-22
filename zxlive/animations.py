@@ -171,8 +171,9 @@ def shake(it: VItem, amount: float, duration: int) -> None:
 
 def anticipate_fuse(it: VItem) -> None:
     """Animation that is played when a fuseable spider is dragged onto a vertex."""
-    if vertex_is_w(it.type):
-        scale(get_w_partner_vitem(it), target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
+    if vertex_is_w(it.ty):
+        assert (w_partner := get_w_partner_vitem(it)) is not None
+        scale(w_partner, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
     scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
 
 
@@ -181,10 +182,12 @@ def fuse(dragged: VItem, target: VItem) -> QAbstractAnimation:
     group = QParallelAnimationGroup()
     group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))
-    if vertex_is_w(dragged.type):
-        group.addAnimation(move(get_w_partner_vitem(dragged), target=target.pos(), duration=100,
+    if vertex_is_w(dragged.ty):
+        assert (dragged_w_partner := get_w_partner_vitem(dragged)) is not None
+        assert (target_w_partner := get_w_partner_vitem(target)) is not None
+        group.addAnimation(move(dragged_w_partner, target=target.pos(), duration=100,
                                 ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
-        group.addAnimation(scale(get_w_partner_vitem(target), target=1, duration=100,
+        group.addAnimation(scale(target_w_partner, target=1, duration=100,
                                  ease=QEasingCurve(QEasingCurve.Type.InBack)))
 
     def set_z(state: QAbstractAnimation.State) -> None:
@@ -217,8 +220,9 @@ def back_to_default(it: VItem) -> None:
     for anim in it.active_animations.copy():
         anim.stop()
     scale(it, target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
-    if vertex_is_w(it.type):
-        scale(get_w_partner_vitem(it), target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
+    if vertex_is_w(it.ty):
+        assert (w_partner := get_w_partner_vitem(it)) is not None
+        scale(w_partner, target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
 
 
 def remove_id(it: VItem) -> VItemAnimation:
