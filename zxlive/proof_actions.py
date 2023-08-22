@@ -5,11 +5,11 @@ from typing import Callable, Literal, List, Optional, TYPE_CHECKING
 import pyzx
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
-from PySide6.QtCore import QParallelAnimationGroup
+from PySide6.QtCore import QParallelAnimationGroup, QEasingCurve
 
 from . import animations as anims
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT
+from .common import ANIMATION_DURATION, ET, GraphT, VT
 from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
@@ -78,6 +78,15 @@ class ProofAction(object):
             anim_after = QParallelAnimationGroup()
             for v1, v2 in matches:
                 anim_after.addAnimation(anims.strong_comp(panel.graph, g, v2, panel.graph_scene))
+        elif isinstance(self.rule, CustomRule) and self.rule.last_rewrite_center is not None:
+            center = self.rule.last_rewrite_center
+            duration = ANIMATION_DURATION / 2
+            anim_before = anims.morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
+                                                      panel.graph_scene, center, duration,
+                                                      QEasingCurve(QEasingCurve.Type.InQuad))
+            anim_after = anims.morph_graph_from_center(g, lambda v: v not in panel.graph.graph,
+                                                       panel.graph_scene, center, duration,
+                                                       QEasingCurve(QEasingCurve.Type.OutQuad))
 
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 

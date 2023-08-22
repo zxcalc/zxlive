@@ -1,6 +1,6 @@
 import itertools
 import random
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
@@ -104,6 +104,46 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
         anim.setEasingCurve(ease)
         group.addAnimation(anim)
     return group
+
+
+def _morph_graph_to_or_from_center(to_center: bool,
+                                   graph: GraphT,
+                                   vertex_filter: Callable[[VT], bool],
+                                   scene: GraphScene,
+                                   center: Tuple[int, int],
+                                   duration: int,
+                                   ease: QEasingCurve) -> QAbstractAnimation:
+    """Morphs a graph to or from the centre by moving the vertices."""
+    moves = (v for v in graph.vertices() if vertex_filter(v))
+    group = QParallelAnimationGroup()
+    for v in moves:
+        if to_center:
+            start_pos, end_pos = (graph.row(v), graph.qubit(v)), center
+        else:
+            start_pos, end_pos = center, (graph.row(v), graph.qubit(v))
+        anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
+        anim.setDuration(duration)
+        anim.setStartValue(QPointF(*pos_to_view(*start_pos)))
+        anim.setEndValue(QPointF(*pos_to_view(*end_pos)))
+        anim.setEasingCurve(ease)
+        group.addAnimation(anim)
+    return group
+
+def morph_graph_to_center(graph: GraphT,
+                          vertex_filter: Callable[[VT], bool],
+                          scene: GraphScene,
+                          center: Tuple[int, int],
+                          duration: int,
+                          ease: QEasingCurve) -> QAbstractAnimation:
+    return _morph_graph_to_or_from_center(True, graph, vertex_filter, scene, center, duration, ease)
+
+def morph_graph_from_center(graph: GraphT,
+                            vertex_filter: Callable[[VT], bool],
+                            scene: GraphScene,
+                            center: Tuple[int, int],
+                            duration: int,
+                            ease: QEasingCurve) -> QAbstractAnimation:
+    return _morph_graph_to_or_from_center(False, graph, vertex_filter, scene, center, duration, ease)
 
 
 def shake(it: VItem, amount: float, duration: int) -> None:

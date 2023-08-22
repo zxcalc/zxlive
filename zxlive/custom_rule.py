@@ -18,6 +18,7 @@ class CustomRule:
         rhs_graph.auto_detect_io()
         self.lhs_graph = to_networkx(lhs_graph)
         self.rhs_graph = to_networkx(rhs_graph)
+        self.last_rewrite_center = None
 
     def __call__(self, graph: Graph, vertices: List[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
@@ -40,6 +41,7 @@ class CustomRule:
                         break
 
         vertex_positions = get_vertex_positions(graph, self.rhs_graph, boundary_vertex_map)
+        self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
         vertex_map = boundary_vertex_map
         for v in self.rhs_graph.nodes():
             if self.rhs_graph.nodes()[v]['type'] != VertexType.BOUNDARY:
