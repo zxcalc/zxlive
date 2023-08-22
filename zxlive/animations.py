@@ -5,10 +5,11 @@ from typing import Optional, Callable
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
+from pyzx.utils import vertex_is_w
 
 from .common import VT, GraphT, pos_to_view
 from .graphscene import GraphScene
-from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z
+from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
 
 
 class AnimatedUndoStack(QUndoStack):
@@ -130,6 +131,8 @@ def shake(it: VItem, amount: float, duration: int) -> None:
 
 def anticipate_fuse(it: VItem) -> None:
     """Animation that is played when a fuseable spider is dragged onto a vertex."""
+    if vertex_is_w(it.type):
+        scale(get_w_partner_vitem(it), target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
     scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
 
 
@@ -169,6 +172,8 @@ def back_to_default(it: VItem) -> None:
     for anim in it.active_animations.copy():
         anim.stop()
     scale(it, target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
+    if vertex_is_w(it.type):
+        scale(get_w_partner_vitem(it), target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
 
 
 def remove_id(it: VItem) -> VItemAnimation:
