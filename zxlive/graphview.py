@@ -68,7 +68,7 @@ class GraphView(QGraphicsView):
     def __init__(self, graph_scene: GraphScene) -> None:
         self.graph_scene = graph_scene
         self.tool = GraphTool.Selection
-        
+
         super().__init__(self.graph_scene)
         self.setMouseTracking(True)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -189,15 +189,14 @@ class GraphView(QGraphicsView):
     def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
         # We do this to allow for zooming
-        
+
         # If control is pressed, we want to zoom
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             ydelta = event.angleDelta().y()
             self.zoom(ydelta)
         else:
             super().wheelEvent(event)
-        
-        
+
     def zoom(self, ydelta: float) -> None:
         # Set Anchors
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
@@ -268,7 +267,7 @@ class GraphView(QGraphicsView):
         painter.drawLines(lines)
         painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
-    
+
     def _emit_sparkles(self, pos: QPointF, mult: int) -> None:
         for _ in range(mult * SPARKLE_COUNT):
             angle = random.random() * 2 * math.pi
@@ -299,14 +298,14 @@ class Sparkle(QGraphicsEllipseItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
         self.setBrush(QBrush(QColor(SPARKLE_COLOR)))
         self.setPen(QPen(Qt.PenStyle.NoPen))
-        
+
         scene.addItem(self)
 
         self.timer = QTimeLine(1000)
         self.timer.valueChanged.connect(self._timer_step)
         self.timer.start()
         self.show()
-        
+
     def _timer_step(self, value: float) -> None:
         dt = value - self.prev_value
         self.prev_value = value

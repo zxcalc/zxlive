@@ -186,7 +186,7 @@ class ProofPanel(BasePanel):
         vertex = item.v
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
             return False
-        
+
         if basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
             return True
