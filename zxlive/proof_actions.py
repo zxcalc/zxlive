@@ -58,9 +58,11 @@ class ProofAction(object):
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
 
-        if self.name == operations['spider']['text']:
+        if self.name == operations['spider']['text'] or self.name == operations['fuse_w']['text']:
             group = QParallelAnimationGroup()
             for v1, v2 in matches:
+                if v1 in rem_verts:
+                    v1, v2 = v2, v1
                 group.addAnimation(anims.fuse(panel.graph_scene.vertex_map[v2], panel.graph_scene.vertex_map[v1]))
             panel.undo_stack.push(cmd, anim_before=group)
         elif self.name == operations['to_z']['text']:

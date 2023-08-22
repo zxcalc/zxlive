@@ -141,6 +141,11 @@ def fuse(dragged: VItem, target: VItem) -> QAbstractAnimation:
     group = QParallelAnimationGroup()
     group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))
+    if vertex_is_w(dragged.type):
+        group.addAnimation(move(get_w_partner_vitem(dragged), target=target.pos(), duration=100,
+                                ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+        group.addAnimation(scale(get_w_partner_vitem(target), target=1, duration=100,
+                                 ease=QEasingCurve(QEasingCurve.Type.InBack)))
 
     def set_z(state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running:
