@@ -15,6 +15,7 @@ from zxlive import proof_actions
 from .proof import ProofModel
 
 from .common import VT,ET, GraphT, Graph
+from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -240,11 +241,12 @@ def create_new_rewrite(parent: MainWindow) -> None:
                 show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
             else:
                 show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
+        rule = CustomRule(parent.left_graph, parent.right_graph)
         rewrite = proof_actions.ProofAction.from_dict({
             "text":name.text(),
             "tooltip":description.toPlainText(),
-            "matcher": proof_actions.create_custom_matcher(parent.left_graph),
-            "rule": proof_actions.create_custom_rule(parent.left_graph, parent.right_graph),
+            "matcher": rule.matcher,
+            "rule": rule,
             "type": proof_actions.MATCHES_VERTICES,
         })
         proof_actions.rewrites.append(rewrite)
