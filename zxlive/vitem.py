@@ -77,6 +77,8 @@ class VItem(QGraphicsPathItem):
     # Vertex we are currently dragged on top of
     _dragged_on: Optional[VItem]
 
+    _last_pos: Optional[QPointF]
+
     class Properties(Enum):
         """Properties of a VItem that can be animated."""
         Position = 0
@@ -203,7 +205,7 @@ class VItem(QGraphicsPathItem):
         for e_item in self.adj_items:
             e_item.refresh()
 
-    def set_vitem_rotation(self):
+    def set_vitem_rotation(self) -> None:
         if self.type == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self)
             if w_in:
@@ -269,6 +271,7 @@ class VItem(QGraphicsPathItem):
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
         if self.is_dragging and self.type == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self)
+            assert w_in is not None
             if self._last_pos is None:
                 self._last_pos = self.pos()
             w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
@@ -311,6 +314,7 @@ class VItem(QGraphicsPathItem):
                 if self.type == VertexType.W_INPUT:
                     # set the position of w_in to next to w_out at the same angle
                     w_out = get_w_partner_vitem(self)
+                    assert w_out is not None
                     w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
                     w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
@@ -441,7 +445,7 @@ def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
 def get_w_partner_vitem(vitem: VItem) -> Optional[VItem]:
     """Get the VItem of the partner of a w_in or w_out vertex."""
     assert vertex_is_w(vitem.type)
-    partner = get_w_partner(vitem.g, vitem.v)
+    partner: int = get_w_partner(vitem.g, vitem.v)
     if partner not in vitem.graph_scene.vertex_map:
         return None
     return vitem.graph_scene.vertex_map[partner]

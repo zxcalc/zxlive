@@ -91,13 +91,14 @@ class ChangeNodeType(BaseCommand):
 
     WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
-    _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
+    _old_vtys: Optional[list[VertexType.Type]] = field(default=None, init=False)
     _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
         for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
             if vertex_is_w(old_vty):
+                assert self._old_w_info is not None
                 v2 = self._old_w_info[v].partner
                 self.g.add_vertex_indexed(v2)
                 self.g.set_type(v2, self._old_w_info[v].partner_type)
