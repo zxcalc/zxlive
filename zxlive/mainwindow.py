@@ -31,7 +31,7 @@ from .construct import *
 from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
-from pyzx import Graph, simplify, Circuit
+from pyzx import Graph, extract_circuit, simplify, Circuit
 
 
 class MainWindow(QMainWindow):
@@ -349,9 +349,15 @@ class MainWindow(QMainWindow):
             assert self.active_panel is not None
             old_graph = self.active_panel.graph
             new_graph = copy.deepcopy(old_graph)
-            reduction["function"](new_graph)
-            cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
-            self.active_panel.undo_stack.push(cmd)
+            try:
+                if reduction["in_place"]:
+                    reduction["function"](new_graph)
+                else:
+                    new_graph = reduction["function"](new_graph)
+                cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
+                self.active_panel.undo_stack.push(cmd)
+            except Exception as e:
+                show_error_msg("Error", str(e))
         return reduce
 
 
@@ -361,22 +367,23 @@ class SimpEntry(TypedDict):
     function: Callable[[BaseGraph], int | None | BaseGraph] | Callable[[BaseGraph | Circuit], int]
 
 simplifications: dict[str, SimpEntry] = {
-    'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp,},
-    'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp},
-    'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp},
-    'phase_free_simp': {"text": "phase_free_simp", "tool_tip":"phase_free_simp", "function": simplify.phase_free_simp},
-    'pivot_simp': {"text": "pivot_simp", "tool_tip":"pivot_simp", "function": simplify.pivot_simp},
-    'pivot_gadget_simp': {"text": "pivot_gadget_simp", "tool_tip":"pivot_gadget_simp", "function": simplify.pivot_gadget_simp},
-    'pivot_boundary_simp': {"text": "pivot_boundary_simp", "tool_tip":"pivot_boundary_simp", "function": simplify.pivot_boundary_simp},
-    'gadget_simp': {"text": "gadget_simp", "tool_tip":"gadget_simp", "function": simplify.gadget_simp},
-    'lcomp_simp': {"text": "lcomp_simp", "tool_tip":"lcomp_simp", "function": simplify.lcomp_simp},
-    'clifford_simp': {"text": "clifford_simp", "tool_tip":"clifford_simp", "function": simplify.clifford_simp},
-    'tcount': {"text": "tcount", "tool_tip":"tcount", "function": simplify.tcount},
-    'to_gh': {"text": "to_gh", "tool_tip":"to_gh", "function": simplify.to_gh},
-    'to_rg': {"text": "to_rg", "tool_tip":"to_rg", "function": simplify.to_rg},
-    'full_reduce': {"text": "full_reduce", "tool_tip":"full_reduce", "function": simplify.full_reduce},
-    'teleport_reduce': {"text": "teleport_reduce", "tool_tip":"teleport_reduce", "function": simplify.teleport_reduce},
-    'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar},
-    'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp},
-    'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph},
+    'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp, "in_place": True},
+    'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp, "in_place": True},
+    'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp, "in_place": True},
+    'phase_free_simp': {"text": "phase_free_simp", "tool_tip":"phase_free_simp", "function": simplify.phase_free_simp, "in_place": True},
+    'pivot_simp': {"text": "pivot_simp", "tool_tip":"pivot_simp", "function": simplify.pivot_simp, "in_place": True},
+    'pivot_gadget_simp': {"text": "pivot_gadget_simp", "tool_tip":"pivot_gadget_simp", "function": simplify.pivot_gadget_simp, "in_place": True},
+    'pivot_boundary_simp': {"text": "pivot_boundary_simp", "tool_tip":"pivot_boundary_simp", "function": simplify.pivot_boundary_simp, "in_place": True},
+    'gadget_simp': {"text": "gadget_simp", "tool_tip":"gadget_simp", "function": simplify.gadget_simp, "in_place": True},
+    'lcomp_simp': {"text": "lcomp_simp", "tool_tip":"lcomp_simp", "function": simplify.lcomp_simp, "in_place": True},
+    'clifford_simp': {"text": "clifford_simp", "tool_tip":"clifford_simp", "function": simplify.clifford_simp, "in_place": True},
+    'tcount': {"text": "tcount", "tool_tip":"tcount", "function": simplify.tcount, "in_place": True},
+    'to_gh': {"text": "to_gh", "tool_tip":"to_gh", "function": simplify.to_gh, "in_place": True},
+    'to_rg': {"text": "to_rg", "tool_tip":"to_rg", "function": simplify.to_rg, "in_place": True},
+    'full_reduce': {"text": "full_reduce", "tool_tip":"full_reduce", "function": simplify.full_reduce, "in_place": True},
+    'teleport_reduce': {"text": "teleport_reduce", "tool_tip":"teleport_reduce", "function": simplify.teleport_reduce, "in_place": True},
+    'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar, "in_place": True},
+    'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp, "in_place": True},
+    'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph, "in_place": True},
+    'extract_circuit': {"text": "extract_circuit", "tool_tip":"extract_circuit", "function": lambda g: extract_circuit(g).to_graph(), "in_place": False},
 }
