@@ -369,6 +369,7 @@ class SimpEntry(TypedDict):
 
 def _extract_circuit(graph: BaseGraph) -> BaseGraph:
     graph.auto_detect_io()
+    simplify.full_reduce(graph)
     return extract_circuit(graph).to_graph()
 
 simplifications: dict[str, SimpEntry] = {
