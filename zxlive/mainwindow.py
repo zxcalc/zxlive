@@ -366,6 +366,11 @@ class SimpEntry(TypedDict):
     tool_tip: str
     function: Callable[[BaseGraph], int | None | BaseGraph] | Callable[[BaseGraph | Circuit], int]
 
+
+def _extract_circuit(graph: BaseGraph) -> BaseGraph:
+    graph.auto_detect_io()
+    return extract_circuit(graph).to_graph()
+
 simplifications: dict[str, SimpEntry] = {
     'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp, "in_place": True},
     'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp, "in_place": True},
@@ -385,5 +390,5 @@ simplifications: dict[str, SimpEntry] = {
     'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar, "in_place": True},
     'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp, "in_place": True},
     'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph, "in_place": True},
-    'extract_circuit': {"text": "extract_circuit", "tool_tip":"extract_circuit", "function": lambda g: extract_circuit(g).to_graph(), "in_place": False},
+    'extract_circuit': {"text": "extract_circuit", "tool_tip":"extract_circuit", "function": _extract_circuit, "in_place": False},
 }
