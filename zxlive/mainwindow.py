@@ -66,7 +66,7 @@ class MainWindow(QMainWindow):
         w.layout().addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
-        tab_widget.tabCloseRequested.connect(lambda i: tab_widget.removeTab(i))
+        tab_widget.tabCloseRequested.connect(self.close_tab)
         self.tab_widget = tab_widget
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
@@ -230,16 +230,24 @@ class MainWindow(QMainWindow):
         i = self.tab_widget.currentIndex()
         if i == -1: # no tabs open
             self.close()
-        if not self.active_panel.undo_stack.isClean():
+        return self.close_tab(i)
+
+    def close_tab(self, i: int) -> bool:
+        if i == -1:
+            return False
+        if not self.tab_widget.widget(i).undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
-            if answer == QMessageBox.StandardButton.Cancel: return False
+            if answer == QMessageBox.StandardButton.Cancel:
+                return False
             if answer == QMessageBox.StandardButton.Yes:
+                self.tab_widget.setCurrentIndex(i)
                 val = self.save_file()
-                if not val: return False
-        self.tab_widget.tabCloseRequested.emit(i)
+                if not val:
+                    return False
+        self.tab_widget.removeTab(i)
         return True
 
     def save_file(self) -> bool:
