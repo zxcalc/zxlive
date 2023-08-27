@@ -1,0 +1,6 @@
+pyzx @ git+https://github.com/Quantomatic/pyzx
+networkx~=3.1
+numpy~=1.25.2
+PySide6~=6.5.2
+shapely~=2.0.1
+sympy~=1.12
