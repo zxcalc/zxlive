@@ -20,7 +20,8 @@ import copy
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
 from PySide6.QtGui import QAction, QKeySequence, QCloseEvent
-from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout, QTabWidget
+from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
+    QTabWidget, QFormLayout
 from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
@@ -42,6 +43,9 @@ class MainWindow(QMainWindow):
 
     edit_panel: GraphEditPanel
     proof_panel: ProofPanel
+    rewrite_form: QFormLayout
+    left_graph: Optional[GraphT]
+    right_graph: Optional[GraphT]
 
     def __init__(self) -> None:
         super().__init__()
@@ -217,7 +221,8 @@ class MainWindow(QMainWindow):
             else:
                 graph = out.p.graphs[-1]
                 self.new_deriv(graph, name)
-                proof_panel: BasePanel = self.active_panel
+                assert isinstance(self.active_panel, ProofPanel)
+                proof_panel: ProofPanel = self.active_panel
                 proof_panel.proof_model = out.p
                 proof_panel.step_view.setModel(proof_panel.proof_model)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
@@ -235,7 +240,8 @@ class MainWindow(QMainWindow):
     def close_tab(self, i: int) -> bool:
         if i == -1:
             return False
-        if not self.tab_widget.widget(i).undo_stack.isClean():
+        widget = self.tab_widget.widget(i)
+        if isinstance(widget, BasePanel) and not widget.undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
@@ -354,7 +360,7 @@ class MainWindow(QMainWindow):
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:
-            assert self.active_panel is not None
+            assert self.active_panel is not None and isinstance(self.active_panel, ProofPanel)
             old_graph = self.active_panel.graph
             new_graph = copy.deepcopy(old_graph)
             try:
