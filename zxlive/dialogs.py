@@ -202,6 +202,21 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tu
         return None
     return file_path, selected_format
 
+def get_lemma_name_and_description(parent: MainWindow) -> None:
+    dialog = QDialog()
+    parent.rewrite_form = QFormLayout(dialog)
+    name = QLineEdit()
+    parent.rewrite_form.addRow("Name", name)
+    description = QTextEdit()
+    parent.rewrite_form.addRow("Description", description)
+    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    parent.rewrite_form.addRow(button_box)
+    button_box.accepted.connect(dialog.accept)
+    button_box.rejected.connect(dialog.reject)
+    if dialog.exec() == QDialog.DialogCode.Accepted:
+        return name.text(), description.toPlainText()
+    return None, None
+
 def create_new_rewrite(parent: MainWindow) -> None:
     dialog = QDialog()
     parent.rewrite_form = QFormLayout(dialog)

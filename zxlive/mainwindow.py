@@ -25,11 +25,12 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
 from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
+from .custom_rule import CustomRule, add_rule_to_file
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph, extract_circuit, simplify, Circuit
@@ -365,7 +366,13 @@ class MainWindow(QMainWindow):
     def proof_as_lemma(self) -> None:
         assert self.active_panel is not None
         assert isinstance(self.active_panel, ProofPanel)
-        pass
+        name, description = get_lemma_name_and_description(self)
+        if name is None or description is None:
+            return
+        lhs_graph = self.active_panel.proof_model.graphs[0]
+        rhs_graph = self.active_panel.proof_model.graphs[-1]
+        rule = CustomRule(lhs_graph, rhs_graph, name, description)
+        add_rule_to_file(rule)
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:
