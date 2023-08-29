@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from enum import Enum
+import json
+import os
 from typing import Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
 
@@ -14,7 +16,7 @@ from zxlive import proof_actions
 
 from .proof import ProofModel
 
-from .common import VT,ET, GraphT, Graph
+from .common import CUSTOM_RULES_PATH, VT,ET, GraphT, Graph
 from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
@@ -241,15 +243,15 @@ def create_new_rewrite(parent: MainWindow) -> None:
                 show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
             else:
                 show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
-        rule = CustomRule(parent.left_graph, parent.right_graph)
-        rewrite = proof_actions.ProofAction.from_dict({
-            "text":name.text(),
-            "tooltip":description.toPlainText(),
-            "matcher": rule.matcher,
-            "rule": rule,
-            "type": proof_actions.MATCHES_VERTICES,
-        })
-        proof_actions.rewrites.append(rewrite)
+        rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
+        if not os.path.isfile(CUSTOM_RULES_PATH):
+            with open(CUSTOM_RULES_PATH, "w") as f:
+                json.dump([], f)
+        with open(CUSTOM_RULES_PATH, "r") as f:
+            data = json.load(f)
+        data.append(rule.to_json())
+        with open(CUSTOM_RULES_PATH, "w") as f:
+            json.dump(data, f)
         dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
