@@ -10,7 +10,6 @@ from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
-from . import proof_actions
 
 from .common import ET, VT, Graph
 
@@ -97,8 +96,8 @@ class CustomRule:
         return cls(lhs_graph, rhs_graph, d['name'], d['tooltip'])
 
     def to_proof_action(self) -> "ProofAction":
-        from .proof_actions import ProofAction
-        return ProofAction(self.name, self.matcher, self, proof_actions.MATCHES_VERTICES, self.tooltip)
+        from .proof_actions import ProofAction, MATCHES_VERTICES
+        return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.tooltip)
 
 
 def to_networkx(graph: Graph) -> nx.Graph:
