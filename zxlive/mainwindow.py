@@ -25,11 +25,12 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
 from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
+from .custom_rule import CustomRule, add_rule_to_file
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
-from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT
 
 from pyzx import Graph, extract_circuit, simplify, Circuit
@@ -147,8 +148,10 @@ class MainWindow(QMainWindow):
         view_menu.addAction(fit_view)
 
         new_rewrite = self._new_action("Create new rewrite", lambda: create_new_rewrite(self), None, "Create a new rewrite")
+        self.proof_as_rewrite_action = self._new_action("Save proof as lemma", self.proof_as_lemma, None, "Save proof as lemma")
         rewrite_menu = menu.addMenu("&Rewrite")
         rewrite_menu.addAction(new_rewrite)
+        rewrite_menu.addAction(self.proof_as_rewrite_action)
 
         simplify_actions = []
         for simp in simplifications.values():
@@ -208,7 +211,9 @@ class MainWindow(QMainWindow):
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
             self.simplify_menu.menuAction().setVisible(True)
+            self.proof_as_rewrite_action.setEnabled(True)
         else:
+            self.proof_as_rewrite_action.setEnabled(False)
             self.simplify_menu.menuAction().setVisible(False)
 
     def open_file(self) -> None:
@@ -357,6 +362,17 @@ class MainWindow(QMainWindow):
     def fit_view(self) -> None:
         assert self.active_panel is not None
         self.active_panel.graph_view.fit_view()
+
+    def proof_as_lemma(self) -> None:
+        assert self.active_panel is not None
+        assert isinstance(self.active_panel, ProofPanel)
+        name, description = get_lemma_name_and_description(self)
+        if name is None or description is None:
+            return
+        lhs_graph = self.active_panel.proof_model.graphs[0]
+        rhs_graph = self.active_panel.proof_model.graphs[-1]
+        rule = CustomRule(lhs_graph, rhs_graph, name, description)
+        add_rule_to_file(rule)
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:
