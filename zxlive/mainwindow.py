@@ -372,7 +372,8 @@ class MainWindow(QMainWindow):
 class SimpEntry(TypedDict):
     text: str
     tool_tip: str
-    function: Callable[[BaseGraph], int | None | BaseGraph] | Callable[[BaseGraph | Circuit], int]
+    function: Callable[[BaseGraph], int | None | BaseGraph] | Callable[[Circuit], int]
+    in_place: bool
 
 
 def _extract_circuit(graph: BaseGraph) -> BaseGraph:

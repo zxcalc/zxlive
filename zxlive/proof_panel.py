@@ -323,9 +323,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         is_last = index.row() == index.model().rowCount() - 1
         line_rect = QRect(
             self.line_padding,
-            option.rect.y(),
+            int(option.rect.y()),
             self.line_width,
-            option.rect.height() if not is_last else option.rect.height() / 2
+            int(option.rect.height() if not is_last else option.rect.height() / 2)
         )
         painter.setBrush(Qt.GlobalColor.black)
         painter.drawRect(line_rect)
@@ -344,8 +344,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()
         text_rect = QRect(
-            option.rect.x() + self.line_width + 2 * self.line_padding,
-            option.rect.y() + option.rect.height() / 2 - text_height / 2,
+            int(option.rect.x() + self.line_width + 2 * self.line_padding),
+            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),
             option.rect.width(),
             text_height
         )
