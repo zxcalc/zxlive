@@ -10,14 +10,11 @@ from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox, QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, QDialogButtonBox
 import numpy as np
 from pyzx import Circuit, extract_circuit
-from pyzx.graph.base import BaseGraph
-
-from zxlive import proof_actions
 
 from .proof import ProofModel
 
-from .common import CUSTOM_RULES_PATH, VT,ET, GraphT, Graph
-from .custom_rule import CustomRule
+from .common import GraphT, Graph
+from .custom_rule import CustomRule, add_rule_to_file
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -244,14 +241,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
             else:
                 show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
-        if not os.path.isfile(CUSTOM_RULES_PATH):
-            with open(CUSTOM_RULES_PATH, "w") as f:
-                json.dump([], f)
-        with open(CUSTOM_RULES_PATH, "r") as f:
-            data = json.load(f)
-        data.append(rule.to_json())
-        with open(CUSTOM_RULES_PATH, "w") as f:
-            json.dump(data, f)
+        add_rule_to_file(rule)
         dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)

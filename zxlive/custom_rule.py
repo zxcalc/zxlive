@@ -1,5 +1,6 @@
 
 import json
+import os
 from typing import Callable, List, TYPE_CHECKING
 
 import networkx as nx
@@ -11,7 +12,7 @@ from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
 
-from .common import ET, VT, Graph
+from .common import CUSTOM_RULES_PATH, ET, VT, Graph
 
 if TYPE_CHECKING:
     from .proof_actions import ProofAction
@@ -140,3 +141,13 @@ def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map:
         area = 1.
     k = (area ** 0.5) / len(rhs_graph)
     return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
+
+def add_rule_to_file(rule):
+    if not os.path.isfile(CUSTOM_RULES_PATH):
+        with open(CUSTOM_RULES_PATH, "w") as f:
+            json.dump([], f)
+    with open(CUSTOM_RULES_PATH, "r") as f:
+        data = json.load(f)
+    data.append(rule.to_json())
+    with open(CUSTOM_RULES_PATH, "w") as f:
+        json.dump(data, f)
