@@ -245,7 +245,8 @@ def create_new_rewrite(parent: MainWindow) -> None:
     button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     parent.rewrite_form.addRow(button_box)
     def add_rewrite() -> None:
-        if parent.left_graph is None or parent.right_graph is None:
+        if parent.left_graph is None or parent.right_graph is None or \
+            name.text() == "" or description.toPlainText() == "":
             return
         parent.left_graph.auto_detect_io()
         parent.right_graph.auto_detect_io()
