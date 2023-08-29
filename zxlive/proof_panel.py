@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import json
+import os
 from typing import Iterator, Union, cast
 
 import pyzx
@@ -11,7 +13,8 @@ from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout, QListView, \
     QStyledItemDelegate, QStyleOptionViewItem, QStyle, QAbstractItemView
 from pyzx import VertexType, basicrules
 
-from .common import get_data, ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
+from .common import CUSTOM_RULES_PATH, get_data, ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
+from .custom_rule import CustomRule
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .graphscene import GraphScene
@@ -78,7 +81,14 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
     def init_action_groups(self) -> None:
-        self.action_groups = [proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()]
+        basic_rules = proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()
+        self.action_groups = [basic_rules]
+        if os.path.isfile(CUSTOM_RULES_PATH):
+            with open(CUSTOM_RULES_PATH, "r") as f:
+                data = json.load(f)
+                proof_action_list = [CustomRule.from_json(d).to_proof_action() for d in data]
+                custom_rules = proof_actions.ProofActionGroup(*proof_action_list).copy()
+            self.action_groups.append(custom_rules)
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
             group.init_buttons(self)
