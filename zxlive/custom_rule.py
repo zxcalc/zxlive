@@ -1,5 +1,6 @@
 
-from typing import Callable, List
+import json
+from typing import Callable, List, TYPE_CHECKING
 
 import networkx as nx
 import numpy as np
@@ -9,8 +10,12 @@ from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
+from . import proof_actions
+
 from .common import ET, VT, Graph
 
+if TYPE_CHECKING:
+    from .proof_actions import ProofAction
 
 class CustomRule:
     def __init__(self, lhs_graph: Graph, rhs_graph: Graph, name: str, tooltip: str) -> None:
@@ -90,6 +95,10 @@ class CustomRule:
         lhs_graph = Graph.from_json(d['lhs_graph'])
         rhs_graph = Graph.from_json(d['rhs_graph'])
         return cls(lhs_graph, rhs_graph, d['name'], d['tooltip'])
+
+    def to_proof_action(self) -> "ProofAction":
+        from .proof_actions import ProofAction
+        return ProofAction(self.name, self.matcher, self, proof_actions.MATCHES_VERTICES, self.tooltip)
 
 
 def to_networkx(graph: Graph) -> nx.Graph:
