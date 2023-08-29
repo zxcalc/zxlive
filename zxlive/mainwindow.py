@@ -147,8 +147,10 @@ class MainWindow(QMainWindow):
         view_menu.addAction(fit_view)
 
         new_rewrite = self._new_action("Create new rewrite", lambda: create_new_rewrite(self), None, "Create a new rewrite")
+        self.proof_as_rewrite_action = self._new_action("Save proof as lemma", self.proof_as_lemma, None, "Save proof as lemma")
         rewrite_menu = menu.addMenu("&Rewrite")
         rewrite_menu.addAction(new_rewrite)
+        rewrite_menu.addAction(self.proof_as_rewrite_action)
 
         simplify_actions = []
         for simp in simplifications.values():
@@ -208,7 +210,9 @@ class MainWindow(QMainWindow):
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
             self.simplify_menu.menuAction().setVisible(True)
+            self.proof_as_rewrite_action.setEnabled(True)
         else:
+            self.proof_as_rewrite_action.setEnabled(False)
             self.simplify_menu.menuAction().setVisible(False)
 
     def open_file(self) -> None:
@@ -357,6 +361,11 @@ class MainWindow(QMainWindow):
     def fit_view(self) -> None:
         assert self.active_panel is not None
         self.active_panel.graph_view.fit_view()
+
+    def proof_as_lemma(self) -> None:
+        assert self.active_panel is not None
+        assert isinstance(self.active_panel, ProofPanel)
+        pass
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:
