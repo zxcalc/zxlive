@@ -144,6 +144,8 @@ class GraphEditPanel(BasePanel):
         self.edge.clicked.connect(lambda: self._tool_clicked(ToolType.EDGE))
         yield ToolbarSection(self.select, self.vertex, self.edge, exclusive=True)
 
+        yield ToolbarSection(self.undo, self.redo)
+
         self.start_derivation = QToolButton(self, text="Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)

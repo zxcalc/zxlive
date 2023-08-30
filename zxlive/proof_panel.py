@@ -74,6 +74,8 @@ class ProofPanel(BasePanel):
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
+        yield ToolbarSection(self.undo, self.redo)
+
         self.identity_choice = (
             QToolButton(self, text="Z", checkable=True, checked=True),
             QToolButton(self, text="X", checkable=True)

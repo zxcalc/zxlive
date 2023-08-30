@@ -1,12 +1,14 @@
 from dataclasses import dataclass
 from typing import Iterator, Sequence, Optional
 
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup, \
-    QHBoxLayout, QSplitter
+    QSplitter
 from pyzx.graph import Graph
 from pyzx.graph.graph_s import GraphS
 
-from .common import GraphT
+from .common import GraphT, get_data
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .commands import SetGraph
@@ -61,6 +63,23 @@ class BasePanel(QWidget):
         self.file_path = None
         self.file_type = None
 
+        # Create icons common to edit and proof panels.
+        icon_size = QSize(32, 32)
+        self.undo = QToolButton(self)
+        self.redo = QToolButton(self)
+        self.undo.setToolTip("Undo (Ctrl+Z)")
+        self.redo.setToolTip("Redo (Ctrl+Shift+Z)")
+        self.undo.setIcon(QIcon(get_data("icons/undo.svg")))
+        self.redo.setIcon(QIcon(get_data("icons/redo.svg")))
+        self.undo.setIconSize(icon_size)
+        self.redo.setIconSize(icon_size)
+        self.undo.setEnabled(False)
+        self.redo.setEnabled(False)
+        self.undo.clicked.connect(self._undo_clicked)
+        self.redo.clicked.connect(self._redo_clicked)
+        self.undo_stack.canUndoChanged.connect(self._undo_changed)
+        self.undo_stack.canRedoChanged.connect(self._redo_changed)
+
         self._populate_toolbar()
 
     @property
@@ -77,6 +96,18 @@ class BasePanel(QWidget):
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         raise NotImplementedError
+
+    def _undo_changed(self) -> None:
+        self.undo.setEnabled(self.undo_stack.canUndo())
+
+    def _redo_changed(self) -> None:
+        self.redo.setEnabled(self.undo_stack.canRedo())
+
+    def _undo_clicked(self) -> None:
+        self.undo_stack.undo()
+
+    def _redo_clicked(self) -> None:
+        self.undo_stack.redo()
 
     def clear_graph(self) -> None:
         empty_graph = Graph()
