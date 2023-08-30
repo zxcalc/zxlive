@@ -12,6 +12,8 @@ from pyzx import EdgeType, VertexType
 from pyzx.utils import vertex_is_w, get_w_partner
 from sympy import sympify
 
+from zxlive.graphview import GraphView
+
 from .vitem import BLACK, ZX_GREEN, ZX_RED, H_YELLOW
 from .eitem import HAD_EDGE_BLUE
 
@@ -61,10 +63,10 @@ class GraphEditPanel(BasePanel):
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         self.graph_scene = EditGraphScene()
-        self.graph_scene.vertices_moved.connect(self._vert_moved)
-        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
-        self.graph_scene.vertex_added.connect(self._add_vert)
-        self.graph_scene.edge_added.connect(self._add_edge)
+        self.graph_scene.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, *x))
+        self.graph_scene.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, *x))
+        self.graph_scene.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, *x))
+        self.graph_scene.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, *x))
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
@@ -77,6 +79,11 @@ class GraphEditPanel(BasePanel):
         self.edge_list = create_list_widget(self, EDGES, self._ety_clicked)
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
+
+    def push_cmd_to_undo_stack(self, command_function, *args) -> None:
+        cmd = command_function(self, self.graph_view, *args)
+        if cmd is not None:
+            self.undo_stack.push(cmd)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield toolbar_select_node_edge(self)
@@ -105,52 +112,6 @@ class GraphEditPanel(BasePanel):
             cmd = ChangeEdgeColor(self.graph_view, selected, ety)
             self.undo_stack.push(cmd)
 
-    def _add_vert(self, x: float, y: float) -> None:
-        self.undo_stack.push(
-            AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT
-            else AddNode(self.graph_view, x, y, self._curr_vty)
-        )
-
-    def _add_edge(self, u: VT, v: VT) -> None:
-        g = self.graph_scene.g
-        if vertex_is_w(g.type(u)) and get_w_partner(g, u) == v:
-            return
-        if g.type(u) == VertexType.W_INPUT and len(g.neighbors(u)) >= 2 or \
-           g.type(v) == VertexType.W_INPUT and len(g.neighbors(v)) >= 2:
-            return
-        cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
-        self.undo_stack.push(cmd)
-
-    def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(self.graph_view, vs)
-        self.undo_stack.push(cmd)
-
-    def _vert_double_clicked(self, v: VT) -> None:
-        if self.graph.type(v) == VertexType.BOUNDARY:
-            input_, ok = QInputDialog.getText(
-                self, "Input Dialog", "Enter Qubit Index:"
-            )
-            try:
-                self.graph.set_qubit(v, int(input_.strip()))
-            except ValueError:
-                show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
-            return
-        elif vertex_is_w(self.graph.type(v)):
-            return
-
-        input_, ok = QInputDialog.getText(
-            self, "Input Dialog", "Enter Desired Phase Value:"
-        )
-        if not ok:
-            return
-        try:
-            new_phase = string_to_phase(input_)
-        except ValueError:
-            show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
-            return
-        cmd = ChangePhase(self.graph_view, v, new_phase)
-        self.undo_stack.push(cmd)
-
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
@@ -178,6 +139,48 @@ class GraphEditPanel(BasePanel):
     def _start_derivation(self) -> None:
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
 
+
+def add_vert(parent, graph_view: GraphView, x: float, y: float) -> None:
+    return AddWNode(graph_view, x, y) if parent._curr_vty == VertexType.W_OUTPUT \
+        else AddNode(graph_view, x, y, parent._curr_vty)
+
+def add_edge(parent, graph_view: GraphView, u: VT, v: VT) -> None:
+    graph = graph_view.graph_scene.g
+    if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
+        return None
+    if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
+        graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
+        return None
+    return AddEdge(graph_view, u, v, parent._curr_ety)
+
+def vert_moved(parent, graph_view: GraphView, vs: list[tuple[VT, float, float]]) -> None:
+    return MoveNode(graph_view, vs)
+
+def vert_double_clicked(parent, graph_view: GraphView, v: VT) -> None:
+    graph = graph_view.graph_scene.g
+    if graph.type(v) == VertexType.BOUNDARY:
+        input_, ok = QInputDialog.getText(
+            parent, "Input Dialog", "Enter Qubit Index:"
+        )
+        try:
+            graph.set_qubit(v, int(input_.strip()))
+        except ValueError:
+            show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
+        return None
+    elif vertex_is_w(graph.type(v)):
+        return None
+
+    input_, ok = QInputDialog.getText(
+        parent, "Input Dialog", "Enter Desired Phase Value:"
+    )
+    if not ok:
+        return None
+    try:
+        new_phase = string_to_phase(input_)
+    except ValueError:
+        show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
+        return None
+    return ChangePhase(graph_view, v, new_phase)
 
 def toolbar_select_node_edge(parent):
     icon_size = QSize(32, 32)
