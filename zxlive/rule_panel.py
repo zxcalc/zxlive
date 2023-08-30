@@ -5,20 +5,17 @@ from enum import Enum
 from typing import Iterator
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QInputDialog, QSplitter, QToolButton)
+from PySide6.QtWidgets import (QSplitter, QToolButton)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
 
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
-                       ChangeNodeType, ChangePhase, CommandGroup, MoveNode,
-                       SetGraph, UpdateGraph)
-from .common import VT, GraphT, ToolType
-from .dialogs import show_error_msg
-from .edit_panel import (EDGES, VERTICES, add_edge, add_vert, create_list_widget, string_to_phase, toolbar_select_node_edge, vert_double_clicked, vert_moved)
+from .commands import (ChangeEdgeColor, ChangeNodeType, SetGraph, UpdateGraph)
+from .common import GraphT, ToolType
+from .edit_panel import (EDGES, VERTICES, add_edge, add_vert, create_list_widget, toolbar_select_node_edge, vert_double_clicked, vert_moved)
 from .graphscene import EditGraphScene
-from .graphview import GraphView
+from .graphview import RuleEditGraphView
 
 
 class Side(Enum):
@@ -39,13 +36,20 @@ class RulePanel(BasePanel):
     def __init__(self, graph1: GraphT, graph2: GraphT) -> None:
         self.graph_scene_left = EditGraphScene()
         self.graph_scene_right = EditGraphScene()
-        super().__init__(graph1, self.graph_scene_left)
+        super().__init__()
+
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
 
-        self.graph_view2 = GraphView(self.graph_scene_right)
-        self.graph_view2.set_graph(graph2)
-        self.splitter.addWidget(self.graph_view2)
+        self.graph_view_left = RuleEditGraphView(self, self.graph_scene_left)
+        self.graph_view_left.set_graph(graph1)
+        self.splitter.addWidget(self.graph_view_left)
+        self.graph_view = self.graph_view_left
+        self.graph_scene = self.graph_scene_left
+
+        self.graph_view_right = RuleEditGraphView(self, self.graph_scene_right)
+        self.graph_view_right.set_graph(graph2)
+        self.splitter.addWidget(self.graph_view_right)
 
         self.graph_scene_left.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, Side.LEFT, *x))
         self.graph_scene_left.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, Side.LEFT, *x))

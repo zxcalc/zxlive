@@ -62,6 +62,7 @@ class GraphEditPanel(BasePanel):
     _curr_vty: VertexType.Type
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
+        super().__init__(*actions)
         self.graph_scene = EditGraphScene()
         self.graph_scene.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, *x))
         self.graph_scene.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, *x))
@@ -70,7 +71,10 @@ class GraphEditPanel(BasePanel):
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
-        super().__init__(graph, self.graph_scene, *actions)
+
+        self.graph_view = GraphView(self.graph_scene)
+        self.splitter.addWidget(self.graph_view)
+        self.graph_view.set_graph(graph)
 
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)

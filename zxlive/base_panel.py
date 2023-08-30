@@ -42,10 +42,10 @@ class BasePanel(QWidget):
     file_path: Optional[str]
     file_type: Optional[FileFormat]
 
-    def __init__(self, graph: GraphT, graph_scene: GraphScene, *actions: QAction) -> None:
+    def __init__(self, *actions: QAction) -> None:
         super().__init__()
-        self.graph_scene = graph_scene
-        self.graph_view = GraphView(self.graph_scene)
+        self.graph_scene = None
+        self.graph_view = None
         self.actions = actions
         self.undo_stack = AnimatedUndoStack(self)
 
@@ -57,9 +57,7 @@ class BasePanel(QWidget):
 
         self.splitter = QSplitter(self)
         self.layout().addWidget(self.splitter)
-        self.splitter.addWidget(self.graph_view)
 
-        self.graph_view.set_graph(graph)
         self.file_path = None
         self.file_type = None
 
