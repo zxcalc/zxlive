@@ -328,7 +328,7 @@ class MainWindow(QMainWindow):
 
     def cut_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel):
+        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
             self.copied_graph = self.active_panel.copy_selection()
             self.active_panel.delete_selection()
 
@@ -338,12 +338,13 @@ class MainWindow(QMainWindow):
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel) and self.copied_graph is not None:
+        if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
+            and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel):
+        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
             self.active_panel.delete_selection()
 
     def _new_panel(self, panel: BasePanel, name: str) -> None:
