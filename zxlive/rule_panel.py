@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from enum import Enum
 from typing import Iterator
 
 from PySide6.QtCore import Qt, Signal
@@ -17,10 +16,6 @@ from .edit_panel import (EDGES, VERTICES, add_edge, add_vert, create_list_widget
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView
 
-
-class Side(Enum):
-    LEFT = 1
-    RIGHT = 2
 
 class RulePanel(BasePanel):
     """Panel for the Rule editor of ZX live."""
@@ -51,15 +46,15 @@ class RulePanel(BasePanel):
         self.graph_view_right.set_graph(graph2)
         self.splitter.addWidget(self.graph_view_right)
 
-        self.graph_scene_left.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, Side.LEFT, *x))
-        self.graph_scene_left.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, Side.LEFT, *x))
-        self.graph_scene_left.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, Side.LEFT, *x))
-        self.graph_scene_left.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, Side.LEFT, *x))
+        self.graph_scene_left.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, *x))
+        self.graph_scene_left.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, *x))
+        self.graph_scene_left.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, *x))
+        self.graph_scene_left.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, *x))
 
-        self.graph_scene_right.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, Side.RIGHT, *x))
-        self.graph_scene_right.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, Side.RIGHT, *x))
-        self.graph_scene_right.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, Side.RIGHT, *x))
-        self.graph_scene_right.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, Side.RIGHT, *x))
+        self.graph_scene_right.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, *x))
+        self.graph_scene_right.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, *x))
+        self.graph_scene_right.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, *x))
+        self.graph_scene_right.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, *x))
 
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
@@ -69,9 +64,8 @@ class RulePanel(BasePanel):
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
 
-    def push_cmd_to_undo_stack(self, command_function, side, *args) -> None:
-        graph_view = self.graph_view if side == Side.LEFT else self.graph_view2
-        cmd = command_function(self, graph_view, *args)
+    def push_cmd_to_undo_stack(self, command_function, *args) -> None:
+        cmd = command_function(self, self.graph_view, *args)
         if cmd is not None:
             self.undo_stack.push(cmd)
 
