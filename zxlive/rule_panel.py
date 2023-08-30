@@ -82,23 +82,19 @@ class RulePanel(BasePanel):
 
     def _vty_clicked(self, vty: VertexType.Type) -> None:
         self._curr_vty = vty
-        selected1 = list(self.graph_scene_left.selected_vertices)
-        selected2 = list(self.graph_scene_right.selected_vertices)
-        if len(selected1) > 0 or len(selected2) > 0:
-            cmd1 = ChangeNodeType(self.graph_view, selected1, vty)
-            cmd2 = ChangeNodeType(self.graph_view2, selected2, vty)
-            self.undo_stack.push(CommandGroup([cmd1, cmd2]))
+        selected = list(self.graph_scene.selected_vertices)
+        if len(selected) > 0:
+            cmd = ChangeNodeType(self.graph_view, selected, vty)
+            self.undo_stack.push(cmd)
 
     def _ety_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
         self.graph_scene_left.curr_ety = ety
         self.graph_scene_right.curr_ety = ety
-        selected1 = list(self.graph_scene_left.selected_edges)
-        selected2 = list(self.graph_scene_right.selected_edges)
-        if len(selected1) > 0 or len(selected2) > 0:
-            cmd1 = ChangeEdgeColor(self.graph_view, selected1, ety)
-            cmd2 = ChangeEdgeColor(self.graph_view2, selected2, ety)
-            self.undo_stack.push(CommandGroup([cmd1, cmd2]))
+        selected = list(self.graph_scene.selected_edges)
+        if len(selected) > 0:
+            cmd = ChangeEdgeColor(self.graph_view, selected, ety)
+            self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
