@@ -79,27 +79,7 @@ class GraphEditPanel(BasePanel):
         self.sidebar.addWidget(self.edge_list)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
-        # Toolbar section for select, node, edge
-        icon_size = QSize(32, 32)
-        self.select = QToolButton(self, checkable=True, checked=True)  # Selected by default
-        self.vertex = QToolButton(self, checkable=True)
-        self.edge = QToolButton(self, checkable=True)
-        self.select.setToolTip("Select (s)")
-        self.vertex.setToolTip("Add Vertex (v)")
-        self.edge.setToolTip("Add Edge (e)")
-        self.select.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
-        self.vertex.setIcon(QIcon(get_data("icons/tikzit-tool-node.svg")))
-        self.edge.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
-        self.select.setShortcut("s")
-        self.vertex.setShortcut("v")
-        self.edge.setShortcut("e")
-        self.select.setIconSize(icon_size)
-        self.vertex.setIconSize(icon_size)
-        self.edge.setIconSize(icon_size)
-        self.select.clicked.connect(lambda: self._tool_clicked(ToolType.SELECT))
-        self.vertex.clicked.connect(lambda: self._tool_clicked(ToolType.VERTEX))
-        self.edge.clicked.connect(lambda: self._tool_clicked(ToolType.EDGE))
-        yield ToolbarSection(self.select, self.vertex, self.edge, exclusive=True)
+        yield toolbar_select_node_edge(self)
 
         yield ToolbarSection(*self.actions)
 
@@ -198,6 +178,28 @@ class GraphEditPanel(BasePanel):
     def _start_derivation(self) -> None:
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
 
+
+def toolbar_select_node_edge(parent):
+    icon_size = QSize(32, 32)
+    select = QToolButton(parent, checkable=True, checked=True)  # Selected by default
+    vertex = QToolButton(parent, checkable=True)
+    edge = QToolButton(parent, checkable=True)
+    select.setToolTip("Select (s)")
+    vertex.setToolTip("Add Vertex (v)")
+    edge.setToolTip("Add Edge (e)")
+    select.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
+    vertex.setIcon(QIcon(get_data("icons/tikzit-tool-node.svg")))
+    edge.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
+    select.setShortcut("s")
+    vertex.setShortcut("v")
+    edge.setShortcut("e")
+    select.setIconSize(icon_size)
+    vertex.setIconSize(icon_size)
+    edge.setIconSize(icon_size)
+    select.clicked.connect(lambda: parent._tool_clicked(ToolType.SELECT))
+    vertex.clicked.connect(lambda: parent._tool_clicked(ToolType.VERTEX))
+    edge.clicked.connect(lambda: parent._tool_clicked(ToolType.EDGE))
+    return ToolbarSection(select, vertex, edge, exclusive=True)
 
 def create_list_widget(parent,
                         data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
