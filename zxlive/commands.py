@@ -46,6 +46,23 @@ class BaseCommand(QUndoCommand):
         #  we could store "dirty flags" for each node/edge.
         self.graph_view.update_graph(self.g, select_new)
 
+@dataclass
+class CommandGroup(QUndoCommand):
+    """A command that groups together multiple commands.
+    Undoing/redoing this command undoes/redoes all commands in the group.
+    """
+    commands: Iterable[QUndoCommand]
+
+    def __post_init__(self) -> None:
+        super().__init__()
+
+    def undo(self) -> None:
+        for cmd in reversed(self.commands):
+            cmd.undo()
+
+    def redo(self) -> None:
+        for cmd in self.commands:
+            cmd.redo()
 
 @dataclass
 class SetGraph(BaseCommand):
