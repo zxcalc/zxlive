@@ -69,9 +69,9 @@ class RulePanel(BasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield toolbar_select_node_edge(self)
 
-        self.save_rule = QToolButton(self, text="Save rule")
-        self.save_rule.clicked.connect(self.save_rule)
-        yield ToolbarSection(self.save_rule)
+        self.save_rule_button = QToolButton(self, text="Save rule")
+        self.save_rule_button.clicked.connect(self.save_rule)
+        yield ToolbarSection(self.save_rule_button)
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene_left.curr_tool = tool
@@ -104,7 +104,7 @@ class RulePanel(BasePanel):
         )
 
     def _add_edge(self, graph_view: GraphView, u: VT, v: VT) -> None:
-        graph = self.graph_view.graph_scene.g
+        graph = graph_view.graph_scene.g
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
             return
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
