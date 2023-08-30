@@ -24,6 +24,8 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
     QTabWidget, QFormLayout
 from pyzx.graph.base import BaseGraph
 
+from zxlive.rule_panel import RulePanel
+
 from .commands import AddRewriteStep
 from .custom_rule import CustomRule, add_rule_to_file
 from .base_panel import BasePanel
@@ -149,10 +151,12 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
 
-        new_rewrite = self._new_action("Create new rewrite", lambda: create_new_rewrite(self), None, "Create a new rewrite")
+        new_rewrite_from_file = self._new_action("New rewrite from file", lambda: create_new_rewrite(self), None, "New rewrite from file")
+        new_rewrite_editor = self._new_action("New rewrite", self.new_rule_editor, None, "New rewrite")
         self.proof_as_rewrite_action = self._new_action("Save proof as lemma", self.proof_as_lemma, None, "Save proof as lemma")
         rewrite_menu = menu.addMenu("&Rewrite")
-        rewrite_menu.addAction(new_rewrite)
+        rewrite_menu.addAction(new_rewrite_editor)
+        rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
         simplify_actions = []
@@ -357,6 +361,15 @@ class MainWindow(QMainWindow):
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
+
+    def new_rule_editor(self, graph1:Optional[GraphT] = None, graph2:Optional[GraphT] = None, name:Optional[str]=None) -> None:
+        graph1 = graph1 or Graph()
+        graph2 = graph2 or Graph()
+        panel = RulePanel(graph1, graph2)
+        if name is None: name = "New Rule"
+        self.tab_widget.addTab(panel, name)
+        self.tab_widget.setCurrentWidget(panel)
+        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
 
     def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
         panel = ProofPanel(graph, self.undo_action, self.redo_action)
