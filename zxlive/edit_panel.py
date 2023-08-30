@@ -73,53 +73,10 @@ class GraphEditPanel(BasePanel):
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
         self.splitter.addWidget(self.sidebar)
-        self.vertex_list = self.create_list_widget(VERTICES, self._vty_clicked)
-        self.edge_list = self.create_list_widget(EDGES, self._ety_clicked)
+        self.vertex_list = create_list_widget(self, VERTICES, self._vty_clicked)
+        self.edge_list = create_list_widget(self, EDGES, self._ety_clicked)
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
-
-    def create_list_widget(self,
-                           data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
-                           onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
-        list_widget = QListWidget(self)
-        list_widget.setResizeMode(QListView.ResizeMode.Adjust)
-        list_widget.setViewMode(QListView.ViewMode.IconMode)
-        list_widget.setMovement(QListView.Movement.Static)
-        list_widget.setUniformItemSizes(True)
-        list_widget.setGridSize(QSize(60, 64))
-        list_widget.setWordWrap(True)
-        list_widget.setIconSize(QSize(24, 24))
-        for typ, value in data.items():
-            icon = self.create_icon(*value["icon"])
-            item = QListWidgetItem(icon, value["text"])
-            item.setData(Qt.ItemDataRole.UserRole, typ)
-            list_widget.addItem(item)
-        list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
-        list_widget.setCurrentItem(list_widget.item(0))
-        return list_widget
-
-    def create_icon(self, shape: ShapeType, color: str) -> QIcon:
-        icon = QIcon()
-        pixmap = QPixmap(64, 64)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(QColor(BLACK), 6))
-        painter.setBrush(QColor(color))
-        if shape == ShapeType.CIRCLE:
-            painter.drawEllipse(4, 4, 56, 56)
-        elif shape == ShapeType.SQUARE:
-            painter.drawRect(4, 4, 56, 56)
-        elif shape == ShapeType.TRIANGLE:
-            painter.drawPolygon([QPoint(32, 10), QPoint(2, 60), QPoint(62, 60)])
-        elif shape == ShapeType.LINE:
-            painter.drawLine(0, 32, 64, 32)
-        elif shape == ShapeType.DASHED_LINE:
-            painter.setPen(QPen(QColor(color), 6, Qt.PenStyle.DashLine))
-            painter.drawLine(0, 32, 64, 32)
-        painter.end()
-        icon.addPixmap(pixmap)
-        return icon
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         # Toolbar section for select, node, edge
@@ -240,6 +197,50 @@ class GraphEditPanel(BasePanel):
 
     def _start_derivation(self) -> None:
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
+
+
+def create_list_widget(parent,
+                        data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
+                        onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
+    list_widget = QListWidget(parent)
+    list_widget.setResizeMode(QListView.ResizeMode.Adjust)
+    list_widget.setViewMode(QListView.ViewMode.IconMode)
+    list_widget.setMovement(QListView.Movement.Static)
+    list_widget.setUniformItemSizes(True)
+    list_widget.setGridSize(QSize(60, 64))
+    list_widget.setWordWrap(True)
+    list_widget.setIconSize(QSize(24, 24))
+    for typ, value in data.items():
+        icon = create_icon(*value["icon"])
+        item = QListWidgetItem(icon, value["text"])
+        item.setData(Qt.ItemDataRole.UserRole, typ)
+        list_widget.addItem(item)
+    list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
+    list_widget.setCurrentItem(list_widget.item(0))
+    return list_widget
+
+def create_icon(shape: ShapeType, color: str) -> QIcon:
+    icon = QIcon()
+    pixmap = QPixmap(64, 64)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(QColor(BLACK), 6))
+    painter.setBrush(QColor(color))
+    if shape == ShapeType.CIRCLE:
+        painter.drawEllipse(4, 4, 56, 56)
+    elif shape == ShapeType.SQUARE:
+        painter.drawRect(4, 4, 56, 56)
+    elif shape == ShapeType.TRIANGLE:
+        painter.drawPolygon([QPoint(32, 10), QPoint(2, 60), QPoint(62, 60)])
+    elif shape == ShapeType.LINE:
+        painter.drawLine(0, 32, 64, 32)
+    elif shape == ShapeType.DASHED_LINE:
+        painter.setPen(QPen(QColor(color), 6, Qt.PenStyle.DashLine))
+        painter.drawLine(0, 32, 64, 32)
+    painter.end()
+    icon.addPixmap(pixmap)
+    return icon
 
 def string_to_phase(string: str) -> Fraction:
     if not string:
