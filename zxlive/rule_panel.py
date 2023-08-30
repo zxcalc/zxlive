@@ -16,7 +16,7 @@ from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
                        SetGraph, UpdateGraph)
 from .common import VT, GraphT, ToolType
 from .dialogs import show_error_msg
-from .edit_panel import (EDGES, VERTICES, create_list_widget, string_to_phase, toolbar_select_node_edge)
+from .edit_panel import (EDGES, VERTICES, add_edge, add_vert, create_list_widget, string_to_phase, toolbar_select_node_edge, vert_double_clicked, vert_moved)
 from .graphscene import EditGraphScene
 from .graphview import GraphView
 
@@ -47,16 +47,15 @@ class RulePanel(BasePanel):
         self.graph_view2.set_graph(graph2)
         self.splitter.addWidget(self.graph_view2)
 
-        self.graph_scene_left.vertices_moved.connect(lambda *x: self._vert_moved(self.graph_view, *x))
-        self.graph_scene_left.vertex_double_clicked.connect(lambda *x: self._vert_double_clicked(self.graph_view, *x))
-        self.graph_scene_left.vertex_added.connect(lambda *x: self._add_vert(self.graph_view, *x))
-        self.graph_scene_left.edge_added.connect(lambda *x: self._add_edge(self.graph_view, *x))
+        self.graph_scene_left.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, Side.LEFT, *x))
+        self.graph_scene_left.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, Side.LEFT, *x))
+        self.graph_scene_left.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, Side.LEFT, *x))
+        self.graph_scene_left.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, Side.LEFT, *x))
 
-        self.graph_scene_right.vertices_moved.connect(lambda *x: self._vert_moved(self.graph_view2, *x))
-        self.graph_scene_right.vertex_double_clicked.connect(lambda *x: self._vert_double_clicked(self.graph_view2, *x))
-        self.graph_scene_right.vertex_added.connect(lambda *x: self._add_vert(self.graph_view2, *x))
-        self.graph_scene_right.edge_added.connect(lambda *x: self._add_edge(self.graph_view2, *x))
-
+        self.graph_scene_right.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, Side.RIGHT, *x))
+        self.graph_scene_right.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, Side.RIGHT, *x))
+        self.graph_scene_right.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, Side.RIGHT, *x))
+        self.graph_scene_right.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, Side.RIGHT, *x))
 
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
@@ -65,6 +64,12 @@ class RulePanel(BasePanel):
         self.edge_list = create_list_widget(self, EDGES, self._ety_clicked)
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
+
+    def push_cmd_to_undo_stack(self, command_function, side, *args) -> None:
+        graph_view = self.graph_view if side == Side.LEFT else self.graph_view2
+        cmd = command_function(self, graph_view, *args)
+        if cmd is not None:
+            self.undo_stack.push(cmd)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield toolbar_select_node_edge(self)
@@ -96,53 +101,6 @@ class RulePanel(BasePanel):
             cmd1 = ChangeEdgeColor(self.graph_view, selected1, ety)
             cmd2 = ChangeEdgeColor(self.graph_view2, selected2, ety)
             self.undo_stack.push(CommandGroup([cmd1, cmd2]))
-
-    def _add_vert(self, graph_view: GraphView, x: float, y: float) -> None:
-        self.undo_stack.push(
-            AddWNode(graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT
-            else AddNode(graph_view, x, y, self._curr_vty)
-        )
-
-    def _add_edge(self, graph_view: GraphView, u: VT, v: VT) -> None:
-        graph = graph_view.graph_scene.g
-        if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
-            return
-        if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
-           graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
-            return
-        cmd = AddEdge(graph_view, u, v, self._curr_ety)
-        self.undo_stack.push(cmd)
-
-    def _vert_moved(self, graph_view: GraphView, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(graph_view, vs)
-        self.undo_stack.push(cmd)
-
-    def _vert_double_clicked(self, graph_view: GraphView, v: VT) -> None:
-        graph = graph_view.graph_scene.g
-        if graph.type(v) == VertexType.BOUNDARY:
-            input_, ok = QInputDialog.getText(
-                self, "Input Dialog", "Enter Qubit Index:"
-            )
-            try:
-                graph.set_qubit(v, int(input_.strip()))
-            except ValueError:
-                show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
-            return
-        elif vertex_is_w(graph.type(v)):
-            return
-
-        input_, ok = QInputDialog.getText(
-            self, "Input Dialog", "Enter Desired Phase Value:"
-        )
-        if not ok:
-            return
-        try:
-            new_phase = string_to_phase(input_)
-        except ValueError:
-            show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
-            return
-        cmd = ChangePhase(graph_view, v, new_phase)
-        self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
