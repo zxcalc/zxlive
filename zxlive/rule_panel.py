@@ -98,22 +98,22 @@ class RulePanel(BasePanel):
 
     def paste_graph(self, graph: GraphT) -> None:
         if graph is None: return
-        new_g = copy.deepcopy(self.graph_scene_left.g)
-        new_verts, new_edges = new_g.merge(graph.translate(0.5,0.5))
+        new_g = copy.deepcopy(self.graph_scene.g)
+        new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene_left.select_vertices(new_verts)
 
     def delete_selection(self) -> None:
-        selection = list(self.graph_scene_left.selected_vertices)
-        selected_edges = list(self.graph_scene_left.selected_edges)
+        selection = list(self.graph_scene.selected_vertices)
+        selected_edges = list(self.graph_scene.selected_edges)
         rem_vertices = selection.copy()
         for v in selection:
-            if vertex_is_w(self.graph_scene_left.g.type(v)):
-                rem_vertices.append(get_w_partner(self.graph_scene_left.g, v))
+            if vertex_is_w(self.graph_scene.g.type(v)):
+                rem_vertices.append(get_w_partner(self.graph_scene.g, v))
         if not rem_vertices and not selected_edges: return
-        new_g = copy.deepcopy(self.graph_scene_left.g)
-        self.graph_scene_left.clearSelection()
+        new_g = copy.deepcopy(self.graph_scene.g)
+        self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(list(set(rem_vertices)))
         cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
