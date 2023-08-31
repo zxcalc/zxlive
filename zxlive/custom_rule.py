@@ -142,3 +142,22 @@ def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map:
     k = (area ** 0.5) / len(rhs_graph)
     return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
 
+def check_rule(rule: CustomRule, show_error: bool = True):
+    rule.lhs_graph.auto_detect_io()
+    rule.rhs_graph.auto_detect_io()
+    if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
+        len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
+        if show_error:
+            from .dialogs import show_error_msg
+            show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
+        return False
+    left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
+    if not np.allclose(left_matrix, right_matrix):
+        if show_error:
+            from .dialogs import show_error_msg
+            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
+                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
+            else:
+                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
+        return False
+    return True

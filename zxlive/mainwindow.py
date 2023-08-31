@@ -25,7 +25,7 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
 from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
-from .custom_rule import CustomRule
+from .custom_rule import CustomRule, check_rule
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
@@ -295,6 +295,7 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
         elif isinstance(self.active_panel, RulePanel):
+            check_rule(self.active_panel.get_rule(), show_error=True)
             data = self.active_panel.get_rule().to_json()
         elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
@@ -319,6 +320,7 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, ProofPanel):
             out = export_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
+            check_rule(self.active_panel.get_rule(), show_error=True)
             out = export_rule_dialog(self.active_panel.get_rule(), self)
         else:
             out = export_diagram_dialog(self.active_panel.graph_scene.g, self)

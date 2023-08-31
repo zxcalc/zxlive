@@ -14,7 +14,7 @@ from pyzx import Circuit, extract_circuit
 from .proof import ProofModel
 
 from .common import GraphT, Graph
-from .custom_rule import CustomRule
+from .custom_rule import CustomRule, check_rule
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -267,15 +267,8 @@ def create_new_rewrite(parent: MainWindow) -> None:
         if parent.left_graph is None or parent.right_graph is None or \
             name.text() == "" or description.toPlainText() == "":
             return
-        parent.left_graph.auto_detect_io()
-        parent.right_graph.auto_detect_io()
-        left_matrix, right_matrix = parent.left_graph.to_matrix(), parent.right_graph.to_matrix()
-        if not np.allclose(left_matrix, right_matrix):
-            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
-            else:
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
+        check_rule(rule, show_error=True)
         if export_rule(rule, parent):
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
@@ -283,6 +276,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
     if not dialog.exec(): return
 
 def export_rule(rule, parent):
+    check_rule(rule, show_error=True)
     data = rule.to_json()
     out = export_rule_dialog(rule, parent)
     if out is None: return False
