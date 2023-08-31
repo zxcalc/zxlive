@@ -174,7 +174,7 @@ class MainWindow(QMainWindow):
         self.new_graph(graph)
 
     def _new_action(self, name: str, trigger: Callable, shortcut: QKeySequence | QKeySequence.StandardKey | None,
-                    tooltip: str, icon_file: str = None) -> QAction:
+                    tooltip: str, icon_file: Optional[str] = None) -> QAction:
         action = QAction(name, self)
         if icon_file:
             action.setIcon(QIcon(get_data(f"icons/{icon_file}")))
@@ -376,7 +376,7 @@ class MainWindow(QMainWindow):
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
 
-    def new_rule_editor(self, rule: CustomRule = None, name: Optional[str] = None) -> None:
+    def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:
         if rule is None:
             graph1 = Graph()
             graph2 = Graph()

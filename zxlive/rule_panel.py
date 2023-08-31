@@ -59,11 +59,11 @@ class RulePanel(EditorBasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
-        self.name = QLineEdit(self, placeholderText="Rule name", text=self.name)
-        self.name.setMaximumWidth(150)
-        self.description = QLineEdit(self, placeholderText="Description", text=self.description)
-        self.description.setMaximumWidth(400)
-        yield ToolbarSection(self.name, self.description)
+        self.name_field = QLineEdit(self, placeholderText="Rule name", text=self.name)
+        self.name_field.setMaximumWidth(150)
+        self.description_field = QLineEdit(self, placeholderText="Description", text=self.description)
+        self.description_field.setMaximumWidth(400)
+        yield ToolbarSection(self.name_field, self.description_field)
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene_left.curr_tool = tool
@@ -72,5 +72,5 @@ class RulePanel(EditorBasePanel):
     def get_rule(self) -> CustomRule:
         return CustomRule(self.graph_scene_left.g,
                           self.graph_scene_right.g,
-                          self.name.text(),
-                          self.description.text())
+                          self.name_field.text(),
+                          self.description_field.text())

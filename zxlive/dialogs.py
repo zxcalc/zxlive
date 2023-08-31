@@ -219,7 +219,7 @@ def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[Tuple[str,
         return None
     return file_path, selected_format
 
-def get_lemma_name_and_description(parent: MainWindow) -> None:
+def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], Optional[str]]:
     dialog = QDialog()
     parent.rewrite_form = QFormLayout(dialog)
     name = QLineEdit()

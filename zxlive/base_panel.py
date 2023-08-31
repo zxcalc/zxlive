@@ -22,10 +22,10 @@ class ToolbarSection:
     Contains a sequence of buttons that should be added in the section.
     If the buttons are checkable, we can optionally allow only one of them
     to be selected at any given time by setting `exclusive=True`."""
-    buttons: Sequence[QToolButton]
+    buttons: Sequence[QWidget]
     exclusive: bool = False
 
-    def __init__(self, *args: QToolButton, exclusive: bool = False) -> None:
+    def __init__(self, *args: QWidget, exclusive: bool = False) -> None:
         self.buttons = args
         self.exclusive = exclusive
 
@@ -37,6 +37,7 @@ class BasePanel(QWidget):
     graph_scene: GraphScene
     graph_view: GraphView
 
+    actions: tuple[QAction]
     toolbar: QToolBar
     undo_stack: AnimatedUndoStack
     file_path: Optional[str]
