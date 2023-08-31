@@ -3,7 +3,7 @@ from typing import Iterator, Sequence, Optional
 
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup, \
-    QSplitter
+    QSplitter, QAbstractButton
 from pyzx.graph import Graph
 from pyzx.graph.graph_s import GraphS
 
@@ -71,11 +71,13 @@ class BasePanel(QWidget):
         for section in self._toolbar_sections():
             group = QButtonGroup(self, exclusive=section.exclusive)
             for btn in section.buttons:
-                if isinstance(btn, QAction):
+                if isinstance(btn, QAbstractButton):
+                    self.toolbar.addWidget(btn)
+                    group.addButton(btn)
+                elif isinstance(btn, QAction):
                     self.toolbar.addAction(btn)
                 else:
                     self.toolbar.addWidget(btn)
-                    group.addButton(btn)
             self.toolbar.addSeparator()
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:

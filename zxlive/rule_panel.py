@@ -4,7 +4,7 @@ from typing import Iterator
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QToolButton
+from PySide6.QtWidgets import QToolButton, QLineEdit, QWidgetAction
 from pyzx import EdgeType, VertexType
 
 from .base_panel import ToolbarSection
@@ -56,9 +56,13 @@ class RulePanel(EditorBasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
+        self.name = QLineEdit(self, placeholderText="Rule name")
+        self.name.setMaximumWidth(150)
+        self.description = QLineEdit(self, placeholderText="Description")
+        self.description.setMaximumWidth(400)
         self.save_rule_button = QToolButton(self, text="Save rule")
         self.save_rule_button.clicked.connect(self.save_rule)
-        yield ToolbarSection(self.save_rule_button)
+        yield ToolbarSection(self.name, self.description, self.save_rule_button)
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene_left.curr_tool = tool
