@@ -23,12 +23,13 @@ if TYPE_CHECKING:
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
 
-    All = "zxg *.json *.qasm *.tikz *.zxp", "All Supported Formats"
+    All = "zxg *.json *.qasm *.tikz *.zxp *.zxr", "All Supported Formats"
     QGraph = "zxg", "QGraph"  # "file extension", "format name"
     QASM = "qasm", "QASM"
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
     ZXProof = "zxp", "ZXProof"
+    ZXRule = "zxr", "ZXRule"
     _value_: str
 
     def __new__(cls, *args, **kwds):  # type: ignore
@@ -71,6 +72,12 @@ class ImportProofOutput:
     file_path: str
     p: ProofModel
 
+@dataclass
+class ImportRuleOutput:
+    file_type: FileFormat
+    file_path: str
+    r: CustomRule
+
 def show_error_msg(title: str, description: Optional[str] = None) -> None:
     """Displays an error message box."""
     msg = QMessageBox()
@@ -80,7 +87,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
         msg.setInformativeText(description)
     msg.exec()
 
-def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput]:
+def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
     """Shows a dialog to import a diagram from disk.
 
     Returns the imported graph or `None` if the import failed."""
@@ -111,6 +118,8 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
     try:
         if selected_format == FileFormat.ZXProof:
             return ImportProofOutput(selected_format, file_path, ProofModel.from_json(data))
+        elif selected_format == FileFormat.ZXRule:
+            return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
             return ImportGraphOutput(selected_format, file_path, Graph.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
@@ -198,6 +207,16 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tu
         return None
     file_path, selected_format = file_path_and_format
     data = proof_model.to_json()
+    if not write_to_file(file_path, data):
+        return None
+    return file_path, selected_format
+
+def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+    file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXRule.filter)
+    if file_path_and_format is None or not file_path_and_format[0]:
+        return None
+    file_path, selected_format = file_path_and_format
+    data = rule.to_json()
     if not write_to_file(file_path, data):
         return None
     return file_path, selected_format

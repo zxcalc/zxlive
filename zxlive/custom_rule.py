@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from .proof_actions import ProofAction
 
 class CustomRule:
-    def __init__(self, lhs_graph: Graph, rhs_graph: Graph, name: str, tooltip: str) -> None:
+    def __init__(self, lhs_graph: Graph, rhs_graph: Graph, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()
         self.lhs_graph = lhs_graph
@@ -26,7 +26,7 @@ class CustomRule:
         self.lhs_graph_nx = to_networkx(lhs_graph)
         self.rhs_graph_nx = to_networkx(rhs_graph)
         self.name = name
-        self.tooltip = tooltip
+        self.description = description
         self.last_rewrite_center = None
 
     def __call__(self, graph: Graph, vertices: List[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
@@ -86,7 +86,7 @@ class CustomRule:
             'lhs_graph': self.lhs_graph.to_json(),
             'rhs_graph': self.rhs_graph.to_json(),
             'name': self.name,
-            'tooltip': self.tooltip,
+            'description': self.description,
         })
 
     @classmethod
@@ -94,11 +94,11 @@ class CustomRule:
         d = json.loads(json_str)
         lhs_graph = Graph.from_json(d['lhs_graph'])
         rhs_graph = Graph.from_json(d['rhs_graph'])
-        return cls(lhs_graph, rhs_graph, d['name'], d['tooltip'])
+        return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_proof_action(self) -> "ProofAction":
         from .proof_actions import ProofAction, MATCHES_VERTICES
-        return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.tooltip)
+        return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
 
 
 def to_networkx(graph: Graph) -> nx.Graph:

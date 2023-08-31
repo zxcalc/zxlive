@@ -31,7 +31,7 @@ from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
 from .construct import *
-from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, ImportProofOutput, ImportRuleOutput, create_new_rewrite, export_proof_dialog, export_rule_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT, get_data
 
 from pyzx import Graph, extract_circuit, simplify, Circuit
@@ -241,7 +241,7 @@ class MainWindow(QMainWindow):
             name = QFileInfo(out.file_path).baseName()
             if isinstance(out, ImportGraphOutput):
                 self.new_graph(out.g, name)
-            else:
+            elif isinstance(out, ImportProofOutput):
                 graph = out.p.graphs[-1]
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
@@ -250,6 +250,10 @@ class MainWindow(QMainWindow):
                 proof_panel.step_view.setModel(proof_panel.proof_model)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
                 proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
+            elif isinstance(out, ImportRuleOutput):
+                self.new_rule_editor(out.r, name)
+            else:
+                raise TypeError("Unknown import type", out)
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
@@ -290,6 +294,8 @@ class MainWindow(QMainWindow):
 
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
+        elif isinstance(self.active_panel, RulePanel):
+            data = self.active_panel.get_rule().to_json()
         elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
@@ -312,6 +318,8 @@ class MainWindow(QMainWindow):
         assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
             out = export_proof_dialog(self.active_panel.proof_model, self)
+        elif isinstance(self.active_panel, RulePanel):
+            out = export_rule_dialog(self.active_panel.get_rule(), self)
         else:
             out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
@@ -355,17 +363,25 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
 
-    def new_graph(self, graph:Optional[GraphT] = None, name:Optional[str]=None) -> None:
+    def new_graph(self, graph:Optional[GraphT] = None, name: Optional[str] = None) -> None:
         graph = graph or Graph()
         panel = GraphEditPanel(graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
 
-    def new_rule_editor(self, graph1:Optional[GraphT] = None, graph2:Optional[GraphT] = None, name:Optional[str]=None) -> None:
-        graph1 = graph1 or Graph()
-        graph2 = graph2 or Graph()
-        panel = RulePanel(graph1, graph2, self.undo_action, self.redo_action)
+    def new_rule_editor(self, rule: CustomRule = None, name: Optional[str] = None) -> None:
+        if rule is None:
+            graph1 = Graph()
+            graph2 = Graph()
+            rule_name = ""
+            rule_description = ""
+        else:
+            graph1 = rule.lhs_graph
+            graph2 = rule.rhs_graph
+            rule_name = rule.name
+            rule_description = rule.description
+        panel = RulePanel(graph1, graph2, rule_name, rule_description, self.undo_action, self.redo_action)
         if name is None: name = "New Rule"
         self._new_panel(panel, name)
 
