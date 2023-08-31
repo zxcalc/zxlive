@@ -7,6 +7,8 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QToolButton, QLineEdit, QWidgetAction
 from pyzx import EdgeType, VertexType
 
+from zxlive.custom_rule import CustomRule, add_rule_to_file
+
 from .base_panel import ToolbarSection
 from .common import GraphT, ToolType
 from .editor_base_panel import EditorBasePanel
@@ -69,4 +71,8 @@ class RulePanel(EditorBasePanel):
         self.graph_scene_right.curr_tool = tool
 
     def save_rule(self) -> None:
-        pass
+        rule = CustomRule(self.graph_scene_left.g,
+                          self.graph_scene_right.g,
+                          self.name.text(),
+                          self.description.text())
+        add_rule_to_file(rule)
