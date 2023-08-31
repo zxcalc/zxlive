@@ -4,13 +4,12 @@ from typing import Iterator
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QToolButton, QLineEdit, QWidgetAction
+from PySide6.QtWidgets import QLineEdit, QToolButton
 from pyzx import EdgeType, VertexType
-
-from zxlive.custom_rule import CustomRule, add_rule_to_file
 
 from .base_panel import ToolbarSection
 from .common import GraphT, ToolType
+from .custom_rule import CustomRule, add_rule_to_file
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView

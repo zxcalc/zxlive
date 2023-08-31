@@ -1,18 +1,18 @@
 from dataclasses import dataclass
-from typing import Iterator, Sequence, Optional
+from typing import Iterator, Optional, Sequence
 
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup, \
-    QSplitter, QAbstractButton
+from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
+                               QToolBar, QToolButton, QVBoxLayout, QWidget)
 from pyzx.graph import Graph
 from pyzx.graph.graph_s import GraphS
 
+from .animations import AnimatedUndoStack
+from .commands import SetGraph
 from .common import GraphT
+from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
-from .commands import SetGraph
-from .dialogs import FileFormat
-from .animations import AnimatedUndoStack
 
 
 @dataclass
