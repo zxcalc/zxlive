@@ -1,58 +1,21 @@
 from __future__ import annotations
 
 import copy
-from enum import Enum
-from fractions import Fraction
-from typing import Iterator, TypedDict, Callable
-from PySide6.QtCore import Signal, QSize, Qt, QPoint
+from typing import Iterator
 
-from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
-from PySide6.QtGui import QIcon, QPen, QPainter, QColor, QPixmap, QAction
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QToolButton
 from pyzx import EdgeType, VertexType
-from pyzx.utils import vertex_is_w, get_w_partner
-from sympy import sympify
 
-from zxlive.graphview import GraphView
-
-from .vitem import BLACK, ZX_GREEN, ZX_RED, H_YELLOW
-from .eitem import HAD_EDGE_BLUE
-
-from .common import VT, GraphT, ToolType, get_data
-from .base_panel import BasePanel, ToolbarSection
-from .commands import (
-    AddEdge, AddNode, AddWNode, MoveNode, SetGraph, UpdateGraph, ChangePhase, ChangeNodeType,
-    ChangeEdgeColor)
-from .dialogs import show_error_msg
+from .base_panel import ToolbarSection
+from .common import GraphT
+from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
+from .graphview import GraphView
 
 
-class ShapeType(Enum):
-    CIRCLE = 1
-    SQUARE = 2
-    TRIANGLE = 3
-    LINE = 4
-    DASHED_LINE = 5
-
-class DrawPanelNodeType(TypedDict):
-    text: str
-    icon: tuple[ShapeType, str]
-
-
-VERTICES: dict[VertexType.Type, DrawPanelNodeType] = {
-    VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, ZX_GREEN)},
-    VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, ZX_RED)},
-    VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, H_YELLOW)},
-    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, BLACK)},
-    VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, BLACK)},
-}
-
-EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
-    EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
-    EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
-}
-
-
-class GraphEditPanel(BasePanel):
+class GraphEditPanel(EditorBasePanel):
     """Panel for the edit mode of ZX live."""
 
     graph_scene: EditGraphScene
@@ -64,10 +27,10 @@ class GraphEditPanel(BasePanel):
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
         self.graph_scene = EditGraphScene()
-        self.graph_scene.vertices_moved.connect(lambda *x: self.push_cmd_to_undo_stack(vert_moved, *x))
-        self.graph_scene.vertex_double_clicked.connect(lambda *x: self.push_cmd_to_undo_stack(vert_double_clicked, *x))
-        self.graph_scene.vertex_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_vert, *x))
-        self.graph_scene.edge_added.connect(lambda *x: self.push_cmd_to_undo_stack(add_edge, *x))
+        self.graph_scene.vertices_moved.connect(self.vert_moved)
+        self.graph_scene.vertex_double_clicked.connect(self.vert_double_clicked)
+        self.graph_scene.vertex_added.connect(self.add_vert)
+        self.graph_scene.edge_added.connect(self.add_edge)
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
@@ -76,197 +39,15 @@ class GraphEditPanel(BasePanel):
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 
-        self.sidebar = QSplitter(self)
-        self.sidebar.setOrientation(Qt.Orientation.Vertical)
+        self.sidebar = self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
-        self.vertex_list = create_list_widget(self, VERTICES, self._vty_clicked)
-        self.edge_list = create_list_widget(self, EDGES, self._ety_clicked)
-        self.sidebar.addWidget(self.vertex_list)
-        self.sidebar.addWidget(self.edge_list)
-
-    def push_cmd_to_undo_stack(self, command_function, *args) -> None:
-        cmd = command_function(self, self.graph_view, *args)
-        if cmd is not None:
-            self.undo_stack.push(cmd)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
-        yield toolbar_select_node_edge(self)
-
-        yield ToolbarSection(*self.actions)
+        yield from super()._toolbar_sections()
 
         self.start_derivation = QToolButton(self, text="Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
 
-    def _tool_clicked(self, tool: ToolType) -> None:
-        self.graph_scene.curr_tool = tool
-
-    def _vty_clicked(self, vty: VertexType.Type) -> None:
-        self._curr_vty = vty
-        selected = list(self.graph_scene.selected_vertices)
-        if len(selected) > 0:
-            cmd = ChangeNodeType(self.graph_view, selected, vty)
-            self.undo_stack.push(cmd)
-
-    def _ety_clicked(self, ety: EdgeType.Type) -> None:
-        self._curr_ety = ety
-        self.graph_scene.curr_ety = ety
-        selected = list(self.graph_scene.selected_edges)
-        if len(selected) > 0:
-            cmd = ChangeEdgeColor(self.graph_view, selected, ety)
-            self.undo_stack.push(cmd)
-
-    def paste_graph(self, graph: GraphT) -> None:
-        if graph is None: return
-        new_g = copy.deepcopy(self.graph_scene.g)
-        new_verts, new_edges = new_g.merge(graph.translate(0.5,0.5))
-        cmd = UpdateGraph(self.graph_view,new_g)
-        self.undo_stack.push(cmd)
-        self.graph_scene.select_vertices(new_verts)
-
-    def delete_selection(self) -> None:
-        selection = list(self.graph_scene.selected_vertices)
-        selected_edges = list(self.graph_scene.selected_edges)
-        rem_vertices = selection.copy()
-        for v in selection:
-            if vertex_is_w(self.graph_scene.g.type(v)):
-                rem_vertices.append(get_w_partner(self.graph_scene.g, v))
-        if not rem_vertices and not selected_edges: return
-        new_g = copy.deepcopy(self.graph_scene.g)
-        self.graph_scene.clearSelection()
-        new_g.remove_edges(selected_edges)
-        new_g.remove_vertices(list(set(rem_vertices)))
-        cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
-            else UpdateGraph(self.graph_view,new_g)
-        self.undo_stack.push(cmd)
-
     def _start_derivation(self) -> None:
         self.start_derivation_signal.emit(copy.deepcopy(self.graph_scene.g))
-
-
-def add_vert(parent, graph_view: GraphView, x: float, y: float) -> None:
-    return AddWNode(graph_view, x, y) if parent._curr_vty == VertexType.W_OUTPUT \
-        else AddNode(graph_view, x, y, parent._curr_vty)
-
-def add_edge(parent, graph_view: GraphView, u: VT, v: VT) -> None:
-    graph = graph_view.graph_scene.g
-    if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
-        return None
-    if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
-        graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
-        return None
-    return AddEdge(graph_view, u, v, parent._curr_ety)
-
-def vert_moved(parent, graph_view: GraphView, vs: list[tuple[VT, float, float]]) -> None:
-    return MoveNode(graph_view, vs)
-
-def vert_double_clicked(parent, graph_view: GraphView, v: VT) -> None:
-    graph = graph_view.graph_scene.g
-    if graph.type(v) == VertexType.BOUNDARY:
-        input_, ok = QInputDialog.getText(
-            parent, "Input Dialog", "Enter Qubit Index:"
-        )
-        try:
-            graph.set_qubit(v, int(input_.strip()))
-        except ValueError:
-            show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
-        return None
-    elif vertex_is_w(graph.type(v)):
-        return None
-
-    input_, ok = QInputDialog.getText(
-        parent, "Input Dialog", "Enter Desired Phase Value:"
-    )
-    if not ok:
-        return None
-    try:
-        new_phase = string_to_phase(input_)
-    except ValueError:
-        show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
-        return None
-    return ChangePhase(graph_view, v, new_phase)
-
-def toolbar_select_node_edge(parent):
-    icon_size = QSize(32, 32)
-    select = QToolButton(parent, checkable=True, checked=True)  # Selected by default
-    vertex = QToolButton(parent, checkable=True)
-    edge = QToolButton(parent, checkable=True)
-    select.setToolTip("Select (s)")
-    vertex.setToolTip("Add Vertex (v)")
-    edge.setToolTip("Add Edge (e)")
-    select.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
-    vertex.setIcon(QIcon(get_data("icons/tikzit-tool-node.svg")))
-    edge.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
-    select.setShortcut("s")
-    vertex.setShortcut("v")
-    edge.setShortcut("e")
-    select.setIconSize(icon_size)
-    vertex.setIconSize(icon_size)
-    edge.setIconSize(icon_size)
-    select.clicked.connect(lambda: parent._tool_clicked(ToolType.SELECT))
-    vertex.clicked.connect(lambda: parent._tool_clicked(ToolType.VERTEX))
-    edge.clicked.connect(lambda: parent._tool_clicked(ToolType.EDGE))
-    return ToolbarSection(select, vertex, edge, exclusive=True)
-
-def create_list_widget(parent,
-                        data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
-                        onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
-    list_widget = QListWidget(parent)
-    list_widget.setResizeMode(QListView.ResizeMode.Adjust)
-    list_widget.setViewMode(QListView.ViewMode.IconMode)
-    list_widget.setMovement(QListView.Movement.Static)
-    list_widget.setUniformItemSizes(True)
-    list_widget.setGridSize(QSize(60, 64))
-    list_widget.setWordWrap(True)
-    list_widget.setIconSize(QSize(24, 24))
-    for typ, value in data.items():
-        icon = create_icon(*value["icon"])
-        item = QListWidgetItem(icon, value["text"])
-        item.setData(Qt.ItemDataRole.UserRole, typ)
-        list_widget.addItem(item)
-    list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
-    list_widget.setCurrentItem(list_widget.item(0))
-    return list_widget
-
-def create_icon(shape: ShapeType, color: str) -> QIcon:
-    icon = QIcon()
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setPen(QPen(QColor(BLACK), 6))
-    painter.setBrush(QColor(color))
-    if shape == ShapeType.CIRCLE:
-        painter.drawEllipse(4, 4, 56, 56)
-    elif shape == ShapeType.SQUARE:
-        painter.drawRect(4, 4, 56, 56)
-    elif shape == ShapeType.TRIANGLE:
-        painter.drawPolygon([QPoint(32, 10), QPoint(2, 60), QPoint(62, 60)])
-    elif shape == ShapeType.LINE:
-        painter.drawLine(0, 32, 64, 32)
-    elif shape == ShapeType.DASHED_LINE:
-        painter.setPen(QPen(QColor(color), 6, Qt.PenStyle.DashLine))
-        painter.drawLine(0, 32, 64, 32)
-    painter.end()
-    icon.addPixmap(pixmap)
-    return icon
-
-def string_to_phase(string: str) -> Fraction:
-    if not string:
-        return Fraction(0)
-    try:
-        s = string.lower().replace(' ', '')
-        s = s.replace('\u03c0', '').replace('pi', '')
-        if '.' in s or 'e' in s:
-            return Fraction(float(s))
-        elif '/' in s:
-            a, b = s.split("/", 2)
-            if not a:
-                return Fraction(1, int(b))
-            if a == '-':
-                a = '-1'
-            return Fraction(int(a), int(b))
-        else:
-            return Fraction(int(s))
-    except ValueError:
-        return sympify(string)
