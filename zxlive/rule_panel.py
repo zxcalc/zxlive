@@ -4,6 +4,7 @@ import copy
 from typing import Iterator
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QSplitter, QToolButton)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
@@ -28,10 +29,10 @@ class RulePanel(BasePanel):
     _curr_vty: VertexType.Type
 
 
-    def __init__(self, graph1: GraphT, graph2: GraphT) -> None:
+    def __init__(self, graph1: GraphT, graph2: GraphT, *actions: QAction) -> None:
+        super().__init__(*actions)
         self.graph_scene_left = EditGraphScene()
         self.graph_scene_right = EditGraphScene()
-        super().__init__()
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
@@ -71,6 +72,7 @@ class RulePanel(BasePanel):
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield toolbar_select_node_edge(self)
+        yield ToolbarSection(*self.actions)
 
         self.save_rule_button = QToolButton(self, text="Save rule")
         self.save_rule_button.clicked.connect(self.save_rule)

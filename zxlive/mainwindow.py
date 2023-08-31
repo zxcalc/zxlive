@@ -24,13 +24,12 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
     QTabWidget, QFormLayout
 from pyzx.graph.base import BaseGraph
 
-from zxlive.rule_panel import RulePanel
-
 from .commands import AddRewriteStep
 from .custom_rule import CustomRule, add_rule_to_file
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
+from .rule_panel import RulePanel
 from .construct import *
 from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT, get_data
@@ -366,11 +365,9 @@ class MainWindow(QMainWindow):
     def new_rule_editor(self, graph1:Optional[GraphT] = None, graph2:Optional[GraphT] = None, name:Optional[str]=None) -> None:
         graph1 = graph1 or Graph()
         graph2 = graph2 or Graph()
-        panel = RulePanel(graph1, graph2)
+        panel = RulePanel(graph1, graph2, self.undo_action, self.redo_action)
         if name is None: name = "New Rule"
-        self.tab_widget.addTab(panel, name)
-        self.tab_widget.setCurrentWidget(panel)
-        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
+        self._new_panel(panel, name)
 
     def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
         panel = ProofPanel(graph, self.undo_action, self.redo_action)
