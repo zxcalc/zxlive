@@ -14,27 +14,31 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Callable, Optional, TypedDict
 
 import copy
+from typing import Callable, Optional, TypedDict
 
-from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
-from PySide6.QtGui import QAction, QKeySequence, QCloseEvent, QIcon
-from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
-    QTabWidget, QFormLayout
+from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
+                            QSettings, QTextStream)
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
+from PySide6.QtWidgets import (QFormLayout, QMainWindow, QMessageBox,
+                               QTabWidget, QVBoxLayout, QWidget)
+from pyzx import Circuit, Graph, extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
 
-from .commands import AddRewriteStep
-from .custom_rule import CustomRule, check_rule
 from .base_panel import BasePanel
+from .commands import AddRewriteStep
+from .common import GraphT, get_data
+from .construct import *
+from .custom_rule import CustomRule, check_rule
+from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
+                      ImportRuleOutput, create_new_rewrite,
+                      export_diagram_dialog, export_proof_dialog, export_rule,
+                      export_rule_dialog, get_lemma_name_and_description,
+                      import_diagram_dialog, show_error_msg)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
-from .construct import *
-from .dialogs import ImportGraphOutput, ImportProofOutput, ImportRuleOutput, export_rule, create_new_rewrite, export_proof_dialog, export_rule_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
-from .common import GraphT, get_data
-
-from pyzx import Graph, extract_circuit, simplify, Circuit
 
 
 class MainWindow(QMainWindow):

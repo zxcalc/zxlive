@@ -1,18 +1,17 @@
 
 import json
-import os
-from typing import Callable, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, List
 
 import networkx as nx
 import numpy as np
 import pyzx
-from networkx.algorithms.isomorphism import GraphMatcher, categorical_node_match
+from networkx.algorithms.isomorphism import (GraphMatcher,
+                                             categorical_node_match)
 from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
-
-from .common import CUSTOM_RULES_PATH, ET, VT, Graph
+from .common import ET, VT, Graph
 
 if TYPE_CHECKING:
     from .proof_actions import ProofAction
@@ -97,7 +96,7 @@ class CustomRule:
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_proof_action(self) -> "ProofAction":
-        from .proof_actions import ProofAction, MATCHES_VERTICES
+        from .proof_actions import MATCHES_VERTICES, ProofAction
         return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
 
 

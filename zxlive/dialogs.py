@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-from enum import Enum
-import json
-import os
-from typing import Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
-from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox, QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, QDialogButtonBox
-import numpy as np
+from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
+                               QFormLayout, QLineEdit, QMessageBox,
+                               QPushButton, QTextEdit, QWidget)
 from pyzx import Circuit, extract_circuit
 
-from .proof import ProofModel
-
-from .common import GraphT, Graph
+from .common import Graph, GraphT
 from .custom_rule import CustomRule, check_rule
+from .proof import ProofModel
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
