@@ -25,13 +25,13 @@ from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
 from pyzx.graph.base import BaseGraph
 
 from .commands import AddRewriteStep
-from .custom_rule import CustomRule, add_rule_to_file
+from .custom_rule import CustomRule
 from .base_panel import BasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
 from .construct import *
-from .dialogs import ImportGraphOutput, ImportProofOutput, ImportRuleOutput, create_new_rewrite, export_proof_dialog, export_rule_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
+from .dialogs import ImportGraphOutput, ImportProofOutput, ImportRuleOutput, export_rule, create_new_rewrite, export_proof_dialog, export_rule_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
 from .common import GraphT, get_data
 
 from pyzx import Graph, extract_circuit, simplify, Circuit
@@ -419,7 +419,7 @@ class MainWindow(QMainWindow):
         lhs_graph = self.active_panel.proof_model.graphs[0]
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        add_rule_to_file(rule)
+        export_rule(rule, self)
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:

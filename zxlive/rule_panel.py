@@ -9,7 +9,7 @@ from pyzx import EdgeType, VertexType
 
 from .base_panel import ToolbarSection
 from .common import GraphT, ToolType
-from .custom_rule import CustomRule, add_rule_to_file
+from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView

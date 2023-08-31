@@ -14,7 +14,7 @@ from pyzx import Circuit, extract_circuit
 from .proof import ProofModel
 
 from .common import GraphT, Graph
-from .custom_rule import CustomRule, add_rule_to_file
+from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -276,8 +276,22 @@ def create_new_rewrite(parent: MainWindow) -> None:
             else:
                 show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
-        add_rule_to_file(rule)
-        dialog.accept()
+        if export_rule(rule, parent):
+            dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
     if not dialog.exec(): return
+
+def export_rule(rule, parent):
+    data = rule.to_json()
+    out = export_rule_dialog(rule, parent)
+    if out is None: return False
+    file_path, file_type = out
+    file = QFile(file_path)
+    if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
+        show_error_msg("Could not write to file")
+        return False
+    out = QTextStream(file)
+    out << data
+    file.close()
+    return True
