@@ -276,6 +276,18 @@ class GraphView(QGraphicsView):
             y = speed * math.sin(angle)
             Sparkle(pos.x(), pos.y(), x, y, SPARKLE_FADE, self.graph_scene)
 
+
+class RuleEditGraphView(GraphView):
+    def __init__(self, parent_panel, graph_scene: GraphScene) -> None:
+        super().__init__(graph_scene)
+        self.parent_panel = parent_panel
+
+    def mousePressEvent(self, e: QMouseEvent) -> None:
+        self.parent_panel.graph_view = self
+        self.parent_panel.graph_scene = self.graph_scene
+        super().mousePressEvent(e)
+
+
 SPARKLE_COLOR = "#900090"
 SPARKLE_COUNT = 1
 SPARKLE_MAX_SPEED = 200.0

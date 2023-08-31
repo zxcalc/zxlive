@@ -14,26 +14,31 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import Callable, Optional, TypedDict
 
 import copy
+from typing import Callable, Optional, TypedDict
 
-from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
-from PySide6.QtGui import QAction, QKeySequence, QCloseEvent, QIcon
-from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
-    QTabWidget, QFormLayout
+from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
+                            QSettings, QTextStream)
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
+from PySide6.QtWidgets import (QFormLayout, QMainWindow, QMessageBox,
+                               QTabWidget, QVBoxLayout, QWidget)
+from pyzx import Circuit, Graph, extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
 
-from .commands import AddRewriteStep
-from .custom_rule import CustomRule, add_rule_to_file
 from .base_panel import BasePanel
+from .commands import AddRewriteStep
+from .common import GraphT, get_data
+from .construct import *
+from .custom_rule import CustomRule, check_rule
+from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
+                      ImportRuleOutput, create_new_rewrite,
+                      export_diagram_dialog, export_proof_dialog,
+                      export_rule_dialog, get_lemma_name_and_description,
+                      import_diagram_dialog, show_error_msg)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
-from .construct import *
-from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
-from .common import GraphT, get_data
-
-from pyzx import Graph, extract_circuit, simplify, Circuit
+from .rule_panel import RulePanel
 
 
 class MainWindow(QMainWindow):
@@ -149,10 +154,12 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
 
-        new_rewrite = self._new_action("Create new rewrite", lambda: create_new_rewrite(self), None, "Create a new rewrite")
+        new_rewrite_from_file = self._new_action("New rewrite from file", lambda: create_new_rewrite(self), None, "New rewrite from file")
+        new_rewrite_editor = self._new_action("New rewrite", self.new_rule_editor, None, "New rewrite")
         self.proof_as_rewrite_action = self._new_action("Save proof as lemma", self.proof_as_lemma, None, "Save proof as lemma")
         rewrite_menu = menu.addMenu("&Rewrite")
-        rewrite_menu.addAction(new_rewrite)
+        rewrite_menu.addAction(new_rewrite_editor)
+        rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
         simplify_actions = []
@@ -238,7 +245,7 @@ class MainWindow(QMainWindow):
             name = QFileInfo(out.file_path).baseName()
             if isinstance(out, ImportGraphOutput):
                 self.new_graph(out.g, name)
-            else:
+            elif isinstance(out, ImportProofOutput):
                 graph = out.p.graphs[-1]
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
@@ -247,6 +254,10 @@ class MainWindow(QMainWindow):
                 proof_panel.step_view.setModel(proof_panel.proof_model)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
                 proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
+            elif isinstance(out, ImportRuleOutput):
+                self.new_rule_editor(out.r, name)
+            else:
+                raise TypeError("Unknown import type", out)
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
@@ -287,6 +298,9 @@ class MainWindow(QMainWindow):
 
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
+        elif isinstance(self.active_panel, RulePanel):
+            check_rule(self.active_panel.get_rule(), show_error=True)
+            data = self.active_panel.get_rule().to_json()
         elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
@@ -309,6 +323,9 @@ class MainWindow(QMainWindow):
         assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
             out = export_proof_dialog(self.active_panel.proof_model, self)
+        elif isinstance(self.active_panel, RulePanel):
+            check_rule(self.active_panel.get_rule(), show_error=True)
+            out = export_rule_dialog(self.active_panel.get_rule(), self)
         else:
             out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
@@ -324,7 +341,7 @@ class MainWindow(QMainWindow):
 
     def cut_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel):
+        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
             self.copied_graph = self.active_panel.copy_selection()
             self.active_panel.delete_selection()
 
@@ -334,12 +351,13 @@ class MainWindow(QMainWindow):
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel) and self.copied_graph is not None:
+        if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
+            and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel):
+        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
             self.active_panel.delete_selection()
 
     def _new_panel(self, panel: BasePanel, name: str) -> None:
@@ -351,11 +369,26 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
 
-    def new_graph(self, graph:Optional[GraphT] = None, name:Optional[str]=None) -> None:
+    def new_graph(self, graph:Optional[GraphT] = None, name: Optional[str] = None) -> None:
         graph = graph or Graph()
         panel = GraphEditPanel(graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
+        self._new_panel(panel, name)
+
+    def new_rule_editor(self, rule: CustomRule = None, name: Optional[str] = None) -> None:
+        if rule is None:
+            graph1 = Graph()
+            graph2 = Graph()
+            rule_name = ""
+            rule_description = ""
+        else:
+            graph1 = rule.lhs_graph
+            graph2 = rule.rhs_graph
+            rule_name = rule.name
+            rule_description = rule.description
+        panel = RulePanel(graph1, graph2, rule_name, rule_description, self.undo_action, self.redo_action)
+        if name is None: name = "New Rule"
         self._new_panel(panel, name)
 
     def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
@@ -392,7 +425,7 @@ class MainWindow(QMainWindow):
         lhs_graph = self.active_panel.proof_model.graphs[0]
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        add_rule_to_file(rule)
+        export_rule_dialog(rule, self)
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:

@@ -18,7 +18,7 @@ from .custom_rule import CustomRule
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .graphscene import GraphScene
-from .graphview import WandTrace, GraphTool
+from .graphview import GraphView, WandTrace, GraphTool
 from .eitem import EItem
 from .proof import ProofModel
 from .vitem import VItem, ZX_GREEN, DragState
@@ -30,13 +30,17 @@ class ProofPanel(BasePanel):
     """Panel for the proof mode of ZX live."""
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
+        super().__init__(*actions)
         self.graph_scene = GraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
         self.graph_scene.selectionChanged.connect(self.update_on_selection)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
 
-        super().__init__(graph, self.graph_scene, *actions)
+
+        self.graph_view = GraphView(self.graph_scene)
+        self.splitter.addWidget(self.graph_view)
+        self.graph_view.set_graph(graph)
 
         self.init_action_groups()
 
@@ -85,12 +89,15 @@ class ProofPanel(BasePanel):
     def init_action_groups(self) -> None:
         basic_rules = proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()
         self.action_groups = [basic_rules]
-        if os.path.isfile(CUSTOM_RULES_PATH):
-            with open(CUSTOM_RULES_PATH, "r") as f:
-                data = json.load(f)
-                proof_action_list = [CustomRule.from_json(d).to_proof_action() for d in data]
-                custom_rules = proof_actions.ProofActionGroup(*proof_action_list).copy()
-            self.action_groups.append(custom_rules)
+        custom_rules = []
+        for root, dirs, files in os.walk(CUSTOM_RULES_PATH):
+            for file in files:
+                if file.endswith(".zxr"):
+                    zxr_file = os.path.join(root, file)
+                    with open(zxr_file, "r") as f:
+                        rule = CustomRule.from_json(f.read()).to_proof_action()
+                        custom_rules.append(rule)
+        self.action_groups.append(proof_actions.ProofActionGroup(*custom_rules).copy())
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
             group.init_buttons(self)

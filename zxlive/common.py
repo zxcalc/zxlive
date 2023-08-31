@@ -9,7 +9,7 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 def get_data(path: str) -> str:
     return os.path.join(_ROOT, path)
 
-CUSTOM_RULES_PATH: Final = "custom_rules.json"
+CUSTOM_RULES_PATH: Final = "lemmas/"
 
 
 VT: TypeAlias = int

@@ -1,20 +1,18 @@
 from __future__ import annotations
 
-from enum import Enum
-import json
-import os
-from typing import Optional, Tuple, TYPE_CHECKING
 from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
-from PySide6.QtWidgets import QWidget, QFileDialog, QMessageBox, QDialog, QFormLayout, QLineEdit, QTextEdit, QPushButton, QDialogButtonBox
-import numpy as np
+from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
+                               QFormLayout, QLineEdit, QMessageBox,
+                               QPushButton, QTextEdit, QWidget)
 from pyzx import Circuit, extract_circuit
 
+from .common import Graph, GraphT
+from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
-
-from .common import GraphT, Graph
-from .custom_rule import CustomRule, add_rule_to_file
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -23,12 +21,13 @@ if TYPE_CHECKING:
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
 
-    All = "zxg *.json *.qasm *.tikz *.zxp", "All Supported Formats"
+    All = "zxg *.json *.qasm *.tikz *.zxp *.zxr", "All Supported Formats"
     QGraph = "zxg", "QGraph"  # "file extension", "format name"
     QASM = "qasm", "QASM"
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
     ZXProof = "zxp", "ZXProof"
+    ZXRule = "zxr", "ZXRule"
     _value_: str
 
     def __new__(cls, *args, **kwds):  # type: ignore
@@ -71,6 +70,12 @@ class ImportProofOutput:
     file_path: str
     p: ProofModel
 
+@dataclass
+class ImportRuleOutput:
+    file_type: FileFormat
+    file_path: str
+    r: CustomRule
+
 def show_error_msg(title: str, description: Optional[str] = None) -> None:
     """Displays an error message box."""
     msg = QMessageBox()
@@ -80,7 +85,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
         msg.setInformativeText(description)
     msg.exec()
 
-def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput]:
+def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
     """Shows a dialog to import a diagram from disk.
 
     Returns the imported graph or `None` if the import failed."""
@@ -111,6 +116,8 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
     try:
         if selected_format == FileFormat.ZXProof:
             return ImportProofOutput(selected_format, file_path, ProofModel.from_json(data))
+        elif selected_format == FileFormat.ZXRule:
+            return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
             return ImportGraphOutput(selected_format, file_path, Graph.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
@@ -202,6 +209,16 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tu
         return None
     return file_path, selected_format
 
+def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+    file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXRule.filter)
+    if file_path_and_format is None or not file_path_and_format[0]:
+        return None
+    file_path, selected_format = file_path_and_format
+    data = rule.to_json()
+    if not write_to_file(file_path, data):
+        return None
+    return file_path, selected_format
+
 def get_lemma_name_and_description(parent: MainWindow) -> None:
     dialog = QDialog()
     parent.rewrite_form = QFormLayout(dialog)
@@ -248,17 +265,10 @@ def create_new_rewrite(parent: MainWindow) -> None:
         if parent.left_graph is None or parent.right_graph is None or \
             name.text() == "" or description.toPlainText() == "":
             return
-        parent.left_graph.auto_detect_io()
-        parent.right_graph.auto_detect_io()
-        left_matrix, right_matrix = parent.left_graph.to_matrix(), parent.right_graph.to_matrix()
-        if not np.allclose(left_matrix, right_matrix):
-            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
-            else:
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
-        add_rule_to_file(rule)
-        dialog.accept()
+        check_rule(rule, show_error=True)
+        if export_rule_dialog(rule, parent):
+            dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
     if not dialog.exec(): return

@@ -1,18 +1,18 @@
 from dataclasses import dataclass
-from typing import Iterator, Sequence, Optional
+from typing import Iterator, Optional, Sequence
 
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QToolBar, QToolButton, QButtonGroup, \
-    QSplitter
+from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
+                               QToolBar, QToolButton, QVBoxLayout, QWidget)
 from pyzx.graph import Graph
 from pyzx.graph.graph_s import GraphS
 
+from .animations import AnimatedUndoStack
+from .commands import SetGraph
 from .common import GraphT
+from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
-from .commands import SetGraph
-from .dialogs import FileFormat
-from .animations import AnimatedUndoStack
 
 
 @dataclass
@@ -42,10 +42,10 @@ class BasePanel(QWidget):
     file_path: Optional[str]
     file_type: Optional[FileFormat]
 
-    def __init__(self, graph: GraphT, graph_scene: GraphScene, *actions: QAction) -> None:
+    def __init__(self, *actions: QAction) -> None:
         super().__init__()
-        self.graph_scene = graph_scene
-        self.graph_view = GraphView(self.graph_scene)
+        self.graph_scene = None
+        self.graph_view = None
         self.actions = actions
         self.undo_stack = AnimatedUndoStack(self)
 
@@ -57,9 +57,7 @@ class BasePanel(QWidget):
 
         self.splitter = QSplitter(self)
         self.layout().addWidget(self.splitter)
-        self.splitter.addWidget(self.graph_view)
 
-        self.graph_view.set_graph(graph)
         self.file_path = None
         self.file_type = None
 
@@ -73,11 +71,13 @@ class BasePanel(QWidget):
         for section in self._toolbar_sections():
             group = QButtonGroup(self, exclusive=section.exclusive)
             for btn in section.buttons:
-                if isinstance(btn, QAction):
+                if isinstance(btn, QAbstractButton):
+                    self.toolbar.addWidget(btn)
+                    group.addButton(btn)
+                elif isinstance(btn, QAction):
                     self.toolbar.addAction(btn)
                 else:
                     self.toolbar.addWidget(btn)
-                    group.addButton(btn)
             self.toolbar.addSeparator()
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:

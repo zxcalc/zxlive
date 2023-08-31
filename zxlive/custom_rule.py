@@ -1,24 +1,23 @@
 
 import json
-import os
-from typing import Callable, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, List
 
 import networkx as nx
 import numpy as np
 import pyzx
-from networkx.algorithms.isomorphism import GraphMatcher, categorical_node_match
+from networkx.algorithms.isomorphism import (GraphMatcher,
+                                             categorical_node_match)
 from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
-
-from .common import CUSTOM_RULES_PATH, ET, VT, Graph
+from .common import ET, VT, Graph
 
 if TYPE_CHECKING:
     from .proof_actions import ProofAction
 
 class CustomRule:
-    def __init__(self, lhs_graph: Graph, rhs_graph: Graph, name: str, tooltip: str) -> None:
+    def __init__(self, lhs_graph: Graph, rhs_graph: Graph, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()
         self.lhs_graph = lhs_graph
@@ -26,7 +25,7 @@ class CustomRule:
         self.lhs_graph_nx = to_networkx(lhs_graph)
         self.rhs_graph_nx = to_networkx(rhs_graph)
         self.name = name
-        self.tooltip = tooltip
+        self.description = description
         self.last_rewrite_center = None
 
     def __call__(self, graph: Graph, vertices: List[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
@@ -86,7 +85,7 @@ class CustomRule:
             'lhs_graph': self.lhs_graph.to_json(),
             'rhs_graph': self.rhs_graph.to_json(),
             'name': self.name,
-            'tooltip': self.tooltip,
+            'description': self.description,
         })
 
     @classmethod
@@ -94,11 +93,11 @@ class CustomRule:
         d = json.loads(json_str)
         lhs_graph = Graph.from_json(d['lhs_graph'])
         rhs_graph = Graph.from_json(d['rhs_graph'])
-        return cls(lhs_graph, rhs_graph, d['name'], d['tooltip'])
+        return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_proof_action(self) -> "ProofAction":
-        from .proof_actions import ProofAction, MATCHES_VERTICES
-        return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.tooltip)
+        from .proof_actions import MATCHES_VERTICES, ProofAction
+        return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
 
 
 def to_networkx(graph: Graph) -> nx.Graph:
@@ -142,12 +141,22 @@ def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map:
     k = (area ** 0.5) / len(rhs_graph)
     return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
 
-def add_rule_to_file(rule):
-    if not os.path.isfile(CUSTOM_RULES_PATH):
-        with open(CUSTOM_RULES_PATH, "w") as f:
-            json.dump([], f)
-    with open(CUSTOM_RULES_PATH, "r") as f:
-        data = json.load(f)
-    data.append(rule.to_json())
-    with open(CUSTOM_RULES_PATH, "w") as f:
-        json.dump(data, f)
+def check_rule(rule: CustomRule, show_error: bool = True):
+    rule.lhs_graph.auto_detect_io()
+    rule.rhs_graph.auto_detect_io()
+    if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
+        len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
+        if show_error:
+            from .dialogs import show_error_msg
+            show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
+        return False
+    left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
+    if not np.allclose(left_matrix, right_matrix):
+        if show_error:
+            from .dialogs import show_error_msg
+            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
+                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
+            else:
+                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
+        return False
+    return True
