@@ -19,7 +19,7 @@ from typing import Callable, Optional, TypedDict
 import copy
 
 from PySide6.QtCore import QFile, QFileInfo, QTextStream, QIODevice, QSettings, QByteArray, QEvent
-from PySide6.QtGui import QAction, QKeySequence, QCloseEvent
+from PySide6.QtGui import QAction, QKeySequence, QCloseEvent, QIcon
 from PySide6.QtWidgets import QMessageBox, QMainWindow, QWidget, QVBoxLayout,\
     QTabWidget, QFormLayout
 from pyzx.graph.base import BaseGraph
@@ -31,7 +31,7 @@ from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .construct import *
 from .dialogs import ImportGraphOutput, create_new_rewrite, export_proof_dialog, get_lemma_name_and_description, import_diagram_dialog, export_diagram_dialog, show_error_msg, FileFormat
-from .common import GraphT
+from .common import GraphT, get_data
 
 from pyzx import Graph, extract_circuit, simplify, Circuit
 
@@ -102,10 +102,10 @@ class MainWindow(QMainWindow):
         file_menu.addAction(save_file)
         file_menu.addAction(save_as)
 
-        undo = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
-            "Undoes the last action")
-        redo = self._new_action("Redo", self.redo, QKeySequence.StandardKey.Redo,
-            "Redoes the last action")
+        self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
+            "Undoes the last action", "undo.svg")
+        self.redo_action = self._new_action("Redo", self.redo, QKeySequence.StandardKey.Redo,
+            "Redoes the last action", "redo.svg")
         cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
             "Cut the selected part of the diagram")
         copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
@@ -123,8 +123,10 @@ class MainWindow(QMainWindow):
         deselect_all.setShortcuts([QKeySequence(QKeySequence.StandardKey.Deselect), QKeySequence("Ctrl+D")])
 
         edit_menu = menu.addMenu("&Edit")
-        edit_menu.addAction(undo)
-        edit_menu.addAction(redo)
+        edit_menu.addAction(self.undo_action)
+        edit_menu.addAction(self.redo_action)
+        self.undo_action.setEnabled(False)
+        self.redo_action.setEnabled(False)
         edit_menu.addSeparator()
         edit_menu.addAction(cut_action)
         edit_menu.addAction(copy_action)
@@ -164,8 +166,11 @@ class MainWindow(QMainWindow):
         graph = construct_circuit()
         self.new_graph(graph)
 
-    def _new_action(self,name:str,trigger:Callable,shortcut:QKeySequence | QKeySequence.StandardKey | None,tooltip:str) -> QAction:
+    def _new_action(self, name: str, trigger: Callable, shortcut: QKeySequence | QKeySequence.StandardKey | None,
+                    tooltip: str, icon_file: str = None) -> QAction:
         action = QAction(name, self)
+        if icon_file:
+            action.setIcon(QIcon(get_data(f"icons/{icon_file}")))
         action.setStatusTip(tooltip)
         action.triggered.connect(trigger)
         if shortcut:
@@ -215,6 +220,16 @@ class MainWindow(QMainWindow):
         else:
             self.proof_as_rewrite_action.setEnabled(False)
             self.simplify_menu.menuAction().setVisible(False)
+        self._undo_changed()
+        self._redo_changed()
+
+    def _undo_changed(self) -> None:
+        if self.active_panel:
+            self.undo_action.setEnabled(self.active_panel.undo_stack.canUndo())
+
+    def _redo_changed(self) -> None:
+        if self.active_panel:
+            self.redo_action.setEnabled(self.active_panel.undo_stack.canRedo())
 
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
@@ -327,21 +342,26 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, GraphEditPanel):
             self.active_panel.delete_selection()
 
+    def _new_panel(self, panel: BasePanel, name: str) -> None:
+        self.tab_widget.addTab(panel, name)
+        self.tab_widget.setCurrentWidget(panel)
+        self.undo_action.setEnabled(False)
+        self.redo_action.setEnabled(False)
+        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
+        panel.undo_stack.canUndoChanged.connect(self._undo_changed)
+        panel.undo_stack.canRedoChanged.connect(self._redo_changed)
+
     def new_graph(self, graph:Optional[GraphT] = None, name:Optional[str]=None) -> None:
         graph = graph or Graph()
-        panel = GraphEditPanel(graph)
+        panel = GraphEditPanel(graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
-        self.tab_widget.addTab(panel, name)
-        self.tab_widget.setCurrentWidget(panel)
-        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
+        self._new_panel(panel, name)
 
     def new_deriv(self, graph:GraphT, name:Optional[str]=None) -> None:
-        panel = ProofPanel(graph)
+        panel = ProofPanel(graph, self.undo_action, self.redo_action)
         if name is None: name = "New Proof"
-        self.tab_widget.addTab(panel, name)
-        self.tab_widget.setCurrentWidget(panel)
-        panel.undo_stack.cleanChanged.connect(self.update_tab_name)
+        self._new_panel(panel, name)
 
     def select_all(self) -> None:
         assert self.active_panel is not None

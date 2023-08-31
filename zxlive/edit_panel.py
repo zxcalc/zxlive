@@ -7,7 +7,7 @@ from typing import Iterator, TypedDict, Callable
 from PySide6.QtCore import Signal, QSize, Qt, QPoint
 
 from PySide6.QtWidgets import QToolButton, QInputDialog, QSplitter, QListView, QListWidget, QListWidgetItem
-from PySide6.QtGui import QShortcut, QIcon, QPen, QPainter, QColor, QPixmap
+from PySide6.QtGui import QIcon, QPen, QPainter, QColor, QPixmap, QAction
 from pyzx import EdgeType, VertexType
 from pyzx.utils import vertex_is_w, get_w_partner
 from sympy import sympify
@@ -59,7 +59,7 @@ class GraphEditPanel(BasePanel):
     _curr_ety: EdgeType.Type
     _curr_vty: VertexType.Type
 
-    def __init__(self, graph: GraphT) -> None:
+    def __init__(self, graph: GraphT, *actions: QAction) -> None:
         self.graph_scene = EditGraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
@@ -68,7 +68,7 @@ class GraphEditPanel(BasePanel):
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
-        super().__init__(graph, self.graph_scene)
+        super().__init__(graph, self.graph_scene, *actions)
 
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
@@ -143,6 +143,8 @@ class GraphEditPanel(BasePanel):
         self.vertex.clicked.connect(lambda: self._tool_clicked(ToolType.VERTEX))
         self.edge.clicked.connect(lambda: self._tool_clicked(ToolType.EDGE))
         yield ToolbarSection(self.select, self.vertex, self.edge, exclusive=True)
+
+        yield ToolbarSection(*self.actions)
 
         self.start_derivation = QToolButton(self, text="Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
