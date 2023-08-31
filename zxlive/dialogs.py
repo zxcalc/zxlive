@@ -267,23 +267,8 @@ def create_new_rewrite(parent: MainWindow) -> None:
             return
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
         check_rule(rule, show_error=True)
-        if export_rule(rule, parent):
+        if export_rule_dialog(rule, parent):
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
     if not dialog.exec(): return
-
-def export_rule(rule, parent):
-    check_rule(rule, show_error=True)
-    data = rule.to_json()
-    out = export_rule_dialog(rule, parent)
-    if out is None: return False
-    file_path, file_type = out
-    file = QFile(file_path)
-    if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
-        show_error_msg("Could not write to file")
-        return False
-    out = QTextStream(file)
-    out << data
-    file.close()
-    return True

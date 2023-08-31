@@ -33,7 +33,7 @@ from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite,
-                      export_diagram_dialog, export_proof_dialog, export_rule,
+                      export_diagram_dialog, export_proof_dialog,
                       export_rule_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, show_error_msg)
 from .edit_panel import GraphEditPanel
@@ -425,7 +425,7 @@ class MainWindow(QMainWindow):
         lhs_graph = self.active_panel.proof_model.graphs[0]
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        export_rule(rule, self)
+        export_rule_dialog(rule, self)
 
     def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
         def reduce() -> None:
