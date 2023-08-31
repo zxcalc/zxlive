@@ -89,12 +89,15 @@ class ProofPanel(BasePanel):
     def init_action_groups(self) -> None:
         basic_rules = proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()
         self.action_groups = [basic_rules]
-        if os.path.isfile(CUSTOM_RULES_PATH):
-            with open(CUSTOM_RULES_PATH, "r") as f:
-                data = json.load(f)
-                proof_action_list = [CustomRule.from_json(d).to_proof_action() for d in data]
-                custom_rules = proof_actions.ProofActionGroup(*proof_action_list).copy()
-            self.action_groups.append(custom_rules)
+        custom_rules = []
+        for root, dirs, files in os.walk(CUSTOM_RULES_PATH):
+            for file in files:
+                if file.endswith(".zxr"):
+                    zxr_file = os.path.join(root, file)
+                    with open(zxr_file, "r") as f:
+                        rule = CustomRule.from_json(f.read()).to_proof_action()
+                        custom_rules.append(rule)
+        self.action_groups.append(proof_actions.ProofActionGroup(*custom_rules).copy())
         for group in reversed(self.action_groups):
             hlayout = QHBoxLayout()
             group.init_buttons(self)
