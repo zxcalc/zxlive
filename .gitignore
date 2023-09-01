@@ -9,5 +9,6 @@ build
 *.zxg
 *.json
 *.zxp
+*.qasm
 .env
 *.zxr
