@@ -93,6 +93,7 @@ class ChangeNodeType(BaseCommand):
 
     _old_vtys: Optional[list[VertexType.Type]] = field(default=None, init=False)
     _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
+    _new_w_inputs: Optional[List[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -109,13 +110,16 @@ class ChangeNodeType(BaseCommand):
                     self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
                     self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
+        for w_in in self._new_w_inputs or []:
+            self._new_w_inputs.remove(w_in)
+            self.g.remove_vertex(w_in)
         self.update_graph_view()
 
     def redo(self) -> None:
         if self._old_w_info is None:
             self._old_w_info = {}
-        if vertex_is_w(self.vty):
-            return
+        if self._new_w_inputs is None:
+            self._new_w_inputs = []
         self.vs = list(self.vs)
         for v in self.vs:
             if vertex_is_w(self.g.type(v)):
@@ -125,18 +129,25 @@ class ChangeNodeType(BaseCommand):
                 if w_out not in self.vs:
                     self.vs.append(w_out)
         self._old_vtys = [self.g.type(v) for v in self.vs]
-        for v1 in self.vs:
-            if vertex_is_w(self.g.type(v1)):
-                v2 = get_w_partner(self.g, v1)
-                v2_neighbors = [v for v in self.g.neighbors(v2) if v != v1]
+        for v in self.vs:
+            if self.vty == VertexType.W_OUTPUT:
+                w_input = self.g.add_vertex(VertexType.W_INPUT,
+                                            self.g.qubit(v) - W_INPUT_OFFSET,
+                                            self.g.row(v))
+                self.g.add_edge(self.g.edge(w_input, v), edgetype=EdgeType.W_IO)
+                self._new_w_inputs.append(w_input)
+        for v in self.vs:
+            if vertex_is_w(self.g.type(v)):
+                v2 = get_w_partner(self.g, v)
+                v2_neighbors = [v for v in self.g.neighbors(v2) if v != v]
                 for v3 in v2_neighbors:
-                    self.g.add_edge(self.g.edge(v1,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
-                self._old_w_info[v1] = self.WInfo(partner=v2,
+                    self.g.add_edge(self.g.edge(v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
+                self._old_w_info[v] = self.WInfo(partner=v2,
                                                   partner_type=self.g.type(v2),
                                                   partner_pos=(self.g.row(v2), self.g.qubit(v2)),
                                                   neighbors=v2_neighbors)
                 self.g.remove_vertex(v2)
-            self.g.set_type(v1, self.vty)
+            self.g.set_type(v, self.vty)
         self.update_graph_view()
 
 
