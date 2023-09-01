@@ -139,13 +139,13 @@ class ChangeNodeType(BaseCommand):
         for v in self.vs:
             if vertex_is_w(self.g.type(v)):
                 v2 = get_w_partner(self.g, v)
-                v2_neighbors = [v for v in self.g.neighbors(v2) if v != v]
+                v2_neighbors = [vn for vn in self.g.neighbors(v2) if vn != v]
                 for v3 in v2_neighbors:
                     self.g.add_edge(self.g.edge(v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
                 self._old_w_info[v] = self.WInfo(partner=v2,
-                                                  partner_type=self.g.type(v2),
-                                                  partner_pos=(self.g.row(v2), self.g.qubit(v2)),
-                                                  neighbors=v2_neighbors)
+                                                 partner_type=self.g.type(v2),
+                                                 partner_pos=(self.g.row(v2), self.g.qubit(v2)),
+                                                 neighbors=v2_neighbors)
                 self.g.remove_vertex(v2)
             self.g.set_type(v, self.vty)
         self.update_graph_view()
