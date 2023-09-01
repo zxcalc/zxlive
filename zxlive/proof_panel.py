@@ -1,29 +1,31 @@
 from __future__ import annotations
 
 import copy
-import json
 import os
 from typing import Iterator, Union, cast
 
 import pyzx
-from PySide6.QtCore import QPointF, QPersistentModelIndex, Qt, \
-    QModelIndex, QItemSelection, QRect, QSize
-from PySide6.QtGui import QVector2D, QFont, QColor, QPainter, QPen, QFontMetrics, QIcon, QAction
-from PySide6.QtWidgets import QWidget, QToolButton, QHBoxLayout, QListView, \
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle, QAbstractItemView
+from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
+                            QPointF, QRect, QSize, Qt)
+from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
+                           QPainter, QPen, QVector2D)
+from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
+                               QStyle, QStyledItemDelegate,
+                               QStyleOptionViewItem, QToolButton, QWidget)
 from pyzx import VertexType, basicrules
 
-from .common import CUSTOM_RULES_PATH, get_data, ET, VT, GraphT, SCALE, pos_from_view, pos_to_view
-from .custom_rule import CustomRule
+from . import animations as anims
+from . import proof_actions
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
-from .graphscene import GraphScene
-from .graphview import GraphView, WandTrace, GraphTool
+from .common import (CUSTOM_RULES_PATH, ET, SCALE, VT, GraphT, get_data,
+                     pos_from_view, pos_to_view)
+from .custom_rule import CustomRule
 from .eitem import EItem
+from .graphscene import GraphScene
+from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
-from .vitem import VItem, ZX_GREEN, DragState
-from . import proof_actions
-from . import animations as anims
+from .vitem import ZX_GREEN, DragState, VItem
 
 
 class ProofPanel(BasePanel):
@@ -78,13 +80,12 @@ class ProofPanel(BasePanel):
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
-        yield ToolbarSection(*self.actions)
-
         self.identity_choice = (
             QToolButton(self, text="Z", checkable=True, checked=True),
             QToolButton(self, text="X", checkable=True)
         )
         yield ToolbarSection(*self.identity_choice, exclusive=True)
+        yield ToolbarSection(*self.actions)
 
     def init_action_groups(self) -> None:
         basic_rules = proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()
@@ -380,7 +381,4 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         size = super().sizeHint(option, index)
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
-
-    # def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QWidget:
-    #     return False
 

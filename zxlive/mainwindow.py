@@ -23,7 +23,7 @@ from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (QFormLayout, QMainWindow, QMessageBox,
                                QTabWidget, QVBoxLayout, QWidget)
-from pyzx import Circuit, Graph, extract_circuit, simplify
+from pyzx import Graph, extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
 from pyzx.graph.graph_s import GraphS
 

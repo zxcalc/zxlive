@@ -1,19 +1,17 @@
+import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Dict, Optional, Iterable, Set, Union, List, Any
-import copy
+from typing import Dict, Iterable, Optional, Set, Union
 
-from PySide6.QtCore import QItemSelection, QModelIndex, QItemSelectionModel, \
-    QSignalBlocker
+from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
-
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w
 
-from .common import VT, ET, W_INPUT_OFFSET, GraphT
+from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
 from .proof import ProofModel, Rewrite
 
