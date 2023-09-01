@@ -9,7 +9,7 @@ from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w
+from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
@@ -91,6 +91,7 @@ class ChangeNodeType(BaseCommand):
 
     _old_vtys: Optional[list[VertexType.Type]] = field(default=None, init=False)
     _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
+    _new_w_inputs: Optional[List[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -107,26 +108,44 @@ class ChangeNodeType(BaseCommand):
                     self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
                     self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
+        for w_in in self._new_w_inputs.copy() or []:
+            self._new_w_inputs.remove(w_in)
+            self.g.remove_vertex(w_in)
         self.update_graph_view()
 
     def redo(self) -> None:
-        if self._old_w_info is None:
-            self._old_w_info = {}
-        if vertex_is_w(self.vty):
-            return
+        self._old_w_info = self._old_w_info or {}
+        self._new_w_inputs = self._new_w_inputs or []
+        self.vs = set(self.vs)
+        for v in self.vs.copy():
+            is_w_node = vertex_is_w(self.g.type(v))
+            if is_w_node and self.vty == VertexType.W_OUTPUT:
+                self.vs.discard(v)
+            elif is_w_node:
+                w_in, w_out = get_w_io(self.g, v)
+                self.vs.discard(w_in)
+                self.vs.add(w_out)
+        self.vs = list(self.vs)
         self._old_vtys = [self.g.type(v) for v in self.vs]
-        for v1 in self.vs:
-            if vertex_is_w(self.g.type(v1)):
-                v2 = get_w_partner(self.g, v1)
-                v2_neighbors = [v for v in self.g.neighbors(v2) if v != v1]
+        if self.vty == VertexType.W_OUTPUT:
+            for v in self.vs:
+                w_input = self.g.add_vertex(VertexType.W_INPUT,
+                                            self.g.qubit(v) - W_INPUT_OFFSET,
+                                            self.g.row(v))
+                self.g.add_edge(self.g.edge(w_input, v), edgetype=EdgeType.W_IO)
+                self._new_w_inputs.append(w_input)
+        for v in self.vs:
+            if vertex_is_w(self.g.type(v)):
+                v2 = get_w_partner(self.g, v)
+                v2_neighbors = [vn for vn in self.g.neighbors(v2) if vn != v]
                 for v3 in v2_neighbors:
-                    self.g.add_edge(self.g.edge(v1,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
-                self._old_w_info[v1] = self.WInfo(partner=v2,
-                                                  partner_type=self.g.type(v2),
-                                                  partner_pos=(self.g.row(v2), self.g.qubit(v2)),
-                                                  neighbors=v2_neighbors)
+                    self.g.add_edge(self.g.edge(v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
+                self._old_w_info[v] = self.WInfo(partner=v2,
+                                                 partner_type=self.g.type(v2),
+                                                 partner_pos=(self.g.row(v2), self.g.qubit(v2)),
+                                                 neighbors=v2_neighbors)
                 self.g.remove_vertex(v2)
-            self.g.set_type(v1, self.vty)
+            self.g.set_type(v, self.vty)
         self.update_graph_view()
 
 
