@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QListView
 
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w
+from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io
 
 from .common import VT, ET, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
@@ -119,9 +119,11 @@ class ChangeNodeType(BaseCommand):
         self.vs = list(self.vs)
         for v in self.vs:
             if vertex_is_w(self.g.type(v)):
-                v2 = get_w_partner(self.g, v)
-                if v2 in self.vs:
-                    self.vs.remove(v2)
+                w_in, w_out = get_w_io(self.g, v)
+                if w_in in self.vs:
+                    self.vs.remove(w_in)
+                if w_out not in self.vs:
+                    self.vs.append(w_out)
         self._old_vtys = [self.g.type(v) for v in self.vs]
         for v1 in self.vs:
             if vertex_is_w(self.g.type(v1)):
