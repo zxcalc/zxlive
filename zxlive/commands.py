@@ -116,21 +116,21 @@ class ChangeNodeType(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        if self._old_w_info is None:
-            self._old_w_info = {}
-        if self._new_w_inputs is None:
-            self._new_w_inputs = []
-        self.vs = list(self.vs)
-        for v in self.vs:
-            if vertex_is_w(self.g.type(v)):
+        self._old_w_info = self._old_w_info or {}
+        self._new_w_inputs = self._new_w_inputs or []
+        self.vs = set(self.vs)
+        for v in self.vs.copy():
+            is_w_node = vertex_is_w(self.g.type(v))
+            if is_w_node and self.vty == VertexType.W_OUTPUT:
+                self.vs.discard(v)
+            elif is_w_node:
                 w_in, w_out = get_w_io(self.g, v)
-                if w_in in self.vs:
-                    self.vs.remove(w_in)
-                if w_out not in self.vs:
-                    self.vs.append(w_out)
+                self.vs.discard(w_in)
+                self.vs.add(w_out)
+        self.vs = list(self.vs)
         self._old_vtys = [self.g.type(v) for v in self.vs]
-        for v in self.vs:
-            if self.vty == VertexType.W_OUTPUT:
+        if self.vty == VertexType.W_OUTPUT:
+            for v in self.vs:
                 w_input = self.g.add_vertex(VertexType.W_INPUT,
                                             self.g.qubit(v) - W_INPUT_OFFSET,
                                             self.g.row(v))
