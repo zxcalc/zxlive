@@ -104,27 +104,6 @@ class VItem(QGraphicsPathItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
-        pen = QPen()
-        pen.setWidthF(3)
-        pen.setColor(QColor(BLACK))
-        self.setPen(pen)
-
-        path = QPainterPath()
-        if self.ty == VertexType.H_BOX:
-            path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        elif self.ty == VertexType.W_OUTPUT:
-            #draw a triangle
-            path.moveTo(0, 0.2 * SCALE)
-            path.lineTo(0.25 * SCALE, -0.15 * SCALE)
-            path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
-            path.lineTo(0, 0.2 * SCALE)
-        elif self.ty == VertexType.W_INPUT:
-            scale = 0.3 * SCALE
-            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
-        else:
-            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        self.setPath(path)
-        self.set_vitem_rotation()
         self.refresh()
 
     @property
@@ -146,6 +125,7 @@ class VItem(QGraphicsPathItem):
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
+        self.update_shape()
         if not self.isSelected():
             t = self.ty
             if t == VertexType.Z:
@@ -206,12 +186,37 @@ class VItem(QGraphicsPathItem):
         for e_item in self.adj_items:
             e_item.refresh()
 
+    def update_shape(self) -> None:
+        pen = QPen()
+        pen.setWidthF(3)
+        pen.setColor(QColor(BLACK))
+        self.setPen(pen)
+
+        path = QPainterPath()
+        if self.ty == VertexType.H_BOX:
+            path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        elif self.ty == VertexType.W_OUTPUT:
+            # draw a triangle
+            path.moveTo(0, 0.2 * SCALE)
+            path.lineTo(0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(0, 0.2 * SCALE)
+        elif self.ty == VertexType.W_INPUT:
+            scale = 0.3 * SCALE
+            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
+        else:
+            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        self.setPath(path)
+        self.set_vitem_rotation()
+
     def set_vitem_rotation(self) -> None:
         if self.ty == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self)
             if w_in:
                 angle = math.atan2(self.pos().x() - w_in.pos().x(), w_in.pos().y() - self.pos().y())
                 self.setRotation(math.degrees(angle))
+        else:
+            self.setRotation(0)
 
     def set_pos_from_graph(self) -> None:
         self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
