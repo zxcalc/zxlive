@@ -110,7 +110,7 @@ class ChangeNodeType(BaseCommand):
                     self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
                     self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
-        for w_in in self._new_w_inputs or []:
+        for w_in in self._new_w_inputs.copy() or []:
             self._new_w_inputs.remove(w_in)
             self.g.remove_vertex(w_in)
         self.update_graph_view()
