@@ -116,6 +116,12 @@ class ChangeNodeType(BaseCommand):
             self._old_w_info = {}
         if vertex_is_w(self.vty):
             return
+        self.vs = list(self.vs)
+        for v in self.vs:
+            if vertex_is_w(self.g.type(v)):
+                v2 = get_w_partner(self.g, v)
+                if v2 in self.vs:
+                    self.vs.remove(v2)
         self._old_vtys = [self.g.type(v) for v in self.vs]
         for v1 in self.vs:
             if vertex_is_w(self.g.type(v1)):
