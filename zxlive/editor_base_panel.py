@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 from enum import Enum
 from fractions import Fraction
@@ -67,7 +69,7 @@ class EditorBasePanel(BasePanel):
         yield toolbar_select_node_edge(self)
         yield ToolbarSection(*self.actions)
 
-    def create_side_bar(self):
+    def create_side_bar(self) -> QSplitter:
         sidebar = QSplitter(self)
         sidebar.setOrientation(Qt.Orientation.Vertical)
         vertex_list = create_list_widget(self, VERTICES, self._vty_clicked)
@@ -164,7 +166,7 @@ class EditorBasePanel(BasePanel):
         self.undo_stack.push(cmd)
 
 
-def toolbar_select_node_edge(parent):
+def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
     icon_size = QSize(32, 32)
     select = QToolButton(parent, checkable=True, checked=True)  # Selected by default
     vertex = QToolButton(parent, checkable=True)

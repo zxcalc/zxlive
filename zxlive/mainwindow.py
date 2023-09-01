@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (QFormLayout, QMainWindow, QMessageBox,
                                QTabWidget, QVBoxLayout, QWidget)
 from pyzx import Circuit, Graph, extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
+from pyzx.graph.graph_s import GraphS
 
 from .base_panel import BasePanel
 from .commands import AddRewriteStep
@@ -369,9 +370,8 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
 
-    def new_graph(self, graph:Optional[GraphT] = None, name: Optional[str] = None) -> None:
-        graph = graph or Graph()
-        panel = GraphEditPanel(graph, self.undo_action, self.redo_action)
+    def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
+        panel = GraphEditPanel(graph or Graph(), self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
@@ -436,7 +436,9 @@ class MainWindow(QMainWindow):
                 if reduction["in_place"]:
                     reduction["function"](new_graph)
                 else:
-                    new_graph = reduction["function"](new_graph)
+                    _new_graph = reduction["function"](new_graph)
+                    assert isinstance(_new_graph, GraphS)
+                    new_graph = _new_graph
                 cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
                 self.active_panel.undo_stack.push(cmd)
             except Exception as e:
@@ -447,7 +449,7 @@ class MainWindow(QMainWindow):
 class SimpEntry(TypedDict):
     text: str
     tool_tip: str
-    function: Callable[[BaseGraph], int | None | BaseGraph] | Callable[[Circuit], int]
+    function: Callable[[BaseGraph], int] | Callable[[BaseGraph], None] | Callable[[BaseGraph], BaseGraph]
     in_place: bool
 
 

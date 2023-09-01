@@ -8,6 +8,7 @@ import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match)
 from networkx.classes.reportviews import NodeView
+from pyzx.graph.graph_s import GraphS
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
@@ -93,6 +94,8 @@ class CustomRule:
         d = json.loads(json_str)
         lhs_graph = Graph.from_json(d['lhs_graph'])
         rhs_graph = Graph.from_json(d['rhs_graph'])
+        assert (isinstance(lhs_graph, GraphS) and
+                isinstance(rhs_graph, GraphS))
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_proof_action(self) -> "ProofAction":
@@ -128,7 +131,7 @@ def create_subgraph(graph: Graph, verts: List[VT]) -> tuple[nx.Graph, dict[str, 
                 i += 1
     return subgraph_nx, boundary_mapping
 
-def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, dict]:
+def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
     pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
     coords = np.array(list(pos_dict.values()))
     center = np.mean(coords, axis=0)
@@ -139,9 +142,10 @@ def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map:
     except:
         area = 1.
     k = (area ** 0.5) / len(rhs_graph)
-    return nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
+    ret: dict[NodeView, tuple[float, float]] = nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
+    return ret
 
-def check_rule(rule: CustomRule, show_error: bool = True):
+def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \

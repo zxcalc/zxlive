@@ -14,6 +14,8 @@ from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
 
+import abc
+
 
 @dataclass
 class ToolbarSection:
@@ -37,7 +39,7 @@ class BasePanel(QWidget):
     graph_scene: GraphScene
     graph_view: GraphView
 
-    actions: tuple[QAction]
+    actions: tuple[QAction, ...]
     toolbar: QToolBar
     undo_stack: AnimatedUndoStack
     file_path: Optional[str]
@@ -45,8 +47,6 @@ class BasePanel(QWidget):
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__()
-        self.graph_scene = None
-        self.graph_view = None
         self.actions = actions
         self.undo_stack = AnimatedUndoStack(self)
 

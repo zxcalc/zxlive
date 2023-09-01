@@ -14,7 +14,7 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import math
 import random
@@ -22,13 +22,16 @@ from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QT
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
 
-from .graphscene import GraphScene, VItem, EItem
+from .graphscene import GraphScene, VItem, EItem, EditGraphScene
 
 from dataclasses import dataclass
 
 from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM
 from .vitem import PHASE_ITEM_Z
 from . import animations as anims
+
+if TYPE_CHECKING:
+    from .rule_panel import RulePanel
 
 
 class GraphTool:
@@ -278,12 +281,13 @@ class GraphView(QGraphicsView):
 
 
 class RuleEditGraphView(GraphView):
-    def __init__(self, parent_panel, graph_scene: GraphScene) -> None:
+    def __init__(self, parent_panel: RulePanel, graph_scene: GraphScene) -> None:
         super().__init__(graph_scene)
         self.parent_panel = parent_panel
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         self.parent_panel.graph_view = self
+        assert isinstance(self.graph_scene, EditGraphScene)
         self.parent_panel.graph_scene = self.graph_scene
         super().mousePressEvent(e)
 
