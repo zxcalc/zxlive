@@ -2,7 +2,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Dict, Iterable, Optional, Set, Union
+from typing import Dict, Iterable, Optional, Set, Union, List
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
