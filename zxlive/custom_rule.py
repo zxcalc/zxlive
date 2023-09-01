@@ -117,6 +117,7 @@ def to_networkx(graph: Graph) -> nx.Graph:
     return G
 
 def create_subgraph(graph: Graph, verts: List[VT]) -> tuple[nx.Graph, dict[str, int]]:
+    verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
     boundary_mapping = {}
