@@ -23,7 +23,6 @@ from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphic
 
 from pyzx.graph.base import EdgeType
 from pyzx.graph import GraphDiff
-from pyzx.graph.graph_s import GraphS
 
 from .common import VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
@@ -122,7 +121,7 @@ class GraphScene(QGraphicsScene):
             self.removeItem(e_item)
 
         new_g = diff.apply_diff(self.g)
-        assert isinstance(new_g, GraphS)
+        assert isinstance(new_g, GraphT)
         self.g = new_g
         # g now contains the new graph,
         # but we still need to update the scene

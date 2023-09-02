@@ -2,7 +2,7 @@ from typing import List
 
 from pyzx.utils import EdgeType, VertexType
 
-from .common import GraphT, Graph
+from .common import GraphT
 
 
 def construct_circuit() -> GraphT:
@@ -56,8 +56,7 @@ def construct_circuit() -> GraphT:
 
     cur_row = [1] * qubits
 
-    g = Graph()
-    assert isinstance(g, GraphT)
+    g = GraphT()
 
     # Adding vertices to the graph
     for (i, qu, tp) in nvlist:

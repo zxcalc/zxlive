@@ -21,8 +21,6 @@ class ToolType(IntEnum):
     VERTEX = 1
     EDGE = 2
 
-from pyzx.graph.graph_s import GraphS as Graph
-
 SCALE: Final = 60.0
 
 # Offsets should be a multiple of SCALE for grid snapping to work properly

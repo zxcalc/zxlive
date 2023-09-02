@@ -188,7 +188,7 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
     edge.clicked.connect(lambda: parent._tool_clicked(ToolType.EDGE))
     return ToolbarSection(select, vertex, edge, exclusive=True)
 
-def create_list_widget(parent,
+def create_list_widget(parent: EditorBasePanel,
                         data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
                         onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
     list_widget = QListWidget(parent)

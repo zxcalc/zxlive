@@ -4,8 +4,6 @@ from typing import Iterator, Optional, Sequence
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QToolButton, QVBoxLayout, QWidget)
-from pyzx.graph import Graph
-from pyzx.graph.graph_s import GraphS
 
 from .animations import AnimatedUndoStack
 from .commands import SetGraph
@@ -85,8 +83,7 @@ class BasePanel(QWidget):
         raise NotImplementedError
 
     def clear_graph(self) -> None:
-        empty_graph = Graph()
-        assert isinstance(empty_graph, GraphS)
+        empty_graph = GraphT()
         cmd = SetGraph(self.graph_view, empty_graph)
         self.undo_stack.push(cmd)
 
@@ -99,5 +96,5 @@ class BasePanel(QWidget):
     def copy_selection(self) -> GraphT:
         selection = list(self.graph_scene.selected_vertices)
         copied_graph = self.graph.subgraph_from_vertices(selection)
-        assert isinstance(copied_graph, GraphS)
+        assert isinstance(copied_graph, GraphT)
         return copied_graph

@@ -8,17 +8,16 @@ import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match)
 from networkx.classes.reportviews import NodeView
-from pyzx.graph.graph_s import GraphS
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
-from .common import ET, VT, Graph
+from .common import ET, VT, GraphT
 
 if TYPE_CHECKING:
     from .proof_actions import ProofAction
 
 class CustomRule:
-    def __init__(self, lhs_graph: Graph, rhs_graph: Graph, name: str, description: str) -> None:
+    def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()
         self.lhs_graph = lhs_graph
@@ -29,7 +28,7 @@ class CustomRule:
         self.description = description
         self.last_rewrite_center = None
 
-    def __call__(self, graph: Graph, vertices: List[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
+    def __call__(self, graph: GraphT, vertices: List[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
@@ -72,7 +71,7 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
-    def matcher(self, graph: Graph, in_selection: Callable[[VT], bool]) -> List[VT]:
+    def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> List[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
         subgraph_nx, _ = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
@@ -92,10 +91,10 @@ class CustomRule:
     @classmethod
     def from_json(cls, json_str: str) -> "CustomRule":
         d = json.loads(json_str)
-        lhs_graph = Graph.from_json(d['lhs_graph'])
-        rhs_graph = Graph.from_json(d['rhs_graph'])
-        assert (isinstance(lhs_graph, GraphS) and
-                isinstance(rhs_graph, GraphS))
+        lhs_graph = GraphT.from_json(d['lhs_graph'])
+        rhs_graph = GraphT.from_json(d['rhs_graph'])
+        assert (isinstance(lhs_graph, GraphT) and
+                isinstance(rhs_graph, GraphT))
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_proof_action(self) -> "ProofAction":
@@ -103,7 +102,7 @@ class CustomRule:
         return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
 
 
-def to_networkx(graph: Graph) -> nx.Graph:
+def to_networkx(graph: GraphT) -> nx.Graph:
     G = nx.Graph()
     v_data = {v: {"type": graph.type(v),
                   "phase": graph.phase(v),}
@@ -116,7 +115,7 @@ def to_networkx(graph: Graph) -> nx.Graph:
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
-def create_subgraph(graph: Graph, verts: List[VT]) -> tuple[nx.Graph, dict[str, int]]:
+def create_subgraph(graph: GraphT, verts: List[VT]) -> tuple[nx.Graph, dict[str, int]]:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
@@ -132,7 +131,7 @@ def create_subgraph(graph: Graph, verts: List[VT]) -> tuple[nx.Graph, dict[str, 
                 i += 1
     return subgraph_nx, boundary_mapping
 
-def get_vertex_positions(graph: Graph, rhs_graph: nx.Graph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
+def get_vertex_positions(graph: GraphT, rhs_graph: nx.Graph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
     pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
     coords = np.array(list(pos_dict.values()))
     center = np.mean(coords, axis=0)

@@ -23,9 +23,8 @@ from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (QFormLayout, QMainWindow, QMessageBox,
                                QTabWidget, QVBoxLayout, QWidget)
-from pyzx import Graph, extract_circuit, simplify
+from pyzx import extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
-from pyzx.graph.graph_s import GraphS
 
 from .base_panel import BasePanel
 from .commands import AddRewriteStep
@@ -371,15 +370,16 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
-        panel = GraphEditPanel(graph or Graph(), self.undo_action, self.redo_action)
+        _graph = graph or GraphT()
+        panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
 
     def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:
         if rule is None:
-            graph1 = Graph()
-            graph2 = Graph()
+            graph1 = GraphT()
+            graph2 = GraphT()
             rule_name = ""
             rule_description = ""
         else:
@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
                     reduction["function"](new_graph)
                 else:
                     _new_graph = reduction["function"](new_graph)
-                    assert isinstance(_new_graph, GraphS)
+                    assert isinstance(_new_graph, GraphT)
                     new_graph = _new_graph
                 cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
                 self.active_panel.undo_stack.push(cmd)

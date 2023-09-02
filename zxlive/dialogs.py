@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QPushButton, QTextEdit, QWidget)
 from pyzx import Circuit, extract_circuit
 
-from .common import Graph, GraphT
+from .common import GraphT
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
 
@@ -119,11 +119,11 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
         elif selected_format == FileFormat.ZXRule:
             return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
-            return ImportGraphOutput(selected_format, file_path, Graph.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
+            return ImportGraphOutput(selected_format, file_path, GraphT.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
             return ImportGraphOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph()) # type: ignore
         elif selected_format == FileFormat.TikZ:
-            return ImportGraphOutput(selected_format, file_path, Graph.from_tikz(data))  # type: ignore
+            return ImportGraphOutput(selected_format, file_path, GraphT.from_tikz(data))  # type: ignore
         else:
             assert selected_format == FileFormat.All
             try:
@@ -131,10 +131,10 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
                 return ImportGraphOutput(FileFormat.QASM, file_path, circ.to_graph())  # type: ignore
             except TypeError:
                 try:
-                    return ImportGraphOutput(FileFormat.QGraph, file_path, Graph.from_json(data))  # type: ignore
+                    return ImportGraphOutput(FileFormat.QGraph, file_path, GraphT.from_json(data))  # type: ignore
                 except Exception:
                     try:
-                        return ImportGraphOutput(FileFormat.TikZ, file_path, Graph.from_tikz(data))  # type: ignore
+                        return ImportGraphOutput(FileFormat.TikZ, file_path, GraphT.from_tikz(data))  # type: ignore
                     except:
                         show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
                         return None
