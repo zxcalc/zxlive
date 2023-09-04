@@ -118,7 +118,8 @@ class ProofActionGroup(object):
         return ProofActionGroup(*copied_actions)
 
     def init_buttons(self, parent: "ProofPanel") -> None:
-        self.btn_group = QButtonGroup(parent, exclusive=False)
+        self.btn_group = QButtonGroup(parent)
+        self.btn_group.setExclusive(False)
         def create_rewrite(action: ProofAction, parent: "ProofPanel") -> Callable[[], None]: # Needed to prevent weird bug with closures in signals
             def rewriter() -> None:
                 action.do_rewrite(parent)

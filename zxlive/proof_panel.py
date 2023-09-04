@@ -67,8 +67,11 @@ class ProofPanel(BasePanel):
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         icon_size = QSize(32, 32)
-        self.selection = QToolButton(self, checkable=True, checked=True)
-        self.magic_wand = QToolButton(self, checkable=True)
+        self.selection = QToolButton(self)
+        self.selection.setCheckable(True)
+        self.selection.setChecked(True)
+        self.magic_wand = QToolButton(self)
+        self.magic_wand.setCheckable(True)
         self.selection.setIcon(QIcon(get_data("icons/tikzit-tool-select.svg")))
         self.magic_wand.setIcon(QIcon(get_data("icons/magic-wand.svg")))
         self.selection.setIconSize(icon_size)
@@ -82,9 +85,15 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
 
         self.identity_choice = (
-            QToolButton(self, text="Z", checkable=True, checked=True),
-            QToolButton(self, text="X", checkable=True)
+            QToolButton(self),
+            QToolButton(self)
         )
+        self.identity_choice[0].setText("Z")
+        self.identity_choice[0].setCheckable(True)
+        self.identity_choice[0].setChecked(True)
+        self.identity_choice[1].setText("Z")
+        self.identity_choice[1].setCheckable(True)
+
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
 

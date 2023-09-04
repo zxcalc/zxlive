@@ -168,9 +168,13 @@ class EditorBasePanel(BasePanel):
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
     icon_size = QSize(32, 32)
-    select = QToolButton(parent, checkable=True, checked=True)  # Selected by default
-    vertex = QToolButton(parent, checkable=True)
-    edge = QToolButton(parent, checkable=True)
+    select = QToolButton(parent)  # Selected by default
+    vertex = QToolButton(parent)
+    edge = QToolButton(parent)
+    select.setCheckable(True)
+    vertex.setCheckable(True)
+    edge.setCheckable(True)
+    select.setChecked(True)
     select.setToolTip("Select (s)")
     vertex.setToolTip("Add Vertex (v)")
     edge.setToolTip("Add Edge (e)")

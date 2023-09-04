@@ -69,7 +69,8 @@ class BasePanel(QWidget):
 
     def _populate_toolbar(self) -> None:
         for section in self._toolbar_sections():
-            group = QButtonGroup(self, exclusive=section.exclusive)
+            group = QButtonGroup(self)
+            group.setExclusive(section.exclusive)
             for btn in section.buttons:
                 if isinstance(btn, QAbstractButton):
                     self.toolbar.addWidget(btn)

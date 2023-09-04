@@ -45,7 +45,8 @@ class GraphEditPanel(EditorBasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
-        self.start_derivation = QToolButton(self, text="Start Derivation")
+        self.start_derivation = QToolButton(self)
+        self.start_derivation.setText("Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
 
