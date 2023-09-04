@@ -59,9 +59,13 @@ class RulePanel(EditorBasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
-        self.name_field = QLineEdit(self, placeholderText="Rule name", text=self.name)
+        self.name_field = QLineEdit(self)
+        self.name_field.setPlaceholderText("Rule name")
+        self.name_field.setText(self.name)
         self.name_field.setMaximumWidth(150)
-        self.description_field = QLineEdit(self, placeholderText="Description", text=self.description)
+        self.description_field = QLineEdit(self)
+        self.description_field.setPlaceholderText("Description")
+        self.description_field.setText(self.description)
         self.description_field.setMaximumWidth(400)
         yield ToolbarSection(self.name_field, self.description_field)
 

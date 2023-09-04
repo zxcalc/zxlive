@@ -11,7 +11,8 @@ from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
                            QPainter, QPen, QVector2D)
 from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
                                QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QToolButton, QWidget)
+                               QStyleOptionViewItem, QToolButton, QWidget,
+                               QVBoxLayout)
 from pyzx import VertexType, basicrules
 
 from . import animations as anims
@@ -109,7 +110,8 @@ class ProofPanel(BasePanel):
 
             widget = QWidget()
             widget.setLayout(hlayout)
-            self.layout().insertWidget(1, widget)
+            assert isinstance(layout := self.layout(), QVBoxLayout)
+            layout.insertWidget(1, widget)
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
