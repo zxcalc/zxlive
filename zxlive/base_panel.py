@@ -37,7 +37,6 @@ class BasePanel(QWidget):
     graph_scene: GraphScene
     graph_view: GraphView
 
-    actions: tuple[QAction, ...]
     toolbar: QToolBar
     undo_stack: AnimatedUndoStack
     file_path: Optional[str]
@@ -45,7 +44,7 @@ class BasePanel(QWidget):
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__()
-        self.actions = actions
+        self.addActions(actions)
         self.undo_stack = AnimatedUndoStack(self)
 
         # Use box layout that fills the entire tab

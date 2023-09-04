@@ -67,7 +67,7 @@ class EditorBasePanel(BasePanel):
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield toolbar_select_node_edge(self)
-        yield ToolbarSection(*self.actions)
+        yield ToolbarSection(*self.actions())
 
     def create_side_bar(self) -> QSplitter:
         sidebar = QSplitter(self)

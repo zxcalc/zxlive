@@ -86,7 +86,7 @@ class ProofPanel(BasePanel):
             QToolButton(self, text="X", checkable=True)
         )
         yield ToolbarSection(*self.identity_choice, exclusive=True)
-        yield ToolbarSection(*self.actions)
+        yield ToolbarSection(*self.actions())
 
     def init_action_groups(self) -> None:
         basic_rules = proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()
