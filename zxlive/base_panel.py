@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Iterator, Optional, Sequence
 
@@ -22,10 +24,10 @@ class ToolbarSection:
     Contains a sequence of buttons that should be added in the section.
     If the buttons are checkable, we can optionally allow only one of them
     to be selected at any given time by setting `exclusive=True`."""
-    buttons: Sequence[QWidget]
+    buttons: Sequence[QWidget | QAction]
     exclusive: bool = False
 
-    def __init__(self, *args: QWidget, exclusive: bool = False) -> None:
+    def __init__(self, *args: QWidget | QAction, exclusive: bool = False) -> None:
         self.buttons = args
         self.exclusive = exclusive
 
