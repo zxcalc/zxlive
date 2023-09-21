@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 from pyzx.utils import EdgeType, VertexType
 
@@ -8,40 +8,32 @@ from .common import GraphT
 def construct_circuit() -> GraphT:
     qubits = 4
 
+    # id, qubit number, vertex type (1 = Z, 2 = X).
     vlist = [
         (0, 0, 1), (1, 1, 2), (2, 2, 1), (3, 3, 1), (4, 0, 1), (5, 1, 1),
         (6, 2, 2), (7, 3, 1), (8, 0, 1), (9, 1, 2), (10, 2, 1), (11, 3, 1),
         (12, 0, 2), (13, 1, 2), (14, 2, 1), (15, 3, 2)]
+    # id1, id2, edge type (0 = SIMPLE, 1 = HADAMARD)
     elist = [
-        (0, 4, 0), (0, 1, 0), (1, 5, 0), (1, 6, 0), (2, 6, 0), (3, 7, 0),
-        (5, 9, 1), (4, 8, 0), (6, 10, 0), (7, 11, 0), (8, 12, 0), (8, 13, 0),
-        (9, 13, 1), (9, 14, 1), (10, 13, 0), (10, 14, 0), (11, 15, 0),
-        (11, 14, 0)]
+        (0, 1, 0), (0, 4, 0), (1, 5, 0), (1, 6, 0), (2, 6, 0), (3, 7, 0),
+        (4, 8, 0), (5, 9, 1), (6, 10, 0), (7, 11, 0), (8, 12, 0), (8, 13, 0),
+        (9, 13, 1), (9, 14, 1), (10, 13, 0), (10, 14, 0), (11, 14, 0),
+        (11, 15, 0)]
 
     nvertices = len(vlist) + (2 * qubits)
 
-    ty: List[VertexType.Type] = [VertexType.BOUNDARY] * nvertices
-
-    nvlist: list[tuple[int, int, VertexType.Type]] = []
+    nvlist: List[Tuple[int, int, VertexType.Type]] = []
     # Adding inputs nodes to the nvlist.
     for i in range(qubits):
         nvlist.append((i, i, VertexType.BOUNDARY))
-        ty[i] = VertexType.BOUNDARY
 
     # Adding the actual vertices to the nvlist.
     for vert in vlist:
-        # print(vert[2])
-        if vert[2] == 1:
-            ty[vert[0]+qubits] = VertexType.Z
-            # print(ty)
-        elif vert[2] == 2:
-            ty[vert[0]+qubits] = VertexType.X
-        nvlist.append((vert[0]+qubits, vert[1], ty[i+qubits-1]))
+        nvlist.append((vert[0]+qubits, vert[1], vert[2]))
 
     # Adding the output nodes to the nvlist.
     for i in range(qubits):
         nvlist.append((nvertices - qubits + i, i, VertexType.BOUNDARY))
-        ty[nvertices - qubits + i] = VertexType.BOUNDARY
 
     nelist = []
 
@@ -59,9 +51,9 @@ def construct_circuit() -> GraphT:
     g = GraphT()
 
     # Adding vertices to the graph
-    for (i, qu, tp) in nvlist:
+    for (_, qu, tp) in nvlist:
         rw = cur_row[qu]
-        g.add_vertex(ty[i], qu, rw)
+        g.add_vertex(tp, qu, rw)
         cur_row[qu] += 1
 
     es1 = [edge[:2] for edge in nelist if not edge[2]]
