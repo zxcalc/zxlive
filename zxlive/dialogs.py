@@ -97,7 +97,6 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
     if selected_filter == "":
         # This happens if the user clicks on cancel
         return None
-    selected_format = next(f for f in FileFormat if f.filter == selected_filter)
 
     file = QFile(file_path)
     if not file.open(QIODevice.OpenModeFlag.ReadOnly | QIODevice.OpenModeFlag.Text):
@@ -107,9 +106,9 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
     data = stream.readAll()
     file.close()
 
-    ext = file_path.split(".")[-1]
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
     if selected_format == FileFormat.All:
+        ext = file_path.split(".")[-1]
         selected_format = next(f for f in FileFormat if f.extension == ext)
 
     # TODO: This would be nicer with match statements...
@@ -164,10 +163,14 @@ def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[Tuple[str
         # This happens if the user clicks on cancel
         return None
 
-    ext = file_path.split(".")[-1]
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
     if selected_format == FileFormat.All:
-        selected_format = next(f for f in FileFormat if f.extension == ext)
+        try:
+            ext = file_path.split(".")[-1]
+            selected_format = next(f for f in FileFormat if f.extension == ext)
+        except StopIteration:
+            show_error_msg("Unable to determine file format.")
+            return None
 
     # Add file extension if it's not already there
     if file_path.split(".")[-1].lower() != selected_format.extension:
