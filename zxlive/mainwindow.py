@@ -241,7 +241,6 @@ class MainWindow(QMainWindow):
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
         if out is not None:
-            assert self.active_panel is not None
             name = QFileInfo(out.file_path).baseName()
             if isinstance(out, ImportGraphOutput):
                 self.new_graph(out.g, name)
@@ -258,6 +257,7 @@ class MainWindow(QMainWindow):
                 self.new_rule_editor(out.r, name)
             else:
                 raise TypeError("Unknown import type", out)
+            assert self.active_panel is not None
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
