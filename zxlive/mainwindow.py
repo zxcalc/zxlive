@@ -90,8 +90,7 @@ class MainWindow(QMainWindow):
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         close_action = self._new_action("Close", self.close_action, QKeySequence.StandardKey.Close,
-            "Closes the window")
-        close_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Close), QKeySequence("Ctrl+W")])
+            "Closes the window", alt_shortcut = QKeySequence("Ctrl+W"))
         # TODO: We should remember if we have saved the diagram before,
         # and give an open to overwrite this file with a Save action
         save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
@@ -118,14 +117,13 @@ class MainWindow(QMainWindow):
         paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
         delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
-            "Delete the selected part of the diagram")
-        delete_action.setShortcuts([QKeySequence(QKeySequence.StandardKey.Delete),QKeySequence("Backspace")])
+            "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
         new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.StandardKey.AddTab,
             "Create a new tab")
         self.addAction(new_tab)
         select_all = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
-        deselect_all = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect, "Deselect all")
-        deselect_all.setShortcuts([QKeySequence(QKeySequence.StandardKey.Deselect), QKeySequence("Ctrl+D")])
+        deselect_all = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
+            "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
@@ -141,9 +139,9 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(select_all)
         edit_menu.addAction(deselect_all)
 
-        zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount")
+        zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount",
+            alt_shortcut = QKeySequence("Ctrl+="))
         zoom_out = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
-        zoom_in.setShortcuts([QKeySequence(QKeySequence.StandardKey.ZoomIn), QKeySequence("Ctrl+=")])
         fit_view = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
         self.addAction(zoom_in)
         self.addAction(zoom_out)
@@ -174,7 +172,8 @@ class MainWindow(QMainWindow):
         self.new_graph(graph)
 
     def _new_action(self, name: str, trigger: Callable, shortcut: QKeySequence | QKeySequence.StandardKey | None,
-                    tooltip: str, icon_file: Optional[str] = None) -> QAction:
+                    tooltip: str, icon_file: Optional[str] = None, alt_shortcut: Optional[QKeySequence] = None) -> QAction:
+        assert not alt_shortcut or shortcut
         action = QAction(name, self)
         if icon_file:
             action.setIcon(QIcon(get_data(f"icons/{icon_file}")))
@@ -182,6 +181,11 @@ class MainWindow(QMainWindow):
         action.triggered.connect(trigger)
         if shortcut:
             action.setShortcut(shortcut)
+            if alt_shortcut:
+                if not action.shortcuts():
+                    action.setShortcut(alt_shortcut)
+                elif alt_shortcut not in action.shortcuts():
+                    action.setShortcuts([shortcut, alt_shortcut])
         return action
 
     @property
