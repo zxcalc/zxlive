@@ -69,6 +69,10 @@ class ProofAction(object):
             for m in matches:
                 anim_before.addAnimation(anims.remove_id(panel.graph_scene.vertex_map[m[0]]))
         elif self.name == operations['copy']['text']:
+            anim_before = QParallelAnimationGroup()
+            for m in matches:
+                anim_before.addAnimation(anims.fuse(panel.graph_scene.vertex_map[m[0]],
+                                                    panel.graph_scene.vertex_map[m[1]]))
             anim_after = QParallelAnimationGroup()
             for m in matches:
                 anim_after.addAnimation(anims.strong_comp(panel.graph, g, m[1], panel.graph_scene))

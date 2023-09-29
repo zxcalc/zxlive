@@ -88,10 +88,10 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
     moves = set()
     for v in itertools.chain(iter(start.vertices()), iter(end.vertices())):
         if v not in start.graph:
-            if u := to_start(v) is not None:
+            if (u := to_start(v)) is not None:
                 moves.add((v, u, v))
         elif v not in end.graph:
-            if u := to_end(v) is not None:
+            if (u := to_end(v)) is not None:
                 moves.add((v, v, u))
         elif start.row(v) != end.row(v) or start.qubit(v) != end.qubit(v):
             moves.add((v, v, v))
