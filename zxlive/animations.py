@@ -88,10 +88,10 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
     moves = set()
     for v in itertools.chain(iter(start.vertices()), iter(end.vertices())):
         if v not in start.graph:
-            if u := to_start(v) is not None:
+            if (u := to_start(v)) is not None:
                 moves.add((v, u, v))
         elif v not in end.graph:
-            if u := to_end(v) is not None:
+            if (u := to_end(v)) is not None:
                 moves.add((v, v, u))
         elif start.row(v) != end.row(v) or start.qubit(v) != end.qubit(v):
             moves.add((v, v, v))
@@ -177,10 +177,15 @@ def anticipate_fuse(it: VItem) -> None:
     scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
 
 
-def fuse(dragged: VItem, target: VItem) -> QAbstractAnimation:
+def fuse(dragged: VItem, target: VItem, meet_halfway: bool = False) -> QAbstractAnimation:
     """Animation that is played when a fuseable spider is dropped onto a vertex."""
     group = QParallelAnimationGroup()
-    group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+    if not meet_halfway:
+        group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+    else:
+        halfway_pos = (dragged.pos() + target.pos()) / 2
+        group.addAnimation(move(dragged, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+        group.addAnimation(move(target, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))
     if vertex_is_w(dragged.ty):
         assert (dragged_w_partner := get_w_partner_vitem(dragged)) is not None

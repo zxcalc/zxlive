@@ -75,9 +75,18 @@ class ProofAction(object):
         elif self.name == operations['pauli']['text']:
             print('To do: animate ' + self.name)
         elif self.name == operations['bialgebra']['text']:
+            anim_before = QParallelAnimationGroup()
+            for v1, v2 in matches:
+                anim_before.addAnimation(anims.fuse(panel.graph_scene.vertex_map[v1],
+                                                    panel.graph_scene.vertex_map[v2], meet_halfway=True))
             anim_after = QParallelAnimationGroup()
             for v1, v2 in matches:
+                v2_row, v2_qubit = panel.graph.row(v2), panel.graph.qubit(v2)
+                panel.graph.set_row(v2, (panel.graph.row(v1) + v2_row) / 2)
+                panel.graph.set_qubit(v2, (panel.graph.qubit(v1) + v2_qubit) / 2)
                 anim_after.addAnimation(anims.strong_comp(panel.graph, g, v2, panel.graph_scene))
+                panel.graph.set_row(v2, v2_row)
+                panel.graph.set_qubit(v2, v2_qubit)
         elif isinstance(self.rule, CustomRule) and self.rule.last_rewrite_center is not None:
             center = self.rule.last_rewrite_center
             duration = ANIMATION_DURATION / 2
