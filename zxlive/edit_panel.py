@@ -58,6 +58,9 @@ class GraphEditPanel(EditorBasePanel):
         yield ToolbarSection(self.start_derivation)
 
     def _start_derivation(self) -> None:
+        if not self.graph_scene.g.is_well_formed():
+            show_error_msg("Graph is not well-formed")
+            return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         for vert in new_g.vertices():
             phase = new_g.phase(vert)
