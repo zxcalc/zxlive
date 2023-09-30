@@ -157,16 +157,7 @@ class EditorBasePanel(BasePanel):
 
     def vert_double_clicked(self, v: VT) -> None:
         graph = self.graph_view.graph_scene.g
-        if graph.type(v) == VertexType.BOUNDARY:
-            input_, ok = QInputDialog.getText(
-                self, "Input Dialog", "Enter Qubit Index:"
-            )
-            try:
-                graph.set_qubit(v, int(input_.strip()))
-            except ValueError:
-                show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1, 2)")
-            return None
-        elif vertex_is_w(graph.type(v)):
+        if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
 
         input_, ok = QInputDialog.getText(

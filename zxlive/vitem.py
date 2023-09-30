@@ -435,10 +435,7 @@ class PhaseItem(QGraphicsTextItem):
         """Call this when a vertex moves or its phase changes"""
 
         phase = self.v_item.g.phase(self.v_item.v)
-        # phase = self.v_item.v
         self.setPlainText(phase_to_s(phase, self.v_item.g.type(self.v_item.v)))
-        if self.v_item.g.type(self.v_item.v) == VertexType.BOUNDARY:
-            self.setPlainText(str(int(self.v_item.g.qubit(self.v_item.v))))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
 
