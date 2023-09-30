@@ -60,6 +60,14 @@ class GraphEditPanel(EditorBasePanel):
                 for var in phase.free_vars():
                     self.variable_types[var.name] = var.is_bool
 
+    def _populate_variables(self) -> None:
+        self.variable_types = {}
+        for vert in self.graph.vertices():
+            phase = self.graph.phase(vert)
+            if isinstance(phase, Poly):
+                for var in phase.free_vars():
+                    self.variable_types[var.name] = var.is_bool
+
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
@@ -84,6 +92,12 @@ class GraphEditPanel(EditorBasePanel):
             return
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
+        
+    def _new_var(self, name: str) -> Poly:
+        if name not in self.variable_types:
+            self.variable_types[name] = False
+            self.variable_viewer.add_item(name)
+        return new_var(name, self.variable_types)
 
     def _new_var(self, name: str) -> Poly:
         if name not in self.variable_types:
