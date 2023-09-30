@@ -21,8 +21,9 @@ from typing import Callable, Optional, TypedDict
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
                             QSettings, QTextStream)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
-from PySide6.QtWidgets import (QFormLayout, QMainWindow, QMessageBox,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QDialog, QFormLayout, QMainWindow, QMessageBox,
+                               QTableWidget, QTableWidgetItem, QTabWidget,
+                               QVBoxLayout, QWidget)
 from pyzx import extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
 
@@ -143,6 +144,7 @@ class MainWindow(QMainWindow):
             alt_shortcut = QKeySequence("Ctrl+="))
         zoom_out = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
         fit_view = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
+        show_matrix = self._new_action("Show matrix", self.show_matrix, None, "Show the matrix of the diagram")
         self.addAction(zoom_in)
         self.addAction(zoom_out)
         self.addAction(fit_view)
@@ -151,6 +153,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_in)
         view_menu.addAction(zoom_out)
         view_menu.addAction(fit_view)
+        view_menu.addAction(show_matrix)
 
         new_rewrite_from_file = self._new_action("New rewrite from file", lambda: create_new_rewrite(self), None, "New rewrite from file")
         new_rewrite_editor = self._new_action("New rewrite", self.new_rule_editor, None, "New rewrite")
@@ -419,6 +422,23 @@ class MainWindow(QMainWindow):
     def fit_view(self) -> None:
         assert self.active_panel is not None
         self.active_panel.graph_view.fit_view()
+
+    def show_matrix(self) -> None:
+        if self.active_panel is None: return
+        matrix = self.active_panel.graph.to_matrix()
+        dialog = QDialog()
+        dialog.setWindowTitle("Matrix")
+        table = QTableWidget()
+        table.setRowCount(matrix.shape[0])
+        table.setColumnCount(matrix.shape[1])
+        for i in range(matrix.shape[0]):
+            for j in range(matrix.shape[1]):
+                table.setItem(i, j, QTableWidgetItem(str(matrix[i,j])))
+        table.resizeColumnsToContents()
+        table.resizeRowsToContents()
+        dialog.setLayout(QVBoxLayout())
+        dialog.layout().addWidget(table)
+        dialog.exec()
 
     def proof_as_lemma(self) -> None:
         assert self.active_panel is not None

@@ -240,7 +240,6 @@ class GraphView(QGraphicsView):
     def fit_view(self) -> None:
         self.fitInView(self.graph_scene.itemsBoundingRect(), Qt.AspectRatioMode.KeepAspectRatio)
         current_zoom = self.transform().m11()
-        print(current_zoom)
         if current_zoom < MIN_ZOOM:
             self.scale(MIN_ZOOM / current_zoom, MIN_ZOOM / current_zoom)
         else:
