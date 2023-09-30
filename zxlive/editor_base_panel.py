@@ -6,12 +6,16 @@ from fractions import Fraction
 from typing import Callable, Iterator, TypedDict
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import (QInputDialog, QListView, QListWidget,
-                               QListWidgetItem, QSplitter, QToolButton)
+from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
+                           QPixmap)
+from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
+                               QInputDialog, QLabel, QListView, QListWidget,
+                               QListWidgetItem, QScrollArea, QSizePolicy,
+                               QSpacerItem, QSplitter, QToolButton, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
 from sympy import sympify
+
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
@@ -21,6 +25,8 @@ from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
 from .eitem import HAD_EDGE_BLUE
 from .graphscene import EditGraphScene
+from .parse_poly import parse
+from .poly import Poly, new_var
 from .vitem import BLACK, H_YELLOW, ZX_GREEN, ZX_RED
 
 
@@ -74,9 +80,20 @@ class EditorBasePanel(BasePanel):
         sidebar.setOrientation(Qt.Orientation.Vertical)
         vertex_list = create_list_widget(self, VERTICES, self._vty_clicked)
         edge_list = create_list_widget(self, EDGES, self._ety_clicked)
+        self._populate_variables()
+        self.variable_viewer = VariableViewer(self.variable_types)
         sidebar.addWidget(vertex_list)
         sidebar.addWidget(edge_list)
+        sidebar.addWidget(self.variable_viewer)
         return sidebar
+
+    def _populate_variables(self) -> None:
+        self.variable_types = {}
+        for vert in self.graph.vertices():
+            phase = self.graph.phase(vert)
+            if isinstance(phase, Poly):
+                for var in phase.free_vars():
+                    self.variable_types[var.name] = var.is_bool
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene.curr_tool = tool
@@ -158,12 +175,111 @@ class EditorBasePanel(BasePanel):
         if not ok:
             return None
         try:
-            new_phase = string_to_phase(input_)
+            new_phase = parse(input_, self._new_var)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return None
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
+
+    def _new_var(self, name: str) -> Poly:
+        if name not in self.variable_types:
+            self.variable_types[name] = False
+            self.variable_viewer.add_item(name)
+        return new_var(name, self.variable_types)
+
+
+class VariableViewer(QScrollArea):
+
+    def __init__(self, variable_types: dict[str, bool]) -> None:
+        super().__init__()
+
+        self._variable_types = variable_types
+
+        self._widget = QWidget()
+        lpal = QApplication.palette("QListWidget")
+        palette = QPalette()
+        palette.setBrush(QPalette.ColorRole.Window, lpal.base())
+        self._widget.setAutoFillBackground(True)
+        self._widget.setPalette(palette)
+        self._layout = QGridLayout(self._widget)
+        self._layout.setColumnStretch(0, 1)
+        self._layout.setColumnStretch(1, 0)
+        self._layout.setColumnStretch(2, 0)
+        cb = QComboBox()
+        cb.insertItems(0, ["Parametric", "Boolean"])
+        self._layout.setColumnMinimumWidth(2, cb.minimumSizeHint().width())
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._items = 0
+
+        vline = QFrame()
+        vline.setFrameShape(QFrame.Shape.VLine)
+        vline.setFixedWidth(3)
+        vline.setLineWidth(1)
+        vline.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        self._layout.addWidget(vline, 0, 1, -1, 1)
+
+        hline = QFrame()
+        hline.setFrameShape(QFrame.Shape.HLine)
+        hline.setFixedHeight(3)
+        hline.setLineWidth(1)
+        hline.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._layout.addWidget(hline, 1, 0, 1, -1)
+
+        vlabel = QLabel("Variable")
+        vlabel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._layout.addWidget(vlabel, 0, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+        tlabel = QLabel("Type")
+        tlabel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._layout.addWidget(tlabel, 0, 2, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter)
+
+        self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
+
+        for name in variable_types.keys():
+            self.add_item(name)
+
+        self.setWidget(self._widget)
+        self.setWidgetResizable(True)
+
+    def minimumSizeHint(self) -> QSize:
+        if self._items == 0:
+            return QSize(0, 0)
+        else:
+            return super().minimumSizeHint()
+
+    def sizeHint(self) -> QSize:
+        if self._items == 0:
+            return QSize(0, 0)
+        else:
+            return super().sizeHint()
+
+    def add_item(self, name: str) -> None:
+        combobox = QComboBox()
+        combobox.insertItems(0, ["Parametric", "Boolean"])
+        if self._variable_types[name]:
+            combobox.setCurrentIndex(1)
+        else:
+            combobox.setCurrentIndex(0)
+        combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
+        item = self._layout.itemAtPosition(2 + self._items, 2)
+        self._layout.removeItem(item)
+        self._layout.addWidget(QLabel(f"<pre>{name}</pre>"), 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+        self._layout.addWidget(combobox, 2 + self._items, 2, Qt.AlignmentFlag.AlignCenter)
+        self._layout.setRowStretch(2 + self._items, 0)
+        self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 3 + self._items, 2)
+        self._layout.setRowStretch(3 + self._items, 1)
+        self._layout.update()
+        self._items += 1
+        self._widget.updateGeometry()
+
+        if self._items == 1:
+            self.updateGeometry()
+
+    def _text_changed(self, name: str, text: str) -> None:
+        if text == "Parametric":
+            self._variable_types[name] = False
+        elif text == "Boolean":
+            self._variable_types[name] = True
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:

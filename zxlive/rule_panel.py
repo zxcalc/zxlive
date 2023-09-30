@@ -7,12 +7,14 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
 from pyzx import EdgeType, VertexType
 
+
 from .base_panel import ToolbarSection
 from .common import GraphT, ToolType
 from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView
+from .poly import Poly
 
 
 class RulePanel(EditorBasePanel):
@@ -68,6 +70,15 @@ class RulePanel(EditorBasePanel):
         self.description_field.setText(self.description)
         self.description_field.setMaximumWidth(400)
         yield ToolbarSection(self.name_field, self.description_field)
+
+    def _populate_variables(self) -> None:
+        self.variable_types = {}
+        for graph in [self.graph_scene_left.g, self.graph_scene_right.g]:
+            for vert in graph.vertices():
+                phase = graph.phase(vert)
+                if isinstance(phase, Poly):
+                    for var in phase.free_vars():
+                        self.variable_types[var.name] = var.is_bool
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene_left.curr_tool = tool
