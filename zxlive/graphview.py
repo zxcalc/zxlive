@@ -18,7 +18,7 @@ from typing import Optional, TYPE_CHECKING
 
 import math
 import random
-from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QTimeLine
+from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
 
@@ -92,6 +92,7 @@ class GraphView(QGraphicsView):
         self.centerOn(OFFSET_X,OFFSET_Y)
 
         self.sparkle_mode = False
+        self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
 
     def _toggle_sparkles(self) -> None:
@@ -125,7 +126,7 @@ class GraphView(QGraphicsView):
                 self.wand_path.setPath(path)
                 self.wand_path.show()
                 if self.sparkle_mode:
-                    self._emit_sparkles(pos, 10)
+                    self.sparkles.emit_sparkles(pos, 10)
         else:
             e.ignore()
 
@@ -147,7 +148,7 @@ class GraphView(QGraphicsView):
                     t = i / 9
                     ipos = QPointF(pos * t + prev * (1.0 - t))
                     if self.sparkle_mode:
-                        self._emit_sparkles(ipos, 1)
+                        self.sparkles.emit_sparkles(ipos, 1)
                     items = self.graph_scene.items(ipos)
                     for item in items:
                         if isinstance(item, VItem) and item not in self.wand_trace.hit:
@@ -178,6 +179,8 @@ class GraphView(QGraphicsView):
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
                     assert self.wand_path is not None
+                    if self.sparkle_mode:
+                        self.sparkles.stop()
                     for item in self.wand_trace.hit:
                         if isinstance(item, VItem):
                             anims.back_to_default(item)
@@ -271,14 +274,6 @@ class GraphView(QGraphicsView):
         painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
 
-    def _emit_sparkles(self, pos: QPointF, mult: int) -> None:
-        for _ in range(mult * SPARKLE_COUNT):
-            angle = random.random() * 2 * math.pi
-            speed = random.random() * (SPARKLE_MAX_SPEED - SPARKLE_MIN_SPEED) + SPARKLE_MIN_SPEED
-            x = speed * math.cos(angle)
-            y = speed * math.sin(angle)
-            Sparkle(pos.x(), pos.y(), x, y, SPARKLE_FADE, self.graph_scene)
-
 
 class RuleEditGraphView(GraphView):
     def __init__(self, parent_panel: RulePanel, graph_scene: GraphScene) -> None:
@@ -294,18 +289,61 @@ class RuleEditGraphView(GraphView):
 
 SPARKLE_COLOR = "#900090"
 SPARKLE_COUNT = 1
-SPARKLE_MAX_SPEED = 200.0
-SPARKLE_MIN_SPEED = 100.0
-SPARKLE_FADE = 20.0
+SPARKLE_MAX_SPEED = 50.0
+SPARKLE_MIN_SPEED = 10.0
+MAX_SPARKLES = 100
+SPARKLE_STEPS = 40
+
+
+class Sparkles(QObject):
+    def __init__(self, graph_scene: GraphScene) -> None:
+        super().__init__()
+        self.graph_scene = graph_scene
+        self.sparkle_index = 0
+        self.sparkles = []
+        self.sparkle_deltas = []
+        for _ in range(MAX_SPARKLES):
+            angle = random.random() * 2 * math.pi
+            speed = random.random() * (SPARKLE_MAX_SPEED - SPARKLE_MIN_SPEED) + SPARKLE_MIN_SPEED
+            vx = speed * math.cos(angle) / SPARKLE_STEPS
+            vy = speed * math.sin(angle) / SPARKLE_STEPS
+            self.sparkle_deltas.append((vx, vy))
+        self.timer_id = None
+
+    def emit_sparkles(self, pos: QPointF, mult: int) -> None:
+        if not self.timer_id:
+            self.timer_id = self.startTimer(int(1000 / SPARKLE_STEPS))
+
+        for _ in range(mult * SPARKLE_COUNT):
+            vx, vy = self.sparkle_deltas[self.sparkle_index]
+            if len(self.sparkles) < MAX_SPARKLES:
+                self.sparkles.append(Sparkle(pos.x(), pos.y(), vx, vy, self.graph_scene))
+            else:
+                self.sparkles[self.sparkle_index].reset(pos.x(), pos.y(), vx, vy)
+            self.sparkle_index = (self.sparkle_index + 1) % MAX_SPARKLES
+
+    def timerEvent(self, event: QTimerEvent) -> None:
+        if event.timerId() != self.timer_id:
+            return
+        for sparkle in self.sparkles:
+            sparkle.timer_step()
+
+    def stop(self):
+        self.killTimer(self.timer_id)
+        self.timer_id = None
+        for sparkle in reversed(self.sparkles):
+            self.graph_scene.removeItem(sparkle)
+        self.sparkles = []
+
 
 class Sparkle(QGraphicsEllipseItem):
-    def __init__(self, x: float, y: float, vx: float, vy: float, vo: float, scene: GraphScene) -> None:
+    def __init__(self, x: float, y: float, vx: float, vy: float, scene: GraphScene) -> None:
         super().__init__(
             -0.05 * SCALE, -0.05 * SCALE, 0.1 * SCALE, 0.1 * SCALE
         )
 
-        self.vx, self.vy, self.vo = vx, vy, vo
-        self.prev_value = 0.0
+        self.vx, self.vy = vx, vy
+        self.vo = 1 / SPARKLE_STEPS
 
         self.setPos(x, y)
         self.setZValue(PHASE_ITEM_Z)
@@ -317,17 +355,23 @@ class Sparkle(QGraphicsEllipseItem):
 
         scene.addItem(self)
 
-        self.timer = QTimeLine(1000)
-        self.timer.valueChanged.connect(self._timer_step)
-        self.timer.start()
+        self.step = 0
         self.show()
 
-    def _timer_step(self, value: float) -> None:
-        dt = value - self.prev_value
-        self.prev_value = value
-        self.setX(self.x() + dt * self.vx)
-        self.setY(self.y() + dt * self.vy)
-        self.setOpacity(max(self.opacity() - dt * self.vo, 0.0))
+    def reset(self, x: float, y: float, vx: float, vy: float):
+        self.setPos(x, y)
+        self.vx, self.vy = vx, vy
+        self.setOpacity(1.0)
 
-        if value == 1.0:
-            self.scene().removeItem(self)
+        self.step = 0
+        self.show()
+
+    def timer_step(self) -> None:
+        self.step += 1
+        if self.step == SPARKLE_STEPS:
+            self.hide()
+            return
+
+        self.setX(self.x() + self.vx)
+        self.setY(self.y() + self.vy)
+        self.setOpacity(self.opacity() - self.vo)
