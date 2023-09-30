@@ -48,6 +48,10 @@ class GraphEditPanel(EditorBasePanel):
         self.sidebar = self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
 
+        self._populate_variables()
+        self.variable_viewer = VariableViewer(self.variable_types)
+        self.sidebar.addWidget(self.variable_viewer)
+
     def _populate_variables(self) -> None:
         self.variable_types = {}
         for vert in self.graph.vertices():
@@ -64,7 +68,7 @@ class GraphEditPanel(EditorBasePanel):
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
 
-    def _vert_double_clicked(self, v: VT) -> None:
+    def vert_double_clicked(self, v: VT) -> None:
         if self.graph.type(v) == VertexType.BOUNDARY:
             return
 
