@@ -128,7 +128,7 @@ class VItem(QGraphicsPathItem):
         self.update_shape()
         if not self.isSelected():
             t = self.ty
-            if t == VertexType.Z:
+            if t == VertexType.Z or t == VertexType.Z_BOX:
                 self.setBrush(QBrush(QColor(ZX_GREEN)))
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED)))
@@ -149,7 +149,7 @@ class VItem(QGraphicsPathItem):
             pen = QPen()
             pen.setWidthF(5)
             t = self.ty
-            if t == VertexType.Z:
+            if t == VertexType.Z or t == VertexType.Z_BOX:
                 brush = QBrush(QColor(ZX_GREEN_PRESSED))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
@@ -193,7 +193,7 @@ class VItem(QGraphicsPathItem):
         self.setPen(pen)
 
         path = QPainterPath()
-        if self.ty == VertexType.H_BOX:
+        if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         elif self.ty == VertexType.W_OUTPUT:
             # draw a triangle

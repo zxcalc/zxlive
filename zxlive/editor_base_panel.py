@@ -46,8 +46,9 @@ VERTICES: dict[VertexType.Type, DrawPanelNodeType] = {
     VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, ZX_GREEN)},
     VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, ZX_RED)},
     VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, H_YELLOW)},
-    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, BLACK)},
+    VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, ZX_GREEN)},
     VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, BLACK)},
+    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, BLACK)},
 }
 
 EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
