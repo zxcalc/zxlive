@@ -167,10 +167,7 @@ class EditorBasePanel(BasePanel):
         if not ok:
             return None
         try:
-            if graph.type(v) == VertexType.Z_BOX:
-                new_phase = string_to_phase(input_)
-            else:
-                new_phase = parse(input_, self._new_var)
+            new_phase = string_to_phase(input_, self._new_var)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return None
@@ -346,7 +343,7 @@ def create_icon(shape: ShapeType, color: str) -> QIcon:
     icon.addPixmap(pixmap)
     return icon
 
-def string_to_phase(string: str) -> Fraction:
+def string_to_phase(string: str, new_var) -> Fraction:
     if not string:
         return Fraction(0)
     try:
@@ -364,5 +361,5 @@ def string_to_phase(string: str) -> Fraction:
         else:
             return Fraction(int(s))
     except ValueError:
-        return sympify(string)
+        return parse(string, new_var)
 
