@@ -215,7 +215,7 @@ class ProofPanel(BasePanel):
             return False
         item = filtered[0]
         vertex = item.v
-        if self.graph.type(vertex) not in (VertexType.Z, VertexType.X):
+        if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX):
             return False
 
         if basicrules.check_remove_id(self.graph, vertex):
@@ -300,8 +300,12 @@ class ProofPanel(BasePanel):
             new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
         if phase_left:
-            new_g.set_phase(left_vert, new_g.phase(v))
-            new_g.set_phase(v, 0)
+            if self.graph.type(v) == VertexType.Z_BOX:
+                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v))
+                set_z_box_label(new_g, v, 1)
+            else:
+                new_g.set_phase(left_vert, new_g.phase(v))
+                new_g.set_phase(v, 0)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
