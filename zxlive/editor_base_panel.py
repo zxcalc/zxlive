@@ -167,7 +167,10 @@ class EditorBasePanel(BasePanel):
         if not ok:
             return None
         try:
-            new_phase = string_to_phase(input_, self._new_var)
+            if graph.type(v) == VertexType.Z_BOX:
+                new_phase = string_to_phase(input_, self._new_var, 'complex')
+            else:
+                new_phase = string_to_phase(input_, self._new_var, 'fraction')
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return None
@@ -343,23 +346,26 @@ def create_icon(shape: ShapeType, color: str) -> QIcon:
     icon.addPixmap(pixmap)
     return icon
 
-def string_to_phase(string: str, new_var) -> Fraction:
+def string_to_phase(string: str, new_var, fraction_or_complex='fraction'):
     if not string:
         return Fraction(0)
     try:
-        s = string.lower().replace(' ', '')
-        s = s.replace('\u03c0', '').replace('pi', '')
-        if '.' in s or 'e' in s:
-            return Fraction(float(s))
-        elif '/' in s:
-            a, b = s.split("/", 2)
-            if not a:
-                return Fraction(1, int(b))
-            if a == '-':
-                a = '-1'
-            return Fraction(int(a), int(b))
+        if fraction_or_complex == 'fraction':
+            s = string.lower().replace(' ', '')
+            s = s.replace('\u03c0', '').replace('pi', '')
+            if '.' in s or 'e' in s:
+                return Fraction(float(s))
+            elif '/' in s:
+                a, b = s.split("/", 2)
+                if not a:
+                    return Fraction(1, int(b))
+                if a == '-':
+                    a = '-1'
+                return Fraction(int(a), int(b))
+            else:
+                return Fraction(int(s))
         else:
-            return Fraction(int(s))
+            return complex(string)
     except ValueError:
         return parse(string, new_var)
 
