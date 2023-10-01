@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 
 
-from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w
+from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
 
 from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 
@@ -433,9 +433,12 @@ class PhaseItem(QGraphicsTextItem):
 
     def refresh(self) -> None:
         """Call this when a vertex moves or its phase changes"""
-
-        phase = self.v_item.g.phase(self.v_item.v)
-        self.setPlainText(phase_to_s(phase, self.v_item.g.type(self.v_item.v)))
+        vertex_type = self.v_item.g.type(self.v_item.v)
+        if vertex_type == VertexType.Z_BOX:
+            self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
+        else:
+            phase = self.v_item.g.phase(self.v_item.v)
+            self.setPlainText(phase_to_s(phase, vertex_type))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
 

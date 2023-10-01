@@ -151,6 +151,9 @@ class GraphScene(QGraphicsScene):
         for v in diff.changed_phases:
             self.vertex_map[v].refresh()
 
+        for v in diff.changed_vdata:
+            self.vertex_map[v].refresh()
+
         for v in diff.changed_pos:
             v_item = self.vertex_map[v]
             for anim in v_item.active_animations.copy():
