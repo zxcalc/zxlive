@@ -167,7 +167,10 @@ class EditorBasePanel(BasePanel):
         if not ok:
             return None
         try:
-            new_phase = parse(input_, self._new_var)
+            if graph.type(v) == VertexType.Z_BOX:
+                new_phase = string_to_phase(input_)
+            else:
+                new_phase = parse(input_, self._new_var)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return None
