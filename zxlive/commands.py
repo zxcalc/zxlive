@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Dict, Iterable, Optional, Set, Union, List
+from typing import Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -92,8 +92,8 @@ class ChangeNodeType(BaseCommand):
     WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
     _old_vtys: Optional[list[VertexType.Type]] = field(default=None, init=False)
-    _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
-    _new_w_inputs: Optional[List[VT]] = field(default=None, init=False)
+    _old_w_info: Optional[dict[VT, WInfo]] = field(default=None, init=False)
+    _new_w_inputs: Optional[list[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -356,7 +356,7 @@ class AddRewriteStep(SetGraph):
 
     def redo(self) -> None:
         # Remove steps from the proof model until we're at the currently selected step
-        self._old_selected = self.step_view.currentIndex().row()
+        self._old_selected = int(self.step_view.currentIndex().row())
         self._old_steps = []
         for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
             self._old_steps.append(self.proof_model.pop_rewrite())

@@ -1,11 +1,13 @@
 from fractions import Fraction
-from typing import Union
+from typing import Union, Optional
+
 
 class Var:
     name: str
-    is_bool: bool
+    _is_bool: bool
+    _types_dict: Optional[Union[bool, dict[str, bool]]]
 
-    def __init__(self, name, data: bool | dict[str, bool]):
+    def __init__(self, name: str, data: Union[bool, dict[str, bool]]):
         self.name = name
         if isinstance(data, dict):
             self._types_dict = data
@@ -21,44 +23,47 @@ class Var:
         if self._frozen:
             return self._is_bool
         else:
+            assert isinstance(self._types_dict, dict)
             return self._types_dict[self.name]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.name
 
-    def __lt__(self, other):
+    def __lt__(self, other: 'Var') -> bool:
         if int(self.is_bool) == int(other.is_bool):
             return self.name < other.name
         return int(self.is_bool) < int(other.is_bool)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         # Variables with the same name map to the same type
         # within the same graph, so no need to include is_bool
         # in the hash.
-        return hash(self.name)
+        return int(hash(self.name))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self.__hash__() == other.__hash__()
 
     def freeze(self) -> None:
         if not self._frozen:
+            assert isinstance(self._types_dict, dict)
             self._is_bool = self._types_dict[self.name]
             self._frozen = True
             self._types_dict = None
 
-    def __copy__(self):
+    def __copy__(self) -> 'Var':
         if self._frozen:
             return Var(self.name, self.is_bool)
         else:
+            assert isinstance(self._types_dict, dict)
             return Var(self.name, self._types_dict)
 
-    def __deepcopy__(self, _memo):
+    def __deepcopy__(self, _memo: object) -> 'Var':
         return self.__copy__()
 
 class Term:
     vars: list[tuple[Var, int]]
 
-    def __init__(self, vars):
+    def __init__(self, vars: list[tuple[Var,int]]) -> None:
         self.vars = vars
 
     def freeze(self) -> None:
@@ -77,7 +82,7 @@ class Term:
                 vs.append(f'{v}^{c}')
         return '*'.join(vs)
 
-    def __mul__(self, other):
+    def __mul__(self, other: 'Term') -> 'Term':
         vs = dict()
         for v, c in self.vars + other.vars:
             if v not in vs: vs[v] = c
@@ -87,17 +92,17 @@ class Term:
                 vs[v] = 1
         return Term([(v, c) for v, c in vs.items()])
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(tuple(sorted(self.vars)))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return self.__hash__() == other.__hash__()
 
 
 class Poly:
     terms: list[tuple[Union[int, float, Fraction], Term]]
 
-    def __init__(self, terms):
+    def __init__(self, terms: list[tuple[Union[int, float, Fraction], Term]]) -> None:
         self.terms = terms
 
     def freeze(self) -> None:
@@ -110,7 +115,7 @@ class Poly:
             output.update(term.free_vars())
         return output
 
-    def __add__(self, other):
+    def __add__(self, other: 'Poly') -> 'Poly':
         if isinstance(other, (int, float, Fraction)):
             other = Poly([(other, Term([]))])
         counter = dict()
@@ -128,7 +133,7 @@ class Poly:
 
     __radd__ = __add__
 
-    def __mul__(self, other):
+    def __mul__(self, other: 'Poly') -> 'Poly':
         if isinstance(other, (int, float)):
             other = Poly([(other, Term([]))])
         p = Poly([])
@@ -139,7 +144,7 @@ class Poly:
 
     __rmul__ = __mul__
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         ts = []
         for c, t in self.terms:
             if t == Term([]):
@@ -150,16 +155,17 @@ class Poly:
                 ts.append(f'{c}{t}')
         return ' + '.join(ts)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, (int, float, Fraction)):
             if other == 0:
                 other = Poly([])
             else:
                 other = Poly([(other, Term([]))])
+        assert isinstance(other, Poly)
         return set(self.terms) == set(other.terms)
 
     @property
-    def is_pauli(self):
+    def is_pauli(self) -> bool:
         for c, t in self.terms:
             if not all(v.is_bool for v, _ in t.vars):
                 return False
@@ -167,8 +173,8 @@ class Poly:
                 return False
         return True
 
-def new_var(name, types_dict):
+def new_var(name: str, types_dict: Union[bool, dict[str, bool]]) -> Poly:
     return Poly([(1, Term([(Var(name, types_dict), 1)]))])
 
-def new_const(coeff):
+def new_const(coeff: Union[int, Fraction]) -> Poly:
     return Poly([(coeff, Term([]))])

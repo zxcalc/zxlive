@@ -1,6 +1,6 @@
 import copy
 from dataclasses import dataclass, field, replace
-from typing import Callable, Literal, List, Optional, TYPE_CHECKING
+from typing import Callable, Literal, Optional, TYPE_CHECKING
 
 import pyzx
 
@@ -27,8 +27,8 @@ MATCHES_EDGES: MatchType = 2
 @dataclass
 class ProofAction(object):
     name: str
-    matcher: Callable[[GraphT, Callable], List]
-    rule: Callable[[GraphT, List], pyzx.rules.RewriteOutputType[ET,VT]]
+    matcher: Callable[[GraphT, Callable], list]
+    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[ET,VT]]
     match_type: MatchType
     tooltip: str
     button: Optional[QPushButton] = field(default=None, init=False)
@@ -103,7 +103,7 @@ class ProofAction(object):
 
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
-    def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
+    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         if self.match_type == MATCHES_VERTICES:
             matches = self.matcher(g, lambda v: v in verts)
         else:
@@ -147,7 +147,7 @@ class ProofActionGroup(object):
             self.btn_group.addButton(btn)
             action.button = btn
 
-    def update_active(self, g: GraphT, verts: List[VT], edges: List[ET]) -> None:
+    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         for action in self.actions:
             action.update_active(g, verts, edges)
 

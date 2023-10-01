@@ -1,6 +1,6 @@
 import itertools
 import random
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
@@ -110,7 +110,7 @@ def _morph_graph_to_or_from_center(to_center: bool,
                                    graph: GraphT,
                                    vertex_filter: Callable[[VT], bool],
                                    scene: GraphScene,
-                                   center: Tuple[int, int],
+                                   center: tuple[int, int],
                                    duration: int,
                                    ease: QEasingCurve) -> QAbstractAnimation:
     """Morphs a graph to or from the centre by moving the vertices."""
@@ -132,7 +132,7 @@ def _morph_graph_to_or_from_center(to_center: bool,
 def morph_graph_to_center(graph: GraphT,
                           vertex_filter: Callable[[VT], bool],
                           scene: GraphScene,
-                          center: Tuple[int, int],
+                          center: tuple[int, int],
                           duration: int,
                           ease: QEasingCurve) -> QAbstractAnimation:
     return _morph_graph_to_or_from_center(True, graph, vertex_filter, scene, center, duration, ease)
@@ -140,7 +140,7 @@ def morph_graph_to_center(graph: GraphT,
 def morph_graph_from_center(graph: GraphT,
                             vertex_filter: Callable[[VT], bool],
                             scene: GraphScene,
-                            center: Tuple[int, int],
+                            center: tuple[int, int],
                             duration: int,
                             ease: QEasingCurve) -> QAbstractAnimation:
     return _morph_graph_to_or_from_center(False, graph, vertex_filter, scene, center, duration, ease)

@@ -299,7 +299,7 @@ class Sparkles(QObject):
         super().__init__()
         self.graph_scene = graph_scene
         self.sparkle_index = 0
-        self.sparkles = []
+        self.sparkles: list[Sparkle] = []
         self.sparkle_deltas = []
         for _ in range(MAX_SPARKLES):
             angle = random.random() * 2 * math.pi
@@ -327,7 +327,7 @@ class Sparkles(QObject):
         for sparkle in self.sparkles:
             sparkle.timer_step()
 
-    def stop(self):
+    def stop(self) -> None:
         self.killTimer(self.timer_id)
         self.timer_id = None
         for sparkle in reversed(self.sparkles):
@@ -357,7 +357,7 @@ class Sparkle(QGraphicsEllipseItem):
         self.step = 0
         self.show()
 
-    def reset(self, x: float, y: float, vx: float, vy: float):
+    def reset(self, x: float, y: float, vx: float, vy: float) -> None:
         self.setPos(x, y)
         self.vx, self.vy = vx, vy
         self.setOpacity(1.0)
