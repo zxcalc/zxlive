@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
                                QStyleOptionViewItem, QToolButton, QWidget,
                                QVBoxLayout)
 from pyzx import VertexType, basicrules
+from pyzx.utils import get_z_box_label, set_z_box_label
 
 from . import animations as anims
 from . import proof_actions
