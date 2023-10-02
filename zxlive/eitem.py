@@ -19,11 +19,11 @@ from typing import Optional, Any, TYPE_CHECKING
 from PySide6.QtCore import QPointF
 from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsItem, \
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
-from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QPainterPath
+from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath
 
 from pyzx import EdgeType
 
-from .common import SCALE, VT, ET, GraphT
+from .common import SCALE, ET, GraphT
 from .vitem import VItem, EITEM_Z
 
 if TYPE_CHECKING:
