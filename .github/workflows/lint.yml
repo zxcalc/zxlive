@@ -20,7 +20,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependecies
       run:
-        python -m pip install pyproject-flake8 pylint
+        python -m pip install ".[test]"
     - name: Flake8
       continue-on-error: true
       run:
