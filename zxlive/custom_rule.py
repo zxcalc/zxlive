@@ -1,6 +1,6 @@
 
 import json
-from typing import TYPE_CHECKING, Callable, List
+from typing import TYPE_CHECKING, Callable
 
 import networkx as nx
 import numpy as np
@@ -28,7 +28,7 @@ class CustomRule:
         self.description = description
         self.last_rewrite_center = None
 
-    def __call__(self, graph: GraphT, vertices: List[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
+    def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
@@ -71,7 +71,7 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
-    def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> List[VT]:
+    def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
         subgraph_nx, _ = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
@@ -115,7 +115,7 @@ def to_networkx(graph: GraphT) -> nx.Graph:
     G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
     return G
 
-def create_subgraph(graph: GraphT, verts: List[VT]) -> tuple[nx.Graph, dict[str, int]]:
+def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str, int]]:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
