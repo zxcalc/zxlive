@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
@@ -153,7 +153,7 @@ def write_to_file(file_path: str, data: str) -> bool:
     return True
 
 
-def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[Tuple[str, FileFormat]]:
+def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[tuple[str, FileFormat]]:
     file_path, selected_filter = QFileDialog.getSaveFileName(
         parent=parent,
         caption="Save File",
@@ -178,7 +178,7 @@ def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[Tuple[str
 
     return file_path, selected_format
 
-def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat if f != FileFormat.ZXProof]))
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
@@ -202,7 +202,7 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[Tuple[str,
 
     return file_path, selected_format
 
-def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
@@ -212,7 +212,7 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[Tu
         return None
     return file_path, selected_format
 
-def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[Tuple[str, FileFormat]]:
+def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXRule.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None

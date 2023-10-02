@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Iterator, Iterable, Dict
+from typing import Optional, Iterator, Iterable
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QTransform
@@ -51,8 +51,8 @@ class GraphScene(QGraphicsScene):
         super().__init__()
         self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
-        self.vertex_map: Dict[VT, VItem] = {}
-        self.edge_map: Dict[ET, EItem] = {}
+        self.vertex_map: dict[VT, VItem] = {}
+        self.edge_map: dict[ET, EItem] = {}
 
     @property
     def selected_vertices(self) -> Iterator[VT]:

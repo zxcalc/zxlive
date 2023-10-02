@@ -209,7 +209,7 @@ class ProofPanel(BasePanel):
 
     def _magic_slice(self, trace: WandTrace) -> bool:
         def cross(a: QPointF, b: QPointF) -> float:
-            return a.y() * b.x() - a.x() * b.y()
+            return float(a.y() * b.x() - a.x() * b.y())
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
         if len(filtered) != 1:
             return False
