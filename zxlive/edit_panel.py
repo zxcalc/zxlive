@@ -3,22 +3,17 @@ from __future__ import annotations
 import copy
 from typing import Iterator
 
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QAction, QPalette
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
-                               QInputDialog, QLabel, QScrollArea, QSizePolicy,
-                               QSpacerItem, QToolButton, QWidget)
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (QToolButton)
 from pyzx import EdgeType, VertexType
 
 from .base_panel import ToolbarSection
-from .commands import ChangePhase
-from .common import VT, GraphT
-from .dialogs import show_error_msg
+from .common import GraphT
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
-from .parse_poly import parse
-from .poly import Poly, new_var
+from .poly import Poly
 
 
 class GraphEditPanel(EditorBasePanel):

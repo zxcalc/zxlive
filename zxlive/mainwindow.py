@@ -90,37 +90,39 @@ class MainWindow(QMainWindow):
             "Create a new tab with an empty graph", alt_shortcut = QKeySequence.StandardKey.AddTab)
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close", self.close_action, QKeySequence.StandardKey.Close,
+        self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
             "Closes the window", alt_shortcut = QKeySequence("Ctrl+W"))
         # TODO: We should remember if we have saved the diagram before,
         # and give an open to overwrite this file with a Save action
-        save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
+        self.save_file = self._new_action("&Save", self.handle_save_file_action, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
-        save_as = self._new_action("Save &as...", self.save_as, QKeySequence.StandardKey.SaveAs,
+        self.save_as = self._new_action("Save &as...", self.handle_save_as_action, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
         file_menu.addAction(open_file)
         file_menu.addSeparator()
-        file_menu.addAction(close_action)
-        file_menu.addAction(save_file)
-        file_menu.addAction(save_as)
+        file_menu.addAction(self.close_action)
+        file_menu.addAction(self.save_file)
+        file_menu.addAction(self.save_as)
+        self.save_file.setEnabled(False)
+        self.save_as.setEnabled(False)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
         self.redo_action = self._new_action("Redo", self.redo, QKeySequence.StandardKey.Redo,
             "Redoes the last action", "redo.svg")
-        cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
+        self.cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
             "Cut the selected part of the diagram")
-        copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
+        self.copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
+        self.paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
-        delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
+        self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
-        select_all = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
-        deselect_all = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
+        self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
+        self.deselect_all_action = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
             "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
 
         edit_menu = menu.addMenu("&Edit")
@@ -129,13 +131,13 @@ class MainWindow(QMainWindow):
         self.undo_action.setEnabled(False)
         self.redo_action.setEnabled(False)
         edit_menu.addSeparator()
-        edit_menu.addAction(cut_action)
-        edit_menu.addAction(copy_action)
-        edit_menu.addAction(paste_action)
-        edit_menu.addAction(delete_action)
+        edit_menu.addAction(self.cut_action)
+        edit_menu.addAction(self.copy_action)
+        edit_menu.addAction(self.paste_action)
+        edit_menu.addAction(self.delete_action)
         edit_menu.addSeparator()
-        edit_menu.addAction(select_all)
-        edit_menu.addAction(deselect_all)
+        edit_menu.addAction(self.select_all_action)
+        edit_menu.addAction(self.deselect_all_action)
 
         zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount",
             alt_shortcut = QKeySequence("Ctrl+="))
@@ -200,7 +202,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, e: QCloseEvent) -> None:
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
-            success = self.close_action()
+            success = self.handle_close_action()
             if not success:
                 e.ignore()  # Abort the closing
                 return
@@ -266,10 +268,9 @@ class MainWindow(QMainWindow):
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
-    def close_action(self) -> bool:
-        assert self.active_panel is not None
+    def handle_close_action(self) -> bool:
         i = self.tab_widget.currentIndex()
-        if i == -1: # no tabs open
+        if i == -1: # no tabs open, close the app
             self.close()
         return self.close_tab(i)
 
@@ -286,20 +287,23 @@ class MainWindow(QMainWindow):
                 return False
             if answer == QMessageBox.StandardButton.Yes:
                 self.tab_widget.setCurrentIndex(i)
-                val = self.save_file()
+                val = self.handle_save_file_action()
                 if not val:
                     return False
         self.tab_widget.removeTab(i)
+        if self.tab_widget.count() == 0:
+            self.save_file.setEnabled(False)
+            self.save_as.setEnabled(False)
         return True
 
-    def save_file(self) -> bool:
+    def handle_save_file_action(self) -> bool:
         assert self.active_panel is not None
         if self.active_panel.file_path is None:
-            return self.save_as()
+            return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
             show_error_msg("Can't save to circuit file",
                 "You imported this file from a circuit description. You can currently only save it in a graph format.")
-            return self.save_as()
+            return self.handle_save_as_action()
 
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
@@ -324,7 +328,7 @@ class MainWindow(QMainWindow):
         return True
 
 
-    def save_as(self) -> bool:
+    def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
             out = export_proof_dialog(self.active_panel.proof_model, self)
@@ -368,8 +372,12 @@ class MainWindow(QMainWindow):
     def _new_panel(self, panel: BasePanel, name: str) -> None:
         self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
+
+        self.save_file.setEnabled(True)
+        self.save_as.setEnabled(True)
         self.undo_action.setEnabled(False)
         self.redo_action.setEnabled(False)
+
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
@@ -422,6 +430,13 @@ class MainWindow(QMainWindow):
         self.active_panel.graph_view.fit_view()
 
     def show_matrix(self) -> None:
+        def format_str(c: complex) -> str:
+            tol = 1e-8
+            if abs(c.real) < tol and abs(c.imag) < tol: return "0"
+            if abs(c.imag) < tol: return f"{c.real:.4f}"
+            if abs(c.real) < tol: return f"{c.imag:.4f}j"
+            return f"{matrix[i,j]:.2f}"
+
         if self.active_panel is None: return
         matrix = self.active_panel.graph.to_matrix()
         dialog = QDialog()
@@ -431,7 +446,7 @@ class MainWindow(QMainWindow):
         table.setColumnCount(matrix.shape[1])
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
-                table.setItem(i, j, QTableWidgetItem(str(matrix[i,j])))
+                table.setItem(i, j, QTableWidgetItem(format_str(matrix[i,j])))
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
         dialog.setLayout(QVBoxLayout())

@@ -1,6 +1,6 @@
 from .poly import Poly, new_const
 
-from typing import List, Any, Callable
+from typing import Any, Callable
 from lark import Lark, Transformer
 from functools import reduce
 from operator import add, mul
@@ -30,26 +30,26 @@ class PolyTransformer(Transformer):
 
         self._new_var = new_var
 
-    def start(self, items: List[Poly]) -> Poly:
+    def start(self, items: list[Poly]) -> Poly:
         return reduce(add, items)
 
-    def term(self, items: List[Poly]) -> Poly:
+    def term(self, items: list[Poly]) -> Poly:
         return reduce(mul, items)
 
-    def var(self, items: List[Any]) -> Poly:
+    def var(self, items: list[Any]) -> Poly:
         v = str(items[0])
         return self._new_var(v)
 
-    def pi(self, _: List[Any]) -> Poly:
+    def pi(self, _: list[Any]) -> Poly:
         return new_const(1)
 
-    def intf(self, items: List[Any]) -> Poly:
+    def intf(self, items: list[Any]) -> Poly:
         return new_const(int(items[0]))
 
-    def frac(self, items: List[Any]) -> Poly:
+    def frac(self, items: list[Any]) -> Poly:
         return new_const(Fraction(int(items[0]), int(items[1])))
 
-    def pifrac(self, items: List[Any]) -> Poly:
+    def pifrac(self, items: list[Any]) -> Poly:
         numerator = int(items[0]) if items[0] else 1
         return new_const(Fraction(numerator, int(items[2])))
 

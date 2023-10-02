@@ -5,7 +5,7 @@ from typing import Iterator, Optional, Sequence
 
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
-                               QToolBar, QToolButton, QVBoxLayout, QWidget)
+                               QToolBar, QVBoxLayout, QWidget)
 
 from .animations import AnimatedUndoStack
 from .commands import SetGraph
@@ -13,8 +13,6 @@ from .common import GraphT
 from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
-
-import abc
 
 
 @dataclass

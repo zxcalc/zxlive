@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 from pyzx.utils import EdgeType, VertexType
 
 from .common import GraphT
@@ -22,7 +20,7 @@ def construct_circuit() -> GraphT:
 
     nvertices = len(vlist) + (2 * qubits)
 
-    nvlist: List[Tuple[int, int, VertexType.Type]] = []
+    nvlist: list[tuple[int, int, VertexType.Type]] = []
     # Adding inputs nodes to the nvlist.
     for i in range(qubits):
         nvlist.append((i, i, VertexType.BOUNDARY))
