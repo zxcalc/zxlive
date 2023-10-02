@@ -26,3 +26,7 @@ jobs:
       - name: Deploy
         run: |
           python deploy.py build
+      - name: Publish
+        run: |
+          ls build
+          echo "TODO: publish build/zxlive and the related files"

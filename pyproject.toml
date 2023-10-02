@@ -66,6 +66,11 @@ zxlive = "zxlive.app:main"
 [tool.pyright]
 reportWildcardImportFromLibrary = "none"
 
+[tool.flake8]
+extend-ignore = [
+    "E501",
+]
+
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
