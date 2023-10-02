@@ -90,7 +90,7 @@ class MainWindow(QMainWindow):
             "Reinitialize with an empty graph")
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
-        close_action = self._new_action("Close", self.close_action, QKeySequence.StandardKey.Close,
+        self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
             "Closes the window", alt_shortcut = QKeySequence("Ctrl+W"))
         # TODO: We should remember if we have saved the diagram before,
         # and give an open to overwrite this file with a Save action
@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(new_graph)
         file_menu.addAction(open_file)
         file_menu.addSeparator()
-        file_menu.addAction(close_action)
+        file_menu.addAction(self.close_action)
         file_menu.addAction(save_file)
         file_menu.addAction(save_as)
 
@@ -111,19 +111,19 @@ class MainWindow(QMainWindow):
             "Undoes the last action", "undo.svg")
         self.redo_action = self._new_action("Redo", self.redo, QKeySequence.StandardKey.Redo,
             "Redoes the last action", "redo.svg")
-        cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
+        self.cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
             "Cut the selected part of the diagram")
-        copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
+        self.copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
+        self.paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
-        delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
+        self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
         new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.StandardKey.AddTab,
             "Create a new tab")
         self.addAction(new_tab)
-        select_all = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
-        deselect_all = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
+        self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
+        self.deselect_all_action = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
             "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
 
         edit_menu = menu.addMenu("&Edit")
@@ -132,13 +132,13 @@ class MainWindow(QMainWindow):
         self.undo_action.setEnabled(False)
         self.redo_action.setEnabled(False)
         edit_menu.addSeparator()
-        edit_menu.addAction(cut_action)
-        edit_menu.addAction(copy_action)
-        edit_menu.addAction(paste_action)
-        edit_menu.addAction(delete_action)
+        edit_menu.addAction(self.cut_action)
+        edit_menu.addAction(self.copy_action)
+        edit_menu.addAction(self.paste_action)
+        edit_menu.addAction(self.delete_action)
         edit_menu.addSeparator()
-        edit_menu.addAction(select_all)
-        edit_menu.addAction(deselect_all)
+        edit_menu.addAction(self.select_all_action)
+        edit_menu.addAction(self.deselect_all_action)
 
         zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount",
             alt_shortcut = QKeySequence("Ctrl+="))
@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, e: QCloseEvent) -> None:
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
-            success = self.close_action()
+            success = self.handle_close_action()
             if not success:
                 e.ignore()  # Abort the closing
                 return
@@ -268,8 +268,7 @@ class MainWindow(QMainWindow):
             self.active_panel.file_path = out.file_path
             self.active_panel.file_type = out.file_type
 
-    def close_action(self) -> bool:
-        assert self.active_panel is not None
+    def handle_close_action(self) -> bool:
         i = self.tab_widget.currentIndex()
         if i == -1: # no tabs open
             self.close()
