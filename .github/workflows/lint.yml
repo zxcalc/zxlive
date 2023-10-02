@@ -1,0 +1,35 @@
+name: test
+
+on:
+  push:
+
+env:
+  SRC_DIR: zxlive
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ 3.9 ]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependecies
+      run:
+        python -m pip install ".[test]"
+    - name: Flake8
+      continue-on-error: true
+      run:
+        pflake8 zxlive
+    - name: Pylint
+      continue-on-error: true
+      run:
+        pylint zxlive
+    - name: mypy
+      continue-on-error: true
+      run:
+        mypy zxlive

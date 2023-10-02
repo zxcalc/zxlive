@@ -42,7 +42,10 @@ test = [
     "PySide6-stubs",
     "shapely-stubs @ git+https://github.com/ciscorn/shapely-stubs.git",
     "mypy",
+    "pyproject-flake8",
+    "pylint",
 ]
+deploy = ["cx_Freeze"]
 
 [project.urls]
 Homepage = "https://github.com/Quantomatic/zxlive"
@@ -63,6 +66,11 @@ zxlive = "zxlive.app:main"
 [tool.pyright]
 reportWildcardImportFromLibrary = "none"
 
+[tool.flake8]
+extend-ignore = [
+    "E501",
+]
+
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
@@ -70,4 +78,17 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 disable_error_code = [
     "import",
+]
+
+[tool.distutils.build_exe]
+excludes = [
+    "IPython",
+    "jupyter",
+    "pytest",
+    "mypy",
+]
+zip_include_packages = [
+    "encodings",
+    "zxlive",
+    "pyzx",
 ]
