@@ -2,8 +2,8 @@ name: deploy
 
 on:
   push:
-#    tags:
-#      - '*'
+    tags:
+      - '*'
 
 env:
   SRC_DIR: zxlive
