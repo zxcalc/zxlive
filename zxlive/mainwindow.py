@@ -274,12 +274,7 @@ class MainWindow(QMainWindow):
         i = self.tab_widget.currentIndex()
         if i == -1: # no tabs open, close the app
             self.close()
-        if not self.close_tab(i):
-            return False
-        if self.tab_widget.count() == 0:
-            self.save_file.setEnabled(False)
-            self.save_as.setEnabled(False)
-        return True
+        return self.close_tab(i)
 
     def close_tab(self, i: int) -> bool:
         if i == -1:
@@ -298,6 +293,9 @@ class MainWindow(QMainWindow):
                 if not val:
                     return False
         self.tab_widget.removeTab(i)
+        if self.tab_widget.count() == 0:
+            self.save_file.setEnabled(False)
+            self.save_as.setEnabled(False)
         return True
 
     def handle_save_file_action(self) -> bool:
