@@ -25,4 +25,4 @@ jobs:
         run: pip install cx_freeze
       - name: Deploy
         run: |
-          python setup.py build
+          python deploy.py build

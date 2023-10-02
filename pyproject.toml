@@ -45,6 +45,7 @@ test = [
     "pyproject-flake8",
     "pylint",
 ]
+deploy = ["cx_Freeze"]
 
 [project.urls]
 Homepage = "https://github.com/Quantomatic/zxlive"
