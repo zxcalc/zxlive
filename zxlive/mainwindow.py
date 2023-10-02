@@ -424,6 +424,13 @@ class MainWindow(QMainWindow):
         self.active_panel.graph_view.fit_view()
 
     def show_matrix(self) -> None:
+        def format_str(c: complex) -> str:
+            tol = 1e-8
+            if abs(c.real) < tol and abs(c.imag) < tol: return "0"
+            if abs(c.imag) < tol: return f"{c.real:.4f}"
+            if abs(c.real) < tol: return f"{c.imag:.4f}j"
+            return f"{matrix[i,j]:.2f}"
+
         if self.active_panel is None: return
         matrix = self.active_panel.graph.to_matrix()
         dialog = QDialog()
@@ -433,7 +440,7 @@ class MainWindow(QMainWindow):
         table.setColumnCount(matrix.shape[1])
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
-                table.setItem(i, j, QTableWidgetItem(str(matrix[i,j])))
+                table.setItem(i, j, QTableWidgetItem(format_str(matrix[i,j])))
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
         dialog.setLayout(QVBoxLayout())
