@@ -94,9 +94,9 @@ class MainWindow(QMainWindow):
             "Closes the window", alt_shortcut = QKeySequence("Ctrl+W"))
         # TODO: We should remember if we have saved the diagram before,
         # and give an open to overwrite this file with a Save action
-        save_file = self._new_action("&Save", self.save_file, QKeySequence.StandardKey.Save,
+        self.save_file = self._new_action("&Save", self.handle_save_file_action, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
-        save_as = self._new_action("Save &as...", self.save_as, QKeySequence.StandardKey.SaveAs,
+        self.save_as = self._new_action("Save &as...", self.handle_save_as_action, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
 
         file_menu = menu.addMenu("&File")
@@ -104,8 +104,10 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_file)
         file_menu.addSeparator()
         file_menu.addAction(close_action)
-        file_menu.addAction(save_file)
-        file_menu.addAction(save_as)
+        file_menu.addAction(self.save_file)
+        file_menu.addAction(self.save_as)
+        self.save_file.setEnabled(False)
+        self.save_as.setEnabled(False)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
@@ -269,9 +271,8 @@ class MainWindow(QMainWindow):
             self.active_panel.file_type = out.file_type
 
     def close_action(self) -> bool:
-        assert self.active_panel is not None
         i = self.tab_widget.currentIndex()
-        if i == -1: # no tabs open
+        if i == -1: # no tabs open, close the app
             self.close()
         return self.close_tab(i)
 
@@ -288,20 +289,23 @@ class MainWindow(QMainWindow):
                 return False
             if answer == QMessageBox.StandardButton.Yes:
                 self.tab_widget.setCurrentIndex(i)
-                val = self.save_file()
+                val = self.handle_save_file_action()
                 if not val:
                     return False
         self.tab_widget.removeTab(i)
+        if self.tab_widget.count() == 0:
+            self.save_file.setEnabled(False)
+            self.save_as.setEnabled(False)
         return True
 
-    def save_file(self) -> bool:
+    def handle_save_file_action(self) -> bool:
         assert self.active_panel is not None
         if self.active_panel.file_path is None:
-            return self.save_as()
+            return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
             show_error_msg("Can't save to circuit file",
                 "You imported this file from a circuit description. You can currently only save it in a graph format.")
-            return self.save_as()
+            return self.handle_save_as_action()
 
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
@@ -326,7 +330,7 @@ class MainWindow(QMainWindow):
         return True
 
 
-    def save_as(self) -> bool:
+    def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
             out = export_proof_dialog(self.active_panel.proof_model, self)
@@ -370,8 +374,12 @@ class MainWindow(QMainWindow):
     def _new_panel(self, panel: BasePanel, name: str) -> None:
         self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
+
+        self.save_file.setEnabled(True)
+        self.save_as.setEnabled(True)
         self.undo_action.setEnabled(False)
         self.redo_action.setEnabled(False)
+
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
