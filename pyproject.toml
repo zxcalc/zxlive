@@ -44,6 +44,7 @@ test = [
     "mypy",
     "pyproject-flake8",
     "pylint",
+    "pytest-qt",
 ]
 deploy = ["cx_Freeze"]
 
