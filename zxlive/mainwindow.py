@@ -106,18 +106,16 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.close_action)
         file_menu.addAction(self.save_file)
         file_menu.addAction(self.save_as)
-        self.save_file.setEnabled(False)
-        self.save_as.setEnabled(False)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
         self.redo_action = self._new_action("Redo", self.redo, QKeySequence.StandardKey.Redo,
             "Redoes the last action", "redo.svg")
-        self.cut_action = self._new_action("Cut", self.cut_graph,QKeySequence.StandardKey.Cut,
+        self.cut_action = self._new_action("Cut", self.cut_graph, QKeySequence.StandardKey.Cut,
             "Cut the selected part of the diagram")
-        self.copy_action = self._new_action("&Copy", self.copy_graph,QKeySequence.StandardKey.Copy,
+        self.copy_action = self._new_action("&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        self.paste_action = self._new_action("Paste", self.paste_graph,QKeySequence.StandardKey.Paste,
+        self.paste_action = self._new_action("Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
         self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
@@ -128,8 +126,6 @@ class MainWindow(QMainWindow):
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
         edit_menu.addAction(self.redo_action)
-        self.undo_action.setEnabled(False)
-        self.redo_action.setEnabled(False)
         edit_menu.addSeparator()
         edit_menu.addAction(self.cut_action)
         edit_menu.addAction(self.copy_action)
@@ -139,20 +135,17 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self.select_all_action)
         edit_menu.addAction(self.deselect_all_action)
 
-        zoom_in  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount",
+        self.zoom_in_action  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount",
             alt_shortcut = QKeySequence("Ctrl+="))
-        zoom_out = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
-        fit_view = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
-        show_matrix = self._new_action("Show matrix", self.show_matrix, None, "Show the matrix of the diagram")
-        self.addAction(zoom_in)
-        self.addAction(zoom_out)
-        self.addAction(fit_view)
+        self.zoom_out_action = self._new_action("Zoom out", self.zoom_out, QKeySequence.StandardKey.ZoomOut, "Zooms out by a fixed amount")
+        self.fit_view_action = self._new_action("Fit view", self.fit_view, QKeySequence("C"), "Fits the view to the diagram")
+        self.show_matrix_action = self._new_action("Show matrix", self.show_matrix, None, "Show the matrix of the diagram")
 
         view_menu = menu.addMenu("&View")
-        view_menu.addAction(zoom_in)
-        view_menu.addAction(zoom_out)
-        view_menu.addAction(fit_view)
-        view_menu.addAction(show_matrix)
+        view_menu.addAction(self.zoom_in_action)
+        view_menu.addAction(self.zoom_out_action)
+        view_menu.addAction(self.fit_view_action)
+        view_menu.addAction(self.show_matrix_action)
 
         new_rewrite_from_file = self._new_action("New rewrite from file", lambda: create_new_rewrite(self), None, "New rewrite from file")
         new_rewrite_editor = self._new_action("New rewrite", self.new_rule_editor, None, "New rewrite")
@@ -161,6 +154,8 @@ class MainWindow(QMainWindow):
         rewrite_menu.addAction(new_rewrite_editor)
         rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
+
+        self._reset_menus(False)
 
         simplify_actions = []
         for simp in simplifications.values():
@@ -172,6 +167,29 @@ class MainWindow(QMainWindow):
 
         graph = construct_circuit()
         self.new_graph(graph)
+
+    def _reset_menus(self, has_active_tab: bool) -> None:
+        self.save_file.setEnabled(has_active_tab)
+        self.save_as.setEnabled(has_active_tab)
+        self.cut_action.setEnabled(has_active_tab)
+        self.copy_action.setEnabled(has_active_tab)
+        self.delete_action.setEnabled(has_active_tab)
+        self.select_all_action.setEnabled(has_active_tab)
+        self.deselect_all_action.setEnabled(has_active_tab)
+        self.zoom_in_action.setEnabled(has_active_tab)
+        self.zoom_out_action.setEnabled(has_active_tab)
+        self.fit_view_action.setEnabled(has_active_tab)
+        self.show_matrix_action.setEnabled(has_active_tab)
+
+        # Paste is enabled only if there is something in the clipboard.
+        self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
+
+        # Undo and redo are always disabled whether on a new tab or closing the last tab.
+        self.undo_action.setEnabled(False)
+        self.redo_action.setEnabled(False)
+
+        # TODO: As an enhancement, cut, copy, delete, select all and deselect all should start 
+        # disabled even on a new tab, and should only be enabled once anything is selected.
 
     def _new_action(self, name: str, trigger: Callable, shortcut: QKeySequence | QKeySequence.StandardKey | None,
                     tooltip: str, icon_file: Optional[str] = None,
@@ -292,8 +310,7 @@ class MainWindow(QMainWindow):
                     return False
         self.tab_widget.removeTab(i)
         if self.tab_widget.count() == 0:
-            self.save_file.setEnabled(False)
-            self.save_as.setEnabled(False)
+            self._reset_menus(False)
         return True
 
     def handle_save_file_action(self) -> bool:
@@ -352,11 +369,13 @@ class MainWindow(QMainWindow):
         assert self.active_panel is not None
         if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
             self.copied_graph = self.active_panel.copy_selection()
+            self.paste_action.setEnabled(True)
             self.active_panel.delete_selection()
 
     def copy_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self.paste_action.setEnabled(True)
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
@@ -373,10 +392,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.addTab(panel, name)
         self.tab_widget.setCurrentWidget(panel)
 
-        self.save_file.setEnabled(True)
-        self.save_as.setEnabled(True)
-        self.undo_action.setEnabled(False)
-        self.redo_action.setEnabled(False)
+        self._reset_menus(True)
 
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
