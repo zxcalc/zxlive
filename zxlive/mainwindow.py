@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
         menu = self.menuBar()
 
         new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
-            "Reinitialize with an empty graph")
+            "Create a new tab with an empty graph", alt_shortcut = QKeySequence.StandardKey.AddTab)
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
@@ -121,9 +121,6 @@ class MainWindow(QMainWindow):
             "Paste the copied part of the diagram")
         self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
-        new_tab = self._new_action("new_tab", self.new_graph, QKeySequence.StandardKey.AddTab,
-            "Create a new tab")
-        self.addAction(new_tab)
         self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
         self.deselect_all_action = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
             "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
@@ -177,7 +174,8 @@ class MainWindow(QMainWindow):
         self.new_graph(graph)
 
     def _new_action(self, name: str, trigger: Callable, shortcut: QKeySequence | QKeySequence.StandardKey | None,
-                    tooltip: str, icon_file: Optional[str] = None, alt_shortcut: Optional[QKeySequence] = None) -> QAction:
+                    tooltip: str, icon_file: Optional[str] = None,
+                    alt_shortcut: Optional[QKeySequence | QKeySequence.StandardKey] = None) -> QAction:
         assert not alt_shortcut or shortcut
         action = QAction(name, self)
         if icon_file:
