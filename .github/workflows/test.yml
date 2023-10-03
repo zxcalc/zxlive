@@ -33,3 +33,6 @@ jobs:
       continue-on-error: true
       run:
         mypy zxlive
+    - name: pytest
+      run:
+        pytest
