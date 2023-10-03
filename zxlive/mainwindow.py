@@ -438,6 +438,11 @@ class MainWindow(QMainWindow):
             return f"{matrix[i,j]:.2f}"
 
         if self.active_panel is None: return
+        try:
+            self.active_panel.graph.auto_detect_io()
+        except Exception as e:
+            show_error_msg("Can't show matrix", str(e))
+            return
         matrix = self.active_panel.graph.to_matrix()
         dialog = QDialog()
         dialog.setWindowTitle("Matrix")
