@@ -25,6 +25,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
     - uses: tlambert03/setup-qt-libs@v1
+    - name: Install dependecies
       run:
         pip install ".[test]"
     - name: pytest
