@@ -8,6 +8,7 @@ on:
 
 env:
   SRC_DIR: zxlive
+  TEST_DIR: test
 
 jobs:
   test:
@@ -25,14 +26,14 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
     - name: Setup QtLibs
-      uses: tlambert03/setup-qt-libs@v1  # See https://pytest-qt.readthedocs.io/en/latest/troubleshooting.html#github-actions
+      uses:  # See https://pytest-qt.readthedocs.io/en/latest/troubleshooting.html#github-actions
+        tlambert03/setup-qt-libs@v1
     - name: Setup Ubuntu
-      run: |
+      run:   # See https://pytest-qt.readthedocs.io/en/latest/troubleshooting.html#github-actions
         /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -screen 0 1920x1200x24 -ac +extension GLX
-#        sudo apt-get install libxcb-xinerama0
-    - name: Install dependecies
+    - name: Install dependencies
       run:
         pip install ".[test]"
     - name: pytest
       run:
-        pytest
+        pytest ${{ env.TEST_DIR }}
