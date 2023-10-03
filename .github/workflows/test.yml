@@ -7,7 +7,7 @@ env:
   SRC_DIR: zxlive
 
 jobs:
-  lint:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -18,9 +18,11 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+        cache: 'pip'
     - name: Install dependecies
-      run:
-        python -m pip install ".[test]"
+      run: |
+        sudo apt install -y xvfb x11-utils libxkbcommon-x11-0
+        pip install ".[test]"
     - name: Flake8
       continue-on-error: true
       run:
