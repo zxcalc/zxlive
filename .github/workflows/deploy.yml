@@ -26,9 +26,9 @@ jobs:
         run: pip install cx_freeze
       - name: Build MacOS
         if: matrix.os == 'ubuntu-latest'
-        run: python deploy.py bdist_rpm
+        run: python deploy.py bdist
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}
-          path: build/*.rpm
+          path: build/*
