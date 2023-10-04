@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
 #        os: [ ubuntu-latest, windows-latest, macos-latest ]
-        os: [ macos-latest ]
+        os: [ macos-latest-large ]
         python-version: [ 3.11 ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -25,10 +25,10 @@ jobs:
       - name: Install base package
         run: pip install cx_freeze
       - name: Build MacOS
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest-large'
         run: python deploy.py bdist_dmg
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}
-          path: build/
+          path: build/*.dmg
