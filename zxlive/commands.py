@@ -11,7 +11,7 @@ from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io
+from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
@@ -310,12 +310,19 @@ class ChangePhase(BaseCommand):
 
     def undo(self) -> None:
         assert self._old_phase is not None
-        self.g.set_phase(self.v, self._old_phase)
+        if self.g.type(self.v) == VertexType.Z_BOX:
+            set_z_box_label(self.g, self.v, self._old_phase)
+        else:
+            self.g.set_phase(self.v, self._old_phase)
         self.update_graph_view()
 
     def redo(self) -> None:
-        self._old_phase = self.g.phase(self.v)
-        self.g.set_phase(self.v, self.new_phase)
+        if self.g.type(self.v) == VertexType.Z_BOX:
+            self._old_phase = get_z_box_label(self.g, self.v)
+            set_z_box_label(self.g, self.v, self.new_phase)
+        else:
+            self._old_phase = self.g.phase(self.v)
+            self.g.set_phase(self.v, self.new_phase)
         self.update_graph_view()
 
 

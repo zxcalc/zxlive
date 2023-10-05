@@ -26,7 +26,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 
 
-from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w
+from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
 
 from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 
@@ -128,7 +128,7 @@ class VItem(QGraphicsPathItem):
         self.update_shape()
         if not self.isSelected():
             t = self.ty
-            if t == VertexType.Z:
+            if t == VertexType.Z or t == VertexType.Z_BOX:
                 self.setBrush(QBrush(QColor(ZX_GREEN)))
             elif t == VertexType.X:
                 self.setBrush(QBrush(QColor(ZX_RED)))
@@ -149,7 +149,7 @@ class VItem(QGraphicsPathItem):
             pen = QPen()
             pen.setWidthF(5)
             t = self.ty
-            if t == VertexType.Z:
+            if t == VertexType.Z or t == VertexType.Z_BOX:
                 brush = QBrush(QColor(ZX_GREEN_PRESSED))
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
@@ -193,7 +193,7 @@ class VItem(QGraphicsPathItem):
         self.setPen(pen)
 
         path = QPainterPath()
-        if self.ty == VertexType.H_BOX:
+        if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         elif self.ty == VertexType.W_OUTPUT:
             # draw a triangle
@@ -433,9 +433,12 @@ class PhaseItem(QGraphicsTextItem):
 
     def refresh(self) -> None:
         """Call this when a vertex moves or its phase changes"""
-
-        phase = self.v_item.g.phase(self.v_item.v)
-        self.setPlainText(phase_to_s(phase, self.v_item.g.type(self.v_item.v)))
+        vertex_type = self.v_item.g.type(self.v_item.v)
+        if vertex_type == VertexType.Z_BOX:
+            self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
+        else:
+            phase = self.v_item.g.phase(self.v_item.v)
+            self.setPlainText(phase_to_s(phase, vertex_type))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
 

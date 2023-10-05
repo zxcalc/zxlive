@@ -160,5 +160,6 @@ rem_id = ProofAction.from_dict(operations['rem_id'])
 copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
+z_to_z_box = ProofAction.from_dict(operations['z_to_z_box'])
 
-rewrites = [spider_fuse, w_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra]
+rewrites = [spider_fuse, w_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra, z_to_z_box]
