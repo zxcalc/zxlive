@@ -49,6 +49,7 @@ class ProofPanel(BasePanel):
         self.actions_bar = QTabWidget(self)
         self.layout().insertWidget(1, self.actions_bar)
         self.init_action_groups()
+        self.actions_bar.currentChanged.connect(self.update_on_selection)
 
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
@@ -121,9 +122,8 @@ class ProofPanel(BasePanel):
 
             widget = QWidget()
             widget.setLayout(hlayout)
+            widget.action_group = group
             self.actions_bar.addTab(widget, group.name)
-            #assert isinstance(layout := self.layout(), QVBoxLayout)
-            #layout.insertWidget(1, widget)
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
@@ -139,9 +139,7 @@ class ProofPanel(BasePanel):
     def update_on_selection(self) -> None:
         selection, edges = self.parse_selection()
         g = self.graph_scene.g
-
-        for group in self.action_groups:
-            group.update_active(g,selection,edges)
+        self.actions_bar.currentWidget().action_group.update_active(g, selection, edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNodeInStep(self.graph_view, vs, self.step_view)
