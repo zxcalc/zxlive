@@ -12,7 +12,7 @@ from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
 from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QWidget,
-                               QVBoxLayout)
+                               QVBoxLayout, QTabWidget)
 from pyzx import VertexType, basicrules
 from pyzx.utils import get_z_box_label, set_z_box_label
 
@@ -45,7 +45,9 @@ class ProofPanel(BasePanel):
         self.graph_view = GraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
-
+        
+        self.actions_bar = QTabWidget(self)
+        self.layout().insertWidget(1, self.actions_bar)
         self.init_action_groups()
 
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
@@ -99,8 +101,7 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(*self.actions())
 
     def init_action_groups(self) -> None:
-        basic_rules = proof_actions.ProofActionGroup(*proof_actions.rewrites).copy()
-        self.action_groups = [basic_rules]
+        self.action_groups = [group.copy() for group in proof_actions.action_groups]
         custom_rules = []
         for root, dirs, files in os.walk(CUSTOM_RULES_PATH):
             for file in files:
@@ -109,8 +110,8 @@ class ProofPanel(BasePanel):
                     with open(zxr_file, "r") as f:
                         rule = CustomRule.from_json(f.read()).to_proof_action()
                         custom_rules.append(rule)
-        self.action_groups.append(proof_actions.ProofActionGroup(*custom_rules).copy())
-        for group in reversed(self.action_groups):
+        self.action_groups.append(proof_actions.ProofActionGroup("Custom rules", *custom_rules).copy())
+        for group in self.action_groups:
             hlayout = QHBoxLayout()
             group.init_buttons(self)
             for action in group.actions:
@@ -120,8 +121,9 @@ class ProofPanel(BasePanel):
 
             widget = QWidget()
             widget.setLayout(hlayout)
-            assert isinstance(layout := self.layout(), QVBoxLayout)
-            layout.insertWidget(1, widget)
+            self.actions_bar.addTab(widget, group.name)
+            #assert isinstance(layout := self.layout(), QVBoxLayout)
+            #layout.insertWidget(1, widget)
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)

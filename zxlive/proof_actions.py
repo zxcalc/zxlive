@@ -117,7 +117,8 @@ class ProofAction(object):
 
 
 class ProofActionGroup(object):
-    def __init__(self, *actions: ProofAction) -> None:
+    def __init__(self, name: str, *actions: ProofAction) -> None:
+        self.name = name
         self.actions = actions
         self.btn_group: Optional[QButtonGroup] = None
         self.parent_panel = None
@@ -128,7 +129,7 @@ class ProofActionGroup(object):
             action_copy = replace(action)
             action_copy.button = None
             copied_actions.append(action_copy)
-        return ProofActionGroup(*copied_actions)
+        return ProofActionGroup(self.name, *copied_actions)
 
     def init_buttons(self, parent: "ProofPanel") -> None:
         self.btn_group = QButtonGroup(parent)
@@ -153,13 +154,26 @@ class ProofActionGroup(object):
 
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
-w_fuse = ProofAction.from_dict(operations['fuse_w'])
 to_z = ProofAction.from_dict(operations['to_z'])
 to_x = ProofAction.from_dict(operations['to_x'])
 rem_id = ProofAction.from_dict(operations['rem_id'])
 copy_action = ProofAction.from_dict(operations['copy'])
 pauli = ProofAction.from_dict(operations['pauli'])
 bialgebra = ProofAction.from_dict(operations['bialgebra'])
-z_to_z_box = ProofAction.from_dict(operations['z_to_z_box'])
+euler_rule = ProofAction.from_dict(operations['euler'])
+rules_basic = ProofActionGroup("Basic rules", spider_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra, euler_rule).copy()
 
-rewrites = [spider_fuse, w_fuse, to_z, to_x, rem_id, copy_action, pauli, bialgebra, z_to_z_box]
+lcomp = ProofAction.from_dict(operations['lcomp'])
+pivot = ProofAction.from_dict(operations['pivot'])
+rules_graph_theoretic = ProofActionGroup("Graph-like rules", lcomp, pivot).copy()
+
+w_fuse = ProofAction.from_dict(operations['fuse_w'])
+z_to_z_box = ProofAction.from_dict(operations['z_to_z_box'])
+rules_zxw = ProofActionGroup("ZXW rules",spider_fuse, w_fuse, z_to_z_box).copy()
+
+hbox_to_edge = ProofAction.from_dict(operations['had2edge'])
+fuse_hbox = ProofAction.from_dict(operations['fuse_hbox'])
+mult_hbox = ProofAction.from_dict(operations['mult_hbox'])
+rules_zh = ProofActionGroup("ZH rules", hbox_to_edge, fuse_hbox, mult_hbox).copy()
+
+action_groups = [rules_basic, rules_graph_theoretic, rules_zxw, rules_zh]
