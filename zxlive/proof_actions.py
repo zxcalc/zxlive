@@ -15,7 +15,7 @@ from .custom_rule import CustomRule
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-operations = pyzx.editor.operations
+operations = copy.deepcopy(pyzx.editor.operations)
 
 MatchType = Literal[1, 2]
 
@@ -31,11 +31,14 @@ class ProofAction(object):
     rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[ET,VT]]
     match_type: MatchType
     tooltip: str
+    copy_first: bool = field(default=False)  # Whether the graph should be copied before trying to test whether it matches. Needed if the matcher changes the graph.
     button: Optional[QPushButton] = field(default=None, init=False)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ProofAction":
-          return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'])
+        if 'copy_first' not in d:
+            d['copy_first'] = False
+        return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'], d['copy_first'])
 
     def do_rewrite(self, panel: "ProofPanel") -> None:
         verts, edges = panel.parse_selection()
@@ -104,6 +107,8 @@ class ProofAction(object):
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
+        if self.copy_first:
+            g = copy.deepcopy(g)
         if self.match_type == MATCHES_VERTICES:
             matches = self.matcher(g, lambda v: v in verts)
         else:
@@ -152,6 +157,38 @@ class ProofActionGroup(object):
         for action in self.actions:
             action.update_active(g, verts, edges)
 
+# We want additional actions that are not part of the original PyZX editor
+# So we add them to operations
+
+operations.update({
+    "pivot_boundary": {"text": "boundary pivot", 
+               "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
+               "matcher": pyzx.rules.match_pivot_boundary, 
+               "rule": pyzx.rules.pivot, 
+               "type": MATCHES_EDGES,
+               "copy_first": True},
+     "pivot_gadget": {"text": "gadget pivot", 
+               "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
+               "matcher": pyzx.rules.match_pivot_gadget, 
+               "rule": pyzx.rules.pivot, 
+               "type": MATCHES_EDGES,
+               "copy_first": True},
+     "phase_gadget_fuse": {"text": "Fuse phase gadgets",
+               "tooltip": "Fuses two phase gadgets with the same connectivity.",
+               "matcher": pyzx.rules.match_phase_gadgets, 
+               "rule": pyzx.rules.merge_phase_gadgets, 
+               "type": MATCHES_VERTICES,
+               "copy_first": True},
+     "supplementarity": {"text": "Supplementarity",
+               "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
+               "matcher": pyzx.rules.match_supplementarity, 
+               "rule": pyzx.rules.apply_supplementarity, 
+               "type": MATCHES_VERTICES,
+               "copy_first": False},
+    }
+)
+
+
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
 to_z = ProofAction.from_dict(operations['to_z'])
@@ -165,7 +202,10 @@ rules_basic = ProofActionGroup("Basic rules", spider_fuse, to_z, to_x, rem_id, c
 
 lcomp = ProofAction.from_dict(operations['lcomp'])
 pivot = ProofAction.from_dict(operations['pivot'])
-rules_graph_theoretic = ProofActionGroup("Graph-like rules", lcomp, pivot).copy()
+pivot_boundary = ProofAction.from_dict(operations['pivot_boundary'])
+pivot_gadget = ProofAction.from_dict(operations['pivot_gadget'])
+supplementarity = ProofAction.from_dict(operations['supplementarity'])
+rules_graph_theoretic = ProofActionGroup("Graph-like rules", lcomp, pivot, pivot_boundary, pivot_gadget, supplementarity).copy()
 
 w_fuse = ProofAction.from_dict(operations['fuse_w'])
 z_to_z_box = ProofAction.from_dict(operations['z_to_z_box'])
