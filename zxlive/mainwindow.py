@@ -37,6 +37,8 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       export_diagram_dialog, export_proof_dialog,
                       export_rule_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, show_error_msg)
+from zxlive.settings_dialog import open_settings_dialog
+
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
@@ -56,7 +58,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        conf = QSettings("zxlive", "zxlive")
+        self.settings = QSettings("zxlive", "zxlive")
 
         self.setWindowTitle("zxlive")
 
@@ -68,7 +70,7 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
 
         # restore the window from the last time it was opened
-        geom = conf.value("main_window_geometry")
+        geom = self.settings.value("main_window_geometry")
         if geom and isinstance(geom, QByteArray):
             self.restoreGeometry(geom)
         self.show()
@@ -122,6 +124,7 @@ class MainWindow(QMainWindow):
         self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
         self.deselect_all_action = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
             "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
+        self.preferences_action = self._new_action("&Preferences...", open_settings_dialog, None, "Open the preferences dialog")
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
@@ -134,6 +137,8 @@ class MainWindow(QMainWindow):
         edit_menu.addSeparator()
         edit_menu.addAction(self.select_all_action)
         edit_menu.addAction(self.deselect_all_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.preferences_action)
 
         self.zoom_in_action  = self._new_action("Zoom in", self.zoom_in,   QKeySequence.StandardKey.ZoomIn,"Zooms in by a fixed amount",
             alt_shortcut = QKeySequence("Ctrl+="))
@@ -226,8 +231,7 @@ class MainWindow(QMainWindow):
                 return
 
         # save the shape/size of this window on close
-        conf = QSettings("zxlive", "zxlive")
-        conf.setValue("main_window_geometry", self.saveGeometry())
+        self.settings.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
     def undo(self,e: QEvent) -> None:
