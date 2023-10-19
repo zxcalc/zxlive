@@ -23,7 +23,7 @@ from zxlive.poly import Poly, Term, Var, new_var
 
 
 def test_string_to_phase():
-    types_dict = {'a': False, 'b': False}
+    types_dict = {'a': False, 'b': False, 'bj': False}
 
     def _new_var(name):
         return new_var(name, types_dict)
@@ -62,7 +62,12 @@ def test_string_to_phase():
     # Test a complex input.
     assert string_to_phase('-123+456j', None, 'complex') == -123 + 456j
 
-    # TODO: Test a complex input with variables.
+    # Document behavior of complex input with new_var. Deceptively, if the user enters `a+bj` as the complex phase, the
+    # result looks like it is parametrized by `a` and `b`, when actually a variable named `bj` is created.
+    # See https://github.com/Quantomatic/zxlive/pull/149#issuecomment-1771782424.
+    assert (string_to_phase('a+bj', _new_var, 'complex') ==
+            Poly([(1, Term([(Var('a', types_dict), 1)])),
+                  (1, Term([(Var('bj', types_dict), 1)]))]))
 
     # Test bad input.
     with pytest.raises(ValueError):
