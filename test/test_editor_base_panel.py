@@ -48,7 +48,10 @@ def test_string_to_phase():
     assert string_to_phase('5.5*pi', None, 'fraction') == Fraction(11,2)
     assert string_to_phase('pi*5.5', None, 'fraction') == Fraction(11,2)
 
-    # TODO: test complex and polynomial input.
+    # Test a complex input.
+    assert string_to_phase('-123+456j', None, 'complex') == -123+456j
+
+    # TODO: Test inputs with variables.
 
     # Test bad input.
     with pytest.raises(ValueError):
