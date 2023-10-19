@@ -14,13 +14,20 @@
 # limitations under the License.
 
 
+from fractions import Fraction
+
 import pytest
 
 from zxlive.editor_base_panel import string_to_phase
-from fractions import Fraction
+from zxlive.poly import Poly, Term, Var, new_var
 
 
 def test_string_to_phase():
+    types_dict = {'a': False, 'b': False}
+
+    def _new_var(name):
+        return new_var(name, types_dict)
+
     # Test empty input clears the phase.
     assert string_to_phase('', None, 'fraction') == Fraction(0)
 
@@ -31,27 +38,31 @@ def test_string_to_phase():
     assert string_to_phase('pi*3', None, 'fraction') == Fraction(3)
 
     # Test different ways of specifying fractions.
-    assert string_to_phase('pi/2', None, 'fraction') == Fraction(1,2)
-    assert string_to_phase('-pi/2', None, 'fraction') == Fraction(-1,2)
-    assert string_to_phase('5/2', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('5pi/2', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('5*pi/2', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('pi*5/2', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('5/2pi', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('5/2*pi', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('5/pi*2', None, 'fraction') == Fraction(5,2)
+    assert string_to_phase('pi/2', None, 'fraction') == Fraction(1, 2)
+    assert string_to_phase('-pi/2', None, 'fraction') == Fraction(-1, 2)
+    assert string_to_phase('5/2', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('5pi/2', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('5*pi/2', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('pi*5/2', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('5/2pi', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('5/2*pi', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('5/pi*2', None, 'fraction') == Fraction(5, 2)
 
     # Test different ways of specifying floats.
-    assert string_to_phase('5.5', None, 'fraction') == Fraction(11,2)
-    assert string_to_phase('5.5pi', None, 'fraction') == Fraction(11,2)
-    assert string_to_phase('25e-1', None, 'fraction') == Fraction(5,2)
-    assert string_to_phase('5.5*pi', None, 'fraction') == Fraction(11,2)
-    assert string_to_phase('pi*5.5', None, 'fraction') == Fraction(11,2)
+    assert string_to_phase('5.5', None, 'fraction') == Fraction(11, 2)
+    assert string_to_phase('5.5pi', None, 'fraction') == Fraction(11, 2)
+    assert string_to_phase('25e-1', None, 'fraction') == Fraction(5, 2)
+    assert string_to_phase('5.5*pi', None, 'fraction') == Fraction(11, 2)
+    assert string_to_phase('pi*5.5', None, 'fraction') == Fraction(11, 2)
+
+    # Test a fractional phase specified with variables.
+    assert (string_to_phase('a*b', _new_var, 'fraction') ==
+            Poly([(1, Term([(Var('a', types_dict), 1), (Var('b', types_dict), 1)]))]))
 
     # Test a complex input.
-    assert string_to_phase('-123+456j', None, 'complex') == -123+456j
+    assert string_to_phase('-123+456j', None, 'complex') == -123 + 456j
 
-    # TODO: Test inputs with variables.
+    # TODO: Test a complex input with variables.
 
     # Test bad input.
     with pytest.raises(ValueError):
