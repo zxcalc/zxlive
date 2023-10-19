@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from enum import Enum
 from fractions import Fraction
 from typing import Callable, Iterator, TypedDict
@@ -161,16 +162,20 @@ class EditorBasePanel(BasePanel):
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
 
+        if graph.type(v) == VertexType.Z_BOX:
+            fraction_or_complex = 'complex'
+            prompt = "Enter desired phase value (complex value):"
+        else:
+            fraction_or_complex = 'fraction'
+            prompt = "Enter desired phase value (in units of pi):"
+
         input_, ok = QInputDialog.getText(
-            self, "Input Dialog", "Enter Desired Phase Value:"
+            self, "Change Phase", prompt
         )
         if not ok:
             return None
         try:
-            if graph.type(v) == VertexType.Z_BOX:
-                new_phase = string_to_phase(input_, self._new_var, 'complex')
-            else:
-                new_phase = string_to_phase(input_, self._new_var, 'fraction')
+            new_phase = string_to_phase(input_, self._new_var, fraction_or_complex)
         except ValueError:
             show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
             return None
@@ -352,7 +357,7 @@ def string_to_phase(string: str, new_var, fraction_or_complex='fraction'):
     try:
         if fraction_or_complex == 'fraction':
             s = string.lower().replace(' ', '')
-            s = s.replace('\u03c0', '').replace('pi', '')
+            s = re.sub('\\*?(pi|\u04c0)\\*?', '', s)
             if '.' in s or 'e' in s:
                 return Fraction(float(s))
             elif '/' in s:
@@ -367,5 +372,7 @@ def string_to_phase(string: str, new_var, fraction_or_complex='fraction'):
         else:
             return complex(string)
     except ValueError:
-        return parse(string, new_var)
-
+        try:
+            return parse(string, new_var)
+        except Exception as e:
+            raise ValueError
