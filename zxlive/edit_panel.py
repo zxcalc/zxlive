@@ -10,6 +10,7 @@ from pyzx import EdgeType, VertexType
 
 from .base_panel import ToolbarSection
 from .common import GraphT
+from .dialogs import show_error_msg
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
