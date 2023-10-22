@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import copy
+import re
 from enum import Enum
 from fractions import Fraction
-from typing import Callable, Iterator, TypedDict
+from typing import Callable, Iterator, TypedDict, Union
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
@@ -14,7 +15,6 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QSpacerItem, QSplitter, QToolButton, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
-from sympy import sympify
 
 
 from .base_panel import BasePanel, ToolbarSection
@@ -161,18 +161,24 @@ class EditorBasePanel(BasePanel):
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
 
+        phase_is_complex = (graph.type(v) == VertexType.Z_BOX)
+        if phase_is_complex:
+            prompt = "Enter desired phase value (complex value):"
+            error_msg = "Please enter a valid input (e.g., -1+2j)."
+
+        else:
+            prompt = "Enter desired phase value (in units of pi):"
+            error_msg = "Please enter a valid input (e.g., 1/2, 2, 0.25, a)."
+
         input_, ok = QInputDialog.getText(
-            self, "Input Dialog", "Enter Desired Phase Value:"
+            self, "Change Phase", prompt
         )
         if not ok:
             return None
         try:
-            if graph.type(v) == VertexType.Z_BOX:
-                new_phase = string_to_phase(input_, self._new_var, 'complex')
-            else:
-                new_phase = string_to_phase(input_, self._new_var, 'fraction')
+            new_phase = string_to_complex(input_) if phase_is_complex else string_to_fraction(input_, self._new_var)
         except ValueError:
-            show_error_msg("Wrong Input Type", "Please enter a valid input (e.g. 1/2, 2)")
+            show_error_msg("Invalid Input", error_msg)
             return None
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
@@ -346,26 +352,30 @@ def create_icon(shape: ShapeType, color: str) -> QIcon:
     icon.addPixmap(pixmap)
     return icon
 
-def string_to_phase(string: str, new_var, fraction_or_complex='fraction'):
+
+def string_to_fraction(string: str, new_var_: Callable[[str], Poly]) -> Union[Fraction, Poly]:
     if not string:
         return Fraction(0)
     try:
-        if fraction_or_complex == 'fraction':
-            s = string.lower().replace(' ', '')
-            s = s.replace('\u03c0', '').replace('pi', '')
-            if '.' in s or 'e' in s:
-                return Fraction(float(s))
-            elif '/' in s:
-                a, b = s.split("/", 2)
-                if not a:
-                    return Fraction(1, int(b))
-                if a == '-':
-                    a = '-1'
-                return Fraction(int(a), int(b))
-            else:
-                return Fraction(int(s))
+        s = string.lower().replace(' ', '')
+        s = re.sub('\\*?(pi|\u04c0)\\*?', '', s)
+        if '.' in s or 'e' in s:
+            return Fraction(float(s))
+        elif '/' in s:
+            a, b = s.split("/", 2)
+            if not a:
+                return Fraction(1, int(b))
+            if a == '-':
+                a = '-1'
+            return Fraction(int(a), int(b))
         else:
-            return complex(string)
+            return Fraction(int(s))
     except ValueError:
-        return parse(string, new_var)
+        try:
+            return parse(string, new_var_)
+        except Exception as e:
+            raise ValueError(e)
 
+
+def string_to_complex(string: str) -> complex:
+    return complex(string) if string else complex(0)
