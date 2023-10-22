@@ -137,7 +137,7 @@ class SettingsDialog(QDialog):
             widget.setValue(val)
         elif ty == 'float':
             widget = QDoubleSpinBox()
-            val = float(int)
+            val = float(val)
             widget.setValue(val)
         
         form.addRow(label, widget)
@@ -159,6 +159,6 @@ class SettingsDialog(QDialog):
 
 
 
-def open_settings_dialog():
+def open_settings_dialog() -> None:
     dialog = SettingsDialog()
     dialog.exec()
