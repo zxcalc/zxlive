@@ -16,20 +16,21 @@
 
 import pytest
 from PySide6 import QtCore
+from pytestqt.qtbot import QtBot
 
 from zxlive.edit_panel import GraphEditPanel
+from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
 
 
 @pytest.fixture
-def app(qtbot):
-    from zxlive.mainwindow import MainWindow
+def app(qtbot: QtBot) -> MainWindow:
     mw = MainWindow()
     qtbot.addWidget(mw)
     return mw
 
 
-def test_close_action(app):
+def test_close_action(app: MainWindow) -> None:
     # The app (currently) starts with one tab. Check that closing it doesn't close the app.
     app.close_action.trigger()
     assert app.tab_widget.count() == 0
@@ -40,7 +41,7 @@ def test_close_action(app):
     assert app.isHidden()
 
 
-def test_undo_redo_actions(app):
+def test_undo_redo_actions(app: MainWindow) -> None:
     # Check that undo and redo are initially disabled.
     assert not app.undo_action.isEnabled()
     assert not app.redo_action.isEnabled()
@@ -63,7 +64,7 @@ def test_undo_redo_actions(app):
     assert app.redo_action.isEnabled()
 
 
-def test_start_derivation(app, qtbot):
+def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     assert app.active_panel is not None
     assert isinstance(app.active_panel, GraphEditPanel)
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
