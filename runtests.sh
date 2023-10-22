@@ -1,3 +1,3 @@
 #!/bin/bash
 pytest
-mypy zxlive
+mypy zxlive test
