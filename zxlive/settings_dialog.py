@@ -159,6 +159,6 @@ class SettingsDialog(QDialog):
 
 
 
-def open_settings_dialog():
+def open_settings_dialog() -> None:
     dialog = SettingsDialog()
     dialog.exec()
