@@ -19,7 +19,7 @@ import copy
 from typing import Callable, Optional, TypedDict
 
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream)
+                            QSettings, QTextStream, Qt)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (QDialog, QFormLayout, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget,
@@ -471,7 +471,9 @@ class MainWindow(QMainWindow):
         table.setColumnCount(matrix.shape[1])
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
-                table.setItem(i, j, QTableWidgetItem(format_str(matrix[i,j])))
+                entry = QTableWidgetItem(format_str(matrix[i, j]))
+                entry.setFlags(entry.flags() & ~Qt.ItemIsEditable)
+                table.setItem(i, j, entry)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
         dialog.setLayout(QVBoxLayout())
