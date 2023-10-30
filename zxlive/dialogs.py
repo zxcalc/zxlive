@@ -85,6 +85,7 @@ def show_error_msg(title: str, description: Optional[str] = None) -> None:
         msg.setInformativeText(description)
     msg.exec()
 
+
 def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
     """Shows a dialog to import a diagram from disk.
 
@@ -98,9 +99,17 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
         # This happens if the user clicks on cancel
         return None
 
+    return import_diagram_from_file(file_path, selected_filter)
+
+
+def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter) -> \
+        Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
+    """Imports a diagram from a given file path.
+
+    Returns the imported graph or `None` if the import failed."""
     file = QFile(file_path)
     if not file.open(QIODevice.OpenModeFlag.ReadOnly | QIODevice.OpenModeFlag.Text):
-        show_error_msg("Could not open file")
+        show_error_msg(f"Could not open file: {file_path}.")
         return None
     stream = QTextStream(file)
     data = stream.readAll()
@@ -111,7 +120,7 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
         ext = file_path.split(".")[-1]
         selected_format = next(f for f in FileFormat if f.extension == ext)
 
-    # TODO: This would be nicer with match statements...
+    # TODO: This would be nicer with match statements (requires python 3.10 though)...
     try:
         if selected_format == FileFormat.ZXProof:
             return ImportProofOutput(selected_format, file_path, ProofModel.from_json(data))
@@ -135,11 +144,11 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
                     try:
                         return ImportGraphOutput(FileFormat.TikZ, file_path, GraphT.from_tikz(data))  # type: ignore
                     except:
-                        show_error_msg(f"Failed to import {selected_format.name} file", "Couldn't determine filetype.")
+                        show_error_msg(f"Failed to import {selected_format.name} file", f"Couldn't determine filetype: {file_path}.")
                         return None
 
     except Exception as e:
-        show_error_msg(f"Failed to import {selected_format.name} file", str(e))
+        show_error_msg(f"Failed to import {selected_format.name} file: {file_path}", str(e))
         return None
 
 def write_to_file(file_path: str, data: str) -> bool:
