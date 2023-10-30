@@ -36,7 +36,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite,
                       export_diagram_dialog, export_proof_dialog,
                       export_rule_dialog, get_lemma_name_and_description,
-                      import_diagram_dialog, show_error_msg)
+                      import_diagram_dialog, import_diagram_from_file, show_error_msg)
 from zxlive.settings_dialog import open_settings_dialog
 
 from .edit_panel import GraphEditPanel
@@ -270,6 +270,14 @@ class MainWindow(QMainWindow):
     def open_file(self) -> None:
         out = import_diagram_dialog(self)
         if out is not None:
+            self._open_file_from_output(out)
+
+    def open_file_from_path(self, file_path: str) -> None:
+        out = import_diagram_from_file(file_path)
+        if out is not None:
+            self._open_file_from_output(out)
+
+    def _open_file_from_output(self, out: ImportGraphOutput | ImportProofOutput | ImportRuleOutput) -> None:
             name = QFileInfo(out.file_path).baseName()
             if isinstance(out, ImportGraphOutput):
                 self.new_graph(out.g, name)

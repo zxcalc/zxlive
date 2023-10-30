@@ -16,11 +16,12 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QCommandLineParser
 import sys
-
-sys.path.insert(0,'../pyzx') # So that it can find a local copy of pyzx
-
 from .mainwindow import MainWindow
+
+sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
+
 
 class ZXLive(QApplication):
     """The main ZX Live application
@@ -32,9 +33,19 @@ class ZXLive(QApplication):
         super().__init__(sys.argv)
         self.setApplicationName('ZX Live')
         self.setDesktopFileName('ZX Live')
+        self.setApplicationVersion('0.1')  # TODO: read this from pyproject.toml if possible
         self.main_window = MainWindow()
 
         self.lastWindowClosed.connect(self.quit)
+
+        parser = QCommandLineParser()
+        parser.setApplicationDescription("ZX Live - An interactive tool for the ZX calculus")
+        parser.addHelpOption()
+        parser.addVersionOption()
+        parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
+        parser.process(self)
+        for f in parser.positionalArguments():
+            self.main_window.open_file_from_path(f)
 
 
 def main() -> None:
