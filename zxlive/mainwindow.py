@@ -468,10 +468,13 @@ class MainWindow(QMainWindow):
         if self.active_panel is None: return
         try:
             self.active_panel.graph.auto_detect_io()
+            matrix = self.active_panel.graph.to_matrix()
+        except AttributeError:
+            show_error_msg("Can't show matrix", "Showing matrices for parametrized diagrams is not supported yet.")
+            return
         except Exception as e:
             show_error_msg("Can't show matrix", str(e))
             return
-        matrix = self.active_panel.graph.to_matrix()
         dialog = QDialog()
         dialog.setWindowTitle("Matrix")
         table = QTableWidget()
