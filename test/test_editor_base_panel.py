@@ -58,6 +58,15 @@ def test_string_to_fraction() -> None:
     # Test a fractional phase specified with variables.
     assert (string_to_fraction('a*b', _new_var) ==
             Poly([(1, Term([(Var('a', types_dict), 1), (Var('b', types_dict), 1)]))]))
+    assert (string_to_fraction('2*a', _new_var) ==
+            Poly([(2, Term([(Var('a', types_dict), 1)]))]))
+    assert (string_to_fraction('2a', _new_var) ==
+            Poly([(2, Term([(Var('a', types_dict), 1)]))]))
+    assert (string_to_fraction('3/2a', _new_var) ==
+            Poly([(3/2, Term([(Var('a', types_dict), 1)]))]))
+    assert (string_to_fraction('3a+2b', _new_var) ==
+            Poly([(3, Term([(Var('a', types_dict), 1)])), (2, Term([(Var('b', types_dict), 1)]))]))
+
 
     # Test bad input.
     with pytest.raises(ValueError):
