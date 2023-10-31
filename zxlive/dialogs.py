@@ -118,7 +118,11 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
     if selected_format == FileFormat.All:
         ext = file_path.split(".")[-1]
-        selected_format = next(f for f in FileFormat if f.extension == ext)
+        try:
+            selected_format = next(f for f in FileFormat if f.extension == ext)
+        except StopIteration:
+            show_error_msg("Failed to import file", f"Couldn't determine filetype: {file_path}.")
+            return None
 
     # TODO: This would be nicer with match statements (requires python 3.10 though)...
     try:
