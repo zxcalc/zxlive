@@ -168,7 +168,7 @@ class EditorBasePanel(BasePanel):
 
         else:
             prompt = "Enter desired phase value (in units of pi):"
-            error_msg = "Please enter a valid input (e.g., 1/2, 2, 0.25, a)."
+            error_msg = "Please enter a valid input (e.g., 1/2, 2, 0.25, 2a+b)."
 
         input_, ok = QInputDialog.getText(
             self, "Change Phase", prompt

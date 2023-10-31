@@ -8,7 +8,7 @@ from fractions import Fraction
 
 poly_grammar = Lark("""
     start      : "(" start ")" | term ("+" term)*
-    term       : factor ("*" factor)*
+    term       : (intf | frac)? factor ("*" factor)*
     ?factor    : intf | frac | pi | pifrac | var
     var        : CNAME
     intf       : INT
