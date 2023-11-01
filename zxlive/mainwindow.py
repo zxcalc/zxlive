@@ -55,12 +55,14 @@ class MainWindow(QMainWindow):
     rewrite_form: QFormLayout
     left_graph: Optional[GraphT]
     right_graph: Optional[GraphT]
+    embedded_graph: Optional[GraphT]
 
-    def __init__(self) -> None:
+    def __init__(self, is_embedded: bool = False) -> None:
         super().__init__()
         self.settings = QSettings("zxlive", "zxlive")
 
         self.setWindowTitle("zxlive")
+        self.is_embedded = is_embedded
 
         w = QWidget(self)
         w.setLayout(QVBoxLayout())
@@ -89,15 +91,21 @@ class MainWindow(QMainWindow):
         menu = self.menuBar()
 
         new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
-            "Create a new tab with an empty graph", alt_shortcut = QKeySequence.StandardKey.AddTab)
+            "Create a new tab with an empty graph", alt_shortcut=QKeySequence.StandardKey.AddTab)
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
-            "Closes the window", alt_shortcut = QKeySequence("Ctrl+W"))
-        # TODO: We should remember if we have saved the diagram before,
-        # and give an open to overwrite this file with a Save action
-        self.save_file = self._new_action("&Save", self.handle_save_file_action, QKeySequence.StandardKey.Save,
-            "Save the diagram by overwriting the previous loaded file.")
+            "Closes the window", alt_shortcut=QKeySequence("Ctrl+W"))
+        if not self.is_embedded:
+            # TODO: We should remember if we have saved the diagram before,
+            # and give an option to overwrite this file with a Save action.
+            self.save_diagram = self._new_action("&Save", self.handle_save_file_action,
+                                                 QKeySequence.StandardKey.Save,
+                                                 "Save the diagram by overwriting the previous loaded file.")
+        else:
+            self.save_diagram = self._new_action("&Save to notebook", self.handle_save_embedded_graph_action,
+                                                 QKeySequence.StandardKey.Save,
+                                                 "Save the diagram back to the notebook.")
         self.save_as = self._new_action("Save &as...", self.handle_save_as_action, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
 
@@ -106,7 +114,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_file)
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
-        file_menu.addAction(self.save_file)
+        file_menu.addAction(self.save_diagram)
         file_menu.addAction(self.save_as)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
@@ -170,11 +178,12 @@ class MainWindow(QMainWindow):
             self.simplify_menu.addAction(action)
         self.simplify_menu.menuAction().setVisible(False)
 
-        graph = construct_circuit()
-        self.new_graph(graph)
+        if not self.is_embedded:
+            graph = construct_circuit()
+            self.new_graph(graph)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
-        self.save_file.setEnabled(has_active_tab)
+        self.save_diagram.setEnabled(has_active_tab)
         self.save_as.setEnabled(has_active_tab)
         self.cut_action.setEnabled(has_active_tab)
         self.copy_action.setEnabled(has_active_tab)
@@ -376,6 +385,12 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(i,name)
         return True
 
+    def handle_save_embedded_graph_action(self) -> bool:
+        assert self.is_embedded and self.embedded_graph is not None
+        assert self.active_panel is not None and isinstance(self.active_panel, GraphEditPanel)
+        self.embedded_graph.__dict__.update(self.active_panel.graph.__dict__)
+        self.active_panel.undo_stack.setClean()
+        return False
 
     def cut_graph(self) -> None:
         assert self.active_panel is not None
@@ -415,6 +430,9 @@ class MainWindow(QMainWindow):
         panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
+        if self.is_embedded:
+            assert graph is not None
+            self.embedded_graph = graph
         self._new_panel(panel, name)
 
     def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:
