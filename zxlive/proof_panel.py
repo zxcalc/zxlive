@@ -31,7 +31,7 @@ from .vitem import DragState, VItem
 
 
 class ProofPanel(BasePanel):
-    """Panel for the proof mode of ZX live."""
+    """Panel for the proof mode of ZXLive."""
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)

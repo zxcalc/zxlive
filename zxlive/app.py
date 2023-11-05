@@ -24,22 +24,22 @@ sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
 
 
 class ZXLive(QApplication):
-    """The main ZX Live application
+    """The main ZXLive application
 
     ...
     """
 
     def __init__(self) -> None:
         super().__init__(sys.argv)
-        self.setApplicationName('ZX Live')
-        self.setDesktopFileName('ZX Live')
+        self.setApplicationName('ZXLive')
+        self.setDesktopFileName('ZXLive')
         self.setApplicationVersion('0.1')  # TODO: read this from pyproject.toml if possible
         self.main_window = MainWindow()
 
         self.lastWindowClosed.connect(self.quit)
 
         parser = QCommandLineParser()
-        parser.setApplicationDescription("ZX Live - An interactive tool for the ZX calculus")
+        parser.setApplicationDescription("ZXLive - An interactive tool for the ZX calculus")
         parser.addHelpOption()
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
@@ -49,7 +49,7 @@ class ZXLive(QApplication):
 
 
 def main() -> None:
-    """Main entry point for ZX Live"""
+    """Main entry point for ZXLive"""
 
     zxl = ZXLive()
     zxl.exec_()
