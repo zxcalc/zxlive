@@ -1,4 +1,4 @@
-#     zxlive - An interactive tool for the ZX calculus
+#     zxlive - An interactive tool for the ZX-calculus
 #     Copyright (C) 2023 - Aleks Kissinger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,7 +39,7 @@ class ZXLive(QApplication):
         self.lastWindowClosed.connect(self.quit)
 
         parser = QCommandLineParser()
-        parser.setApplicationDescription("ZXLive - An interactive tool for the ZX calculus")
+        parser.setApplicationDescription("ZXLive - An interactive tool for the ZX-calculus")
         parser.addHelpOption()
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
