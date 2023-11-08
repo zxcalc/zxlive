@@ -27,9 +27,11 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QMainWindow, QMessageBox,
 from pyzx import extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
 
+import pyperclip
+
 from .base_panel import BasePanel
 from .commands import AddRewriteStep
-from .common import GraphT, get_data
+from .common import GraphT, get_data, to_tikz, from_tikz
 from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -117,8 +119,12 @@ class MainWindow(QMainWindow):
             "Cut the selected part of the diagram")
         self.copy_action = self._new_action("&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
+        self.copy_clipboard_action = self._new_action("Copy to clipboard", self.copy_graph_to_clipboard, 
+                                                      QKeySequence("Ctrl+Shift+C"), "Copy the selected part of the diagram to the clipboard as tikz")
         self.paste_action = self._new_action("Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
+        self.paste_clipboard_action = self._new_action("Paste from clipboard", self.paste_graph_from_clipboard,
+                                                       QKeySequence("Ctrl+Shift+V"), "Paste a tikz diagram in the clipboard to ZXLive")
         self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
         self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
@@ -134,6 +140,9 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self.copy_action)
         edit_menu.addAction(self.paste_action)
         edit_menu.addAction(self.delete_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.copy_clipboard_action)
+        edit_menu.addAction(self.paste_clipboard_action)
         edit_menu.addSeparator()
         edit_menu.addAction(self.select_all_action)
         edit_menu.addAction(self.deselect_all_action)
@@ -389,11 +398,26 @@ class MainWindow(QMainWindow):
         self.copied_graph = self.active_panel.copy_selection()
         self.paste_action.setEnabled(True)
 
+    def copy_graph_to_clipboard(self) -> None:
+        """Copies the selected graph to the clipboard as a tikz string that can be understood by Tikzit."""
+        assert self.active_panel is not None
+        copied_graph = self.active_panel.copy_selection()
+        tikz = to_tikz(copied_graph)
+        pyperclip.copy(tikz)
+
     def paste_graph(self) -> None:
         assert self.active_panel is not None
         if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
             and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
+    
+    def paste_graph_from_clipboard(self) -> None:
+        assert self.active_panel is not None
+        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel): 
+            tikz = pyperclip.paste()
+            copied_graph = from_tikz(tikz)
+            if copied_graph is not None:
+                self.active_panel.paste_graph(copied_graph)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None

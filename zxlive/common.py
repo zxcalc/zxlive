@@ -51,3 +51,14 @@ def pos_from_view_int(x:float,y: float) -> tuple[int, int]:
 def view_to_length(width:float,height:float)-> tuple[float, float]:
     return (width / SCALE, height / SCALE)
 
+def to_tikz(g: GraphT) -> str:
+    # TODO: make export use custom settings
+    return pyzx.tikz.to_tikz(g)
+
+def from_tikz(s: str) -> GraphT:
+    try:
+        return pyzx.tikz.tikz_to_graph(s)
+    except Exception as e:
+        from . import dialogs
+        dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
+        return None
