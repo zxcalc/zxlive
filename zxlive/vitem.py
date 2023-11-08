@@ -28,19 +28,13 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
 
-from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
+from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view, colors
 
 if TYPE_CHECKING:
     from .eitem import EItem
     from .graphscene import GraphScene
 
 
-ZX_GREEN = "#ccffcc"
-ZX_GREEN_PRESSED = "#64BC90"
-ZX_RED = "#ff8888"
-ZX_RED_PRESSED = "#bb0f0f"
-H_YELLOW = "#ffff00"
-H_YELLOW_PRESSED = "#f1c232"
 BLACK = "#000000"
 
 # Z values for different items. We use those to make sure that edges
@@ -129,20 +123,20 @@ class VItem(QGraphicsPathItem):
         if not self.isSelected():
             t = self.ty
             if t == VertexType.Z or t == VertexType.Z_BOX:
-                self.setBrush(QBrush(QColor(ZX_GREEN)))
+                self.setBrush(QBrush(colors.z_spider))
             elif t == VertexType.X:
-                self.setBrush(QBrush(QColor(ZX_RED)))
+                self.setBrush(QBrush(colors.x_spider))
             elif t == VertexType.H_BOX:
-                self.setBrush(QBrush(QColor(H_YELLOW)))
+                self.setBrush(QBrush(colors.hadamard))
             elif t == VertexType.W_INPUT:
-                self.setBrush(QBrush(QColor(BLACK)))
+                self.setBrush(QBrush(colors.w_input))
             elif t == VertexType.W_OUTPUT:
-                self.setBrush(QBrush(QColor(BLACK)))
+                self.setBrush(QBrush(colors.w_output))
             else:
-                self.setBrush(QBrush(QColor(BLACK)))
+                self.setBrush(QBrush(colors.boundary))
             pen = QPen()
             pen.setWidthF(3)
-            pen.setColor(QColor(BLACK))
+            pen.setColor(colors.outline)
             self.setPen(pen)
 
         if self.isSelected():
@@ -150,30 +144,30 @@ class VItem(QGraphicsPathItem):
             pen.setWidthF(5)
             t = self.ty
             if t == VertexType.Z or t == VertexType.Z_BOX:
-                brush = QBrush(QColor(ZX_GREEN_PRESSED))
+                brush = QBrush(colors.z_spider_pressed)
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.X:
-                brush = QBrush(QColor(ZX_RED_PRESSED))
+                brush = QBrush(colors.x_spider_pressed)
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.H_BOX:
-                brush = QBrush(QColor(H_YELLOW_PRESSED))
+                brush = QBrush(colors.hadamard_pressed)
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.W_INPUT:
-                brush = QBrush(QColor(BLACK))
+                brush = QBrush(colors.w_input_pressed)
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.W_OUTPUT:
-                brush = QBrush(QColor(BLACK))
+                brush = QBrush(colors.w_output_pressed)
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             else:
-                brush = QBrush(QColor("#444444"))
+                brush = QBrush(colors.boundary_pressed)
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
-                pen.setColor(QColor("#444444"))
+                pen.setColor(colors.boundary_pressed)
             self.setPen(pen)
 
         if self.phase_item:
@@ -189,7 +183,7 @@ class VItem(QGraphicsPathItem):
     def update_shape(self) -> None:
         pen = QPen()
         pen.setWidthF(3)
-        pen.setColor(QColor(BLACK))
+        pen.setColor(colors.outline)
         self.setPen(pen)
 
         path = QPainterPath()

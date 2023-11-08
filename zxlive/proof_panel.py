@@ -21,13 +21,13 @@ from . import proof_actions
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .common import (get_custom_rules_path, ET, SCALE, VT, GraphT, get_data,
-                     pos_from_view, pos_to_view)
+                     pos_from_view, pos_to_view, colors)
 from .custom_rule import CustomRule
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
-from .vitem import ZX_GREEN, DragState, VItem
+from .vitem import DragState, VItem
 
 
 class ProofPanel(BasePanel):
@@ -368,7 +368,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw circle
         painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
-        painter.setBrush(QColor(ZX_GREEN))
+        painter.setBrush(colors.z_spider)
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
         painter.drawEllipse(
             QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),

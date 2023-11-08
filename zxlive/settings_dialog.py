@@ -22,17 +22,19 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget,
                                QVBoxLayout, QSpinBox, QDoubleSpinBox,
-                               QLabel, QHBoxLayout, QTabWidget)
+                               QLabel, QHBoxLayout, QTabWidget,
+                                QComboBox)
 
 import pyzx
 
-from .common import set_pyzx_tikz_settings
+from .common import set_pyzx_tikz_settings, colors
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
 
 defaults: Dict[str,Any] = {
     "path/custom-rules": "lemmas/",
+    "color-scheme": "modern-red-green",
 
     "tikz/Z-spider-export": "Z dot",
     "tikz/Z-phase-export": "Z phase dot",
@@ -60,6 +62,12 @@ defaults: Dict[str,Any] = {
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
 }
 
+color_schemes = {
+    'modern-red-green': "Modern Red & Green",
+    'classic-red-green': "Classic Red & Green",
+    'white-grey': "Dodo book White & Grey",
+    'gidney': "Gidney's Black & White",
+}
 
 class SettingsDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -87,6 +95,7 @@ class SettingsDialog(QDialog):
         w.setLayout(form_general)
         vlayout.addWidget(w)
         self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
+        self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
         vlayout.addStretch()
 
         ##### Tikz Export settings #####
@@ -161,7 +170,7 @@ class SettingsDialog(QDialog):
         hlayout.addWidget(cancel_button)
 
         
-    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str) -> None:
+    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data:Any=None) -> None:
         val = self.settings.value(name)
         if val is None: val = defaults[name]
         if ty == 'str':
@@ -192,6 +201,14 @@ class SettingsDialog(QDialog):
             button = QPushButton("Browse")
             button.clicked.connect(browse)
             hlayout.addWidget(button)
+        elif ty == 'combo':
+            widget = QComboBox()
+            val = str(val)
+            assert isinstance(data, dict)
+            widget.addItems(data.values())
+            widget.setCurrentText(data[val])
+            widget.data = data
+
         
         form.addRow(label, widget)
         self.value_dict[name] = widget
@@ -204,9 +221,15 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, widget.value())
             elif isinstance(widget, QDoubleSpinBox):
                 self.settings.setValue(name, widget.value())
+            elif isinstance(widget, QComboBox):
+                s = widget.currentText()
+                assert hasattr(widget, "data")
+                val = next(k for k in widget.data if widget.data[k] == s)
+                self.settings.setValue(name, val)
             elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
                 self.settings.setValue(name, widget.text_value)
         set_pyzx_tikz_settings()
+        colors.set_color_scheme(self.settings.value("color-scheme"))
         self.accept()
 
     def cancel(self) -> None:

@@ -4,6 +4,7 @@ from typing import Final
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
+from PySide6.QtGui import QColor
 
 import pyzx
 
@@ -55,6 +56,66 @@ def pos_from_view_int(x:float,y: float) -> tuple[int, int]:
 def view_to_length(width:float,height:float)-> tuple[float, float]:
     return (width / SCALE, height / SCALE)
 
+
+class Colors(object):
+    z_spider: QColor = QColor("#ccffcc")
+    z_spider_pressed: QColor = QColor("#64BC90")
+    x_spider: QColor = QColor("#ff8888")
+    x_spider_pressed: QColor = QColor("#bb0f0f")
+    hadamard: QColor = QColor("#ffff00")
+    hadamard_pressed: QColor = QColor("#f1c232")
+    boundary: QColor = QColor("#000000")
+    boundary_pressed: QColor = QColor("#444444")
+    w_input: QColor = QColor("#000000")
+    w_input_pressed: QColor = QColor("#444444")
+    w_output: QColor = QColor("#000000")
+    w_output_pressed: QColor = QColor("#444444")
+    outline: QColor = QColor("#000000")
+
+    def __init__(self, color_scheme:str='modern-red-green'):
+        self.set_color_scheme(color_scheme)
+
+    def set_color_scheme(self,color_scheme):
+        if color_scheme == 'modern-red-green':
+            self.z_spider = QColor("#ccffcc")
+            self.z_spider_pressed = QColor("#64BC90")
+            self.x_spider = QColor("#ff8888")
+            self.x_spider_pressed = QColor("#bb0f0f")
+            self.hadamard = QColor("#ffff00")
+            self.hadamard_pressed = QColor("#f1c232")
+            self.boundary = QColor("#000000")
+        elif color_scheme == 'classic-red-green':
+            self.z_spider = QColor("#00ff00")
+            self.z_spider_pressed = QColor("#00dd00")
+            self.x_spider = QColor("#ff0d00")
+            self.x_spider_pressed = QColor("#dd0b00")
+            self.hadamard = QColor("#ffff00")
+            self.hadamard_pressed = QColor("#f1c232")
+            self.boundary = QColor("#000000")
+        elif color_scheme == 'white-grey':
+            self.z_spider = QColor("#ffffff")
+            self.z_spider_pressed = QColor("#eeeeee")
+            self.x_spider = QColor("#b4b4b4")
+            self.x_spider_pressed = QColor("#a0a0a0")
+            self.hadamard = QColor("#ffffff")
+            self.hadamard_pressed = QColor("#dddddd")
+            self.boundary = QColor("#000000")
+        elif color_scheme == 'gidney':
+            self.z_spider = QColor("#000000")
+            self.z_spider_pressed = QColor("#222222")
+            self.x_spider = QColor("#ffffff")
+            self.x_spider_pressed = QColor("#dddddd")
+            self.hadamard = QColor("#ffffff")
+            self.hadamard_pressed = QColor("#dddddd")
+            self.boundary = QColor("#000000")
+        else:
+            raise ValueError(f"Unknown colour scheme {color_scheme}")
+
+settings = QSettings("zxlive", "zxlive")
+color_scheme = settings.value("color-scheme")
+if color_scheme is None: color_scheme = 'modern-red-green'
+else: color_scheme = str(color_scheme)
+colors = Colors(color_scheme)
 
 def set_pyzx_tikz_settings() -> None:
     settings = QSettings("zxlive", "zxlive")
