@@ -13,8 +13,9 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
 
-
-CUSTOM_RULES_PATH: Final = "lemmas/"
+def get_custom_rules_path() -> str:
+    settings = QSettings("zxlive", "zxlive")
+    return str(settings.value('path/custom-rules'))
 
 
 VT: TypeAlias = int

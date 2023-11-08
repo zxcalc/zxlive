@@ -20,7 +20,7 @@ from . import animations as anims
 from . import proof_actions
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
-from .common import (CUSTOM_RULES_PATH, ET, SCALE, VT, GraphT, get_data,
+from .common import (get_custom_rules_path, ET, SCALE, VT, GraphT, get_data,
                      pos_from_view, pos_to_view)
 from .custom_rule import CustomRule
 from .eitem import EItem
@@ -104,7 +104,7 @@ class ProofPanel(BasePanel):
     def init_action_groups(self) -> None:
         self.action_groups = [group.copy() for group in proof_actions.action_groups]
         custom_rules = []
-        for root, dirs, files in os.walk(CUSTOM_RULES_PATH):
+        for root, dirs, files in os.walk(get_custom_rules_path()):
             for file in files:
                 if file.endswith(".zxr"):
                     zxr_file = os.path.join(root, file)

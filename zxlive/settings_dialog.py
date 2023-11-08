@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Optional,TYPE_CHECKING, Dict, Any
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream, QSettings
+from PySide6.QtCore import QFile, QIODevice, QTextStream, QSettings, Qt
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget,
@@ -32,6 +32,8 @@ if TYPE_CHECKING:
     from .mainwindow import MainWindow
 
 defaults: Dict[str,Any] = {
+    "path/custom-rules": "lemmas/",
+
     "tikz/Z-spider-export": "Z dot",
     "tikz/Z-phase-export": "Z phase dot",
     "tikz/X-spider-export": "X dot",
@@ -74,6 +76,20 @@ class SettingsDialog(QDialog):
         tab_widget = QTabWidget()
         layout.addWidget(tab_widget)
 
+        ##### General settings #####
+        panel_base_settings = QWidget()
+        vlayout = QVBoxLayout()
+        panel_base_settings.setLayout(vlayout)
+        tab_widget.addTab(panel_base_settings, "General")
+        vlayout.addWidget(QLabel("General ZXLive settings"))
+        form_general = QFormLayout()
+        w = QWidget()
+        w.setLayout(form_general)
+        vlayout.addWidget(w)
+        self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
+        vlayout.addStretch()
+
+        ##### Tikz Export settings #####
         panel_tikz_export = QWidget()
         vlayout = QVBoxLayout()
         panel_tikz_export.setLayout(vlayout)
@@ -86,6 +102,7 @@ class SettingsDialog(QDialog):
         w = QWidget()
         w.setLayout(form_export)
         vlayout.addWidget(w)
+        vlayout.addStretch()
 
         self.add_setting(form_export, "tikz/Z-spider-export", "Z-spider", 'str')
         self.add_setting(form_export, "tikz/Z-phase-export", "Z-spider with phase", 'str')
@@ -101,6 +118,8 @@ class SettingsDialog(QDialog):
         self.add_setting(form_export, "tikz/z-box-export", "Z box", 'str')
         self.add_setting(form_export, "tikz/edge-W-export", "W io edge", 'str')
 
+
+        ##### Tikz Import settings #####
         panel_tikz_import = QWidget()
         vlayout = QVBoxLayout()
         panel_tikz_import.setLayout(vlayout)
@@ -113,6 +132,7 @@ class SettingsDialog(QDialog):
         w = QWidget()
         w.setLayout(form_import)
         vlayout.addWidget(w)
+        vlayout.addStretch()
 
         self.add_setting(form_import, "tikz/Z-spider-import", "Z-spider", 'str')
         self.add_setting(form_import, "tikz/X-spider-import", "X-spider", 'str')
@@ -126,6 +146,8 @@ class SettingsDialog(QDialog):
         self.add_setting(form_import, "tikz/z-box-import", "Z box", 'str')
         self.add_setting(form_import, "tikz/edge-W-import", "W io edge", 'str')
 
+
+        ##### Okay/Cancel Buttons #####
         w= QWidget()
         hlayout = QHBoxLayout()
         hlayout.addStretch()
@@ -154,6 +176,22 @@ class SettingsDialog(QDialog):
             widget = QDoubleSpinBox()
             val = float(val)
             widget.setValue(val)
+        elif ty == 'folder':
+            widget = QWidget()
+            hlayout = QHBoxLayout()
+            widget.setLayout(hlayout)
+            widget_line = QLineEdit()
+            val = str(val)
+            widget_line.setText(val)
+            def browse() -> None:
+                directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.ShowDirsOnly)
+                if directory:
+                    widget_line.setText(directory)
+                    widget.text_value = directory
+            hlayout.addWidget(widget_line)
+            button = QPushButton("Browse")
+            button.clicked.connect(browse)
+            hlayout.addWidget(button)
         
         form.addRow(label, widget)
         self.value_dict[name] = widget
@@ -161,11 +199,13 @@ class SettingsDialog(QDialog):
     def okay(self) -> None:
         for name,widget in self.value_dict.items():
             if isinstance(widget, QLineEdit):
-               self.settings.setValue(name, widget.text())
+                self.settings.setValue(name, widget.text())
             elif isinstance(widget, QSpinBox):
-               self.settings.setValue(name, widget.value())
+                self.settings.setValue(name, widget.value())
             elif isinstance(widget, QDoubleSpinBox):
-               self.settings.setValue(name, widget.value())
+                self.settings.setValue(name, widget.value())
+            elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
+                self.settings.setValue(name, widget.text_value)
         set_pyzx_tikz_settings()
         self.accept()
 
