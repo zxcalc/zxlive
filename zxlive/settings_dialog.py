@@ -26,6 +26,8 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
 
 import pyzx
 
+from .common import set_pyzx_tikz_settings
+
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
 
@@ -151,6 +153,7 @@ class SettingsDialog(QDialog):
                self.settings.setValue(name, widget.value())
             elif isinstance(widget, QDoubleSpinBox):
                self.settings.setValue(name, widget.value())
+        set_pyzx_tikz_settings()
         self.accept()
 
     def cancel(self) -> None:

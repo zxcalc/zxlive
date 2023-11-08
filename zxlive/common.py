@@ -2,6 +2,9 @@ import os
 from enum import IntEnum
 from typing import Final
 from typing_extensions import TypeAlias
+
+from PySide6.QtCore import QSettings
+
 import pyzx
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
@@ -51,8 +54,38 @@ def pos_from_view_int(x:float,y: float) -> tuple[int, int]:
 def view_to_length(width:float,height:float)-> tuple[float, float]:
     return (width / SCALE, height / SCALE)
 
+
+def set_pyzx_tikz_settings() -> None:
+    settings = QSettings("zxlive", "zxlive")
+    tikz_classes = {
+        'boundary': str(settings.value('tikz/boundary-export')),
+        'Z': str(settings.value('tikz/Z-spider-export')),
+        'X': str(settings.value('tikz/X-spider-export')),
+        'Z phase': str(settings.value('tikz/Z-phase-export')),
+        'X phase': str(settings.value('tikz/X-phase-export')),
+        'Z box': str(settings.value('tikz/Z-box-export')),
+        'H': str(settings.value('tikz/Hadamard-export')),
+        'W': str(settings.value('tikz/W-output-export')),
+        'W input': str(settings.value('tikz/W-input-export')),
+        'edge': str(settings.value('tikz/edge-export')),
+        'H-edge': str(settings.value('tikz/edge-H-export')),
+        'W-io-edge': str(settings.value('tikz/edge-W-export')),
+        }
+    pyzx.settings.tikz_classes = tikz_classes
+    pyzx.tikz.synonyms_boundary = [str(s).strip().lower() for s in settings.value('tikz/boundary-import').split(',')]
+    pyzx.tikz.synonyms_z = [str(s).strip().lower() for s in settings.value('tikz/Z-spider-import').split(',')]
+    pyzx.tikz.synonyms_x = [str(s).strip().lower() for s in settings.value('tikz/X-spider-import').split(',')]
+    pyzx.tikz.synonyms_hadamard = [str(s).strip().lower() for s in settings.value('tikz/Hadamard-import').split(',')]
+    pyzx.tikz.synonyms_w_input = [str(s).strip().lower() for s in settings.value('tikz/W-input-import').split(',')]
+    pyzx.tikz.synonyms_w_output = [str(s).strip().lower() for s in settings.value('tikz/W-output-import').split(',')]
+    pyzx.tikz.synonyms_z_box = [str(s).strip().lower() for s in settings.value('tikz/Z-box-import').split(',')]
+    pyzx.tikz.synonyms_edge = [str(s).strip().lower() for s in settings.value('tikz/edge-import').split(',')]
+    pyzx.tikz.synonyms_hedge = [str(s).strip().lower() for s in settings.value('tikz/edge-H-import').split(',')]
+    pyzx.tikz.synonyms_wedge = [str(s).strip().lower() for s in settings.value('tikz/edge-W-import').split(',')]
+
+set_pyzx_tikz_settings()  # Call it once on startup
+
 def to_tikz(g: GraphT) -> str:
-    # TODO: make export use custom settings
     return pyzx.tikz.to_tikz(g)
 
 def from_tikz(s: str) -> GraphT:
