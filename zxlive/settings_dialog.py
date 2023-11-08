@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget,
                                QVBoxLayout, QSpinBox, QDoubleSpinBox,
-                               QLabel, QHBoxLayout)
+                               QLabel, QHBoxLayout, QTabWidget)
 
 import pyzx
 
@@ -71,13 +71,21 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(QLabel("Tikz export settings"))
-        layout.addWidget(QLabel("These are the class names that will be used when exporting to tikz."))
+        tab_widget = QTabWidget()
+        layout.addWidget(tab_widget)
+
+        panel_tikz_export = QWidget()
+        vlayout = QVBoxLayout()
+        panel_tikz_export.setLayout(vlayout)
+        tab_widget.addTab(panel_tikz_export, "Tikz export")
+
+        vlayout.addWidget(QLabel("Tikz export settings"))
+        vlayout.addWidget(QLabel("These are the class names that will be used when exporting to tikz."))
 
         form_export = QFormLayout()
         w = QWidget()
         w.setLayout(form_export)
-        layout.addWidget(w)
+        vlayout.addWidget(w)
 
         self.add_setting(form_export, "tikz/Z-spider-export", "Z-spider", 'str')
         self.add_setting(form_export, "tikz/Z-phase-export", "Z-spider with phase", 'str')
@@ -93,13 +101,18 @@ class SettingsDialog(QDialog):
         self.add_setting(form_export, "tikz/z-box-export", "Z box", 'str')
         self.add_setting(form_export, "tikz/edge-W-export", "W io edge", 'str')
 
-        layout.addWidget(QLabel("Tikz import settings"))
-        layout.addWidget(QLabel("These are the class names that are understood when importing from tikz."))
+        panel_tikz_import = QWidget()
+        vlayout = QVBoxLayout()
+        panel_tikz_import.setLayout(vlayout)
+        tab_widget.addTab(panel_tikz_import, "Tikz import")
+
+        vlayout.addWidget(QLabel("Tikz import settings"))
+        vlayout.addWidget(QLabel("These are the class names that are understood when importing from tikz."))
 
         form_import = QFormLayout()
         w = QWidget()
         w.setLayout(form_import)
-        layout.addWidget(w)
+        vlayout.addWidget(w)
 
         self.add_setting(form_import, "tikz/Z-spider-import", "Z-spider", 'str')
         self.add_setting(form_import, "tikz/X-spider-import", "X-spider", 'str')
