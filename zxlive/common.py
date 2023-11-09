@@ -1,6 +1,6 @@
 import os
 from enum import IntEnum
-from typing import Final
+from typing import Final, Optional
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
@@ -75,7 +75,7 @@ class Colors(object):
     def __init__(self, color_scheme:str='modern-red-green'):
         self.set_color_scheme(color_scheme)
 
-    def set_color_scheme(self,color_scheme):
+    def set_color_scheme(self, color_scheme: str) -> None:
         if color_scheme == 'modern-red-green':
             self.z_spider = QColor("#ccffcc")
             self.z_spider_pressed = QColor("#64BC90")
@@ -111,41 +111,51 @@ class Colors(object):
         else:
             raise ValueError(f"Unknown colour scheme {color_scheme}")
 
+
 settings = QSettings("zxlive", "zxlive")
 color_scheme = settings.value("color-scheme")
 if color_scheme is None: color_scheme = 'modern-red-green'
 else: color_scheme = str(color_scheme)
 colors = Colors(color_scheme)
 
+
 def set_pyzx_tikz_settings() -> None:
-    settings = QSettings("zxlive", "zxlive")
     tikz_classes = {
-        'boundary': str(settings.value('tikz/boundary-export')),
-        'Z': str(settings.value('tikz/Z-spider-export')),
-        'X': str(settings.value('tikz/X-spider-export')),
-        'Z phase': str(settings.value('tikz/Z-phase-export')),
-        'X phase': str(settings.value('tikz/X-phase-export')),
-        'Z box': str(settings.value('tikz/Z-box-export')),
-        'H': str(settings.value('tikz/Hadamard-export')),
-        'W': str(settings.value('tikz/W-output-export')),
-        'W input': str(settings.value('tikz/W-input-export')),
-        'edge': str(settings.value('tikz/edge-export')),
-        'H-edge': str(settings.value('tikz/edge-H-export')),
-        'W-io-edge': str(settings.value('tikz/edge-W-export')),
+        'boundary': str(settings.value('tikz/boundary-export') or pyzx.settings.tikz_classes['boundary']),
+        'Z': str(settings.value('tikz/Z-spider-export') or pyzx.settings.tikz_classes['Z']),
+        'X': str(settings.value('tikz/X-spider-export') or pyzx.settings.tikz_classes['X']),
+        'Z phase': str(settings.value('tikz/Z-phase-export') or pyzx.settings.tikz_classes['Z phase']),
+        'X phase': str(settings.value('tikz/X-phase-export') or pyzx.settings.tikz_classes['X phase']),
+        'Z box': str(settings.value('tikz/Z-box-export') or pyzx.settings.tikz_classes['Z box']),
+        'H': str(settings.value('tikz/Hadamard-export') or pyzx.settings.tikz_classes['H']),
+        'W': str(settings.value('tikz/W-output-export') or pyzx.settings.tikz_classes['W']),
+        'W input': str(settings.value('tikz/W-input-export') or pyzx.settings.tikz_classes['W input']),
+        'edge': str(settings.value('tikz/edge-export') or pyzx.settings.tikz_classes['edge']),
+        'H-edge': str(settings.value('tikz/edge-H-export') or pyzx.settings.tikz_classes['H-edge']),
+        'W-io-edge': str(settings.value('tikz/edge-W-export') or pyzx.settings.tikz_classes['W-io-edge']),
         }
+
+    def _get_synonyms(key: str, default: list[str]) -> list[str]:
+        val: object = settings.value(key)
+        if not val:
+            return default
+        return [s.strip().lower() for s in str(val).split(',')]
+
     pyzx.settings.tikz_classes = tikz_classes
-    pyzx.tikz.synonyms_boundary = [str(s).strip().lower() for s in settings.value('tikz/boundary-import').split(',')]
-    pyzx.tikz.synonyms_z = [str(s).strip().lower() for s in settings.value('tikz/Z-spider-import').split(',')]
-    pyzx.tikz.synonyms_x = [str(s).strip().lower() for s in settings.value('tikz/X-spider-import').split(',')]
-    pyzx.tikz.synonyms_hadamard = [str(s).strip().lower() for s in settings.value('tikz/Hadamard-import').split(',')]
-    pyzx.tikz.synonyms_w_input = [str(s).strip().lower() for s in settings.value('tikz/W-input-import').split(',')]
-    pyzx.tikz.synonyms_w_output = [str(s).strip().lower() for s in settings.value('tikz/W-output-import').split(',')]
-    pyzx.tikz.synonyms_z_box = [str(s).strip().lower() for s in settings.value('tikz/Z-box-import').split(',')]
-    pyzx.tikz.synonyms_edge = [str(s).strip().lower() for s in settings.value('tikz/edge-import').split(',')]
-    pyzx.tikz.synonyms_hedge = [str(s).strip().lower() for s in settings.value('tikz/edge-H-import').split(',')]
-    pyzx.tikz.synonyms_wedge = [str(s).strip().lower() for s in settings.value('tikz/edge-W-import').split(',')]
+    pyzx.tikz.synonyms_boundary = _get_synonyms('tikz/boundary-import', pyzx.tikz.synonyms_boundary)
+    pyzx.tikz.synonyms_z = _get_synonyms('tikz/Z-spider-import', pyzx.tikz.synonyms_z)
+    pyzx.tikz.synonyms_x = _get_synonyms('tikz/X-spider-import', pyzx.tikz.synonyms_x)
+    pyzx.tikz.synonyms_hadamard = _get_synonyms('tikz/Hadamard-import', pyzx.tikz.synonyms_hadamard)
+    pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/W-input-import', pyzx.tikz.synonyms_w_input)
+    pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/W-output-import', pyzx.tikz.synonyms_w_output)
+    pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/Z-box-import', pyzx.tikz.synonyms_z_box)
+    pyzx.tikz.synonyms_edge = _get_synonyms('tikz/edge-import', pyzx.tikz.synonyms_edge)
+    pyzx.tikz.synonyms_hedge = _get_synonyms('tikz/edge-H-import', pyzx.tikz.synonyms_hedge)
+    pyzx.tikz.synonyms_wedge = _get_synonyms('tikz/edge-W-import', pyzx.tikz.synonyms_wedge)
+
 
 set_pyzx_tikz_settings()  # Call it once on startup
+
 
 def to_tikz(g: GraphT) -> str:
     return pyzx.tikz.to_tikz(g)
