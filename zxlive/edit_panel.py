@@ -18,7 +18,7 @@ from .poly import Poly
 
 
 class GraphEditPanel(EditorBasePanel):
-    """Panel for the edit mode of ZX live."""
+    """Panel for the edit mode of ZXLive."""
 
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)

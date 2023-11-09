@@ -59,7 +59,7 @@ EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
 
 class EditorBasePanel(BasePanel):
     """Base class implementing the shared functionality of graph edit
-    and rule edit panels of ZX live."""
+    and rule edit panels of ZXLive."""
 
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
