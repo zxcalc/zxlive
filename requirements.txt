@@ -5,5 +5,4 @@ numpy~=1.25.2
 pytest-qt~=4.2.0
 PySide6~=6.5.2
 shapely~=2.0.1
-sympy~=1.12
 pyperclip>=1.8.1
