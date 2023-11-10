@@ -26,6 +26,7 @@ from zxlive.proof_panel import ProofPanel
 @pytest.fixture
 def app(qtbot: QtBot) -> MainWindow:
     mw = MainWindow()
+    mw.open_demo_graph()
     qtbot.addWidget(mw)
     return mw
 
