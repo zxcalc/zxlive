@@ -171,6 +171,7 @@ class MainWindow(QMainWindow):
 
         self._reset_menus(False)
 
+    def open_demo_graph(self) -> None:
         graph = construct_circuit()
         self.new_graph(graph)
 
