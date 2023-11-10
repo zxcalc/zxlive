@@ -90,6 +90,16 @@ class EditorBasePanel(BasePanel):
         self.sidebar.addWidget(self.edge_list)
         self.sidebar.addWidget(self.variable_viewer)
 
+    def update_side_bar(self) -> None:
+        populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked)
+        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked)
+
+    def update_colors(self) -> None:
+        self.update_side_bar()
+
+    def update_variable_viewer(self) -> None:
+        self.update_side_bar()
+
     def _populate_variables(self) -> None:
         self.variable_types = {}
         for vert in self.graph.vertices():
@@ -332,6 +342,7 @@ def populate_list_widget(list_widget: QListWidget,
                          data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
                          onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) \
         -> None:
+    row = list_widget.currentRow()
     list_widget.clear()
     for typ, value in data.items():
         icon = create_icon(*value["icon"])
@@ -339,6 +350,7 @@ def populate_list_widget(list_widget: QListWidget,
         item.setData(Qt.ItemDataRole.UserRole, typ)
         list_widget.addItem(item)
     list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
+    list_widget.setCurrentRow(row)
 
 
 def create_icon(shape: ShapeType, color: str) -> QIcon:

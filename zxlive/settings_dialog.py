@@ -71,6 +71,7 @@ color_schemes = {
 class SettingsDialog(QDialog):
     def __init__(self, parent: MainWindow) -> None:
         super().__init__(parent)
+        self.parent = parent
         self.setWindowTitle("Settings")
         self.settings = QSettings("zxlive", "zxlive")
         self.value_dict: Dict[str,QWidget] = {}
@@ -95,6 +96,7 @@ class SettingsDialog(QDialog):
         vlayout.addWidget(w)
         self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
         self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
+        self.prev_color_scheme = self.settings.value("color-scheme")
         vlayout.addStretch()
 
         ##### Tikz Export settings #####
@@ -148,7 +150,7 @@ class SettingsDialog(QDialog):
         self.add_setting(form_import, "tikz/boundary-import", "Boundary", 'str')
         self.add_setting(form_import, "tikz/edge-import", "Regular Edge", 'str')
         self.add_setting(form_import, "tikz/edge-H-import", "Hadamard edge", 'str')
-        
+
         self.add_setting(form_import, "tikz/w-input-import", "W input", 'str')
         self.add_setting(form_import, "tikz/w-output-import", "W output", 'str')
         self.add_setting(form_import, "tikz/z-box-import", "Z box", 'str')
@@ -168,7 +170,7 @@ class SettingsDialog(QDialog):
         cancel_button.clicked.connect(self.cancel)
         hlayout.addWidget(cancel_button)
 
-        
+
     def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data:Any=None) -> None:
         val = self.settings.value(name)
         if val is None: val = defaults[name]
@@ -208,7 +210,7 @@ class SettingsDialog(QDialog):
             widget.setCurrentText(data[val])
             widget.data = data
 
-        
+
         form.addRow(label, widget)
         self.value_dict[name] = widget
 
@@ -228,7 +230,9 @@ class SettingsDialog(QDialog):
             elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
                 self.settings.setValue(name, widget.text_value)
         set_pyzx_tikz_settings()
-        colors.set_color_scheme(self.settings.value("color-scheme"))
+        if self.settings.value("color-scheme") != self.prev_color_scheme:
+            colors.set_color_scheme(self.settings.value("color-scheme"))
+            self.parent.update_colors()
         self.accept()
 
     def cancel(self) -> None:
