@@ -44,8 +44,11 @@ class ZXLive(QApplication):
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
         parser.process(self)
-        for f in parser.positionalArguments():
-            self.main_window.open_file_from_path(f)
+        if not parser.positionalArguments():
+            self.main_window.open_demo_graph()
+        else:
+            for f in parser.positionalArguments():
+                self.main_window.open_file_from_path(f)
 
 
 def main() -> None:
