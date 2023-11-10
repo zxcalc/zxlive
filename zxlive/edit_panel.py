@@ -41,7 +41,7 @@ class GraphEditPanel(EditorBasePanel):
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 
-        self.sidebar = self.create_side_bar()
+        self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
 
 
