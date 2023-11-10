@@ -18,7 +18,7 @@ from .poly import Poly
 
 
 class RulePanel(EditorBasePanel):
-    """Panel for the Rule editor of ZX live."""
+    """Panel for the Rule editor of ZXLive."""
 
     graph_scene_left: EditGraphScene
     graph_scene_right: EditGraphScene

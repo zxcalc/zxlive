@@ -1,4 +1,4 @@
-#     zxlive - An interactive tool for the ZX calculus
+#     zxlive - An interactive tool for the ZX-calculus
 #     Copyright (C) 2023 - Aleks Kissinger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,9 +27,11 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QMainWindow, QMessageBox,
 from pyzx import extract_circuit, simplify
 from pyzx.graph.base import BaseGraph
 
+import pyperclip
+
 from .base_panel import BasePanel
 from .commands import AddRewriteStep
-from .common import GraphT, get_data
+from .common import GraphT, get_data, to_tikz, from_tikz
 from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -125,8 +127,12 @@ class MainWindow(QMainWindow):
             "Cut the selected part of the diagram")
         self.copy_action = self._new_action("&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
+        self.copy_clipboard_action = self._new_action("Copy to clipboard", self.copy_graph_to_clipboard, 
+                                                      QKeySequence("Ctrl+Shift+C"), "Copy the selected part of the diagram to the clipboard as tikz")
         self.paste_action = self._new_action("Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
+        self.paste_clipboard_action = self._new_action("Paste from clipboard", self.paste_graph_from_clipboard,
+                                                       QKeySequence("Ctrl+Shift+V"), "Paste a tikz diagram in the clipboard to ZXLive")
         self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
         self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
@@ -142,6 +148,9 @@ class MainWindow(QMainWindow):
         edit_menu.addAction(self.copy_action)
         edit_menu.addAction(self.paste_action)
         edit_menu.addAction(self.delete_action)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.copy_clipboard_action)
+        edit_menu.addAction(self.paste_clipboard_action)
         edit_menu.addSeparator()
         edit_menu.addAction(self.select_all_action)
         edit_menu.addAction(self.deselect_all_action)
@@ -169,14 +178,6 @@ class MainWindow(QMainWindow):
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
         self._reset_menus(False)
-
-        simplify_actions = []
-        for simp in simplifications.values():
-            simplify_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp), None, simp["tool_tip"]))
-        self.simplify_menu = menu.addMenu("&Simplify")
-        for action in simplify_actions:
-            self.simplify_menu.addAction(action)
-        self.simplify_menu.menuAction().setVisible(False)
 
         if not self.is_embedded:
             graph = construct_circuit()
@@ -260,11 +261,9 @@ class MainWindow(QMainWindow):
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
-            self.simplify_menu.menuAction().setVisible(True)
             self.proof_as_rewrite_action.setEnabled(True)
         else:
             self.proof_as_rewrite_action.setEnabled(False)
-            self.simplify_menu.menuAction().setVisible(False)
         self._undo_changed()
         self._redo_changed()
 
@@ -404,11 +403,26 @@ class MainWindow(QMainWindow):
         self.copied_graph = self.active_panel.copy_selection()
         self.paste_action.setEnabled(True)
 
+    def copy_graph_to_clipboard(self) -> None:
+        """Copies the selected graph to the clipboard as a tikz string that can be understood by Tikzit."""
+        assert self.active_panel is not None
+        copied_graph = self.active_panel.copy_selection()
+        tikz = to_tikz(copied_graph)
+        pyperclip.copy(tikz)
+
     def paste_graph(self) -> None:
         assert self.active_panel is not None
         if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
             and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
+    
+    def paste_graph_from_clipboard(self) -> None:
+        assert self.active_panel is not None
+        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel): 
+            tikz = pyperclip.paste()
+            copied_graph = from_tikz(tikz)
+            if copied_graph is not None:
+                self.active_panel.paste_graph(copied_graph)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
@@ -519,56 +533,3 @@ class MainWindow(QMainWindow):
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
         export_rule_dialog(rule, self)
-
-    def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
-        def reduce() -> None:
-            assert self.active_panel is not None and isinstance(self.active_panel, ProofPanel)
-            old_graph = self.active_panel.graph
-            new_graph = copy.deepcopy(old_graph)
-            try:
-                if reduction["in_place"]:
-                    reduction["function"](new_graph)
-                else:
-                    _new_graph = reduction["function"](new_graph)
-                    assert isinstance(_new_graph, GraphT)
-                    new_graph = _new_graph
-                cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
-                self.active_panel.undo_stack.push(cmd)
-            except Exception as e:
-                show_error_msg("Error", str(e))
-        return reduce
-
-
-class SimpEntry(TypedDict):
-    text: str
-    tool_tip: str
-    function: Callable[[BaseGraph], int] | Callable[[BaseGraph], None] | Callable[[BaseGraph], BaseGraph]
-    in_place: bool
-
-
-def _extract_circuit(graph: BaseGraph) -> BaseGraph:
-    graph.auto_detect_io()
-    simplify.full_reduce(graph)
-    return extract_circuit(graph).to_graph()
-
-simplifications: dict[str, SimpEntry] = {
-    'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp, "in_place": True},
-    'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp, "in_place": True},
-    'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp, "in_place": True},
-    'phase_free_simp': {"text": "phase_free_simp", "tool_tip":"phase_free_simp", "function": simplify.phase_free_simp, "in_place": True},
-    'pivot_simp': {"text": "pivot_simp", "tool_tip":"pivot_simp", "function": simplify.pivot_simp, "in_place": True},
-    'pivot_gadget_simp': {"text": "pivot_gadget_simp", "tool_tip":"pivot_gadget_simp", "function": simplify.pivot_gadget_simp, "in_place": True},
-    'pivot_boundary_simp': {"text": "pivot_boundary_simp", "tool_tip":"pivot_boundary_simp", "function": simplify.pivot_boundary_simp, "in_place": True},
-    'gadget_simp': {"text": "gadget_simp", "tool_tip":"gadget_simp", "function": simplify.gadget_simp, "in_place": True},
-    'lcomp_simp': {"text": "lcomp_simp", "tool_tip":"lcomp_simp", "function": simplify.lcomp_simp, "in_place": True},
-    'clifford_simp': {"text": "clifford_simp", "tool_tip":"clifford_simp", "function": simplify.clifford_simp, "in_place": True},
-    'tcount': {"text": "tcount", "tool_tip":"tcount", "function": simplify.tcount, "in_place": True},
-    'to_gh': {"text": "to_gh", "tool_tip":"to_gh", "function": simplify.to_gh, "in_place": True},
-    'to_rg': {"text": "to_rg", "tool_tip":"to_rg", "function": simplify.to_rg, "in_place": True},
-    'full_reduce': {"text": "full_reduce", "tool_tip":"full_reduce", "function": simplify.full_reduce, "in_place": True},
-    'teleport_reduce': {"text": "teleport_reduce", "tool_tip":"teleport_reduce", "function": simplify.teleport_reduce, "in_place": True},
-    'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar, "in_place": True},
-    'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp, "in_place": True},
-    'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph, "in_place": True},
-    'extract_circuit': {"text": "extract_circuit", "tool_tip":"extract_circuit", "function": _extract_circuit, "in_place": False},
-}

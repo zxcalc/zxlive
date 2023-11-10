@@ -3,6 +3,7 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Literal, Optional, TYPE_CHECKING
 
 import pyzx
+from pyzx import simplify, extract_circuit
 
 from PySide6.QtWidgets import QPushButton, QButtonGroup
 from PySide6.QtCore import QParallelAnimationGroup, QEasingCurve
@@ -11,6 +12,7 @@ from . import animations as anims
 from .commands import AddRewriteStep
 from .common import ANIMATION_DURATION, ET, GraphT, VT
 from .custom_rule import CustomRule
+from .dialogs import show_error_msg
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -32,13 +34,16 @@ class ProofAction(object):
     match_type: MatchType
     tooltip: str
     copy_first: bool = field(default=False)  # Whether the graph should be copied before trying to test whether it matches. Needed if the matcher changes the graph.
+    returns_new_graph: bool = field(default=False)  # Whether the rule returns a new graph instead of returning the rewrite changes.
     button: Optional[QPushButton] = field(default=None, init=False)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ProofAction":
         if 'copy_first' not in d:
             d['copy_first'] = False
-        return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'], d['copy_first'])
+        if 'returns_new_graph' not in d:
+            d['returns_new_graph'] = False
+        return cls(d['text'], d['matcher'], d['rule'], d['type'], d['tooltip'], d['copy_first'], d['returns_new_graph'])
 
     def do_rewrite(self, panel: "ProofPanel") -> None:
         verts, edges = panel.parse_selection()
@@ -49,10 +54,17 @@ class ProofAction(object):
         else:
             matches = self.matcher(g, lambda e: e in edges)
 
-        etab, rem_verts, rem_edges, check_isolated_vertices = self.rule(g, matches)
-        g.remove_edges(rem_edges)
-        g.remove_vertices(rem_verts)
-        g.add_edge_table(etab)
+        try:
+            if self.returns_new_graph:
+                g = self.rule(g, matches)
+            else:
+                etab, rem_verts, rem_edges, check_isolated_vertices = self.rule(g, matches)
+                g.remove_edges(rem_edges)
+                g.remove_vertices(rem_verts)
+                g.add_edge_table(etab)
+        except Exception as e:
+            show_error_msg('Error while applying rewrite rule', str(e))
+            return
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before = None
@@ -188,6 +200,155 @@ operations.update({
     }
 )
 
+always_true = lambda graph, matches: matches
+
+def apply_simplification(simplification: Callable[[GraphT], GraphT]) -> Callable[[GraphT, list], pyzx.rules.RewriteOutputType[ET,VT]]:
+    def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[ET,VT]:
+        simplification(g)
+        return ({}, [], [], True)
+    return rule
+
+def _extract_circuit(graph, matches):
+    graph.auto_detect_io()
+    simplify.full_reduce(graph)
+    return extract_circuit(graph).to_graph()
+
+simplifications: dict = {
+    'bialg_simp': {
+        "text": "bialgebra",
+        "tooltip": "bialg_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.bialg_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'spider_simp': {
+        "text": "spider fusion",
+        "tooltip": "spider_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.spider_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'id_simp': {
+        "text": "id",
+        "tooltip": "id_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.id_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'phase_free_simp': {
+        "text": "phase free",
+        "tooltip": "phase_free_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.phase_free_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'pivot_simp': {
+        "text": "pivot",
+        "tooltip": "pivot_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.pivot_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'pivot_gadget_simp': {
+        "text": "pivot gadget",
+        "tooltip": "pivot_gadget_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.pivot_gadget_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'pivot_boundary_simp': {
+        "text": "pivot boundary",
+        "tooltip": "pivot_boundary_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.pivot_boundary_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'gadget_simp': {
+        "text": "gadget",
+        "tooltip": "gadget_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.gadget_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'lcomp_simp': {
+        "text": "local complementation",
+        "tooltip": "lcomp_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.lcomp_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'clifford_simp': {
+        "text": "clifford simplification",
+        "tooltip": "clifford_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.clifford_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'tcount': {
+        "text": "tcount",
+        "tooltip": "tcount",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.tcount),
+        "type": MATCHES_VERTICES,
+        },
+    'to_gh': {
+        "text": "to green-hadamard form",
+        "tooltip": "to_gh",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.to_gh),
+        "type": MATCHES_VERTICES,
+        },
+    'to_rg': {
+        "text": "to red-green form",
+        "tooltip": "to_rg",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.to_rg),
+        "type": MATCHES_VERTICES,
+        },
+    'full_reduce': {
+        "text": "full reduce",
+        "tooltip": "full_reduce",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.full_reduce),
+        "type": MATCHES_VERTICES,
+        },
+    'teleport_reduce': {
+        "text": "teleport reduce",
+        "tooltip": "teleport_reduce",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.teleport_reduce),
+        "type": MATCHES_VERTICES,
+        },
+    'reduce_scalar': {
+        "text": "reduce scalar",
+        "tooltip": "reduce_scalar",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.reduce_scalar),
+        "type": MATCHES_VERTICES,
+        },
+    'supplementarity_simp': {
+        "text": "supplementarity",
+        "tooltip": "supplementarity_simp",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.supplementarity_simp),
+        "type": MATCHES_VERTICES,
+        },
+    'to_clifford_normal_form_graph': {
+        "text": "to clifford normal form",
+        "tooltip": "to_clifford_normal_form_graph",
+        "matcher": always_true,
+        "rule": apply_simplification(simplify.to_clifford_normal_form_graph),
+        "type": MATCHES_VERTICES,
+        },
+    'extract_circuit': {
+        "text": "circuit extraction",
+        "tooltip": "extract_circuit",
+        "matcher": always_true,
+        "rule": _extract_circuit,
+        "type": MATCHES_VERTICES,
+        "returns_new_graph": True,
+        },
+}
 
 
 spider_fuse = ProofAction.from_dict(operations['spider'])
@@ -216,4 +377,6 @@ fuse_hbox = ProofAction.from_dict(operations['fuse_hbox'])
 mult_hbox = ProofAction.from_dict(operations['mult_hbox'])
 rules_zh = ProofActionGroup("ZH rules", hbox_to_edge, fuse_hbox, mult_hbox).copy()
 
-action_groups = [rules_basic, rules_graph_theoretic, rules_zxw, rules_zh]
+simplification_actions = ProofActionGroup("Simplification routines", *[ProofAction.from_dict(s) for s in simplifications.values()]).copy()
+
+action_groups = [rules_basic, rules_graph_theoretic, rules_zxw, rules_zh, simplification_actions]

@@ -21,13 +21,13 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data
+from .common import VT, GraphT, ToolType, get_data, colors
 from .dialogs import show_error_msg
 from .eitem import HAD_EDGE_BLUE
 from .graphscene import EditGraphScene
 from .parse_poly import parse
 from .poly import Poly, new_var
-from .vitem import BLACK, H_YELLOW, ZX_GREEN, ZX_RED
+from .vitem import BLACK
 
 
 class ShapeType(Enum):
@@ -43,12 +43,12 @@ class DrawPanelNodeType(TypedDict):
 
 
 VERTICES: dict[VertexType.Type, DrawPanelNodeType] = {
-    VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, ZX_GREEN)},
-    VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, ZX_RED)},
-    VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, H_YELLOW)},
-    VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, ZX_GREEN)},
-    VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, BLACK)},
-    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, BLACK)},
+    VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, colors.z_spider)},
+    VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, colors.x_spider)},
+    VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, colors.hadamard)},
+    VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, colors.z_spider)},
+    VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, colors.w_output)},
+    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, colors.w_input)},
 }
 
 EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
@@ -59,7 +59,7 @@ EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
 
 class EditorBasePanel(BasePanel):
     """Base class implementing the shared functionality of graph edit
-    and rule edit panels of ZX live."""
+    and rule edit panels of ZXLive."""
 
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)

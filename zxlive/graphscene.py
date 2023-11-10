@@ -1,4 +1,4 @@
-#     zxlive - An interactive tool for the ZX calculus
+#     zxlive - An interactive tool for the ZX-calculus
 #     Copyright (C) 2023 - Aleks Kissinger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

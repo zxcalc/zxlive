@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zxlive"
 version = "0.1"
-description = "An interactive tool for the ZX calculus"
+description = "An interactive tool for the ZX-calculus"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
@@ -30,11 +30,11 @@ classifiers = [
 dependencies = [
     "PySide6",
     "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
-    "sympy>=1.12",
     "networkx",
     "numpy",
     "shapely",
-    "lark>=1.1.5"
+    "lark>=1.1.5",
+    "pyperclip>=1.8.1"
 ]
 
 [project.optional-dependencies]

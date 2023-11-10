@@ -2,9 +2,9 @@ name: lint
 
 on:
   push:
-    branches:
-      - 'main'
-  pull_request:
+    branches: [ master ]
+  pull_request: 
+    branches: [ master ]
 
 env:
   SRC_DIR: zxlive

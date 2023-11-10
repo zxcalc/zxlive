@@ -20,18 +20,18 @@ from . import animations as anims
 from . import proof_actions
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
-from .common import (CUSTOM_RULES_PATH, ET, SCALE, VT, GraphT, get_data,
-                     pos_from_view, pos_to_view)
+from .common import (get_custom_rules_path, ET, SCALE, VT, GraphT, get_data,
+                     pos_from_view, pos_to_view, colors)
 from .custom_rule import CustomRule
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
-from .vitem import ZX_GREEN, DragState, VItem
+from .vitem import DragState, VItem
 
 
 class ProofPanel(BasePanel):
-    """Panel for the proof mode of ZX live."""
+    """Panel for the proof mode of ZXLive."""
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -45,7 +45,7 @@ class ProofPanel(BasePanel):
         self.graph_view = GraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
-        
+
         self.actions_bar = QTabWidget(self)
         self.layout().insertWidget(1, self.actions_bar)
         self.init_action_groups()
@@ -104,7 +104,7 @@ class ProofPanel(BasePanel):
     def init_action_groups(self) -> None:
         self.action_groups = [group.copy() for group in proof_actions.action_groups]
         custom_rules = []
-        for root, dirs, files in os.walk(CUSTOM_RULES_PATH):
+        for root, dirs, files in os.walk(get_custom_rules_path()):
             for file in files:
                 if file.endswith(".zxr"):
                     zxr_file = os.path.join(root, file)
@@ -368,7 +368,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw circle
         painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
-        painter.setBrush(QColor(ZX_GREEN))
+        painter.setBrush(colors.z_spider)
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
         painter.drawEllipse(
             QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),

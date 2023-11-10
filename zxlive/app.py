@@ -1,4 +1,4 @@
-#     zxlive - An interactive tool for the ZX calculus
+#     zxlive - An interactive tool for the ZX-calculus
 #     Copyright (C) 2023 - Aleks Kissinger
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,7 +26,7 @@ sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
 
 
 class ZXLive(QApplication):
-    """The main ZX Live application
+    """The main ZXLive application
 
     ...
     """
@@ -36,15 +36,15 @@ class ZXLive(QApplication):
 
     def __init__(self) -> None:
         super().__init__(sys.argv)
-        self.setApplicationName('ZX Live')
-        self.setDesktopFileName('ZX Live')
+        self.setApplicationName('ZXLive')
+        self.setDesktopFileName('ZXLive')
         self.setApplicationVersion('0.1')  # TODO: read this from pyproject.toml if possible
         self.main_window = MainWindow()
 
         self.lastWindowClosed.connect(self.quit)
 
         parser = QCommandLineParser()
-        parser.setApplicationDescription("ZX Live - An interactive tool for the ZX calculus")
+        parser.setApplicationDescription("ZXLive - An interactive tool for the ZX-calculus")
         parser.addHelpOption()
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
@@ -70,6 +70,6 @@ def get_embedded_app() -> ZXLive:
 
 
 def main() -> None:
-    """Main entry point for ZX Live as a standalone app."""
+    """Main entry point for ZXLive as a standalone app."""
     zxl = ZXLive()
     zxl.exec_()
