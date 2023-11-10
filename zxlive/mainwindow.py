@@ -41,6 +41,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       import_diagram_dialog, import_diagram_from_file, show_error_msg)
 from zxlive.settings_dialog import open_settings_dialog
 
+from .editor_base_panel import EditorBasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
@@ -130,7 +131,7 @@ class MainWindow(QMainWindow):
         self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
         self.deselect_all_action = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
             "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
-        self.preferences_action = self._new_action("&Preferences...", open_settings_dialog, None, "Open the preferences dialog")
+        self.preferences_action = self._new_action("&Preferences...", lambda: open_settings_dialog(self), None, "Open the preferences dialog")
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(self.undo_action)
@@ -257,6 +258,8 @@ class MainWindow(QMainWindow):
             self.proof_as_rewrite_action.setEnabled(False)
         self._undo_changed()
         self._redo_changed()
+        if self.active_panel:
+            self.active_panel.update_colors()
 
     def _undo_changed(self) -> None:
         if self.active_panel:
@@ -515,3 +518,7 @@ class MainWindow(QMainWindow):
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
         export_rule_dialog(rule, self)
+
+    def update_colors(self) -> None:
+        if self.active_panel is not None:
+            self.active_panel.update_colors()

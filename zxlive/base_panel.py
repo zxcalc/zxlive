@@ -98,3 +98,6 @@ class BasePanel(QWidget):
         copied_graph = self.graph.subgraph_from_vertices(selection)
         assert isinstance(copied_graph, GraphT)
         return copied_graph
+
+    def update_colors(self) -> None:
+        self.graph_scene.update_colors()

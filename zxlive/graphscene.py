@@ -166,6 +166,12 @@ class GraphScene(QGraphicsScene):
 
         self.select_vertices(selected_vertices)
 
+    def update_colors(self) -> None:
+        for v in self.vertex_map.values():
+            v.refresh()
+        for e in self.edge_map.values():
+            e.refresh()
+
     def add_items(self) -> None:
         """Add QGraphicsItem's for all vertices and edges in the graph"""
         self.vertex_map = {}
