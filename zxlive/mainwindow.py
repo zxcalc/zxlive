@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         self.select_all_action = self._new_action("Select &All", self.select_all, QKeySequence.StandardKey.SelectAll, "Select all")
         self.deselect_all_action = self._new_action("&Deselect All", self.deselect_all, QKeySequence.StandardKey.Deselect,
             "Deselect all", alt_shortcut = QKeySequence("Ctrl+D"))
-        self.preferences_action = self._new_action("&Preferences...", open_settings_dialog, None, "Open the preferences dialog")
+        self.preferences_action = self._new_action("&Preferences...", lambda: open_settings_dialog(self), None, "Open the preferences dialog")
 
         edit_menu = menu.addMenu("&Edit")
         edit_menu.addAction(self.undo_action)

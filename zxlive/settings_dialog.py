@@ -69,7 +69,7 @@ color_schemes = {
 }
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: MainWindow) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.settings = QSettings("zxlive", "zxlive")
@@ -237,6 +237,6 @@ class SettingsDialog(QDialog):
 
 
 
-def open_settings_dialog() -> None:
-    dialog = SettingsDialog()
+def open_settings_dialog(parent: MainWindow) -> None:
+    dialog = SettingsDialog(parent)
     dialog.exec()
