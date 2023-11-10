@@ -42,19 +42,21 @@ class DrawPanelNodeType(TypedDict):
     icon: tuple[ShapeType, str]
 
 
-VERTICES: dict[VertexType.Type, DrawPanelNodeType] = {
-    VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, colors.z_spider)},
-    VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, colors.x_spider)},
-    VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, colors.hadamard)},
-    VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, colors.z_spider)},
-    VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, colors.w_output)},
-    VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, colors.w_input)},
-}
+def vertices_data() -> dict[VertexType.Type, DrawPanelNodeType]:
+    return {
+        VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, colors.z_spider)},
+        VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, colors.x_spider)},
+        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, colors.hadamard)},
+        VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, colors.z_spider)},
+        VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, colors.w_output)},
+        VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, colors.w_input)},
+    }
 
-EDGES: dict[EdgeType.Type, DrawPanelNodeType] = {
-    EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
-    EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
-}
+def edges_data() -> dict[EdgeType.Type, DrawPanelNodeType]:
+    return {
+        EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
+        EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
+    }
 
 
 class EditorBasePanel(BasePanel):
@@ -63,6 +65,7 @@ class EditorBasePanel(BasePanel):
 
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
+    sidebar: QSplitter
 
     _curr_ety: EdgeType.Type
     _curr_vty: VertexType.Type
@@ -76,17 +79,16 @@ class EditorBasePanel(BasePanel):
         yield toolbar_select_node_edge(self)
         yield ToolbarSection(*self.actions())
 
-    def create_side_bar(self) -> QSplitter:
-        sidebar = QSplitter(self)
-        sidebar.setOrientation(Qt.Orientation.Vertical)
-        vertex_list = create_list_widget(self, VERTICES, self._vty_clicked)
-        edge_list = create_list_widget(self, EDGES, self._ety_clicked)
+    def create_side_bar(self) -> None:
+        self.sidebar = QSplitter(self)
+        self.sidebar.setOrientation(Qt.Orientation.Vertical)
+        self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked)
+        self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked)
         self._populate_variables()
         self.variable_viewer = VariableViewer(self.variable_types)
-        sidebar.addWidget(vertex_list)
-        sidebar.addWidget(edge_list)
-        sidebar.addWidget(self.variable_viewer)
-        return sidebar
+        self.sidebar.addWidget(self.vertex_list)
+        self.sidebar.addWidget(self.edge_list)
+        self.sidebar.addWidget(self.variable_viewer)
 
     def _populate_variables(self) -> None:
         self.variable_types = {}
@@ -309,9 +311,10 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
     edge.clicked.connect(lambda: parent._tool_clicked(ToolType.EDGE))
     return ToolbarSection(select, vertex, edge, exclusive=True)
 
+
 def create_list_widget(parent: EditorBasePanel,
-                        data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
-                        onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
+                       data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
+                       onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
     list_widget = QListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
     list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -320,14 +323,23 @@ def create_list_widget(parent: EditorBasePanel,
     list_widget.setGridSize(QSize(60, 64))
     list_widget.setWordWrap(True)
     list_widget.setIconSize(QSize(24, 24))
+    populate_list_widget(list_widget, data, onclick)
+    list_widget.setCurrentItem(list_widget.item(0))
+    return list_widget
+
+
+def populate_list_widget(list_widget: QListWidget,
+                         data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
+                         onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) \
+        -> None:
+    list_widget.clear()
     for typ, value in data.items():
         icon = create_icon(*value["icon"])
         item = QListWidgetItem(icon, value["text"])
         item.setData(Qt.ItemDataRole.UserRole, typ)
         list_widget.addItem(item)
     list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
-    list_widget.setCurrentItem(list_widget.item(0))
-    return list_widget
+
 
 def create_icon(shape: ShapeType, color: str) -> QIcon:
     icon = QIcon()

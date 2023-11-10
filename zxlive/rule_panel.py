@@ -55,7 +55,7 @@ class RulePanel(EditorBasePanel):
         self.graph_scene_right.vertex_added.connect(self.add_vert)
         self.graph_scene_right.edge_added.connect(self.add_edge)
 
-        self.sidebar = self.create_side_bar()
+        self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
