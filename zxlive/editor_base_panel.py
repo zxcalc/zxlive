@@ -95,6 +95,7 @@ class EditorBasePanel(BasePanel):
         populate_list_widget(self.edge_list, edges_data(), self._ety_clicked)
 
     def update_colors(self) -> None:
+        super().update_colors()
         self.update_side_bar()
 
     def update_variable_viewer(self) -> None:

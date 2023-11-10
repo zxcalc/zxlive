@@ -100,4 +100,4 @@ class BasePanel(QWidget):
         return copied_graph
 
     def update_colors(self) -> None:
-        pass
+        self.graph_scene.update_colors()
