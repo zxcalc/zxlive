@@ -45,7 +45,7 @@ class ProofPanel(BasePanel):
         self.graph_view = GraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
-        
+
         self.actions_bar = QTabWidget(self)
         self.layout().insertWidget(1, self.actions_bar)
         self.init_action_groups()

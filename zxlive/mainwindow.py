@@ -171,14 +171,6 @@ class MainWindow(QMainWindow):
 
         self._reset_menus(False)
 
-        simplify_actions = []
-        for simp in simplifications.values():
-            simplify_actions.append(self._new_action(simp["text"], self.apply_pyzx_reduction(simp), None, simp["tool_tip"]))
-        self.simplify_menu = menu.addMenu("&Simplify")
-        for action in simplify_actions:
-            self.simplify_menu.addAction(action)
-        self.simplify_menu.menuAction().setVisible(False)
-
         graph = construct_circuit()
         self.new_graph(graph)
 
@@ -260,11 +252,9 @@ class MainWindow(QMainWindow):
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
-            self.simplify_menu.menuAction().setVisible(True)
             self.proof_as_rewrite_action.setEnabled(True)
         else:
             self.proof_as_rewrite_action.setEnabled(False)
-            self.simplify_menu.menuAction().setVisible(False)
         self._undo_changed()
         self._redo_changed()
 
@@ -525,56 +515,3 @@ class MainWindow(QMainWindow):
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
         export_rule_dialog(rule, self)
-
-    def apply_pyzx_reduction(self, reduction: SimpEntry) -> Callable[[],None]:
-        def reduce() -> None:
-            assert self.active_panel is not None and isinstance(self.active_panel, ProofPanel)
-            old_graph = self.active_panel.graph
-            new_graph = copy.deepcopy(old_graph)
-            try:
-                if reduction["in_place"]:
-                    reduction["function"](new_graph)
-                else:
-                    _new_graph = reduction["function"](new_graph)
-                    assert isinstance(_new_graph, GraphT)
-                    new_graph = _new_graph
-                cmd = AddRewriteStep(self.active_panel.graph_view, new_graph, self.active_panel.step_view, reduction["text"])
-                self.active_panel.undo_stack.push(cmd)
-            except Exception as e:
-                show_error_msg("Error", str(e))
-        return reduce
-
-
-class SimpEntry(TypedDict):
-    text: str
-    tool_tip: str
-    function: Callable[[BaseGraph], int] | Callable[[BaseGraph], None] | Callable[[BaseGraph], BaseGraph]
-    in_place: bool
-
-
-def _extract_circuit(graph: BaseGraph) -> BaseGraph:
-    graph.auto_detect_io()
-    simplify.full_reduce(graph)
-    return extract_circuit(graph).to_graph()
-
-simplifications: dict[str, SimpEntry] = {
-    'bialg_simp': {"text": "bialg_simp", "tool_tip":"bialg_simp", "function": simplify.bialg_simp, "in_place": True},
-    'spider_simp': {"text": "spider_simp", "tool_tip":"spider_simp", "function": simplify.spider_simp, "in_place": True},
-    'id_simp': {"text": "id_simp", "tool_tip":"id_simp", "function": simplify.id_simp, "in_place": True},
-    'phase_free_simp': {"text": "phase_free_simp", "tool_tip":"phase_free_simp", "function": simplify.phase_free_simp, "in_place": True},
-    'pivot_simp': {"text": "pivot_simp", "tool_tip":"pivot_simp", "function": simplify.pivot_simp, "in_place": True},
-    'pivot_gadget_simp': {"text": "pivot_gadget_simp", "tool_tip":"pivot_gadget_simp", "function": simplify.pivot_gadget_simp, "in_place": True},
-    'pivot_boundary_simp': {"text": "pivot_boundary_simp", "tool_tip":"pivot_boundary_simp", "function": simplify.pivot_boundary_simp, "in_place": True},
-    'gadget_simp': {"text": "gadget_simp", "tool_tip":"gadget_simp", "function": simplify.gadget_simp, "in_place": True},
-    'lcomp_simp': {"text": "lcomp_simp", "tool_tip":"lcomp_simp", "function": simplify.lcomp_simp, "in_place": True},
-    'clifford_simp': {"text": "clifford_simp", "tool_tip":"clifford_simp", "function": simplify.clifford_simp, "in_place": True},
-    'tcount': {"text": "tcount", "tool_tip":"tcount", "function": simplify.tcount, "in_place": True},
-    'to_gh': {"text": "to_gh", "tool_tip":"to_gh", "function": simplify.to_gh, "in_place": True},
-    'to_rg': {"text": "to_rg", "tool_tip":"to_rg", "function": simplify.to_rg, "in_place": True},
-    'full_reduce': {"text": "full_reduce", "tool_tip":"full_reduce", "function": simplify.full_reduce, "in_place": True},
-    'teleport_reduce': {"text": "teleport_reduce", "tool_tip":"teleport_reduce", "function": simplify.teleport_reduce, "in_place": True},
-    'reduce_scalar': {"text": "reduce_scalar", "tool_tip":"reduce_scalar", "function": simplify.reduce_scalar, "in_place": True},
-    'supplementarity_simp': {"text": "supplementarity_simp", "tool_tip":"supplementarity_simp", "function": simplify.supplementarity_simp, "in_place": True},
-    'to_clifford_normal_form_graph': {"text": "to_clifford_normal_form_graph", "tool_tip":"to_clifford_normal_form_graph", "function": simplify.to_clifford_normal_form_graph, "in_place": True},
-    'extract_circuit': {"text": "extract_circuit", "tool_tip":"extract_circuit", "function": _extract_circuit, "in_place": False},
-}
