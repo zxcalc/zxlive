@@ -107,7 +107,7 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(self.refresh_rules)
 
     def init_action_groups(self) -> None:
-        # self.action_groups = [group.copy() for group in proof_actions.action_groups]
+        self.action_groups = [group.copy() for group in proof_actions.action_groups]
         custom_rules = []
         for root, dirs, files in os.walk(get_custom_rules_path()):
             for file in files:
