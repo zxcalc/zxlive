@@ -33,8 +33,11 @@ class CustomRule:
     def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
-        matching = list(graph_matcher.match())[0]
+            node_match=categorical_node_match('type', 1))
+        matchings = graph_matcher.match()
+        matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
+        matching = matchings[0]
+        symbolic_params_map = match_symbolic_parameters(matching, self.lhs_graph_nx, subgraph_nx)
 
         vertices_to_remove = []
         for v in matching:
@@ -55,10 +58,15 @@ class CustomRule:
         vertex_map = boundary_vertex_map
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY:
+                phase = self.rhs_graph_nx.nodes()[v]['phase']
+                if isinstance(phase, Poly):
+                    phase = phase.substitute(symbolic_params_map)
+                    if phase.free_vars() == set():
+                        phase = phase.terms[0][0]
                 vertex_map[v] = graph.add_vertex(ty = self.rhs_graph_nx.nodes()[v]['type'],
                                                  row = vertex_positions[v][0],
                                                  qubit = vertex_positions[v][1],
-                                                 phase = self.rhs_graph_nx.nodes()[v]['phase'],)
+                                                 phase = phase,)
 
         # create etab to add edges
         etab = {}
