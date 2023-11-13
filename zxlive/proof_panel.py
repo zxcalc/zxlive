@@ -102,8 +102,13 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
 
+        self.refresh_rules = QToolButton(self)
+        self.refresh_rules.setText("Refresh rules")
+        self.refresh_rules.clicked.connect(self._refresh_rules)
+
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
+        yield ToolbarSection(self.refresh_rules)
 
     def init_action_groups(self) -> None:
         self.action_groups = [group.copy() for group in proof_actions.action_groups]
@@ -361,6 +366,28 @@ class ProofPanel(BasePanel):
             return
         cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
         self.undo_stack.push(cmd)
+
+    def _refresh_rules(self):
+        self.actions_bar.removeTab(self.actions_bar.count() - 1)
+        custom_rules = []
+        for root, dirs, files in os.walk(get_custom_rules_path()):
+            for file in files:
+                if file.endswith(".zxr"):
+                    zxr_file = os.path.join(root, file)
+                    with open(zxr_file, "r") as f:
+                        rule = CustomRule.from_json(f.read()).to_proof_action()
+                        custom_rules.append(rule)
+        group = proof_actions.ProofActionGroup("Custom rules", *custom_rules).copy()
+        hlayout = QHBoxLayout()
+        group.init_buttons(self)
+        for action in group.actions:
+            assert action.button is not None
+            hlayout.addWidget(action.button)
+        hlayout.addStretch()
+        widget = QWidget()
+        widget.setLayout(hlayout)
+        widget.action_group = group
+        self.actions_bar.addTab(widget, group.name)
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
