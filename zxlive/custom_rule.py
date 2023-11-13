@@ -11,6 +11,8 @@ from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
+from pyzx.symbolic import Poly
+
 from .common import ET, VT, GraphT
 
 if TYPE_CHECKING:
@@ -75,8 +77,10 @@ class CustomRule:
         vertices = [v for v in graph.vertices() if in_selection(v)]
         subgraph_nx, _ = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
-        if graph_matcher.is_isomorphic():
+            node_match=categorical_node_match('type', 1))
+        matchings = list(graph_matcher.match())
+        matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
+        if len(matchings) > 0:
             return vertices
         return []
 
@@ -100,6 +104,32 @@ class CustomRule:
     def to_proof_action(self) -> "ProofAction":
         from .proof_actions import MATCHES_VERTICES, ProofAction
         return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
+
+
+def match_symbolic_parameters(match, left, right):
+    params = {}
+    left_phase = left.nodes.data('phase', default=0)
+    right_phase = right.nodes.data('phase', default=0)
+    for v in left.nodes():
+        if isinstance(left_phase[v], Poly):
+            if str(left_phase[v]) in params:
+                if params[str(left_phase)] != right_phase[match[v]]:
+                    raise ValueError("Symbolic parameters do not match")
+            else:
+                params[str(left_phase[v])] = right_phase[match[v]]
+        elif left_phase[v] != right_phase[match[v]]:
+            raise ValueError("Parameters do not match")
+    return params
+
+def filter_matchings_if_symbolic_compatible(matchings, left, right):
+    new_matchings = []
+    for matching in matchings:
+        try:
+            match_symbolic_parameters(matching, left, right)
+            new_matchings.append(matching)
+        except ValueError:
+            pass
+    return new_matchings
 
 
 def to_networkx(graph: GraphT) -> nx.Graph:
