@@ -6,8 +6,9 @@ from typing import Iterator
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
-from pyzx import EdgeType, VertexType, Circuit
+from pyzx import EdgeType, VertexType
 from pyzx.circuit.qasmparser import QASMParser
+from pyzx.symbolic import Poly
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
@@ -16,7 +17,6 @@ from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
-from .poly import Poly
 
 
 class GraphEditPanel(EditorBasePanel):
