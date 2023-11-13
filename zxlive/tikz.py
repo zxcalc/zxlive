@@ -1,13 +1,7 @@
-from typing import Union
-
 from PySide6.QtCore import QSettings
-from pyzx.graph.graph_s import GraphS
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
 from zxlive.proof import ProofModel
-
-
-
 
 
 def proof_to_tikz(proof: ProofModel) -> str:

@@ -390,7 +390,6 @@ class MainWindow(QMainWindow):
         if path is None:
             show_error_msg("Export failed", "Invalid path")
             return False
-        print(path)
         with open(path, "w") as f:
             f.write(proof_to_tikz(self.active_panel.proof_model))
 
