@@ -11,6 +11,8 @@ def proof_to_tikz(proof: ProofModel) -> str:
     max_width = settings.value("tikz/layout/max-width")
     draw_scalar = False
 
+    assert isinstance(vspace, float) and isinstance(hspace, float) and isinstance(max_width, float)
+
     xoffset = -max_width
     yoffset = -10
     idoffset = 0

@@ -392,6 +392,7 @@ class MainWindow(QMainWindow):
             return False
         with open(path, "w") as f:
             f.write(proof_to_tikz(self.active_panel.proof_model))
+        return True
 
     def cut_graph(self) -> None:
         assert self.active_panel is not None
