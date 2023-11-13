@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QSpacerItem, QSplitter, QToolButton, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
+from pyzx.symbolic import Poly
 
 
 from .base_panel import BasePanel, ToolbarSection
@@ -26,7 +27,6 @@ from .dialogs import show_error_msg
 from .eitem import HAD_EDGE_BLUE
 from .graphscene import EditGraphScene
 from .parse_poly import parse
-from .poly import Poly, new_var
 from .vitem import BLACK
 
 

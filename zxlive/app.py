@@ -19,10 +19,10 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QCommandLineParser
 from PySide6.QtGui import QIcon
 import sys
+sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
+
 from .mainwindow import MainWindow
 from .common import get_data
-
-#sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
 
 # The following hack is needed on windows in order to show the icon in the taskbar
 # See https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
