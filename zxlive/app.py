@@ -30,7 +30,7 @@ import os
 if os.name == 'nt':
     import ctypes
     myappid = 'quantomatic.zxlive.zxlive.1.0.0' # arbitrary string
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
 
 
 class ZXLive(QApplication):

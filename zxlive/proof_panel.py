@@ -51,7 +51,7 @@ class ProofPanel(BasePanel):
         self.graph_view.set_graph(graph)
 
         self.actions_bar = QTabWidget(self)
-        self.layout().insertWidget(1, self.actions_bar)
+        self.layout().insertWidget(1, self.actions_bar)  # type: ignore
         self.init_action_groups()
         self.actions_bar.currentChanged.connect(self.update_on_selection)
 
@@ -131,7 +131,7 @@ class ProofPanel(BasePanel):
 
             widget = QWidget()
             widget.setLayout(hlayout)
-            widget.action_group = group
+            setattr(widget, "action_group", group)
             self.actions_bar.addTab(widget, group.name)
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
@@ -148,7 +148,8 @@ class ProofPanel(BasePanel):
     def update_on_selection(self) -> None:
         selection, edges = self.parse_selection()
         g = self.graph_scene.g
-        self.actions_bar.currentWidget().action_group.update_active(g, selection, edges)
+        action_group = getattr(self.actions_bar.currentWidget(), "action_group")
+        action_group.update_active(g, selection, edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNodeInStep(self.graph_view, vs, self.step_view)
@@ -244,7 +245,7 @@ class ProofPanel(BasePanel):
             if not ok:
                 return False
             try:
-                def new_var(_):
+                def new_var(_: str) -> Poly:
                     raise ValueError()
                 phase = string_to_complex(text) if phase_is_complex else string_to_fraction(text, new_var)
             except ValueError:
@@ -367,7 +368,7 @@ class ProofPanel(BasePanel):
         cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
         self.undo_stack.push(cmd)
 
-    def _refresh_rules(self):
+    def _refresh_rules(self) -> None:
         self.actions_bar.removeTab(self.actions_bar.count() - 1)
         custom_rules = []
         for root, dirs, files in os.walk(get_custom_rules_path()):
@@ -386,7 +387,7 @@ class ProofPanel(BasePanel):
         hlayout.addStretch()
         widget = QWidget()
         widget.setLayout(hlayout)
-        widget.action_group = group
+        setattr(widget, "action_group", group)
         self.actions_bar.addTab(widget, group.name)
 
 
@@ -406,6 +407,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
+        assert hasattr(option, "state") and hasattr(option, "rect") and hasattr(option, "font")
 
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)

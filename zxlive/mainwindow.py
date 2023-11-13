@@ -214,7 +214,7 @@ class MainWindow(QMainWindow):
                 if not action.shortcuts():
                     action.setShortcut(alt_shortcut)
                 elif alt_shortcut not in action.shortcuts():
-                    action.setShortcuts([shortcut, alt_shortcut])
+                    action.setShortcuts([shortcut, alt_shortcut])  # type: ignore
         return action
 
     @property
@@ -501,7 +501,7 @@ class MainWindow(QMainWindow):
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
                 entry = QTableWidgetItem(format_str(matrix[i, j]))
-                entry.setFlags(entry.flags() & ~Qt.ItemIsEditable)
+                entry.setFlags(entry.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 table.setItem(i, j, entry)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()

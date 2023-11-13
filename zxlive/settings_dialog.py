@@ -69,9 +69,9 @@ color_schemes = {
 }
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent: MainWindow) -> None:
-        super().__init__(parent)
-        self.parent = parent
+    def __init__(self, main_window: MainWindow) -> None:
+        super().__init__(main_window)
+        self.main_window = main_window
         self.setWindowTitle("Settings")
         self.settings = QSettings("zxlive", "zxlive")
         self.value_dict: Dict[str,QWidget] = {}
@@ -173,6 +173,7 @@ class SettingsDialog(QDialog):
 
     def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data:Any=None) -> None:
         val = self.settings.value(name)
+        widget: QWidget
         if val is None: val = defaults[name]
         if ty == 'str':
             widget = QLineEdit()
@@ -180,12 +181,10 @@ class SettingsDialog(QDialog):
             widget.setText(val)
         elif ty == 'int':
             widget = QSpinBox()
-            val = int(val)
-            widget.setValue(val)
+            widget.setValue(int(val))  # type: ignore
         elif ty == 'float':
             widget = QDoubleSpinBox()
-            val = float(val)
-            widget.setValue(val)
+            widget.setValue(float(val))  # type: ignore
         elif ty == 'folder':
             widget = QWidget()
             hlayout = QHBoxLayout()
@@ -194,10 +193,10 @@ class SettingsDialog(QDialog):
             val = str(val)
             widget_line.setText(val)
             def browse() -> None:
-                directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.ShowDirsOnly)
+                directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.Option.ShowDirsOnly)
                 if directory:
                     widget_line.setText(directory)
-                    widget.text_value = directory
+                    setattr(widget, "text_value", directory)
             hlayout.addWidget(widget_line)
             button = QPushButton("Browse")
             button.clicked.connect(browse)
@@ -206,9 +205,9 @@ class SettingsDialog(QDialog):
             widget = QComboBox()
             val = str(val)
             assert isinstance(data, dict)
-            widget.addItems(data.values())
+            widget.addItems(list(data.values()))
             widget.setCurrentText(data[val])
-            widget.data = data
+            setattr(widget, "data", data)
 
 
         form.addRow(label, widget)
@@ -231,8 +230,10 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, widget.text_value)
         set_pyzx_tikz_settings()
         if self.settings.value("color-scheme") != self.prev_color_scheme:
-            colors.set_color_scheme(self.settings.value("color-scheme"))
-            self.parent.update_colors()
+            theme = self.settings.value("color-scheme")
+            assert isinstance(theme, str)
+            colors.set_color_scheme(theme)
+            self.main_window.update_colors()
         self.accept()
 
     def cancel(self) -> None:

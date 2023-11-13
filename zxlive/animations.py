@@ -183,7 +183,8 @@ def fuse(dragged: VItem, target: VItem, meet_halfway: bool = False) -> QAbstract
     if not meet_halfway:
         group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     else:
-        halfway_pos = (dragged.pos() + target.pos()) / 2
+        sum_pos = dragged.pos() + target.pos()
+        halfway_pos = QPointF(sum_pos.x() / 2, sum_pos.y() / 2)
         group.addAnimation(move(dragged, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
         group.addAnimation(move(target, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))

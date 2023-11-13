@@ -39,7 +39,7 @@ class ShapeType(Enum):
 
 class DrawPanelNodeType(TypedDict):
     text: str
-    icon: tuple[ShapeType, str]
+    icon: tuple[ShapeType, QColor]
 
 
 def vertices_data() -> dict[VertexType.Type, DrawPanelNodeType]:
@@ -54,8 +54,8 @@ def vertices_data() -> dict[VertexType.Type, DrawPanelNodeType]:
 
 def edges_data() -> dict[EdgeType.Type, DrawPanelNodeType]:
     return {
-        EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
-        EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
+        EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, QColor(BLACK))},
+        EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, QColor(HAD_EDGE_BLUE))},
     }
 
 
@@ -211,7 +211,7 @@ class VariableViewer(QScrollArea):
         self._variable_types = variable_types
 
         self._widget = QWidget()
-        lpal = QApplication.palette("QListWidget")
+        lpal = QApplication.palette("QListWidget")  # type: ignore
         palette = QPalette()
         palette.setBrush(QPalette.ColorRole.Window, lpal.base())
         self._widget.setAutoFillBackground(True)
@@ -354,14 +354,14 @@ def populate_list_widget(list_widget: QListWidget,
     list_widget.setCurrentRow(row)
 
 
-def create_icon(shape: ShapeType, color: str) -> QIcon:
+def create_icon(shape: ShapeType, color: QColor) -> QIcon:
     icon = QIcon()
     pixmap = QPixmap(64, 64)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setPen(QPen(QColor(BLACK), 6))
-    painter.setBrush(QColor(color))
+    painter.setBrush(color)
     if shape == ShapeType.CIRCLE:
         painter.drawEllipse(4, 4, 56, 56)
     elif shape == ShapeType.SQUARE:

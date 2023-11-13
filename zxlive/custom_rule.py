@@ -93,8 +93,8 @@ class CustomRule:
         d = json.loads(json_str)
         lhs_graph = GraphT.from_json(d['lhs_graph'])
         rhs_graph = GraphT.from_json(d['rhs_graph'])
-        assert (isinstance(lhs_graph, GraphT) and
-                isinstance(rhs_graph, GraphT))
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))  # type: ignore
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_proof_action(self) -> "ProofAction":
