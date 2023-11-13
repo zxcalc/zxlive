@@ -121,7 +121,7 @@ def match_symbolic_parameters(match, left, right):
     for v in left.nodes():
         if isinstance(left_phase[v], Poly):
             if str(left_phase[v]) in params:
-                if params[str(left_phase)] != right_phase[match[v]]:
+                if params[str(left_phase[v])] != right_phase[match[v]]:
                     raise ValueError("Symbolic parameters do not match")
             else:
                 params[str(left_phase[v])] = right_phase[match[v]]
