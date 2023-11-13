@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import os
+from fractions import Fraction
 from typing import Iterator, Union, cast
 
 import pyzx
@@ -12,7 +13,7 @@ from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
 from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QWidget,
-                               QVBoxLayout, QTabWidget)
+                               QVBoxLayout, QTabWidget, QInputDialog)
 from pyzx import VertexType, basicrules
 from pyzx.utils import get_z_box_label, set_z_box_label
 
@@ -23,11 +24,14 @@ from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .common import (get_custom_rules_path, ET, SCALE, VT, GraphT, get_data,
                      pos_from_view, pos_to_view, colors)
 from .custom_rule import CustomRule
+from .dialogs import show_error_msg
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
 from .vitem import DragState, VItem
+from .editor_base_panel import string_to_complex, string_to_fraction
+from .poly import Poly
 
 
 class ProofPanel(BasePanel):
@@ -219,10 +223,34 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX):
             return False
 
-        if basicrules.check_remove_id(self.graph, vertex):
+        if not trace.shift and basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
             return True
-
+        
+        if trace.shift:
+            phase_is_complex = (self.graph.type(vertex) == VertexType.Z_BOX)
+            if phase_is_complex:
+                prompt = "Enter desired phase value (complex value):"
+                error_msg = "Please enter a valid input (e.g., -1+2j)."
+            else:
+                prompt = "Enter desired phase value (in units of pi):"
+                error_msg = "Please enter a valid input (e.g., 1/2, 2, 0.25, 2a+b)."
+            text, ok = QInputDialog().getText(self, "Choose Phase of one Spider", prompt)
+            if not ok:
+                return False
+            try:
+                def new_var(_):
+                    raise ValueError()
+                phase = string_to_complex(text) if phase_is_complex else string_to_fraction(text, new_var)
+            except ValueError:
+                show_error_msg("Invalid Input", error_msg)
+                return False
+        else:
+            if self.graph.type(vertex) == VertexType.Z_BOX:
+                phase = get_z_box_label(self.graph, vertex)
+            else:
+                phase = self.graph.phase(vertex)
+        
         start = trace.hit[item][0]
         end = trace.hit[item][-1]
         if start.y() > end.y():
@@ -240,7 +268,7 @@ class ProofPanel(BasePanel):
             else:
                 right.append(neighbor)
         mouse_dir = ((start + end) * (1/2)) - pos
-        self._unfuse(vertex, left, mouse_dir)
+        self._unfuse(vertex, left, mouse_dir, phase)
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -250,7 +278,7 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Poly | complex | Fraction) -> None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
@@ -302,11 +330,18 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert))
         if phase_left:
             if self.graph.type(v) == VertexType.Z_BOX:
-                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v))
-                set_z_box_label(new_g, v, 1)
+                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v) / phase)
+                set_z_box_label(new_g, v, phase)
             else:
-                new_g.set_phase(left_vert, new_g.phase(v))
-                new_g.set_phase(v, 0)
+                new_g.set_phase(left_vert, new_g.phase(v) - phase)
+                new_g.set_phase(v, phase)
+        else:
+            if self.graph.type(v) == VertexType.Z_BOX:
+                set_z_box_label(new_g, left_vert, phase)
+                set_z_box_label(new_g, v, get_z_box_label(new_g, v) / phase)
+            else:
+                new_g.set_phase(left_vert, phase)
+                new_g.set_phase(v, new_g.phase(v) - phase)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
