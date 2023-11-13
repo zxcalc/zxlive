@@ -154,13 +154,14 @@ def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
             from .dialogs import show_error_msg
             show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
         return False
-    left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
-    if not np.allclose(left_matrix, right_matrix):
-        if show_error:
-            from .dialogs import show_error_msg
-            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
-            else:
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
-        return False
+    if not rule.lhs_graph.variable_types and not rule.rhs_graph.variable_types:
+        left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
+        if not np.allclose(left_matrix, right_matrix):
+            if show_error:
+                from .dialogs import show_error_msg
+                if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
+                    show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
+                else:
+                    show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
+            return False
     return True
