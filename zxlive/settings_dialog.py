@@ -59,6 +59,20 @@ defaults: Dict[str,Any] = {
     "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
     "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
+
+    "tikz/layout/hspace": 2,
+    "tikz/layout/vspace": 2,
+    "tikz/layout/max-width": 10,
+
+    "tikz/names/fuse spiders": "f",
+    "tikz/names/bialgebra": "b",
+    "tikz/names/change color to Z": "cc",
+    "tikz/names/change color to X": "cc",
+    "tikz/names/remove identity": "id",
+    "tikz/names/Add Z identity": "id",
+    "tikz/names/copy 0/pi spider": "cp",
+    "tikz/names/push Pauli": "pi",
+    "tikz/names/decompose hadamard": "eu",
 }
 
 color_schemes = {
@@ -67,6 +81,14 @@ color_schemes = {
     'white-grey': "Dodo book White & Grey",
     'gidney': "Gidney's Black & White",
 }
+
+
+# Initialise settings
+settings = QSettings("zxlive", "zxlive")
+for key, value in defaults.items():
+    if not settings.contains(key):
+        settings.setValue(key, value)
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent: MainWindow) -> None:
@@ -155,6 +177,51 @@ class SettingsDialog(QDialog):
         self.add_setting(form_import, "tikz/w-output-import", "W output", 'str')
         self.add_setting(form_import, "tikz/z-box-import", "Z box", 'str')
         self.add_setting(form_import, "tikz/edge-W-import", "W io edge", 'str')
+
+        ##### Tikz Layout settings #####
+        panel_tikz_layout = QWidget()
+        vlayout = QVBoxLayout()
+        panel_tikz_layout.setLayout(vlayout)
+        tab_widget.addTab(panel_tikz_layout, "Tikz layout")
+
+        vlayout.addWidget(QLabel("Tikz layout settings"))
+
+        form_layout = QFormLayout()
+        w = QWidget()
+        w.setLayout(form_layout)
+        vlayout.addWidget(w)
+        vlayout.addStretch()
+
+        self.add_setting(form_layout, "tikz/layout/hspace", "Horizontal spacing", "float")
+        self.add_setting(form_layout, "tikz/layout/vspace", "Vertical spacing", "float")
+        self.add_setting(form_layout, "tikz/layout/max-width", "Maximum width", 'float')
+
+
+        ##### Tikz rule name settings #####
+        panel_tikz_names = QWidget()
+        vlayout = QVBoxLayout()
+        panel_tikz_names.setLayout(vlayout)
+        tab_widget.addTab(panel_tikz_names, "Tikz rule names")
+
+        vlayout.addWidget(QLabel("Tikz rule name settings"))
+        vlayout.addWidget(QLabel("Mapping of pyzx rule names to tikz display strings"))
+
+        form_names = QFormLayout()
+        w = QWidget()
+        w.setLayout(form_names)
+        vlayout.addWidget(w)
+        vlayout.addStretch()
+
+        self.add_setting(form_names, "tikz/names/fuse spiders", "fuse spiders", "str")
+        self.add_setting(form_names, "tikz/names/bialgebra", "bialgebra", "str")
+        self.add_setting(form_names, "tikz/names/change color to Z", "change color to Z", "str")
+        self.add_setting(form_names, "tikz/names/change color to X", "change color to X", "str")
+        self.add_setting(form_names, "tikz/names/remove identity", "remove identity", "str")
+        self.add_setting(form_names, "tikz/names/Add Z identity", "add Z identity", "str")
+        self.add_setting(form_names, "tikz/names/copy 0/pi spider", "copy 0/pi spider", "str")
+        self.add_setting(form_names, "tikz/names/push Pauli", "push Pauli", "str")
+        self.add_setting(form_names, "tikz/names/decompose hadamard", "decompose hadamard", "str")
+
 
 
         ##### Okay/Cancel Buttons #####

@@ -36,15 +36,17 @@ from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite,
-                      export_diagram_dialog, export_proof_dialog,
-                      export_rule_dialog, get_lemma_name_and_description,
-                      import_diagram_dialog, import_diagram_from_file, show_error_msg)
+                      save_diagram_dialog, safe_proof_dialog,
+                      safe_rule_dialog, get_lemma_name_and_description,
+                      import_diagram_dialog, import_diagram_from_file, show_error_msg,
+                      export_proof_dialog)
 from zxlive.settings_dialog import open_settings_dialog
 
 from .editor_base_panel import EditorBasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
+from .tikz import proof_to_tikz
 
 
 class MainWindow(QMainWindow):
@@ -103,6 +105,8 @@ class MainWindow(QMainWindow):
             "Save the diagram by overwriting the previous loaded file.")
         self.save_as = self._new_action("Save &as...", self.handle_save_as_action, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
+        self.export_tikz_proof = self._new_action("Export to tikz", self.handle_export_tikz_proof_action, None,
+            "Exports the proof to tikz")
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
@@ -111,6 +115,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.close_action)
         file_menu.addAction(self.save_file)
         file_menu.addAction(self.save_as)
+        file_menu.addAction(self.export_tikz_proof)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
@@ -363,12 +368,12 @@ class MainWindow(QMainWindow):
     def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
-            out = export_proof_dialog(self.active_panel.proof_model, self)
+            out = safe_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
             check_rule(self.active_panel.get_rule(), show_error=True)
-            out = export_rule_dialog(self.active_panel.get_rule(), self)
+            out = safe_rule_dialog(self.active_panel.get_rule(), self)
         else:
-            out = export_diagram_dialog(self.active_panel.graph_scene.g, self)
+            out = save_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
         file_path, file_type = out
         self.active_panel.file_path = file_path
@@ -379,6 +384,15 @@ class MainWindow(QMainWindow):
         self.tab_widget.setTabText(i,name)
         return True
 
+    def handle_export_tikz_proof_action(self) -> bool:
+        assert isinstance(self.active_panel, ProofPanel)
+        path = export_proof_dialog(self)
+        if path is None:
+            show_error_msg("Export failed", "Invalid path")
+            return False
+        print(path)
+        with open(path, "w") as f:
+            f.write(proof_to_tikz(self.active_panel.proof_model))
 
     def cut_graph(self) -> None:
         assert self.active_panel is not None
@@ -518,7 +532,7 @@ class MainWindow(QMainWindow):
         lhs_graph = self.active_panel.proof_model.graphs[0]
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        export_rule_dialog(rule, self)
+        safe_rule_dialog(rule, self)
 
     def update_colors(self) -> None:
         if self.active_panel is not None:
