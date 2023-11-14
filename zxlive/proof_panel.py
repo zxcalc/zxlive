@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import os
+from fractions import Fraction
 from typing import Iterator, Union, cast
 
 import pyzx
@@ -12,9 +13,9 @@ from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
 from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton, QWidget,
-                               QVBoxLayout, QTabWidget)
+                               QVBoxLayout, QTabWidget, QInputDialog)
 from pyzx import VertexType, basicrules
-from pyzx.utils import get_z_box_label, set_z_box_label
+from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType
 
 from . import animations as anims
 from . import proof_actions
@@ -23,11 +24,14 @@ from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
 from .common import (get_custom_rules_path, ET, SCALE, VT, GraphT, get_data,
                      pos_from_view, pos_to_view, colors)
 from .custom_rule import CustomRule
+from .dialogs import show_error_msg
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
-from .vitem import DragState, VItem
+from .vitem import DragState, VItem, get_w_partner_vitem, W_INPUT_OFFSET, SCALE
+from .editor_base_panel import string_to_complex, string_to_fraction
+from .poly import Poly
 
 
 class ProofPanel(BasePanel):
@@ -47,7 +51,7 @@ class ProofPanel(BasePanel):
         self.graph_view.set_graph(graph)
 
         self.actions_bar = QTabWidget(self)
-        self.layout().insertWidget(1, self.actions_bar)
+        self.layout().insertWidget(1, self.actions_bar)  # type: ignore
         self.init_action_groups()
         self.actions_bar.currentChanged.connect(self.update_on_selection)
 
@@ -98,8 +102,13 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
 
+        self.refresh_rules = QToolButton(self)
+        self.refresh_rules.setText("Refresh rules")
+        self.refresh_rules.clicked.connect(self._refresh_rules)
+
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
+        yield ToolbarSection(self.refresh_rules)
 
     def init_action_groups(self) -> None:
         self.action_groups = [group.copy() for group in proof_actions.action_groups]
@@ -122,7 +131,7 @@ class ProofPanel(BasePanel):
 
             widget = QWidget()
             widget.setLayout(hlayout)
-            widget.action_group = group
+            setattr(widget, "action_group", group)
             self.actions_bar.addTab(widget, group.name)
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
@@ -139,7 +148,8 @@ class ProofPanel(BasePanel):
     def update_on_selection(self) -> None:
         selection, edges = self.parse_selection()
         g = self.graph_scene.g
-        self.actions_bar.currentWidget().action_group.update_active(g, selection, edges)
+        action_group = getattr(self.actions_bar.currentWidget(), "action_group")
+        action_group.update_active(g, selection, edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNodeInStep(self.graph_view, vs, self.step_view)
@@ -216,13 +226,37 @@ class ProofPanel(BasePanel):
             return False
         item = filtered[0]
         vertex = item.v
-        if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX):
+        if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX, VertexType.W_OUTPUT):
             return False
 
-        if basicrules.check_remove_id(self.graph, vertex):
+        if not trace.shift and basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
             return True
-
+        
+        if trace.shift and self.graph.type(vertex) != VertexType.W_OUTPUT:
+            phase_is_complex = (self.graph.type(vertex) == VertexType.Z_BOX)
+            if phase_is_complex:
+                prompt = "Enter desired phase value (complex value):"
+                error_msg = "Please enter a valid input (e.g., -1+2j)."
+            else:
+                prompt = "Enter desired phase value (in units of pi):"
+                error_msg = "Please enter a valid input (e.g., 1/2, 2, 0.25, 2a+b)."
+            text, ok = QInputDialog().getText(self, "Choose Phase of one Spider", prompt)
+            if not ok:
+                return False
+            try:
+                def new_var(_: str) -> Poly:
+                    raise ValueError()
+                phase = string_to_complex(text) if phase_is_complex else string_to_fraction(text, new_var)
+            except ValueError:
+                show_error_msg("Invalid Input", error_msg)
+                return False
+        elif self.graph.type(vertex) != VertexType.W_OUTPUT:
+            if self.graph.type(vertex) == VertexType.Z_BOX:
+                phase = get_z_box_label(self.graph, vertex)
+            else:
+                phase = self.graph.phase(vertex)
+        
         start = trace.hit[item][0]
         end = trace.hit[item][-1]
         if start.y() > end.y():
@@ -240,7 +274,11 @@ class ProofPanel(BasePanel):
             else:
                 right.append(neighbor)
         mouse_dir = ((start + end) * (1/2)) - pos
-        self._unfuse(vertex, left, mouse_dir)
+        
+        if self.graph.type(vertex) == VertexType.W_OUTPUT:
+            self._unfuse_w(vertex, left, mouse_dir)
+        else:
+            self._unfuse(vertex, left, mouse_dir, phase)
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -250,7 +288,45 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
+    def _unfuse_w(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
+        new_g = copy.deepcopy(self.graph)
+
+        vi = get_w_partner(self.graph, v)
+        par_dir = QVector2D(
+            self.graph.row(v) - self.graph.row(vi), 
+            self.graph.qubit(v) - self.graph.qubit(vi)
+        ).normalized()
+
+        perp_dir = QVector2D(mouse_dir - QPointF(self.graph.row(v)/SCALE, self.graph.qubit(v)/SCALE)).normalized()
+        perp_dir -= QVector2D.dotProduct(perp_dir, par_dir) * par_dir
+        perp_dir.normalize()
+
+        out_offset_x = par_dir.x() * 0.5 + perp_dir.x() * 0.5
+        out_offset_y = par_dir.y() * 0.5 + perp_dir.y() * 0.5
+
+        in_offset_x = out_offset_x - par_dir.x()*W_INPUT_OFFSET
+        in_offset_y = out_offset_y - par_dir.y()*W_INPUT_OFFSET
+
+        left_vert = new_g.add_vertex(VertexType.W_OUTPUT,
+                                     qubit=self.graph.qubit(v) + out_offset_y,
+                                     row=self.graph.row(v) + out_offset_x)
+        left_vert_i = new_g.add_vertex(VertexType.W_INPUT,
+                                     qubit=self.graph.qubit(v) + in_offset_y,
+                                     row=self.graph.row(v) + in_offset_x)
+        new_g.add_edge((left_vert_i, left_vert), EdgeType.W_IO)
+        new_g.add_edge((v, left_vert_i))
+        new_g.set_row(v, self.graph.row(v))
+        new_g.set_qubit(v, self.graph.qubit(v))
+        for neighbor in left_neighbours:
+            new_g.add_edge((neighbor, left_vert),
+                           self.graph.edge_type((v, neighbor)))
+            new_g.remove_edge((v, neighbor))
+
+        anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
+        self.undo_stack.push(cmd, anim_after=anim)
+
+    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Poly | complex | Fraction) -> None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
@@ -302,11 +378,18 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert))
         if phase_left:
             if self.graph.type(v) == VertexType.Z_BOX:
-                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v))
-                set_z_box_label(new_g, v, 1)
+                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v) / phase)
+                set_z_box_label(new_g, v, phase)
             else:
-                new_g.set_phase(left_vert, new_g.phase(v))
-                new_g.set_phase(v, 0)
+                new_g.set_phase(left_vert, new_g.phase(v) - phase)
+                new_g.set_phase(v, phase)
+        else:
+            if self.graph.type(v) == VertexType.Z_BOX:
+                set_z_box_label(new_g, left_vert, phase)
+                set_z_box_label(new_g, v, get_z_box_label(new_g, v) / phase)
+            else:
+                new_g.set_phase(left_vert, phase)
+                new_g.set_phase(v, new_g.phase(v) - phase)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
@@ -327,6 +410,28 @@ class ProofPanel(BasePanel):
         cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
         self.undo_stack.push(cmd)
 
+    def _refresh_rules(self) -> None:
+        self.actions_bar.removeTab(self.actions_bar.count() - 1)
+        custom_rules = []
+        for root, dirs, files in os.walk(get_custom_rules_path()):
+            for file in files:
+                if file.endswith(".zxr"):
+                    zxr_file = os.path.join(root, file)
+                    with open(zxr_file, "r") as f:
+                        rule = CustomRule.from_json(f.read()).to_proof_action()
+                        custom_rules.append(rule)
+        group = proof_actions.ProofActionGroup("Custom rules", *custom_rules).copy()
+        hlayout = QHBoxLayout()
+        group.init_buttons(self)
+        for action in group.actions:
+            assert action.button is not None
+            hlayout.addWidget(action.button)
+        hlayout.addStretch()
+        widget = QWidget()
+        widget.setLayout(hlayout)
+        setattr(widget, "action_group", group)
+        self.actions_bar.addTab(widget, group.name)
+
 
 class ProofStepItemDelegate(QStyledItemDelegate):
     """This class controls the painting of items in the proof steps list view.
@@ -344,6 +449,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
+        assert hasattr(option, "state") and hasattr(option, "rect") and hasattr(option, "font")
 
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)

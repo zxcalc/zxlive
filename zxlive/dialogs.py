@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget)
+                               QPushButton, QTextEdit, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
 
 from .common import GraphT
@@ -102,6 +102,11 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
     return import_diagram_from_file(file_path, selected_filter)
 
 
+def create_circuit_dialog(parent: QWidget) -> Optional[str]:
+    s, success = QInputDialog.getMultiLineText(parent, "Circuit input", "Write a circuit in QASM format", "qreg qs[3];\n")
+    return s if success else None
+
+
 def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter) -> \
         Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
     """Imports a diagram from a given file path.
@@ -191,7 +196,7 @@ def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[tuple[str
 
     return file_path, selected_format
 
-def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
+def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat if f != FileFormat.ZXProof]))
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
@@ -215,7 +220,7 @@ def export_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str,
 
     return file_path, selected_format
 
-def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
+def safe_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
@@ -225,7 +230,7 @@ def export_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tu
         return None
     return file_path, selected_format
 
-def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
+def safe_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXRule.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
@@ -234,6 +239,12 @@ def export_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str,
     if not write_to_file(file_path, data):
         return None
     return file_path, selected_format
+
+def export_proof_dialog(parent: QWidget) -> Optional[str]:
+    file_path_and_format = get_file_path_and_format(parent, FileFormat.TikZ.filter)
+    if file_path_and_format is None or not file_path_and_format[0]:
+        return None
+    return file_path_and_format[0]
 
 def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], Optional[str]]:
     dialog = QDialog()
@@ -283,7 +294,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
             return
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
         check_rule(rule, show_error=True)
-        if export_rule_dialog(rule, parent):
+        if safe_rule_dialog(rule, parent):
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)

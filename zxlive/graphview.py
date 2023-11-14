@@ -43,12 +43,14 @@ class GraphTool:
 class WandTrace:
     start: QPointF
     end: QPointF
+    shift: bool
     hit: dict[VItem | EItem, list[QPointF]]
 
-    def __init__(self, start: QPointF) -> None:
+    def __init__(self, start: QPointF, shift: bool = False) -> None:
         self.start = start
         self.hit = {}
         self.end = start
+        self.shift = shift
 
 
 WAND_COLOR = "#500050"
@@ -116,7 +118,8 @@ class GraphView(QGraphicsView):
                 self.rubberband.show()
             elif self.tool == GraphTool.MagicWand:
                 pos = self.mapToScene(e.pos())
-                self.wand_trace = WandTrace(pos)
+                shift = e.modifiers() & Qt.KeyboardModifier.ShiftModifier
+                self.wand_trace = WandTrace(pos, bool(shift))
                 self.wand_path = QGraphicsPathItem()
                 self.graph_scene.addItem(self.wand_path)
                 pen = QPen(QColor(WAND_COLOR), WAND_WIDTH)
@@ -137,6 +140,8 @@ class GraphView(QGraphicsView):
                 self.rubberband.setGeometry(QRect(self._rubberband_start, e.pos()).normalized())
         elif self.tool == GraphTool.MagicWand:
             if self.wand_trace is not None:
+                if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+                    self.wand_trace.shift = False
                 assert self.wand_path is not None
                 pos = self.mapToScene(e.pos())
                 prev = self.wand_trace.end
@@ -178,6 +183,8 @@ class GraphView(QGraphicsView):
                         it.setSelected(not (len(items) == 1 or e.modifiers() & Qt.KeyboardModifier.ShiftModifier) or not it.isSelected())
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
+                    if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+                        self.wand_trace.shift = False
                     assert self.wand_path is not None
                     if self.sparkle_mode:
                         self.sparkles.stop()
@@ -295,6 +302,7 @@ SPARKLE_STEPS = 40
 
 
 class Sparkles(QObject):
+
     def __init__(self, graph_scene: GraphScene) -> None:
         super().__init__()
         self.graph_scene = graph_scene
@@ -307,7 +315,7 @@ class Sparkles(QObject):
             vx = speed * math.cos(angle) / SPARKLE_STEPS
             vy = speed * math.sin(angle) / SPARKLE_STEPS
             self.sparkle_deltas.append((vx, vy))
-        self.timer_id = None
+        self.timer_id: Optional[int] = None
 
     def emit_sparkles(self, pos: QPointF, mult: int) -> None:
         if not self.timer_id:
@@ -328,6 +336,7 @@ class Sparkles(QObject):
             sparkle.timer_step()
 
     def stop(self) -> None:
+        assert self.timer_id is not None
         self.killTimer(self.timer_id)
         self.timer_id = None
         for sparkle in reversed(self.sparkles):

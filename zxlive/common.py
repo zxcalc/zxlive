@@ -158,7 +158,7 @@ set_pyzx_tikz_settings()  # Call it once on startup
 
 
 def to_tikz(g: GraphT) -> str:
-    return pyzx.tikz.to_tikz(g)
+    return pyzx.tikz.to_tikz(g)  # type: ignore
 
 def from_tikz(s: str) -> GraphT:
     try:

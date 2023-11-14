@@ -17,12 +17,21 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QCommandLineParser
+from PySide6.QtGui import QIcon
 import sys
 from .mainwindow import MainWindow
-from .common import GraphT
+from .common import get_data, GraphT
 from typing import Optional
 
-sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
+#sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
+
+# The following hack is needed on windows in order to show the icon in the taskbar
+# See https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
+import os
+if os.name == 'nt':
+    import ctypes
+    myappid = 'quantomatic.zxlive.zxlive.1.0.0' # arbitrary string
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
 
 
 class ZXLive(QApplication):
@@ -39,6 +48,8 @@ class ZXLive(QApplication):
         self.setDesktopFileName('ZXLive')
         self.setApplicationVersion('0.1')  # TODO: read this from pyproject.toml if possible
         self.main_window = MainWindow()
+        self.main_window.setWindowIcon(QIcon(get_data('icons/logo.png')))
+        self.setWindowIcon(self.main_window.windowIcon())
 
         self.lastWindowClosed.connect(self.quit)
 

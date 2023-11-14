@@ -59,6 +59,20 @@ defaults: Dict[str,Any] = {
     "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
     "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
+
+    "tikz/layout/hspace": 2.0,
+    "tikz/layout/vspace": 2.0,
+    "tikz/layout/max-width": 10.0,
+
+    "tikz/names/fuse spiders": "f",
+    "tikz/names/bialgebra": "b",
+    "tikz/names/change color to Z": "cc",
+    "tikz/names/change color to X": "cc",
+    "tikz/names/remove identity": "id",
+    "tikz/names/Add Z identity": "id",
+    "tikz/names/copy 0/pi spider": "cp",
+    "tikz/names/push Pauli": "pi",
+    "tikz/names/decompose hadamard": "eu",
 }
 
 color_schemes = {
@@ -68,10 +82,18 @@ color_schemes = {
     'gidney': "Gidney's Black & White",
 }
 
+
+# Initialise settings
+settings = QSettings("zxlive", "zxlive")
+for key, value in defaults.items():
+    if not settings.contains(key):
+        settings.setValue(key, value)
+
+
 class SettingsDialog(QDialog):
-    def __init__(self, parent: MainWindow) -> None:
-        super().__init__(parent)
-        self.parent = parent
+    def __init__(self, main_window: MainWindow) -> None:
+        super().__init__(main_window)
+        self.main_window = main_window
         self.setWindowTitle("Settings")
         self.settings = QSettings("zxlive", "zxlive")
         self.value_dict: Dict[str,QWidget] = {}
@@ -156,6 +178,51 @@ class SettingsDialog(QDialog):
         self.add_setting(form_import, "tikz/z-box-import", "Z box", 'str')
         self.add_setting(form_import, "tikz/edge-W-import", "W io edge", 'str')
 
+        ##### Tikz Layout settings #####
+        panel_tikz_layout = QWidget()
+        vlayout = QVBoxLayout()
+        panel_tikz_layout.setLayout(vlayout)
+        tab_widget.addTab(panel_tikz_layout, "Tikz layout")
+
+        vlayout.addWidget(QLabel("Tikz layout settings"))
+
+        form_layout = QFormLayout()
+        w = QWidget()
+        w.setLayout(form_layout)
+        vlayout.addWidget(w)
+        vlayout.addStretch()
+
+        self.add_setting(form_layout, "tikz/layout/hspace", "Horizontal spacing", "float")
+        self.add_setting(form_layout, "tikz/layout/vspace", "Vertical spacing", "float")
+        self.add_setting(form_layout, "tikz/layout/max-width", "Maximum width", 'float')
+
+
+        ##### Tikz rule name settings #####
+        panel_tikz_names = QWidget()
+        vlayout = QVBoxLayout()
+        panel_tikz_names.setLayout(vlayout)
+        tab_widget.addTab(panel_tikz_names, "Tikz rule names")
+
+        vlayout.addWidget(QLabel("Tikz rule name settings"))
+        vlayout.addWidget(QLabel("Mapping of pyzx rule names to tikz display strings"))
+
+        form_names = QFormLayout()
+        w = QWidget()
+        w.setLayout(form_names)
+        vlayout.addWidget(w)
+        vlayout.addStretch()
+
+        self.add_setting(form_names, "tikz/names/fuse spiders", "fuse spiders", "str")
+        self.add_setting(form_names, "tikz/names/bialgebra", "bialgebra", "str")
+        self.add_setting(form_names, "tikz/names/change color to Z", "change color to Z", "str")
+        self.add_setting(form_names, "tikz/names/change color to X", "change color to X", "str")
+        self.add_setting(form_names, "tikz/names/remove identity", "remove identity", "str")
+        self.add_setting(form_names, "tikz/names/Add Z identity", "add Z identity", "str")
+        self.add_setting(form_names, "tikz/names/copy 0/pi spider", "copy 0/pi spider", "str")
+        self.add_setting(form_names, "tikz/names/push Pauli", "push Pauli", "str")
+        self.add_setting(form_names, "tikz/names/decompose hadamard", "decompose hadamard", "str")
+
+
 
         ##### Okay/Cancel Buttons #####
         w= QWidget()
@@ -173,6 +240,7 @@ class SettingsDialog(QDialog):
 
     def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data:Any=None) -> None:
         val = self.settings.value(name)
+        widget: QWidget
         if val is None: val = defaults[name]
         if ty == 'str':
             widget = QLineEdit()
@@ -180,12 +248,10 @@ class SettingsDialog(QDialog):
             widget.setText(val)
         elif ty == 'int':
             widget = QSpinBox()
-            val = int(val)
-            widget.setValue(val)
+            widget.setValue(int(val))  # type: ignore
         elif ty == 'float':
             widget = QDoubleSpinBox()
-            val = float(val)
-            widget.setValue(val)
+            widget.setValue(float(val))  # type: ignore
         elif ty == 'folder':
             widget = QWidget()
             hlayout = QHBoxLayout()
@@ -194,10 +260,10 @@ class SettingsDialog(QDialog):
             val = str(val)
             widget_line.setText(val)
             def browse() -> None:
-                directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.ShowDirsOnly)
+                directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.Option.ShowDirsOnly)
                 if directory:
                     widget_line.setText(directory)
-                    widget.text_value = directory
+                    setattr(widget, "text_value", directory)
             hlayout.addWidget(widget_line)
             button = QPushButton("Browse")
             button.clicked.connect(browse)
@@ -206,9 +272,9 @@ class SettingsDialog(QDialog):
             widget = QComboBox()
             val = str(val)
             assert isinstance(data, dict)
-            widget.addItems(data.values())
+            widget.addItems(list(data.values()))
             widget.setCurrentText(data[val])
-            widget.data = data
+            setattr(widget, "data", data)
 
 
         form.addRow(label, widget)
@@ -231,8 +297,10 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, widget.text_value)
         set_pyzx_tikz_settings()
         if self.settings.value("color-scheme") != self.prev_color_scheme:
-            colors.set_color_scheme(self.settings.value("color-scheme"))
-            self.parent.update_colors()
+            theme = self.settings.value("color-scheme")
+            assert isinstance(theme, str)
+            colors.set_color_scheme(theme)
+            self.main_window.update_colors()
         self.accept()
 
     def cancel(self) -> None:

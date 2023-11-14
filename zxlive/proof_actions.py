@@ -208,7 +208,7 @@ def apply_simplification(simplification: Callable[[GraphT], GraphT]) -> Callable
         return ({}, [], [], True)
     return rule
 
-def _extract_circuit(graph, matches):
+def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
     graph.auto_detect_io()
     simplify.full_reduce(graph)
     return extract_circuit(graph).to_graph()

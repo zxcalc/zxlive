@@ -24,7 +24,7 @@ poly_grammar = Lark("""
     parser='lalr',
     maybe_placeholders=True)
 
-class PolyTransformer(Transformer):
+class PolyTransformer(Transformer[Poly]):
     def __init__(self, new_var: Callable[[str], Poly]):
         super().__init__()
 

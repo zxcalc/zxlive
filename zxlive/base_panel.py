@@ -100,7 +100,8 @@ class BasePanel(QWidget):
     def copy_selection(self) -> GraphT:
         selection = list(self.graph_scene.selected_vertices)
         copied_graph = self.graph.subgraph_from_vertices(selection)
-        assert isinstance(copied_graph, GraphT)
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert isinstance(copied_graph, GraphT)  # type: ignore
         return copied_graph
 
     def update_colors(self) -> None:
