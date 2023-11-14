@@ -114,17 +114,26 @@ class CustomRule:
         return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
 
 
+def get_var(v):
+    if not isinstance(v, Poly):
+        raise ValueError("Not a symbolic parameter")
+    if len(v.terms) != 1:
+        raise ValueError("Only single-term symbolic parameters are supported")
+    if len(v.terms[0][1].vars) != 1:
+        raise ValueError("Only single-variable symbolic parameters are supported")
+    return v.terms[0][1].vars[0][0]
+
 def match_symbolic_parameters(match, left, right):
     params = {}
     left_phase = left.nodes.data('phase', default=0)
     right_phase = right.nodes.data('phase', default=0)
     for v in left.nodes():
         if isinstance(left_phase[v], Poly):
-            if str(left_phase[v]) in params:
-                if params[str(left_phase[v])] != right_phase[match[v]]:
+            if get_var(left_phase[v]) in params:
+                if params[get_var(left_phase[v])] != right_phase[match[v]]:
                     raise ValueError("Symbolic parameters do not match")
             else:
-                params[str(left_phase[v])] = right_phase[match[v]]
+                params[get_var(left_phase[v])] = right_phase[match[v]]
         elif left_phase[v] != right_phase[match[v]]:
             raise ValueError("Parameters do not match")
     return params
