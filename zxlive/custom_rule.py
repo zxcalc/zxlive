@@ -132,6 +132,8 @@ def match_symbolic_parameters(match, left, right):
 def filter_matchings_if_symbolic_compatible(matchings, left, right):
     new_matchings = []
     for matching in matchings:
+        if len(matching) != len(left):
+            continue
         try:
             match_symbolic_parameters(matching, left, right)
             new_matchings.append(matching)
