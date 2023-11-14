@@ -60,9 +60,9 @@ defaults: Dict[str,Any] = {
     "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
 
-    "tikz/layout/hspace": 2,
-    "tikz/layout/vspace": 2,
-    "tikz/layout/max-width": 10,
+    "tikz/layout/hspace": 2.0,
+    "tikz/layout/vspace": 2.0,
+    "tikz/layout/max-width": 10.0,
 
     "tikz/names/fuse spiders": "f",
     "tikz/names/bialgebra": "b",
