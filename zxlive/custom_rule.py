@@ -213,4 +213,17 @@ def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
                 else:
                     show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
             return False
+    else:
+        if not (rule.rhs_graph.variable_types.items() <= rule.lhs_graph.variable_types.items()):
+            if show_error:
+                from .dialogs import show_error_msg
+                show_error_msg("Warning!", "The right-hand side has more free variables than the left-hand side.")
+            return False
+        for vertex in rule.lhs_graph.vertices():
+            if isinstance(rule.lhs_graph.phase(vertex), Poly):
+                if len(rule.lhs_graph.phase(vertex).free_vars()) > 1:
+                    if show_error:
+                        from .dialogs import show_error_msg
+                        show_error_msg("Warning!", "Only one symbolic parameter per vertex is supported on the left-hand side.")
+                    return False
     return True
