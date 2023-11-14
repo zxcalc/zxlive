@@ -1,4 +1,4 @@
-
+import copy
 import json
 from typing import TYPE_CHECKING, Callable
 
@@ -29,6 +29,30 @@ class CustomRule:
         self.last_rewrite_center = None
 
     def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
+        graph_nx = to_networkx(graph)
+        subgraph_nx_without_boundaries = nx.Graph(graph_nx.subgraph(vertices))
+        lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
+        lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
+        graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
+            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
+        matching = list(graph_matcher.match())[0]
+
+        g = graph#copy.deepcopy(graph)
+        subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
+        for v in matching:
+            if len([n for n in self.lhs_graph_nx.neighbors(v) if self.lhs_graph_nx.nodes()[n]['type'] == VertexType.BOUNDARY]) == 1:
+                if len([b for b in subgraph_nx.neighbors(matching[v]) if subgraph_nx.nodes()[b]['type'] == VertexType.BOUNDARY]) > 1:
+                    # now we unfuse
+                    vtype = self.lhs_graph_nx.nodes()[v]['type']
+                    if vtype == VertexType.Z or vtype == VertexType.X:
+                        new_v = g.add_vertex(vtype, qubit=g.qubit(matching[v]), row=g.row(matching[v]))
+                        neighbors = list(g.neighbors(matching[v]))
+                        g.add_edge(g.edge(new_v, matching[v]))
+                        for b in neighbors:
+                            if b not in subgraph_nx.nodes:
+                                g.remove_edge(g.edge(matching[v], b))
+                                g.add_edge(g.edge(new_v, b))
+
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
@@ -71,10 +95,22 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
-    def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
+    def matcher_with_boundaries(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
         subgraph_nx, _ = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
+            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
+        if graph_matcher.is_isomorphic():
+            return vertices
+        return []
+
+    def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
+        vertices = [v for v in graph.vertices() if in_selection(v)]
+        graph_nx = to_networkx(graph)
+        subgraph_nx = nx.Graph(graph_nx.subgraph(vertices))
+        lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
+        lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
+        graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
         if graph_matcher.is_isomorphic():
             return vertices
