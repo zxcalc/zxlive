@@ -6,11 +6,13 @@ from typing import Iterator
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
-from pyzx import EdgeType, VertexType
+from pyzx import EdgeType, VertexType, Circuit
+from pyzx.circuit.qasmparser import QASMParser
 
 from .base_panel import ToolbarSection
+from .commands import UpdateGraph
 from .common import GraphT
-from .dialogs import show_error_msg
+from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
@@ -48,10 +50,16 @@ class GraphEditPanel(EditorBasePanel):
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
+        self.input_circuit = QToolButton(self)
+        self.input_circuit.setText("Input Circuit")
+        self.input_circuit.clicked.connect(self._input_circuit)
+        yield ToolbarSection(self.input_circuit)
+
         self.start_derivation = QToolButton(self)
         self.start_derivation.setText("Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
+
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():
@@ -63,3 +71,22 @@ class GraphEditPanel(EditorBasePanel):
             if isinstance(phase, Poly):
                 phase.freeze()
         self.start_derivation_signal.emit(new_g)
+
+    def _input_circuit(self) -> None:
+        qasm = create_circuit_dialog(self)
+        if qasm is not None:
+            new_g = copy.deepcopy(self.graph_scene.g)
+            try:
+                circ = QASMParser().parse(qasm, strict=False).to_graph()
+            except TypeError as err:
+                show_error_msg("Invalid circuit", str(err))
+                return
+            except Exception:
+                show_error_msg("Invalid circuit", "Couldn't parse QASM code")
+                return
+
+            new_verts, new_edges = new_g.merge(circ)
+            cmd = UpdateGraph(self.graph_view, new_g)
+            self.undo_stack.push(cmd)
+            self.graph_scene.select_vertices(new_verts)
+

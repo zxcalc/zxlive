@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget)
+                               QPushButton, QTextEdit, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
 
 from .common import GraphT
@@ -100,6 +100,11 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
         return None
 
     return import_diagram_from_file(file_path, selected_filter)
+
+
+def create_circuit_dialog(parent: QWidget) -> Optional[str]:
+    s, success = QInputDialog.getMultiLineText(parent, "Circuit input", "Write a circuit in QASM format", "qreg qs[3];\n")
+    return s if success else None
 
 
 def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter) -> \
