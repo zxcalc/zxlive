@@ -1,30 +1,26 @@
 from __future__ import annotations
 
 import copy
-import os
-from fractions import Fraction
 from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
-                           QPainter, QPen, QVector2D)
-from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
+                           QPainter, QPen, QVector2D, QFontInfo)
+from PySide6.QtWidgets import (QAbstractItemView, QListView,
                                QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QToolButton, QWidget,
-                               QVBoxLayout, QTabWidget, QInputDialog)
+                               QStyleOptionViewItem, QToolButton,
+                               QInputDialog, QTreeView)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType, FractionLike
 
 from . import animations as anims
-from . import proof_actions
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
-from .common import (get_custom_rules_path, ET, SCALE, VT, GraphT, get_data,
+from .common import (ET, VT, GraphT, get_data,
                      pos_from_view, pos_to_view, colors)
-from .custom_rule import CustomRule
 from .dialogs import show_error_msg
 from .eitem import EItem
 from .graphscene import GraphScene
@@ -32,6 +28,8 @@ from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
 from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
 from .editor_base_panel import string_to_complex
+from .rewrite_data import action_groups, refresh_custom_rules
+from .rewrite_action import RewriteActionTreeModel
 
 
 class ProofPanel(BasePanel):
@@ -41,8 +39,6 @@ class ProofPanel(BasePanel):
         super().__init__(*actions)
         self.graph_scene = GraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
-        # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
-        self.graph_scene.selectionChanged.connect(self.update_on_selection)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
 
 
@@ -50,10 +46,9 @@ class ProofPanel(BasePanel):
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 
-        self.actions_bar = QTabWidget(self)
-        self.layout().insertWidget(1, self.actions_bar)  # type: ignore
-        self.init_action_groups()
-        self.actions_bar.currentChanged.connect(self.update_on_selection)
+        self.rewrites_panel = QTreeView(self)
+        self.splitter.insertWidget(0, self.rewrites_panel)
+        self.init_rewrites_bar()
 
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
@@ -104,35 +99,29 @@ class ProofPanel(BasePanel):
 
         self.refresh_rules = QToolButton(self)
         self.refresh_rules.setText("Refresh rules")
-        self.refresh_rules.clicked.connect(self._refresh_rules)
+        self.refresh_rules.clicked.connect(self._refresh_rewrites_model)
 
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
         yield ToolbarSection(self.refresh_rules)
 
-    def init_action_groups(self) -> None:
-        self.action_groups = [group.copy() for group in proof_actions.action_groups]
-        custom_rules = []
-        for root, dirs, files in os.walk(get_custom_rules_path()):
-            for file in files:
-                if file.endswith(".zxr"):
-                    zxr_file = os.path.join(root, file)
-                    with open(zxr_file, "r") as f:
-                        rule = CustomRule.from_json(f.read()).to_proof_action()
-                        custom_rules.append(rule)
-        self.action_groups.append(proof_actions.ProofActionGroup("Custom rules", *custom_rules).copy())
-        for group in self.action_groups:
-            hlayout = QHBoxLayout()
-            group.init_buttons(self)
-            for action in group.actions:
-                assert action.button is not None
-                hlayout.addWidget(action.button)
-            hlayout.addStretch()
+    def init_rewrites_bar(self) -> None:
+        self.rewrites_panel.setUniformRowHeights(True)
+        self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        fi = QFontInfo(self.font())
 
-            widget = QWidget()
-            widget.setLayout(hlayout)
-            setattr(widget, "action_group", group)
-            self.actions_bar.addTab(widget, group.name)
+        self.rewrites_panel.setStyleSheet(
+            f'''
+            QTreeView::Item:hover {{
+                background-color: #e2f4ff;
+            }}
+            QTreeView::Item{{
+                height:{fi.pixelSize() * 2}px;
+            }}
+            ''')
+
+        # Set the models
+        self._refresh_rewrites_model()
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
@@ -144,12 +133,6 @@ class ProofPanel(BasePanel):
                 edges.append(e)
 
         return selection, edges
-
-    def update_on_selection(self) -> None:
-        selection, edges = self.parse_selection()
-        g = self.graph_scene.g
-        action_group = getattr(self.actions_bar.currentWidget(), "action_group")
-        action_group.update_active(g, selection, edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNodeInStep(self.graph_view, vs, self.step_view)
@@ -232,7 +215,7 @@ class ProofPanel(BasePanel):
         if not trace.shift and basicrules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
             return True
-        
+
         if trace.shift and self.graph.type(vertex) != VertexType.W_OUTPUT:
             phase_is_complex = (self.graph.type(vertex) == VertexType.Z_BOX)
             if phase_is_complex:
@@ -254,7 +237,7 @@ class ProofPanel(BasePanel):
                 phase = get_z_box_label(self.graph, vertex)
             else:
                 phase = self.graph.phase(vertex)
-        
+
         start = trace.hit[item][0]
         end = trace.hit[item][-1]
         if start.y() > end.y():
@@ -272,7 +255,7 @@ class ProofPanel(BasePanel):
             else:
                 right.append(neighbor)
         mouse_dir = ((start + end) * (1/2)) - pos
-        
+
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
             self._unfuse_w(vertex, left, mouse_dir)
         else:
@@ -291,7 +274,7 @@ class ProofPanel(BasePanel):
 
         vi = get_w_partner(self.graph, v)
         par_dir = QVector2D(
-            self.graph.row(v) - self.graph.row(vi), 
+            self.graph.row(v) - self.graph.row(vi),
             self.graph.qubit(v) - self.graph.qubit(vi)
         ).normalized()
 
@@ -408,27 +391,14 @@ class ProofPanel(BasePanel):
         cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
         self.undo_stack.push(cmd)
 
-    def _refresh_rules(self) -> None:
-        self.actions_bar.removeTab(self.actions_bar.count() - 1)
-        custom_rules = []
-        for root, dirs, files in os.walk(get_custom_rules_path()):
-            for file in files:
-                if file.endswith(".zxr"):
-                    zxr_file = os.path.join(root, file)
-                    with open(zxr_file, "r") as f:
-                        rule = CustomRule.from_json(f.read()).to_proof_action()
-                        custom_rules.append(rule)
-        group = proof_actions.ProofActionGroup("Custom rules", *custom_rules).copy()
-        hlayout = QHBoxLayout()
-        group.init_buttons(self)
-        for action in group.actions:
-            assert action.button is not None
-            hlayout.addWidget(action.button)
-        hlayout.addStretch()
-        widget = QWidget()
-        widget.setLayout(hlayout)
-        setattr(widget, "action_group", group)
-        self.actions_bar.addTab(widget, group.name)
+    def _refresh_rewrites_model(self) -> None:
+        refresh_custom_rules()
+        model = RewriteActionTreeModel.from_dict(action_groups, self)
+        self.rewrites_panel.setModel(model)
+        self.rewrites_panel.clicked.connect(model.do_rewrite)
+        # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
+        self.graph_scene.selectionChanged.connect(model.update_on_selection)
+        self.rewrites_panel.expandAll()
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):

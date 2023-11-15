@@ -16,7 +16,7 @@ from pyzx.symbolic import Poly
 from .common import ET, VT, GraphT
 
 if TYPE_CHECKING:
-    from .proof_actions import ProofAction
+    from .rewrite_data import RewriteData
 
 class CustomRule:
     def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
@@ -109,9 +109,10 @@ class CustomRule:
         assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))  # type: ignore
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
-    def to_proof_action(self) -> "ProofAction":
-        from .proof_actions import MATCHES_VERTICES, ProofAction
-        return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
+    def to_rewrite_data(self) -> "RewriteData":
+        from .rewrite_data import MATCHES_VERTICES
+        return {"text": self.name, "matcher": self.matcher, "rule": self, "type": MATCHES_VERTICES,
+                "tooltip": self.description, 'copy_first': False, 'returns_new_graph': False}
 
 
 def get_linear(v):
