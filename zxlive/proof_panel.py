@@ -118,6 +118,9 @@ class ProofPanel(BasePanel):
             QTreeView::Item{{
                 height:{fi.pixelSize() * 2}px;
             }}
+            QTreeView::Item:!enabled {{
+                color: #c0c0c0;
+            }}
             ''')
 
         # Set the models
