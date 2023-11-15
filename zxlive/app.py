@@ -19,8 +19,8 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QCommandLineParser
 from PySide6.QtGui import QIcon
 
-#import sys
-#sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
+import sys
+# sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
 
 from .mainwindow import MainWindow
 from .common import get_data, GraphT
