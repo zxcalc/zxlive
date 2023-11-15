@@ -1,15 +1,23 @@
+from __future__ import annotations
+
 import itertools
 import random
-from typing import Optional, Callable
+from typing import Optional, Callable, TYPE_CHECKING
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
 from pyzx.utils import vertex_is_w
 
-from .common import VT, GraphT, pos_to_view
+from .custom_rule import CustomRule
+from .rewrite_data import operations
+from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
+
+if TYPE_CHECKING:
+    from .proof_panel import ProofPanel
+    from .rewrite_action import RewriteAction
 
 
 class AnimatedUndoStack(QUndoStack):
@@ -183,7 +191,8 @@ def fuse(dragged: VItem, target: VItem, meet_halfway: bool = False) -> QAbstract
     if not meet_halfway:
         group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     else:
-        halfway_pos = (dragged.pos() + target.pos()) / 2
+        sum_pos = dragged.pos() + target.pos()
+        halfway_pos = QPointF(sum_pos.x() / 2, sum_pos.y() / 2)
         group.addAnimation(move(dragged, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
         group.addAnimation(move(target, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))
@@ -255,3 +264,55 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
     return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
                        duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 
+
+def make_animation(self: RewriteAction, panel: ProofPanel, g, matches, rem_verts) -> tuple:
+    anim_before = None
+    anim_after = None
+    if self.name == operations['spider']['text'] or self.name == operations['fuse_w']['text']:
+        anim_before = QParallelAnimationGroup()
+        for v1, v2 in matches:
+            if v1 in rem_verts:
+                v1, v2 = v2, v1
+            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v2], panel.graph_scene.vertex_map[v1]))
+    elif self.name == operations['to_z']['text']:
+        print('To do: animate ' + self.name)
+    elif self.name == operations['to_x']['text']:
+        print('To do: animate ' + self.name)
+    elif self.name == operations['rem_id']['text']:
+        anim_before = QParallelAnimationGroup()
+        for m in matches:
+            anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[m[0]]))
+    elif self.name == operations['copy']['text']:
+        anim_before = QParallelAnimationGroup()
+        for m in matches:
+            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
+                                                panel.graph_scene.vertex_map[m[1]]))
+        anim_after = QParallelAnimationGroup()
+        for m in matches:
+            anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
+    elif self.name == operations['pauli']['text']:
+        print('To do: animate ' + self.name)
+    elif self.name == operations['bialgebra']['text']:
+        anim_before = QParallelAnimationGroup()
+        for v1, v2 in matches:
+            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v1],
+                                                panel.graph_scene.vertex_map[v2], meet_halfway=True))
+        anim_after = QParallelAnimationGroup()
+        for v1, v2 in matches:
+            v2_row, v2_qubit = panel.graph.row(v2), panel.graph.qubit(v2)
+            panel.graph.set_row(v2, (panel.graph.row(v1) + v2_row) / 2)
+            panel.graph.set_qubit(v2, (panel.graph.qubit(v1) + v2_qubit) / 2)
+            anim_after.addAnimation(strong_comp(panel.graph, g, v2, panel.graph_scene))
+            panel.graph.set_row(v2, v2_row)
+            panel.graph.set_qubit(v2, v2_qubit)
+    elif isinstance(self.rule, CustomRule) and self.rule.last_rewrite_center is not None:
+        center = self.rule.last_rewrite_center
+        duration = ANIMATION_DURATION / 2
+        anim_before = morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
+                                                  panel.graph_scene, center, duration,
+                                                  QEasingCurve(QEasingCurve.Type.InQuad))
+        anim_after = morph_graph_from_center(g, lambda v: v not in panel.graph.graph,
+                                                   panel.graph_scene, center, duration,
+                                                   QEasingCurve(QEasingCurve.Type.OutQuad))
+
+    return anim_before, anim_after

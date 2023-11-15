@@ -113,7 +113,8 @@ class ProofModel(QAbstractListModel):
     def get_graph(self, index: int) -> GraphT:
         """Returns the grap at a given position in the proof."""
         copy = self.graphs[index].copy()
-        assert isinstance(copy, GraphT)
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert isinstance(copy, GraphT)  # type: ignore
         return copy
 
     def to_json(self) -> str:
@@ -132,11 +133,13 @@ class ProofModel(QAbstractListModel):
         """Deserializes the model from JSON."""
         d = json.loads(json_str)
         initial_graph = GraphT.from_tikz(d["initial_graph"])
-        assert isinstance(initial_graph, GraphT)
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert isinstance(initial_graph, GraphT)  # type: ignore
         model = ProofModel(initial_graph)
         for step in d["proof_steps"]:
             rewrite = Rewrite.from_json(step)
             rewritten_graph = rewrite.diff.apply_diff(model.graphs[-1])
-            assert isinstance(rewritten_graph, GraphT)
+            # Mypy issue: https://github.com/python/mypy/issues/11673
+            assert isinstance(rewritten_graph, GraphT)  # type: ignore
             model.add_rewrite(rewrite, rewritten_graph)
         return model

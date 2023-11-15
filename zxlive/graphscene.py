@@ -121,7 +121,8 @@ class GraphScene(QGraphicsScene):
             self.removeItem(e_item)
 
         new_g = diff.apply_diff(self.g)
-        assert isinstance(new_g, GraphT)
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert isinstance(new_g, GraphT)  # type: ignore
         self.g = new_g
         # g now contains the new graph,
         # but we still need to update the scene

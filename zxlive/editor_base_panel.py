@@ -3,8 +3,7 @@ from __future__ import annotations
 import copy
 import re
 from enum import Enum
-from fractions import Fraction
-from typing import Callable, Iterator, TypedDict, Union
+from typing import Callable, Iterator, TypedDict
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
@@ -15,7 +14,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QSpacerItem, QSplitter, QToolButton, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
-
+from pyzx.graph.jsonparser import string_to_phase
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
@@ -25,8 +24,6 @@ from .common import VT, GraphT, ToolType, get_data, colors
 from .dialogs import show_error_msg
 from .eitem import HAD_EDGE_BLUE
 from .graphscene import EditGraphScene
-from .parse_poly import parse
-from .poly import Poly, new_var
 from .vitem import BLACK
 
 
@@ -39,7 +36,7 @@ class ShapeType(Enum):
 
 class DrawPanelNodeType(TypedDict):
     text: str
-    icon: tuple[ShapeType, str]
+    icon: tuple[ShapeType, QColor]
 
 
 def vertices_data() -> dict[VertexType.Type, DrawPanelNodeType]:
@@ -54,8 +51,8 @@ def vertices_data() -> dict[VertexType.Type, DrawPanelNodeType]:
 
 def edges_data() -> dict[EdgeType.Type, DrawPanelNodeType]:
     return {
-        EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, BLACK)},
-        EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, HAD_EDGE_BLUE)},
+        EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, QColor(BLACK))},
+        EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, QColor(HAD_EDGE_BLUE))},
     }
 
 
@@ -98,16 +95,8 @@ class EditorBasePanel(BasePanel):
         super().update_colors()
         self.update_side_bar()
 
-    def update_variable_viewer(self) -> None:
-        self.update_side_bar()
-
     def _populate_variables(self) -> None:
-        self.variable_types = {}
-        for vert in self.graph.vertices():
-            phase = self.graph.phase(vert)
-            if isinstance(phase, Poly):
-                for var in phase.free_vars():
-                    self.variable_types[var.name] = var.is_bool
+        self.variable_types = self.graph.variable_types.copy()
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene.curr_tool = tool
@@ -189,18 +178,18 @@ class EditorBasePanel(BasePanel):
         if not ok:
             return None
         try:
-            new_phase = string_to_complex(input_) if phase_is_complex else string_to_fraction(input_, self._new_var)
+            new_phase = string_to_complex(input_) if phase_is_complex else string_to_phase(input_, graph)
         except ValueError:
             show_error_msg("Invalid Input", error_msg)
             return None
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
-
-    def _new_var(self, name: str) -> Poly:
-        if name not in self.variable_types:
-            self.variable_types[name] = False
-            self.variable_viewer.add_item(name)
-        return new_var(name, self.variable_types)
+        # For some reason it is important we first push to the stack before we do the following.
+        if len(graph.variable_types) != len(self.variable_types):
+            new_vars = graph.variable_types.keys() - self.variable_types.keys()
+            self.variable_types.update(graph.variable_types)
+            for v in new_vars:
+                self.variable_viewer.add_item(v)
 
 
 class VariableViewer(QScrollArea):
@@ -211,7 +200,7 @@ class VariableViewer(QScrollArea):
         self._variable_types = variable_types
 
         self._widget = QWidget()
-        lpal = QApplication.palette("QListWidget")
+        lpal = QApplication.palette("QListWidget")  # type: ignore
         palette = QPalette()
         palette.setBrush(QPalette.ColorRole.Window, lpal.base())
         self._widget.setAutoFillBackground(True)
@@ -354,14 +343,14 @@ def populate_list_widget(list_widget: QListWidget,
     list_widget.setCurrentRow(row)
 
 
-def create_icon(shape: ShapeType, color: str) -> QIcon:
+def create_icon(shape: ShapeType, color: QColor) -> QIcon:
     icon = QIcon()
     pixmap = QPixmap(64, 64)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setPen(QPen(QColor(BLACK), 6))
-    painter.setBrush(QColor(color))
+    painter.setBrush(color)
     if shape == ShapeType.CIRCLE:
         painter.drawEllipse(4, 4, 56, 56)
     elif shape == ShapeType.SQUARE:
@@ -376,30 +365,6 @@ def create_icon(shape: ShapeType, color: str) -> QIcon:
     painter.end()
     icon.addPixmap(pixmap)
     return icon
-
-
-def string_to_fraction(string: str, new_var_: Callable[[str], Poly]) -> Union[Fraction, Poly]:
-    if not string:
-        return Fraction(0)
-    try:
-        s = string.lower().replace(' ', '')
-        s = re.sub('\\*?(pi|\u04c0)\\*?', '', s)
-        if '.' in s or 'e' in s:
-            return Fraction(float(s))
-        elif '/' in s:
-            a, b = s.split("/", 2)
-            if not a:
-                return Fraction(1, int(b))
-            if a == '-':
-                a = '-1'
-            return Fraction(int(a), int(b))
-        else:
-            return Fraction(int(s))
-    except ValueError:
-        try:
-            return parse(string, new_var_)
-        except Exception as e:
-            raise ValueError(e)
 
 
 def string_to_complex(string: str) -> complex:

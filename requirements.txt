@@ -1,5 +1,4 @@
 pyzx @ git+https://github.com/Quantomatic/pyzx
-lark~=1.1.7
 networkx~=3.1
 numpy~=1.25.2
 pytest-qt~=4.2.0

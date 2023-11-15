@@ -222,6 +222,7 @@ class VItem(QGraphicsPathItem):
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
+        assert hasattr(option, "state")
         option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
 
