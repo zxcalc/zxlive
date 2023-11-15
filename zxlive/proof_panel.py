@@ -15,7 +15,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QListView,
                                QStyleOptionViewItem, QToolButton, QWidget,
                                QVBoxLayout, QTabWidget, QInputDialog)
 from pyzx import VertexType, basicrules
-from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType
+from pyzx.graph.jsonparser import string_to_phase
+from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType, FractionLike
 
 from . import animations as anims
 from . import proof_actions
@@ -29,9 +30,8 @@ from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, GraphView, WandTrace
 from .proof import ProofModel
-from .vitem import DragState, VItem, get_w_partner_vitem, W_INPUT_OFFSET, SCALE
-from .editor_base_panel import string_to_complex, string_to_fraction
-from .poly import Poly
+from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
+from .editor_base_panel import string_to_complex
 
 
 class ProofPanel(BasePanel):
@@ -245,9 +245,7 @@ class ProofPanel(BasePanel):
             if not ok:
                 return False
             try:
-                def new_var(_: str) -> Poly:
-                    raise ValueError()
-                phase = string_to_complex(text) if phase_is_complex else string_to_fraction(text, new_var)
+                phase = string_to_complex(text) if phase_is_complex else string_to_phase(input_, graph)
             except ValueError:
                 show_error_msg("Invalid Input", error_msg)
                 return False
@@ -326,7 +324,7 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
         self.undo_stack.push(cmd, anim_after=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Poly | complex | Fraction) -> None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: FractionLike) -> None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)

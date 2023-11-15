@@ -11,11 +11,11 @@ from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx import basicrules
 from pyzx.graph import GraphDiff
+from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .graphview import GraphView
-from .poly import Poly
 from .proof import ProofModel, Rewrite
 
 

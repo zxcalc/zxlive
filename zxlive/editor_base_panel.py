@@ -3,8 +3,7 @@ from __future__ import annotations
 import copy
 import re
 from enum import Enum
-from fractions import Fraction
-from typing import Callable, Iterator, TypedDict, Union
+from typing import Callable, Iterator, TypedDict
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
@@ -16,7 +15,6 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.symbolic import Poly
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
@@ -367,30 +365,6 @@ def create_icon(shape: ShapeType, color: QColor) -> QIcon:
     painter.end()
     icon.addPixmap(pixmap)
     return icon
-
-
-#def string_to_fraction(string: str, new_var_: Callable[[str], Poly]) -> Union[Fraction, Poly]:
-#    if not string:
-#        return Fraction(0)
-#    try:
-#        s = string.lower().replace(' ', '')
-#        s = re.sub('\\*?(pi|\u04c0)\\*?', '', s)
-#        if '.' in s or 'e' in s:
-#            return Fraction(float(s))
-#        elif '/' in s:
-#            a, b = s.split("/", 2)
-#            if not a:
-#                return Fraction(1, int(b))
-#            if a == '-':
-#                a = '-1'
-#            return Fraction(int(a), int(b))
-#        else:
-#            return Fraction(int(s))
-#    except ValueError:
-#        try:
-#            return parse(string, new_var_)
-#        except Exception as e:
-#            raise ValueError(e)
 
 
 def string_to_complex(string: str) -> complex:
