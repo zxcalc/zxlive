@@ -11,6 +11,8 @@ from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType
 from shapely import Polygon
 
+from pyzx.symbolic import Poly
+
 from .common import ET, VT, GraphT
 
 if TYPE_CHECKING:
@@ -31,8 +33,11 @@ class CustomRule:
     def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
-        matching = list(graph_matcher.match())[0]
+            node_match=categorical_node_match('type', 1))
+        matchings = graph_matcher.match()
+        matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
+        matching = matchings[0]
+        symbolic_params_map = match_symbolic_parameters(matching, self.lhs_graph_nx, subgraph_nx)
 
         vertices_to_remove = []
         for v in matching:
@@ -53,10 +58,15 @@ class CustomRule:
         vertex_map = boundary_vertex_map
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY:
+                phase = self.rhs_graph_nx.nodes()[v]['phase']
+                if isinstance(phase, Poly):
+                    phase = phase.substitute(symbolic_params_map)
+                    if phase.free_vars() == set():
+                        phase = phase.terms[0][0]
                 vertex_map[v] = graph.add_vertex(ty = self.rhs_graph_nx.nodes()[v]['type'],
                                                  row = vertex_positions[v][0],
                                                  qubit = vertex_positions[v][1],
-                                                 phase = self.rhs_graph_nx.nodes()[v]['phase'],)
+                                                 phase = phase,)
 
         # create etab to add edges
         etab = {}
@@ -75,8 +85,10 @@ class CustomRule:
         vertices = [v for v in graph.vertices() if in_selection(v)]
         subgraph_nx, _ = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
-        if graph_matcher.is_isomorphic():
+            node_match=categorical_node_match('type', 1))
+        matchings = list(graph_matcher.match())
+        matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
+        if len(matchings) > 0:
             return vertices
         return []
 
@@ -100,6 +112,75 @@ class CustomRule:
     def to_proof_action(self) -> "ProofAction":
         from .proof_actions import MATCHES_VERTICES, ProofAction
         return ProofAction(self.name, self.matcher, self, MATCHES_VERTICES, self.description)
+
+
+def get_linear(v):
+    if not isinstance(v, Poly):
+        raise ValueError("Not a symbolic parameter")
+    if len(v.terms) > 2 or len(v.free_vars()) > 1:
+        raise ValueError("Only linear symbolic parameters are supported")
+    if len(v.terms) == 0:
+        return 1, None, 0
+    elif len(v.terms) == 1:
+        if len(v.terms[0][1].vars) > 0:
+            var_term = v.terms[0]
+            const = 0
+        else:
+            const = v.terms[0][0]
+            return 1, None, const
+    else:
+        if len(v.terms[0][1].vars) > 0:
+            var_term = v.terms[0]
+            const = v.terms[1][0]
+        else:
+            var_term = v.terms[1]
+            const = v.terms[0][0]
+    coeff = var_term[0]
+    var, power = var_term[1].vars[0]
+    if power != 1:
+        raise ValueError("Only linear symbolic parameters are supported")
+    return coeff, var, const
+
+
+def match_symbolic_parameters(match, left, right):
+    params = {}
+    left_phase = left.nodes.data('phase', default=0)
+    right_phase = right.nodes.data('phase', default=0)
+
+    def check_phase_equality(v):
+        if left_phase[v] != right_phase[match[v]]:
+            raise ValueError("Parameters do not match")
+
+    def update_params(v, var, coeff, const):
+        var_value = (right_phase[match[v]] - const) / coeff
+        if var in params and params[var] != var_value:
+            raise ValueError("Symbolic parameters do not match")
+        params[var] = var_value
+
+    for v in left.nodes():
+        if isinstance(left_phase[v], Poly):
+            coeff, var, const = get_linear(left_phase[v])
+            if var is None:
+                check_phase_equality(v)
+                continue
+            update_params(v, var, coeff, const)
+        else:
+            check_phase_equality(v)
+
+    return params
+
+
+def filter_matchings_if_symbolic_compatible(matchings, left, right):
+    new_matchings = []
+    for matching in matchings:
+        if len(matching) != len(left):
+            continue
+        try:
+            match_symbolic_parameters(matching, left, right)
+            new_matchings.append(matching)
+        except ValueError:
+            pass
+    return new_matchings
 
 
 def to_networkx(graph: GraphT) -> nx.Graph:
@@ -154,13 +235,29 @@ def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
             from .dialogs import show_error_msg
             show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
         return False
-    left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
-    if not np.allclose(left_matrix, right_matrix):
-        if show_error:
-            from .dialogs import show_error_msg
-            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
-            else:
-                show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
-        return False
+    if not rule.lhs_graph.variable_types and not rule.rhs_graph.variable_types:
+        left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
+        if not np.allclose(left_matrix, right_matrix):
+            if show_error:
+                from .dialogs import show_error_msg
+                if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
+                    show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
+                else:
+                    show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
+            return False
+    else:
+        if not (rule.rhs_graph.variable_types.items() <= rule.lhs_graph.variable_types.items()):
+            if show_error:
+                from .dialogs import show_error_msg
+                show_error_msg("Warning!", "The right-hand side has more free variables than the left-hand side.")
+            return False
+        for vertex in rule.lhs_graph.vertices():
+            if isinstance(rule.lhs_graph.phase(vertex), Poly):
+                try:
+                    get_linear(rule.lhs_graph.phase(vertex))
+                except ValueError as e:
+                    if show_error:
+                        from .dialogs import show_error_msg
+                        show_error_msg("Warning!", str(e))
+                    return False
     return True
