@@ -218,3 +218,4 @@ class RewriteActionTreeModel(QAbstractItemModel):
         g = self.proof_panel.graph_scene.g
 
         self.root_item.update_on_selection(g, selection, edges)
+        self.dataChanged.emit(QModelIndex(), QModelIndex(), [])
