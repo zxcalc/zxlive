@@ -13,3 +13,4 @@ dist
 *.qasm
 .env
 *.zxr
+.ipynb_checkpoints

@@ -50,10 +50,7 @@ from .tikz import proof_to_tikz
 
 
 class MainWindow(QMainWindow):
-    """A simple window containing a single `GraphView`
-    This is just an example, and should be replaced with
-    something more sophisticated.
-    """
+    """The main window of the ZXLive application."""
 
     edit_panel: GraphEditPanel
     proof_panel: ProofPanel
@@ -94,13 +91,13 @@ class MainWindow(QMainWindow):
         menu = self.menuBar()
 
         new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
-            "Create a new tab with an empty graph", alt_shortcut = QKeySequence.StandardKey.AddTab)
+            "Create a new tab with an empty graph", alt_shortcut=QKeySequence.StandardKey.AddTab)
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
-            "Closes the window", alt_shortcut = QKeySequence("Ctrl+W"))
+            "Closes the window", alt_shortcut=QKeySequence("Ctrl+W"))
         # TODO: We should remember if we have saved the diagram before,
-        # and give an open to overwrite this file with a Save action
+        # and give an option to overwrite this file with a Save action.
         self.save_file = self._new_action("&Save", self.handle_save_file_action, QKeySequence.StandardKey.Save,
             "Save the diagram by overwriting the previous loaded file.")
         self.save_as = self._new_action("Save &as...", self.handle_save_as_action, QKeySequence.StandardKey.SaveAs,
@@ -448,6 +445,25 @@ class MainWindow(QMainWindow):
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
+
+    def open_graph_from_notebook(self, graph: GraphT, name: str = None) -> None:
+        """Opens a ZXLive window from within a notebook to edit a graph.
+
+        Replaces the graph in an existing tab if it has the same name."""
+        # TODO: handle multiple tabs with the same name somehow
+        for i in range(self.tab_widget.count()):
+            if self.tab_widget.tabText(i) == name or self.tab_widget.tabText(i) == name + "*":
+                self.tab_widget.setCurrentIndex(i)
+                self.active_panel.replace_graph(graph)
+                return
+        self.new_graph(copy.deepcopy(graph), name)
+
+    def get_copy_of_graph(self, name: str):
+        # TODO: handle multiple tabs with the same name somehow
+        for i in range(self.tab_widget.count()):
+            if self.tab_widget.tabText(i) == name or self.tab_widget.tabText(i) == name + "*":
+                return copy.deepcopy(self.tab_widget.widget(i).graph_scene.g)
+        return None
 
     def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:
         if rule is None:

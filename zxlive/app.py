@@ -20,7 +20,8 @@ from PySide6.QtCore import QCommandLineParser
 from PySide6.QtGui import QIcon
 import sys
 from .mainwindow import MainWindow
-from .common import get_data
+from .common import get_data, GraphT
+from typing import Optional
 
 #sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
 
@@ -38,6 +39,8 @@ class ZXLive(QApplication):
 
     ...
     """
+
+    main_window: Optional[MainWindow] = None
 
     def __init__(self) -> None:
         super().__init__(sys.argv)
@@ -62,9 +65,26 @@ class ZXLive(QApplication):
             for f in parser.positionalArguments():
                 self.main_window.open_file_from_path(f)
 
+    def edit_graph(self, g: GraphT, name: str) -> None:
+        """Opens a ZXLive window from within a notebook to edit a graph."""
+        if not self.main_window:
+            self.main_window = MainWindow()
+        self.main_window.show()
+        self.main_window.open_graph_from_notebook(g, name)
+
+    def get_copy_of_graph(self, name: str) -> GraphT:
+        """Returns a copy of the graph which has the given name."""
+        return self.main_window.get_copy_of_graph(name)
+
+
+def get_embedded_app() -> ZXLive:
+    """Main entry point for ZXLive as an embedded app inside a jupyter notebook."""
+    app = QApplication.instance() or ZXLive()
+    app.__class__ = ZXLive
+    return app
+
 
 def main() -> None:
-    """Main entry point for ZXLive"""
-
+    """Main entry point for ZXLive as a standalone app."""
     zxl = ZXLive()
     zxl.exec_()
