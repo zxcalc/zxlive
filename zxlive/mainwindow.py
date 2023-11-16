@@ -48,10 +48,6 @@ from .tikz import proof_to_tikz
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
 
-    rewrite_form: QFormLayout
-    left_graph: Optional[GraphT]
-    right_graph: Optional[GraphT]
-
     def __init__(self) -> None:
         super().__init__()
         self.settings = QSettings("zxlive", "zxlive")

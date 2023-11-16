@@ -248,13 +248,13 @@ def export_proof_dialog(parent: QWidget) -> Optional[str]:
 
 def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], Optional[str]]:
     dialog = QDialog()
-    parent.rewrite_form = QFormLayout(dialog)
+    rewrite_form = QFormLayout(dialog)
     name = QLineEdit()
-    parent.rewrite_form.addRow("Name", name)
+    rewrite_form.addRow("Name", name)
     description = QTextEdit()
-    parent.rewrite_form.addRow("Description", description)
+    rewrite_form.addRow("Description", description)
     button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-    parent.rewrite_form.addRow(button_box)
+    rewrite_form.addRow(button_box)
     button_box.accepted.connect(dialog.accept)
     button_box.rejected.connect(dialog.reject)
     if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -263,36 +263,37 @@ def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], O
 
 def create_new_rewrite(parent: MainWindow) -> None:
     dialog = QDialog()
-    parent.rewrite_form = QFormLayout(dialog)
+    rewrite_form = QFormLayout(dialog)
     name = QLineEdit()
-    parent.rewrite_form.addRow("Name", name)
+    rewrite_form.addRow("Name", name)
     description = QTextEdit()
-    parent.rewrite_form.addRow("Description", description)
+    rewrite_form.addRow("Description", description)
     left_button = QPushButton("Left-hand side of the rule")
     right_button = QPushButton("Right-hand side of the rule")
-    parent.left_graph = None
-    parent.right_graph = None
+    left_graph = None
+    right_graph = None
 
     def get_file(self: MainWindow, button: QPushButton, side: str) -> None:
+        nonlocal left_graph, right_graph
         out = import_diagram_dialog(self)
         if out is not None and isinstance(out, ImportGraphOutput):
             button.setText(out.file_path)
             if side == "left":
-                self.left_graph = out.g
+                left_graph = out.g
             else:
-                self.right_graph = out.g
+                right_graph = out.g
 
     left_button.clicked.connect(lambda: get_file(parent, left_button, "left"))
     right_button.clicked.connect(lambda: get_file(parent, right_button, "right"))
-    parent.rewrite_form.addRow(left_button)
-    parent.rewrite_form.addRow(right_button)
+    rewrite_form.addRow(left_button)
+    rewrite_form.addRow(right_button)
     button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-    parent.rewrite_form.addRow(button_box)
+    rewrite_form.addRow(button_box)
     def add_rewrite() -> None:
-        if parent.left_graph is None or parent.right_graph is None or \
-            name.text() == "" or description.toPlainText() == "":
+        nonlocal left_graph, right_graph
+        if left_graph is None or right_graph is None or name.text() == "" or description.toPlainText() == "":
             return
-        rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
+        rule = CustomRule(left_graph, right_graph, name.text(), description.toPlainText())
         check_rule(rule, show_error=True)
         if safe_rule_dialog(rule, parent):
             dialog.accept()
