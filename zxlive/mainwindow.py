@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Callable, Optional, TypedDict
+from typing import Callable, Optional
 
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
                             QSettings, QTextStream, Qt)
@@ -24,13 +24,10 @@ from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (QDialog, QFormLayout, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
-from pyzx import extract_circuit, simplify
-from pyzx.graph.base import BaseGraph
 
 import pyperclip
 
 from .base_panel import BasePanel
-from .commands import AddRewriteStep
 from .common import GraphT, get_data, to_tikz, from_tikz
 from .construct import *
 from .custom_rule import CustomRule, check_rule
@@ -42,7 +39,6 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       export_proof_dialog)
 from zxlive.settings_dialog import open_settings_dialog
 
-from .editor_base_panel import EditorBasePanel
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
@@ -52,8 +48,6 @@ from .tikz import proof_to_tikz
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
 
-    edit_panel: GraphEditPanel
-    proof_panel: ProofPanel
     rewrite_form: QFormLayout
     left_graph: Optional[GraphT]
     right_graph: Optional[GraphT]
