@@ -104,13 +104,16 @@ class CustomRule:
                     # now we unfuse
                     vtype = self.lhs_graph_nx.nodes()[v]['type']
                     if vtype == VertexType.Z or vtype == VertexType.X:
-                        new_v = graph.add_vertex(vtype, qubit=graph.qubit(matching[v]), row=graph.row(matching[v]))
-                        neighbors = list(graph.neighbors(matching[v]))
-                        graph.add_edge(graph.edge(new_v, matching[v]))
-                        for b in neighbors:
-                            if b not in subgraph_nx.nodes:
-                                graph.remove_edge(graph.edge(matching[v], b))
-                                graph.add_edge(graph.edge(new_v, b))
+                        self.unfuse_zx(graph, subgraph_nx, matching[v], vtype)
+
+    def unfuse_zx(self, graph, subgraph_nx, v, vtype):
+        new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
+        neighbors = list(graph.neighbors(v))
+        graph.add_edge(graph.edge(new_v, v))
+        for b in neighbors:
+            if b not in subgraph_nx.nodes:
+                graph.remove_edge(graph.edge(v, b))
+                graph.add_edge(graph.edge(new_v, b))
 
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
