@@ -128,14 +128,14 @@ class ProofPanel(BasePanel):
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
+        edges = set(self.graph_scene.selected_edges)
         g = self.graph_scene.g
-        edges = []
         for e in g.edges():
             s,t = g.edge_st(e)
             if s in selection and t in selection:
-                edges.append(e)
+                edges.add(e)
 
-        return selection, edges
+        return selection, list(edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNodeInStep(self.graph_view, vs, self.step_view)
