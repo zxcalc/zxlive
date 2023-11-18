@@ -90,7 +90,7 @@ class CustomRule:
                 if isinstance(phase, Poly):
                     phase = phase.substitute(symbolic_params_map)
                     if phase.free_vars() == set():
-                        phase = phase.terms[0][0]
+                        phase = phase.terms[0][0] if len(phase.terms) > 0 else 0
                 vertex_map[v] = graph.add_vertex(ty = self.rhs_graph_nx.nodes()[v]['type'],
                                                  row = vertex_positions[v][0],
                                                  qubit = vertex_positions[v][1],
