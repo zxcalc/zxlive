@@ -97,16 +97,14 @@ class CustomRule:
             node_match=categorical_node_match('type', 1))
         matching = list(graph_matcher.match())[0]
 
-        subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
+        subgraph_nx, _ = create_subgraph(graph, vertices)
         for v in matching:
-            if len([n for n in self.lhs_graph_nx.neighbors(v) if self.lhs_graph_nx.nodes()[n]['type'] == VertexType.BOUNDARY]) == 1:
-                if len([b for b in subgraph_nx.neighbors(matching[v]) if subgraph_nx.nodes()[b]['type'] == VertexType.BOUNDARY]) != 1:
-                    # now we unfuse
-                    vtype = self.lhs_graph_nx.nodes()[v]['type']
-                    if vtype == VertexType.Z or vtype == VertexType.X:
-                        self.unfuse_zx(graph, subgraph_nx, matching[v], vtype)
+            if self.check_if_unfuse_vertex(self.lhs_graph_nx, v):
+                vtype = self.lhs_graph_nx.nodes()[v]['type']
+                if vtype == VertexType.Z or vtype == VertexType.X:
+                    self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
 
-    def unfuse_zx(self, graph, subgraph_nx, v, vtype):
+    def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype):
         new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
         neighbors = list(graph.neighbors(v))
         graph.add_edge(graph.edge(new_v, v))
@@ -115,6 +113,15 @@ class CustomRule:
                 graph.add_edge((new_v, b), graph.edge_type((v, b)))
                 graph.remove_edge(graph.edge(v, b))
 
+    def check_if_unfuse_vertex(self, graph, v):
+        if len([n for n in self.lhs_graph_nx.neighbors(v) if self.lhs_graph_nx.nodes()[n]['type'] == VertexType.BOUNDARY]) == 1:
+            if len([n for n in graph.neighbors(v) if graph.type(n) == VertexType.BOUNDARY]) != 1:
+                return True
+            else:
+                for n in graph.neighbors(v):
+                    if graph.edge_type((v, n)) != EdgeType.SIMPLE:
+                        return True
+        return False
 
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
