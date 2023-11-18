@@ -29,6 +29,10 @@ class CustomRule:
         self.name = name
         self.description = description
         self.last_rewrite_center = None
+        self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
+        if self.is_rewrite_unfusable:
+            self.lhs_graph_without_boundaries_nx = nx.Graph(self.lhs_graph_nx.subgraph(
+                [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
     def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
         graph_nx = to_networkx(graph)
@@ -36,7 +40,7 @@ class CustomRule:
         lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
         lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
-            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
+            node_match=categorical_node_match('type', 1))
         matching = list(graph_matcher.match())[0]
 
         g = graph
@@ -105,28 +109,18 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
-    def matcher_with_boundaries(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
-        vertices = [v for v in graph.vertices() if in_selection(v)]
-        subgraph_nx, _ = create_subgraph(graph, vertices)
-        graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match('type', 1))
-        matchings = list(graph_matcher.match())
-        matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
-        if len(matchings) > 0:
-            return vertices
-        return []
-
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
-        graph_nx = to_networkx(graph)
-        subgraph_nx = nx.Graph(graph_nx.subgraph(vertices))
-        lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
-        lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
+        if self.is_rewrite_unfusable:
+            subgraph_nx = nx.Graph(to_networkx(graph).subgraph(vertices))
+            lhs_graph_nx = self.lhs_graph_without_boundaries_nx
+        else:
+            subgraph_nx, _ = create_subgraph(graph, vertices)
+            lhs_graph_nx = self.lhs_graph_nx
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
-        if graph_matcher.is_isomorphic():
-            return vertices
-        return []
+            node_match=categorical_node_match('type', 1))
+        matchings = filter_matchings_if_symbolic_compatible(graph_matcher.match(), lhs_graph_nx, subgraph_nx)
+        return vertices if matchings else []
 
     def to_json(self) -> str:
         return json.dumps({
@@ -150,6 +144,20 @@ class CustomRule:
         return {"text": self.name, "matcher": self.matcher, "rule": self, "type": MATCHES_VERTICES,
                 "tooltip": self.description, 'copy_first': False, 'returns_new_graph': False}
 
+
+def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:
+    # if any of the output edges of the lhs_graph is a Hadamard edge, then the rewrite is not unfusable
+    for v in lhs_graph.outputs():
+        for n in lhs_graph.neighbors(v):
+            if lhs_graph.edge_type((v, n)) == EdgeType.HADAMARD:
+                return False
+    # all nodes must be connected to at most one boundary node
+    for v in lhs_graph.vertices():
+        if lhs_graph.type(v) == VertexType.BOUNDARY:
+            continue
+        if len([n for n in lhs_graph.neighbors(v) if lhs_graph.type(n) == VertexType.BOUNDARY]) > 1:
+            return False
+    return True
 
 def get_linear(v):
     if not isinstance(v, Poly):
