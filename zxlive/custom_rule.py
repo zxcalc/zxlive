@@ -112,8 +112,9 @@ class CustomRule:
         graph.add_edge(graph.edge(new_v, v))
         for b in neighbors:
             if b not in subgraph_nx.nodes:
+                graph.add_edge((new_v, b), graph.edge_type((v, b)))
                 graph.remove_edge(graph.edge(v, b))
-                graph.add_edge(graph.edge(new_v, b))
+
 
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
