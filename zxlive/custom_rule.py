@@ -39,11 +39,11 @@ class CustomRule:
             node_match=categorical_node_match(['type', 'phase'], default=[1, 0]))
         matching = list(graph_matcher.match())[0]
 
-        g = graph#copy.deepcopy(graph)
+        g = graph
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         for v in matching:
             if len([n for n in self.lhs_graph_nx.neighbors(v) if self.lhs_graph_nx.nodes()[n]['type'] == VertexType.BOUNDARY]) == 1:
-                if len([b for b in subgraph_nx.neighbors(matching[v]) if subgraph_nx.nodes()[b]['type'] == VertexType.BOUNDARY]) > 1:
+                if len([b for b in subgraph_nx.neighbors(matching[v]) if subgraph_nx.nodes()[b]['type'] == VertexType.BOUNDARY]) != 1:
                     # now we unfuse
                     vtype = self.lhs_graph_nx.nodes()[v]['type']
                     if vtype == VertexType.Z or vtype == VertexType.X:
