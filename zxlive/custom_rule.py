@@ -1,4 +1,4 @@
-import copy
+
 import json
 from typing import TYPE_CHECKING, Callable
 
@@ -108,8 +108,12 @@ class CustomRule:
                 subgraph_nx.edges()[(matching[v], outside_verts[0])]['type'] == EdgeType.SIMPLE:
                 continue
             vtype = self.lhs_graph_nx.nodes()[v]['type']
-            if vtype == VertexType.Z or vtype == VertexType.X:
+            if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
                 self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
+            elif vtype == VertexType.H_BOX:
+                raise NotImplementedError("Unfusing H_BOX vertices is not implemented yet")
+            elif vtype == VertexType.W_INPUT:
+                raise NotImplementedError("Unfusing W_INPUT vertices is not implemented yet")
 
     def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype):
         new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
