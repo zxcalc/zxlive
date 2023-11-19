@@ -267,7 +267,7 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str,
                 boundary_node = 'b' + str(i)
                 boundary_mapping[boundary_node] = vn
                 subgraph_nx.add_node(boundary_node, type=VertexType.BOUNDARY)
-                subgraph_nx.add_edge(v, boundary_node, type=EdgeType.SIMPLE)
+                subgraph_nx.add_edge(v, boundary_node, type=graph.edge_type((v, vn)))
                 i += 1
     return subgraph_nx, boundary_mapping
 
