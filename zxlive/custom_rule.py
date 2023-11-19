@@ -89,8 +89,10 @@ class CustomRule:
         return etab, vertices_to_remove, [], True
 
     def unfuse_subgraph_for_rewrite(self, graph, vertices):
-        graph_nx = to_networkx(graph)
-        subgraph_nx_without_boundaries = nx.Graph(graph_nx.subgraph(vertices))
+        def get_adjacent_boundary_vertices(graph, v):
+            return [n for n in graph.neighbors(v) if graph.nodes()[n]['type'] == VertexType.BOUNDARY]
+
+        subgraph_nx_without_boundaries = nx.Graph(to_networkx(graph).subgraph(vertices))
         lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
         lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
@@ -99,10 +101,15 @@ class CustomRule:
 
         subgraph_nx, _ = create_subgraph(graph, vertices)
         for v in matching:
-            if self.check_if_unfuse_vertex(self.lhs_graph_nx, v):
-                vtype = self.lhs_graph_nx.nodes()[v]['type']
-                if vtype == VertexType.Z or vtype == VertexType.X:
-                    self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
+            if len(get_adjacent_boundary_vertices(self.lhs_graph_nx, v)) != 1:
+                continue
+            outside_verts = get_adjacent_boundary_vertices(subgraph_nx, matching[v])
+            if len(outside_verts) == 1 and \
+                subgraph_nx.edges()[(matching[v], outside_verts[0])]['type'] == EdgeType.SIMPLE:
+                continue
+            vtype = self.lhs_graph_nx.nodes()[v]['type']
+            if vtype == VertexType.Z or vtype == VertexType.X:
+                self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
 
     def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype):
         new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
@@ -112,16 +119,6 @@ class CustomRule:
             if b not in subgraph_nx.nodes:
                 graph.add_edge((new_v, b), graph.edge_type((v, b)))
                 graph.remove_edge(graph.edge(v, b))
-
-    def check_if_unfuse_vertex(self, graph, v):
-        if len([n for n in self.lhs_graph_nx.neighbors(v) if self.lhs_graph_nx.nodes()[n]['type'] == VertexType.BOUNDARY]) == 1:
-            if len([n for n in graph.neighbors(v) if graph.type(n) == VertexType.BOUNDARY]) != 1:
-                return True
-            else:
-                for n in graph.neighbors(v):
-                    if graph.edge_type((v, n)) != EdgeType.SIMPLE:
-                        return True
-        return False
 
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
