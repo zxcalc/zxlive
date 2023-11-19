@@ -8,7 +8,7 @@ import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match)
 from networkx.classes.reportviews import NodeView
-from pyzx.utils import EdgeType, VertexType
+from pyzx.utils import EdgeType, VertexType, get_w_io
 from shapely import Polygon
 
 from pyzx.symbolic import Poly
@@ -29,13 +29,22 @@ class CustomRule:
         self.name = name
         self.description = description
         self.last_rewrite_center = None
+        self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
+        if self.is_rewrite_unfusable:
+            self.lhs_graph_without_boundaries_nx = nx.Graph(self.lhs_graph_nx.subgraph(
+                [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
     def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
+        if self.is_rewrite_unfusable:
+            self.unfuse_subgraph_for_rewrite(graph, vertices)
+
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match('type', 1))
         matchings = graph_matcher.match()
         matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
+        if len(matchings) == 0:
+            raise ValueError("No matchings found")
         matching = matchings[0]
         symbolic_params_map = match_symbolic_parameters(matching, self.lhs_graph_nx, subgraph_nx)
 
@@ -62,7 +71,7 @@ class CustomRule:
                 if isinstance(phase, Poly):
                     phase = phase.substitute(symbolic_params_map)
                     if phase.free_vars() == set():
-                        phase = phase.terms[0][0]
+                        phase = phase.terms[0][0] if len(phase.terms) > 0 else 0
                 vertex_map[v] = graph.add_vertex(ty = self.rhs_graph_nx.nodes()[v]['type'],
                                                  row = vertex_positions[v][0],
                                                  qubit = vertex_positions[v][1],
@@ -81,16 +90,77 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
+    def unfuse_subgraph_for_rewrite(self, graph, vertices):
+        def get_adjacent_boundary_vertices(graph, v):
+            return [n for n in graph.neighbors(v) if graph.nodes()[n]['type'] == VertexType.BOUNDARY]
+
+        subgraph_nx_without_boundaries = nx.Graph(to_networkx(graph).subgraph(vertices))
+        lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
+        lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
+        graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
+            node_match=categorical_node_match('type', 1))
+        matching = list(graph_matcher.match())[0]
+
+        subgraph_nx, _ = create_subgraph(graph, vertices)
+        for v in matching:
+            if len(get_adjacent_boundary_vertices(self.lhs_graph_nx, v)) != 1:
+                continue
+            vtype = self.lhs_graph_nx.nodes()[v]['type']
+            outside_verts = get_adjacent_boundary_vertices(subgraph_nx, matching[v])
+            if len(outside_verts) == 1 and \
+                subgraph_nx.edges()[(matching[v], outside_verts[0])]['type'] == EdgeType.SIMPLE and \
+                vtype != VertexType.W_INPUT:
+                continue
+            if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
+                self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
+            elif vtype == VertexType.H_BOX:
+                self.unfuse_h_box_vertex(graph, subgraph_nx, matching[v])
+            elif vtype == VertexType.W_OUTPUT or vtype == VertexType.W_INPUT:
+                self.unfuse_w_vertex(graph, subgraph_nx, matching[v], vtype)
+
+    def unfuse_update_edges(self, graph, subgraph_nx, old_v, new_v):
+        neighbors = list(graph.neighbors(old_v))
+        for b in neighbors:
+            if b not in subgraph_nx.nodes:
+                graph.add_edge((new_v, b), graph.edge_type((old_v, b)))
+                graph.remove_edge(graph.edge(old_v, b))
+
+    def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype):
+        new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
+        self.unfuse_update_edges(graph, subgraph_nx, v, new_v)
+        graph.add_edge(graph.edge(new_v, v))
+
+    def unfuse_h_box_vertex(self, graph, subgraph_nx, v):
+        new_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v)+0.3, row=graph.row(v)+0.3)
+        new_mid_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v), row=graph.row(v))
+        self.unfuse_update_edges(graph, subgraph_nx, v, new_h)
+        graph.add_edge((new_mid_h, v))
+        graph.add_edge((new_h, new_mid_h))
+
+    def unfuse_w_vertex(self, graph, subgraph_nx, v, vtype):
+        w_in, w_out = get_w_io(graph, v)
+        new_w_in = graph.add_vertex(VertexType.W_INPUT, qubit=graph.qubit(w_in), row=graph.row(w_in))
+        new_w_out = graph.add_vertex(VertexType.W_OUTPUT, qubit=graph.qubit(w_out), row=graph.row(w_out))
+        self.unfuse_update_edges(graph, subgraph_nx, w_in, new_w_in)
+        self.unfuse_update_edges(graph, subgraph_nx, w_out, new_w_out)
+        if vtype == VertexType.W_OUTPUT:
+            graph.add_edge((new_w_in, w_out))
+        else:
+            graph.add_edge((w_in, new_w_out))
+        graph.add_edge((new_w_in, new_w_out), EdgeType.W_IO)
+
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
-        subgraph_nx, _ = create_subgraph(graph, vertices)
-        graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
+        if self.is_rewrite_unfusable:
+            subgraph_nx = nx.Graph(to_networkx(graph).subgraph(vertices))
+            lhs_graph_nx = self.lhs_graph_without_boundaries_nx
+        else:
+            subgraph_nx, _ = create_subgraph(graph, vertices)
+            lhs_graph_nx = self.lhs_graph_nx
+        graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match('type', 1))
-        matchings = list(graph_matcher.match())
-        matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
-        if len(matchings) > 0:
-            return vertices
-        return []
+        matchings = filter_matchings_if_symbolic_compatible(graph_matcher.match(), lhs_graph_nx, subgraph_nx)
+        return vertices if matchings else []
 
     def to_json(self) -> str:
         return json.dumps({
@@ -114,6 +184,20 @@ class CustomRule:
         return {"text": self.name, "matcher": self.matcher, "rule": self, "type": MATCHES_VERTICES,
                 "tooltip": self.description, 'copy_first': False, 'returns_new_graph': False}
 
+
+def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:
+    # if any of the output edges of the lhs_graph is a Hadamard edge, then the rewrite is not unfusable
+    for v in lhs_graph.outputs():
+        for n in lhs_graph.neighbors(v):
+            if lhs_graph.edge_type((v, n)) == EdgeType.HADAMARD:
+                return False
+    # all nodes must be connected to at most one boundary node
+    for v in lhs_graph.vertices():
+        if lhs_graph.type(v) == VertexType.BOUNDARY:
+            continue
+        if len([n for n in lhs_graph.neighbors(v) if lhs_graph.type(n) == VertexType.BOUNDARY]) > 1:
+            return False
+    return True
 
 def get_linear(v):
     if not isinstance(v, Poly):
@@ -209,7 +293,7 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str,
                 boundary_node = 'b' + str(i)
                 boundary_mapping[boundary_node] = vn
                 subgraph_nx.add_node(boundary_node, type=VertexType.BOUNDARY)
-                subgraph_nx.add_edge(v, boundary_node, type=EdgeType.SIMPLE)
+                subgraph_nx.add_edge(v, boundary_node, type=graph.edge_type((v, vn)))
                 i += 1
     return subgraph_nx, boundary_mapping
 
