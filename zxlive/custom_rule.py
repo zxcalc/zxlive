@@ -111,18 +111,27 @@ class CustomRule:
             if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
                 self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
             elif vtype == VertexType.H_BOX:
-                raise NotImplementedError("Unfusing H_BOX vertices is not implemented yet")
-            elif vtype == VertexType.W_INPUT:
-                raise NotImplementedError("Unfusing W_INPUT vertices is not implemented yet")
+                self.unfuse_h_box_vertex(graph, subgraph_nx, matching[v])
+
+    def unfuse_update_edges(self, graph, subgraph_nx, old_v, new_v):
+        neighbors = list(graph.neighbors(old_v))
+        for b in neighbors:
+            if b not in subgraph_nx.nodes:
+                graph.add_edge((new_v, b), graph.edge_type((old_v, b)))
+                graph.remove_edge(graph.edge(old_v, b))
 
     def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype):
         new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
-        neighbors = list(graph.neighbors(v))
+        self.unfuse_update_edges(graph, subgraph_nx, v, new_v)
         graph.add_edge(graph.edge(new_v, v))
-        for b in neighbors:
-            if b not in subgraph_nx.nodes:
-                graph.add_edge((new_v, b), graph.edge_type((v, b)))
-                graph.remove_edge(graph.edge(v, b))
+
+    def unfuse_h_box_vertex(self, graph, subgraph_nx, v):
+        new_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v)+0.3, row=graph.row(v)+0.3)
+        new_mid_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v), row=graph.row(v))
+        self.unfuse_update_edges(graph, subgraph_nx, v, new_h)
+        graph.add_edge((new_mid_h, v))
+        graph.add_edge((new_h, new_mid_h))
+
 
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
