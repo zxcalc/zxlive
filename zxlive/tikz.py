@@ -6,12 +6,10 @@ from zxlive.proof import ProofModel
 
 def proof_to_tikz(proof: ProofModel) -> str:
     settings = QSettings("zxlive", "zxlive")
-    vspace = settings.value("tikz/layout/vspace")
-    hspace = settings.value("tikz/layout/hspace")
-    max_width = settings.value("tikz/layout/max-width")
+    vspace = float(settings.value("tikz/layout/vspace"))
+    hspace = float(settings.value("tikz/layout/hspace"))
+    max_width = float(settings.value("tikz/layout/max-width"))
     draw_scalar = False
-
-    assert isinstance(vspace, float) and isinstance(hspace, float) and isinstance(max_width, float)
 
     xoffset = -max_width
     yoffset = -10
