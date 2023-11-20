@@ -238,8 +238,8 @@ rules_zxw = {"spider", "fuse_w", "z_to_z_box"}
 rules_zh = {"had2edge", "fuse_hbox", "mult_hbox"}
 
 action_groups = {
-    "Custom rules": {},
     "Basic rules": {key: operations[key] for key in rules_basic},
+    "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,
     "ZXW rules": {key: operations[key] for key in rules_zxw},
     "ZH rules": {key: operations[key] for key in rules_zh},
