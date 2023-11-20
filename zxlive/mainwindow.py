@@ -36,8 +36,8 @@ from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite,
-                      save_diagram_dialog, safe_proof_dialog,
-                      safe_rule_dialog, get_lemma_name_and_description,
+                      save_diagram_dialog, save_proof_dialog,
+                      save_rule_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file, show_error_msg,
                       export_proof_dialog)
 from zxlive.settings_dialog import open_settings_dialog
@@ -365,10 +365,10 @@ class MainWindow(QMainWindow):
     def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
         if isinstance(self.active_panel, ProofPanel):
-            out = safe_proof_dialog(self.active_panel.proof_model, self)
+            out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
             check_rule(self.active_panel.get_rule(), show_error=True)
-            out = safe_rule_dialog(self.active_panel.get_rule(), self)
+            out = save_rule_dialog(self.active_panel.get_rule(), self)
         else:
             out = save_diagram_dialog(self.active_panel.graph_scene.g, self)
         if out is None: return False
@@ -548,7 +548,7 @@ class MainWindow(QMainWindow):
         lhs_graph = self.active_panel.proof_model.graphs[0]
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        safe_rule_dialog(rule, self)
+        save_rule_dialog(rule, self)
 
     def update_colors(self) -> None:
         if self.active_panel is not None:
