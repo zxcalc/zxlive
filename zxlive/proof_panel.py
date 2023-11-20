@@ -401,7 +401,6 @@ class ProofPanel(BasePanel):
         self.rewrites_panel.clicked.connect(model.do_rewrite)
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
         self.graph_scene.selectionChanged.connect(model.update_on_selection)
-        self.rewrites_panel.expandAll()
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
