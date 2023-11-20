@@ -220,25 +220,20 @@ def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, F
 
     return file_path, selected_format
 
-def safe_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
-    file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXProof.filter)
+def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str) -> Optional[tuple[str, FileFormat]]:
+    file_path_and_format = get_file_path_and_format(parent, filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
     file_path, selected_format = file_path_and_format
-    data = proof_model.to_json()
     if not write_to_file(file_path, data):
         return None
     return file_path, selected_format
 
-def safe_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
-    file_path_and_format = get_file_path_and_format(parent, FileFormat.ZXRule.filter)
-    if file_path_and_format is None or not file_path_and_format[0]:
-        return None
-    file_path, selected_format = file_path_and_format
-    data = rule.to_json()
-    if not write_to_file(file_path, data):
-        return None
-    return file_path, selected_format
+def save_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
+    return _save_rule_or_proof_dialog(proof_model.to_json(), parent, FileFormat.ZXProof.filter)
+
+def save_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
+    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter)
 
 def export_proof_dialog(parent: QWidget) -> Optional[str]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.TikZ.filter)
@@ -294,7 +289,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
             return
         rule = CustomRule(parent.left_graph, parent.right_graph, name.text(), description.toPlainText())
         check_rule(rule, show_error=True)
-        if safe_rule_dialog(rule, parent):
+        if save_rule_dialog(rule, parent):
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
