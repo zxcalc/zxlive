@@ -17,7 +17,7 @@ python_path = python
 # python packages to install
 # ordered-set = increase compile time performance of nuitka packaging
 # zstandard = provides final executable size optimization
-packages = nuitka==1.6.*,ordered_set,zstandard
+packages = nuitka==1.8.*,ordered_set,zstandard
 # buildozer = for deploying Android application
 android_packages = buildozer==1.5.*,cython==0.29.*
 
@@ -35,7 +35,9 @@ wheel_shiboken =
 [nuitka]
 # (str) specify any extra nuitka arguments
 # eg = extra_args = --show-modules --follow-stdlib
-extra_args = --quiet --noinclude-qt-translations=True
+extra_args = 
+	--quiet
+	--noinclude-qt-translations
 	--nofollow-import-to=IPython
 	--nofollow-import-to=scipy
 	--nofollow-import-to=pytest
@@ -44,7 +46,7 @@ extra_args = --quiet --noinclude-qt-translations=True
 	--nofollow-import-to=sympy
 	--nofollow-import-to=ipywidgets
 	--nofollow-import-to=tkinter
-	--include-data-dir=./zxlive/icons=zxlive/icons
+#	--include-data-dir = ./zxlive/icons=zxlive/icons
 
 [buildozer]
 # build mode
