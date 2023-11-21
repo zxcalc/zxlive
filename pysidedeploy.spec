@@ -7,7 +7,7 @@ project_dir = ./zxlive
 # source file path
 input_file = __main__.py
 # directory where exec is stored
-exec_directory = ./zxlive
+exec_directory = ./build
 # path to .pyproject project file
 project_file = 
 
@@ -17,9 +17,9 @@ python_path = python
 # python packages to install
 # ordered-set = increase compile time performance of nuitka packaging
 # zstandard = provides final executable size optimization
-packages = nuitka==1.5.5,ordered_set,zstandard
+packages = nuitka==1.6.*,ordered_set,zstandard
 # buildozer = for deploying Android application
-android_packages = buildozer==1.5.0,cython==0.29.33
+android_packages = buildozer==1.5.*,cython==0.29.*
 
 [qt]
 # comma separated path to qml files required
