@@ -25,8 +25,14 @@ jobs:
       - name: Install dependencies
         run:
           pip install .
+      - name: Fix pysidedeploy.spec file specific to MacOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          sed -i '' '48i\
+              --macos-create-app-bundles\
+          ' pysidedeploy.spec
       - name: Build ZXLive
-        run: pyside6-deploy -c pysidedeploy.spec -f
+        run: pyside6-deploy -v -f -c pysidedeploy.spec
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
