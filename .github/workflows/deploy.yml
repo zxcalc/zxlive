@@ -37,7 +37,7 @@ jobs:
           [System.IO.Compression.ZipFile]::ExtractToDirectory("Dependencies_x64_Release.zip", "Dependencies_x64_Release")
           ls
           ls Dependencies_x64_Release
-          mv Dependencies_x64_Release\Dependencies.exe C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
+          Move-Item -Path Dependencies_x64_Release\Dependencies.exe -Destination C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
       - name: Install dependencies
         run:
           pip install .
