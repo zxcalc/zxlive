@@ -3,11 +3,11 @@
 title = ZXLive
 # project directory. the general assumption is that project_dir is the parent directory
 # of input_file
-project_dir = ./zxlive
+project_dir = ./zxlive/
 # source file path
 input_file = __main__.py
 # directory where exec is stored
-exec_directory = ./build
+exec_directory = ./build/
 # path to .pyproject project file
 project_file = 
 
@@ -34,9 +34,8 @@ wheel_shiboken =
 
 [nuitka]
 # (str) specify any extra nuitka arguments
-# eg = extra_args = --show-modules --follow-stdlib
+# for arm macos add
 extra_args = 
-	--quiet
 	--noinclude-qt-translations
 	--nofollow-import-to=IPython
 	--nofollow-import-to=scipy
@@ -46,7 +45,9 @@ extra_args =
 	--nofollow-import-to=sympy
 	--nofollow-import-to=ipywidgets
 	--nofollow-import-to=tkinter
-#	--include-data-dir = ./zxlive/icons=zxlive/icons
+	--deployment
+	--disable-console
+	--include-package-data=zxlive.icons
 
 [buildozer]
 # build mode
