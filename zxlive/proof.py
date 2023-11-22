@@ -119,7 +119,7 @@ class ProofModel(QAbstractListModel):
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
-        initial_graph_tikz = self.graphs[0].to_tikz()
+        initial_graph_tikz = self.graphs[0].to_json()
         proof_steps = []
         for step in self.steps:
             proof_steps.append(step.to_json())
@@ -132,7 +132,7 @@ class ProofModel(QAbstractListModel):
     def from_json(json_str: str) -> "ProofModel":
         """Deserializes the model from JSON."""
         d = json.loads(json_str)
-        initial_graph = GraphT.from_tikz(d["initial_graph"])
+        initial_graph = GraphT.from_json(d["initial_graph"])
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(initial_graph, GraphT)  # type: ignore
         model = ProofModel(initial_graph)
