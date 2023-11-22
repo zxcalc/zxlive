@@ -12,8 +12,7 @@ jobs:
   build_and_deploy:
     strategy:
       matrix:
-#        os: [ ubuntu-latest, windows-latest, macos-latest ]
-        os: [ windows-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
         python-version: [ 3.11 ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -32,11 +31,11 @@ jobs:
       - name: Download Dependencies executable instead of Dependency Walker - Specific to Windows
         if: matrix.os == 'windows-latest'
         run: |
-          Invoke-WebRequest -Uri 'https://github.com/lucasg/Dependencies/releases/download/v1.11.1/Dependencies_x64_Release.zip' -OutFile 'Dependencies_x64_Release.zip'
+          Invoke-WebRequest -Uri 'https://dependencywalker.com/depends22_x86.zip' -OutFile 'depends22_x86.zip'
           Add-Type -AssemblyName System.IO.Compression.FileSystem ;
-          [System.IO.Compression.ZipFile]::ExtractToDirectory("Dependencies_x64_Release.zip", "Dependencies_x64_Release")
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("depends22_x86.zip", "depends22_x86")
           New-Item -ItemType Directory -Path C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\ -Force
-          Move-Item -Path Dependencies_x64_Release\Dependencies.exe -Destination C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
+          Move-Item -Path depends22_x86\depends.exe -Destination C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
       - name: Install dependencies
         run:
           pip install .
