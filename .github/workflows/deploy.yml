@@ -22,9 +22,6 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
-      - name: Install dependencies
-        run:
-          pip install .
       - name: Fix pysidedeploy.spec file - Specific to MacOS
         if: matrix.os == 'macos-latest'
         run: |
@@ -34,10 +31,13 @@ jobs:
       - name: Download Dependencies executable instead of Dependency Walker - Specific to Windows
         if: matrix.os == 'windows-latest'
         run: |
-          Invoke-WebRequest -Uri 'https://github.com/lucasg/Dependencies/releases/download/v1.11.1/Dependencies_x64_Release.zip' -OutFile '$PWD\Dependencies_x64_Release.zip'
+          Invoke-WebRequest -Uri 'https://github.com/lucasg/Dependencies/releases/download/v1.11.1/Dependencies_x64_Release.zip' -OutFile 'Dependencies_x64_Release.zip'
           Add-Type -AssemblyName System.IO.Compression.FileSystem ;
-          [System.IO.Compression.ZipFile]::ExtractToDirectory("$PWD\Dependencies_x64_Release.zip", "$PWD")
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("Dependencies_x64_Release.zip", ".")
           mv Dependencies_x64_Release\Dependencies.exe C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
+      - name: Install dependencies
+        run:
+          pip install .
       - name: Build ZXLive
         run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
       - name: Fix deployment file location - Specific to MacOS
