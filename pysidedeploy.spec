@@ -34,7 +34,7 @@ wheel_shiboken =
 
 [nuitka]
 # (str) specify any extra nuitka arguments
-# for arm macos add
+# for arm macos add --macos-create-app-bundle
 extra_args = 
 	--noinclude-qt-translations
 	--nofollow-import-to=IPython
@@ -48,6 +48,7 @@ extra_args =
 	--deployment
 	--disable-console
 	--include-package-data=zxlive.icons
+	--macos-create-app-bundle
 
 [buildozer]
 # build mode
