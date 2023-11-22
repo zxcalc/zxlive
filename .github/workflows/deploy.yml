@@ -12,7 +12,8 @@ jobs:
   build_and_deploy:
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest, macos-latest ]
+#        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        os: [ windows-latest ]
         python-version: [ 3.11 ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -34,6 +35,8 @@ jobs:
           Invoke-WebRequest -Uri 'https://github.com/lucasg/Dependencies/releases/download/v1.11.1/Dependencies_x64_Release.zip' -OutFile 'Dependencies_x64_Release.zip'
           Add-Type -AssemblyName System.IO.Compression.FileSystem ;
           [System.IO.Compression.ZipFile]::ExtractToDirectory("Dependencies_x64_Release.zip", "Dependencies_x64_Release")
+          ls
+          ls Dependencies_x64_Release
           mv Dependencies_x64_Release\Dependencies.exe C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
       - name: Install dependencies
         run:
