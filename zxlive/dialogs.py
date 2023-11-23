@@ -103,7 +103,14 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
 
 
 def create_circuit_dialog(parent: QWidget) -> Optional[str]:
-    s, success = QInputDialog.getMultiLineText(parent, "Circuit input", "Write a circuit in QASM format", "qreg qs[3];\n")
+    """Shows a dialog to input a circuit in QASM format."""
+    explanation = """Write a circuit in QASM format. Example:
+    qreg q[3];
+    cx q[0], q[1];
+    h q[2];
+    ccx q[0], q[1], q[2];
+    """
+    s, success = QInputDialog.getMultiLineText(parent, "Circuit input", explanation, "qreg q[3];\n")
     return s if success else None
 
 
