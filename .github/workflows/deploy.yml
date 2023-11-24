@@ -1,9 +1,9 @@
-name: deploy
+name: Deploy and release
 
 on:
   push:
     tags:
-      - '*'
+      - "v*.*.*"
 
 env:
   SRC_DIR: zxlive
@@ -12,7 +12,7 @@ jobs:
   build_and_deploy:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
         python-version: [ 3.11 ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -21,12 +21,33 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install base package
-        run: pip install cx_freeze
-      - name: Deploy
+          cache: 'pip'
+      - name: Download Dependency Walker - Specific to Windows
+        # If this is not done, Nuitka crashes weirdly.
+        if: matrix.os == 'windows-latest'
         run: |
-          python deploy.py build
-      - name: Publish
+          Invoke-WebRequest -Uri 'https://dependencywalker.com/depends22_x86.zip' -OutFile 'depends22_x86.zip'
+          Add-Type -AssemblyName System.IO.Compression.FileSystem ;
+          [System.IO.Compression.ZipFile]::ExtractToDirectory("depends22_x86.zip", "depends22_x86")
+          New-Item -ItemType Directory -Path C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\ -Force
+          Move-Item -Path depends22_x86\depends.exe -Destination C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
+      - name: Install dependencies
+        run:
+          pip install .
+      - name: Build ZXLive
+        run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
+      - name: Rename files, fix deployment file location - Windows
+        if: matrix.os == 'windows-latest'
+        run: mv build/__main__.exe ./zxlive_app_windows.exe
+      - name: Rename files, fix deployment file location - Linux, MacOS
+        if: matrix.os != 'windows-latest'
         run: |
-          ls build
-          echo "TODO: publish build/zxlive and the related files"
+          if [ "$RUNNER_OS" == "Linux" ]; then
+              mv build/__main__.bin ./zxlive_app_linux.bin 
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+              mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_app_macos.bin
+          fi
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: zxlive_app_*
