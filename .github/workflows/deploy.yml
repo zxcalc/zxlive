@@ -36,12 +36,14 @@ jobs:
           pip install .
       - name: Build ZXLive
         run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
-      - name: Rename files, fix deployment file location
+      - name: Rename files, fix deployment file location - Windows
+        if: matrix.os == 'windows-latest'
+        run: mv build/__main__.exe ./zxlive_windows.exe
+      - name: Rename files, fix deployment file location - Linux, MacOS
+        if: matrix.os != 'windows-latest'
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
               mv build/__main__.bin ./zxlive_linux.bin 
-          elif [ "$RUNNER_OS" == "Windows" ]; then
-              mv build/__main__.bin ./zxlive_windows.exe
           elif [ "$RUNNER_OS" == "macOS" ]; then
               mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_macos.command
           fi
