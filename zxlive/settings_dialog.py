@@ -15,12 +15,12 @@
 
 from __future__ import annotations
 
-from typing import Optional,TYPE_CHECKING, Dict, Any
+from typing import TYPE_CHECKING, Dict, Any
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream, QSettings, Qt
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget,
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import (QDialog, QFileDialog,
+                               QFormLayout, QLineEdit,
+                               QPushButton, QWidget,
                                QVBoxLayout, QSpinBox, QDoubleSpinBox,
                                QLabel, QHBoxLayout, QTabWidget,
                                 QComboBox)

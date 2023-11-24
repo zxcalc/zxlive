@@ -1,6 +1,6 @@
 import os
 from enum import IntEnum
-from typing import Final, Optional
+from typing import Final
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings

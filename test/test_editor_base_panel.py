@@ -14,8 +14,6 @@
 # limitations under the License.
 
 
-from fractions import Fraction
-
 import pytest
 
 from zxlive.editor_base_panel import string_to_complex

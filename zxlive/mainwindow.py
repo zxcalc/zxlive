@@ -21,7 +21,7 @@ from typing import Callable, Optional
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
                             QSettings, QTextStream, Qt)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
-from PySide6.QtWidgets import (QDialog, QFormLayout, QMainWindow, QMessageBox,
+from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
 
