@@ -1,9 +1,9 @@
-name: deploy
+name: Deploy and relase
 
 on:
   push:
 #    tags:
-#      - '*'
+#      - "v*.*.*"
 
 env:
   SRC_DIR: zxlive
@@ -22,13 +22,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
-      - name: Fix pysidedeploy.spec file - Specific to MacOS
-        if: matrix.os == 'macos-latest'
-        run: |
-          sed -i '' '48i\
-              --macos-create-app-bundle\
-          ' pysidedeploy.spec
-      - name: Download Dependencies executable instead of Dependency Walker - Specific to Windows
+      - name: Download Dependency Walker - Specific to Windows
+        # If this is not done, Nuitka crashes weirdly.
         if: matrix.os == 'windows-latest'
         run: |
           Invoke-WebRequest -Uri 'https://dependencywalker.com/depends22_x86.zip' -OutFile 'depends22_x86.zip'
@@ -41,11 +36,20 @@ jobs:
           pip install .
       - name: Build ZXLive
         run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
-      - name: Fix deployment file location - Specific to MacOS
-        if: matrix.os == 'macos-latest'
-        run: mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ build/__main__.bin
+      - name: Rename files, fix deployment file location
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+              mv build/__main__.bin ./zxlive_linux.bin 
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+              mv build/__main__.bin ./zxlive_windows.exe
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+              mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_macos.command
+          fi
+#      - name: Release
+#        uses: softprops/action-gh-release@v1
+#        with:
+#          files: zxlive_*
       - name: Upload build
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.os }}
-          path: build/*
+          path: zxlive_*
