@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zxlive"
-version = "0.1"
+version = "0.1.1"
 description = "An interactive tool for the ZX-calculus"
 readme = "README.md"
 requires-python = ">=3.9"
