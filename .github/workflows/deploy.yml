@@ -2,8 +2,8 @@ name: Deploy and relase
 
 on:
   push:
-#    tags:
-#      - "v*.*.*"
+    tags:
+      - "v*.*.*"
 
 env:
   SRC_DIR: zxlive
@@ -38,20 +38,16 @@ jobs:
         run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
       - name: Rename files, fix deployment file location - Windows
         if: matrix.os == 'windows-latest'
-        run: mv build/__main__.exe ./zxlive_windows.exe
+        run: mv build/__main__.exe ./zxlive_app_windows.exe
       - name: Rename files, fix deployment file location - Linux, MacOS
         if: matrix.os != 'windows-latest'
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-              mv build/__main__.bin ./zxlive_linux.bin 
+              mv build/__main__.bin ./zxlive_app_linux.bin 
           elif [ "$RUNNER_OS" == "macOS" ]; then
-              mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_macos.command
+              mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_app_macos.bin
           fi
-#      - name: Release
-#        uses: softprops/action-gh-release@v1
-#        with:
-#          files: zxlive_*
-      - name: Upload build
-        uses: actions/upload-artifact@v3
+      - name: Release
+        uses: softprops/action-gh-release@v1
         with:
-          path: zxlive_*
+          files: zxlive_app_*
