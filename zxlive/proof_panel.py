@@ -18,7 +18,7 @@ from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep
+from .commands import AddRewriteStep, GoToRewriteStep, MoveNodeInStep, UndoableChange
 from .common import (ET, VT, GraphT, get_data,
                      pos_from_view, pos_to_view, colors)
 from .dialogs import show_error_msg
@@ -65,8 +65,26 @@ class ProofPanel(BasePanel):
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self.step_view.doubleClicked.connect(self.__doubleClickHandler)
 
         self.splitter.addWidget(self.step_view)
+
+    def __doubleClickHandler(self, index: QModelIndex | QPersistentModelIndex):
+        # The first row in the item list is the START step, which is not interactive
+        if index.row() == 0:
+            return
+
+        new_name, ok = QInputDialog.getText(self, "Rename proof step", "Enter new name")
+
+        if ok:
+            # Subtract 1 from index since the START step isn't part of the model
+            old_name = self.proof_model.steps[index.row()-1].display_name
+            cmd = UndoableChange(self,
+                lambda: self.proof_model.rename_step(index.row()-1, old_name),
+                lambda: self.proof_model.rename_step(index.row()-1, new_name)
+            )
+
+            self.undo_stack.push(cmd)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         icon_size = QSize(32, 32)

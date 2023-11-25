@@ -47,6 +47,18 @@ class BaseCommand(QUndoCommand):
         #  we could store "dirty flags" for each node/edge.
         self.graph_view.update_graph(self.g, select_new)
 
+@dataclass
+class UndoableChange(BaseCommand):
+    """ Generic undoable change in the graph that can be appended to the
+    undo stack
+
+    Can be initialised as: UndoableChange(<parent>, <undo_cmd>, <redo_cmd>)
+
+    Where <parent> must contain the graph_view attribute as it is used in
+    BaseCommand.
+    """
+    undo: Callable[[], None]
+    redo: Callable[[], None]
 
 @dataclass
 class SetGraph(BaseCommand):
@@ -370,7 +382,7 @@ class AddRewriteStep(SetGraph):
             self._old_steps.append(self.proof_model.pop_rewrite())
 
         diff = self.diff or GraphDiff(self.g, self.new_g)
-        self.proof_model.add_rewrite(Rewrite(self.name, diff), self.new_g)
+        self.proof_model.add_rewrite(Rewrite(self.name, self.name, diff), self.new_g)
 
         # Select the added step
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
