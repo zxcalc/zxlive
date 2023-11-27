@@ -6,7 +6,7 @@ import networkx as nx
 import numpy as np
 import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
-                                             categorical_node_match)
+                                             categorical_node_match, categorical_edge_match)
 from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType, get_w_io
 from shapely import Polygon
@@ -40,7 +40,8 @@ class CustomRule:
 
         subgraph_nx, boundary_mapping = create_subgraph(graph, vertices)
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match('type', 1))
+            node_match=categorical_node_match('type', 1),
+            edge_match=categorical_edge_match('type', 1))
         matchings = graph_matcher.match()
         matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
         if len(matchings) == 0:
@@ -158,7 +159,8 @@ class CustomRule:
             subgraph_nx, _ = create_subgraph(graph, vertices)
             lhs_graph_nx = self.lhs_graph_nx
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx,
-            node_match=categorical_node_match('type', 1))
+            node_match=categorical_node_match('type', 1),
+            edge_match=categorical_edge_match('type', 1))
         matchings = filter_matchings_if_symbolic_compatible(graph_matcher.match(), lhs_graph_nx, subgraph_nx)
         return vertices if matchings else []
 
