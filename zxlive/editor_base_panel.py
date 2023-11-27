@@ -80,8 +80,7 @@ class EditorBasePanel(BasePanel):
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
         self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked)
         self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked)
-        self._populate_variables()
-        self.variable_viewer = VariableViewer(self.variable_types)
+        self.variable_viewer = VariableViewer(self)
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
         self.sidebar.addWidget(self.variable_viewer)
@@ -93,9 +92,6 @@ class EditorBasePanel(BasePanel):
     def update_colors(self) -> None:
         super().update_colors()
         self.update_side_bar()
-
-    def _populate_variables(self) -> None:
-        self.variable_types = self.graph.variable_types.copy()
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene.curr_tool = tool
@@ -158,7 +154,8 @@ class EditorBasePanel(BasePanel):
         self.undo_stack.push(MoveNode(self.graph_view, vs))
 
     def vert_double_clicked(self, v: VT) -> None:
-        graph = self.graph_view.graph_scene.g
+        graph = self.graph
+        old_variables = graph.variable_types.copy()
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
 
@@ -184,20 +181,18 @@ class EditorBasePanel(BasePanel):
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
         # For some reason it is important we first push to the stack before we do the following.
-        if len(graph.variable_types) != len(self.variable_types):
-            new_vars = graph.variable_types.keys() - self.variable_types.keys()
-            self.variable_types.update(graph.variable_types)
+        if len(graph.variable_types) != len(old_variables):
+            new_vars = graph.variable_types.keys() - old_variables.keys()
+            #self.graph.variable_types.update(graph.variable_types)
             for v in new_vars:
                 self.variable_viewer.add_item(v)
 
 
 class VariableViewer(QScrollArea):
 
-    def __init__(self, variable_types: dict[str, bool]) -> None:
+    def __init__(self, parent: EditorBasePanel) -> None:
         super().__init__()
-
-        self._variable_types = variable_types
-
+        self.parent = parent
         self._widget = QWidget()
         lpal = QApplication.palette("QListWidget")  # type: ignore
         palette = QPalette()
@@ -237,7 +232,7 @@ class VariableViewer(QScrollArea):
 
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
 
-        for name in variable_types.keys():
+        for name in self.parent.graph.variable_types.keys():
             self.add_item(name)
 
         self.setWidget(self._widget)
@@ -258,7 +253,7 @@ class VariableViewer(QScrollArea):
     def add_item(self, name: str) -> None:
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
-        if self._variable_types[name]:
+        if self.parent.graph.variable_types[name]:
             combobox.setCurrentIndex(1)
         else:
             combobox.setCurrentIndex(0)
@@ -279,9 +274,9 @@ class VariableViewer(QScrollArea):
 
     def _text_changed(self, name: str, text: str) -> None:
         if text == "Parametric":
-            self._variable_types[name] = False
+            self.parent.graph.variable_types[name] = False
         elif text == "Boolean":
-            self._variable_types[name] = True
+            self.parent.graph.variable_types[name] = True
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
