@@ -27,67 +27,10 @@ from PySide6.QtWidgets import (QDialog, QFileDialog,
 
 import pyzx
 
-from .common import set_pyzx_tikz_settings, colors
+from .common import set_pyzx_tikz_settings, colors, setting, color_schemes, defaults
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
-
-defaults: Dict[str,Any] = {
-    "path/custom-rules": "lemmas/",
-    "color-scheme": "modern-red-green",
-
-    "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
-    "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
-    "tikz/X-spider-export": pyzx.settings.tikz_classes['X'],
-    "tikz/Z-phase-export": pyzx.settings.tikz_classes['Z phase'],
-    "tikz/X-phase-export": pyzx.settings.tikz_classes['X phase'],
-    "tikz/z-box-export": pyzx.settings.tikz_classes['Z box'],
-    "tikz/Hadamard-export": pyzx.settings.tikz_classes['H'],
-    "tikz/w-output-export": pyzx.settings.tikz_classes['W'],
-    "tikz/w-input-export": pyzx.settings.tikz_classes['W input'],
-    "tikz/edge-export": pyzx.settings.tikz_classes['edge'],
-    "tikz/edge-H-export": pyzx.settings.tikz_classes['H-edge'],
-    "tikz/edge-W-export": pyzx.settings.tikz_classes['W-io-edge'],
-
-    "tikz/boundary-import": ", ".join(pyzx.tikz.synonyms_boundary),
-    "tikz/Z-spider-import": ", ".join(pyzx.tikz.synonyms_z),
-    "tikz/X-spider-import": ", ".join(pyzx.tikz.synonyms_x),
-    "tikz/Hadamard-import": ", ".join(pyzx.tikz.synonyms_hadamard),
-    "tikz/w-input-import": ", ".join(pyzx.tikz.synonyms_w_input),
-    "tikz/w-output-import": ", ".join(pyzx.tikz.synonyms_w_output),
-    "tikz/z-box-import": ", ".join(pyzx.tikz.synonyms_z_box),
-    "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
-    "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
-    "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
-
-    "tikz/layout/hspace": 2.0,
-    "tikz/layout/vspace": 2.0,
-    "tikz/layout/max-width": 10.0,
-
-    "tikz/names/fuse spiders": "f",
-    "tikz/names/bialgebra": "b",
-    "tikz/names/change color to Z": "cc",
-    "tikz/names/change color to X": "cc",
-    "tikz/names/remove identity": "id",
-    "tikz/names/Add Z identity": "id",
-    "tikz/names/copy 0/pi spider": "cp",
-    "tikz/names/push Pauli": "pi",
-    "tikz/names/decompose hadamard": "eu",
-}
-
-color_schemes = {
-    'modern-red-green': "Modern Red & Green",
-    'classic-red-green': "Classic Red & Green",
-    'white-grey': "Dodo book White & Grey",
-    'gidney': "Gidney's Black & White",
-}
-
-
-# Initialise settings
-settings = QSettings("zxlive", "zxlive")
-for key, value in defaults.items():
-    if not settings.contains(key):
-        settings.setValue(key, value)
 
 
 class SettingsDialog(QDialog):
@@ -118,6 +61,8 @@ class SettingsDialog(QDialog):
         vlayout.addWidget(w)
         self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
         self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
+        self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo', 
+                         data={2: "2", 4: "4", 8: "8", 16: "16"})
         self.prev_color_scheme = self.settings.value("color-scheme")
         vlayout.addStretch()
 
@@ -270,7 +215,6 @@ class SettingsDialog(QDialog):
             hlayout.addWidget(button)
         elif ty == 'combo':
             widget = QComboBox()
-            val = str(val)
             assert isinstance(data, dict)
             widget.addItems(list(data.values()))
             widget.setCurrentText(data[val])
@@ -296,6 +240,7 @@ class SettingsDialog(QDialog):
             elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
                 self.settings.setValue(name, widget.text_value)
         set_pyzx_tikz_settings()
+        setting.update()
         if self.settings.value("color-scheme") != self.prev_color_scheme:
             theme = self.settings.value("color-scheme")
             assert isinstance(theme, str)

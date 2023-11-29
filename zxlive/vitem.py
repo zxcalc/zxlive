@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
 
-from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view, colors
+from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, setting, pos_to_view, pos_from_view, colors
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -231,9 +231,12 @@ class VItem(QGraphicsPathItem):
         # event and returning a new position
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and not self.is_animated:
             assert isinstance(value, QPointF)
-            grid_size = SCALE / 8
-            x = round(value.x() / grid_size) * grid_size
-            y = round(value.y() / grid_size) * grid_size
+            if self.ty == VertexType.W_INPUT:
+                x = value.x()
+                y = value.y()
+            else:
+                x = round(value.x() / setting.SNAP) * setting.SNAP
+                y = round(value.y() / setting.SNAP) * setting.SNAP
             return QPointF(x, y)
 
         # When selecting/deselecting items, we move them to the front/back

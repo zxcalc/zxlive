@@ -1,6 +1,6 @@
 import os
 from enum import IntEnum
-from typing import Final
+from typing import Final, Dict, Any
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
@@ -28,7 +28,79 @@ class ToolType(IntEnum):
     VERTEX = 1
     EDGE = 2
 
-SCALE: Final = 60.0
+SCALE: Final = 64.0
+
+
+defaults: Dict[str,Any] = {
+    "path/custom-rules": "lemmas/",
+    "color-scheme": "modern-red-green",
+    "snap-granularity": 4,
+
+    "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
+    "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
+    "tikz/X-spider-export": pyzx.settings.tikz_classes['X'],
+    "tikz/Z-phase-export": pyzx.settings.tikz_classes['Z phase'],
+    "tikz/X-phase-export": pyzx.settings.tikz_classes['X phase'],
+    "tikz/z-box-export": pyzx.settings.tikz_classes['Z box'],
+    "tikz/Hadamard-export": pyzx.settings.tikz_classes['H'],
+    "tikz/w-output-export": pyzx.settings.tikz_classes['W'],
+    "tikz/w-input-export": pyzx.settings.tikz_classes['W input'],
+    "tikz/edge-export": pyzx.settings.tikz_classes['edge'],
+    "tikz/edge-H-export": pyzx.settings.tikz_classes['H-edge'],
+    "tikz/edge-W-export": pyzx.settings.tikz_classes['W-io-edge'],
+
+    "tikz/boundary-import": ", ".join(pyzx.tikz.synonyms_boundary),
+    "tikz/Z-spider-import": ", ".join(pyzx.tikz.synonyms_z),
+    "tikz/X-spider-import": ", ".join(pyzx.tikz.synonyms_x),
+    "tikz/Hadamard-import": ", ".join(pyzx.tikz.synonyms_hadamard),
+    "tikz/w-input-import": ", ".join(pyzx.tikz.synonyms_w_input),
+    "tikz/w-output-import": ", ".join(pyzx.tikz.synonyms_w_output),
+    "tikz/z-box-import": ", ".join(pyzx.tikz.synonyms_z_box),
+    "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
+    "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
+    "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
+
+    "tikz/layout/hspace": 2.0,
+    "tikz/layout/vspace": 2.0,
+    "tikz/layout/max-width": 10.0,
+
+    "tikz/names/fuse spiders": "f",
+    "tikz/names/bialgebra": "b",
+    "tikz/names/change color to Z": "cc",
+    "tikz/names/change color to X": "cc",
+    "tikz/names/remove identity": "id",
+    "tikz/names/Add Z identity": "id",
+    "tikz/names/copy 0/pi spider": "cp",
+    "tikz/names/push Pauli": "pi",
+    "tikz/names/decompose hadamard": "eu",
+}
+
+color_schemes = {
+    'modern-red-green': "Modern Red & Green",
+    'classic-red-green': "Classic Red & Green",
+    'white-grey': "Dodo book White & Grey",
+    'gidney': "Gidney's Black & White",
+}
+
+
+# Initialise settings
+settings = QSettings("zxlive", "zxlive")
+for key, value in defaults.items():
+    if not settings.contains(key):
+        settings.setValue(key, value)
+        
+
+class Settings(object):
+    SNAP_DIVISION = 4  # Should be an integer dividing SCALE
+    def __init__(self):
+        self.update()
+
+    def update(self):
+        settings = QSettings("zxlive", "zxlive")
+        self.SNAP_DIVISION = int(settings.value("snap-granularity"))
+        self.SNAP = SCALE / self.SNAP_DIVISION
+
+setting = Settings()
 
 # Offsets should be a multiple of SCALE for grid snapping to work properly
 OFFSET_X: Final = 300 * SCALE
@@ -40,6 +112,7 @@ ANIMATION_DURATION: Final = 400
 
 MIN_ZOOM = 0.05
 MAX_ZOOM = 10.0
+
 
 def pos_to_view(x:float,y: float) -> tuple[float, float]:
     return (x * SCALE + OFFSET_X, y * SCALE + OFFSET_Y)
