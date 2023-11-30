@@ -78,16 +78,16 @@ class EditorBasePanel(BasePanel):
     def create_side_bar(self) -> None:
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
-        self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked)
-        self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked)
+        self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked, self._vty_double_clicked)
+        self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked, self._ety_double_clicked)
         self.variable_viewer = VariableViewer(self)
         self.sidebar.addWidget(self.vertex_list)
         self.sidebar.addWidget(self.edge_list)
         self.sidebar.addWidget(self.variable_viewer)
 
     def update_side_bar(self) -> None:
-        populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked)
-        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked)
+        populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked, self._vty_double_clicked)
+        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked)
 
     def update_colors(self) -> None:
         super().update_colors()
@@ -98,12 +98,18 @@ class EditorBasePanel(BasePanel):
 
     def _vty_clicked(self, vty: VertexType.Type) -> None:
         self._curr_vty = vty
+
+    def _vty_double_clicked(self, vty: VertexType.Type) -> None:
+        self._curr_vty = vty
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) > 0:
             cmd = ChangeNodeType(self.graph_view, selected, vty)
             self.undo_stack.push(cmd)
 
     def _ety_clicked(self, ety: EdgeType.Type) -> None:
+        self._curr_ety = ety
+
+    def _ety_double_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
         selected = list(self.graph_scene.selected_edges)
@@ -308,7 +314,9 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
 
 def create_list_widget(parent: EditorBasePanel,
                        data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
-                       onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) -> QListWidget:
+                       onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None],
+                       ondoubleclick: Callable[[VertexType.Type, None] | Callable[[EdgeType.Type], None]]) \
+                          -> QListWidget:
     list_widget = QListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
     list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -317,15 +325,16 @@ def create_list_widget(parent: EditorBasePanel,
     list_widget.setGridSize(QSize(60, 64))
     list_widget.setWordWrap(True)
     list_widget.setIconSize(QSize(24, 24))
-    populate_list_widget(list_widget, data, onclick)
+    populate_list_widget(list_widget, data, onclick, ondoubleclick)
     list_widget.setCurrentItem(list_widget.item(0))
     return list_widget
 
 
 def populate_list_widget(list_widget: QListWidget,
                          data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
-                         onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) \
-        -> None:
+                         onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None],
+                         ondoubleclick: Callable[[VertexType.Type, None] | Callable[[EdgeType.Type], None]]) \
+                            -> None:
     row = list_widget.currentRow()
     list_widget.clear()
     for typ, value in data.items():
@@ -334,6 +343,7 @@ def populate_list_widget(list_widget: QListWidget,
         item.setData(Qt.ItemDataRole.UserRole, typ)
         list_widget.addItem(item)
     list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
+    list_widget.itemDoubleClicked.connect(lambda x: ondoubleclick(x.data(Qt.ItemDataRole.UserRole)))
     list_widget.setCurrentRow(row)
 
 
