@@ -1,7 +1,8 @@
 import json
 from typing import NamedTuple, Union, Any
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, QPersistentModelIndex, Qt
+from PySide6.QtCore import (QAbstractListModel, QModelIndex, QPersistentModelIndex,
+                            Qt, QAbstractItemModel)
 from PySide6.QtGui import QFont
 from pyzx.graph import GraphDiff
 
@@ -11,12 +12,14 @@ from .common import GraphT
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
+    display_name: str # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     diff: GraphDiff  # Diff from the last step to this step
 
     def to_json(self) -> str:
         """Serializes the rewrite to JSON."""
         return json.dumps({
+            "display_name": self.display_name,
             "rule": self.rule,
             "diff": self.diff.to_json()
         })
@@ -25,7 +28,9 @@ class Rewrite(NamedTuple):
     def from_json(json_str: str) -> "Rewrite":
         """Deserializes the rewrite from JSON."""
         d = json.loads(json_str)
+
         return Rewrite(
+            display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
             rule=d["rule"],
             diff=GraphDiff.from_json(d["diff"])
         )
@@ -66,7 +71,7 @@ class ProofModel(QAbstractListModel):
             if index.row() == 0:
                 return "START"
             else:
-                return self.steps[index.row()-1].rule
+                return self.steps[index.row()-1].display_name
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
 
@@ -116,6 +121,19 @@ class ProofModel(QAbstractListModel):
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(copy, GraphT)  # type: ignore
         return copy
+
+    def rename_step(self, index: int, name: str):
+        """Change the display name"""
+        old_step = self.steps[index]
+
+        # Must create a new Rewrite object instead of modifying current object
+        # since Rewrite inherits NamedTuple and is hence immutable
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.diff)
+
+        # Rerender the proof step otherwise it will display the old name until
+        # the cursor moves
+        modelIndex = self.createIndex(index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
