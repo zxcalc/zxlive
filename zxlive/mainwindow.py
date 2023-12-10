@@ -181,6 +181,9 @@ class MainWindow(QMainWindow):
         self.fit_view_action.setEnabled(has_active_tab)
         self.show_matrix_action.setEnabled(has_active_tab)
 
+        # Export to tikz is enabled only if there is a proof in the active tab.
+        self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+
         # Paste is enabled only if there is something in the clipboard.
         self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
 
@@ -253,6 +256,7 @@ class MainWindow(QMainWindow):
         self._redo_changed()
         if self.active_panel:
             self.active_panel.update_colors()
+            self._reset_menus(True)
 
     def _undo_changed(self) -> None:
         if self.active_panel:
@@ -318,6 +322,8 @@ class MainWindow(QMainWindow):
         self.tab_widget.removeTab(i)
         if self.tab_widget.count() == 0:
             self._reset_menus(False)
+        else:
+            self._reset_menus(True)
         return True
 
     def handle_save_file_action(self) -> bool:

@@ -66,8 +66,26 @@ def test_undo_redo_actions(app: MainWindow) -> None:
 
 
 def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
+    # Demo graph is not a proof, so export to tikz should be disabled.
     assert app.active_panel is not None
     assert isinstance(app.active_panel, GraphEditPanel)
+    assert not app.export_tikz_proof.isEnabled()
+
+    # Start a derivation. Export to tikz is enabled.
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     assert app.tab_widget.count() == 2
     assert isinstance(app.active_panel, ProofPanel)
+    assert app.export_tikz_proof.isEnabled()
+
+    # Switch to the demo graph tab. Export to tikz is disabled.
+    app.tab_widget.setCurrentIndex(0)
+    assert not app.export_tikz_proof.isEnabled()
+
+    # Switch back to the proof tab. Export to tikz is enabled.
+    app.tab_widget.setCurrentIndex(1)
+    assert app.export_tikz_proof.isEnabled()
+
+    # Close the proof tab. Export to tikz is disabled.
+    app.close_action.trigger()
+    assert app.tab_widget.count() == 1
+    assert not app.export_tikz_proof.isEnabled()
