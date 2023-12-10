@@ -178,10 +178,11 @@ def write_to_file(file_path: str, data: str) -> bool:
     return True
 
 
-def get_file_path_and_format(parent: QWidget, filter: str) -> Optional[tuple[str, FileFormat]]:
+def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = "") -> Optional[tuple[str, FileFormat]]:
     file_path, selected_filter = QFileDialog.getSaveFileName(
         parent=parent,
         caption="Save File",
+        dir=default_input,
         filter=filter,
     )
     if selected_filter == "":
@@ -227,8 +228,8 @@ def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, F
 
     return file_path, selected_format
 
-def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str) -> Optional[tuple[str, FileFormat]]:
-    file_path_and_format = get_file_path_and_format(parent, filter)
+def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str, filename: str = "") -> Optional[tuple[str, FileFormat]]:
+    file_path_and_format = get_file_path_and_format(parent, filter, filename)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
     file_path, selected_format = file_path_and_format
@@ -239,8 +240,8 @@ def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str) -> Optio
 def save_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     return _save_rule_or_proof_dialog(proof_model.to_json(), parent, FileFormat.ZXProof.filter)
 
-def save_rule_dialog(rule: CustomRule, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
-    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter)
+def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str ="") -> Optional[tuple[str, FileFormat]]:
+    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, filename)
 
 def export_proof_dialog(parent: QWidget) -> Optional[str]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.TikZ.filter)
