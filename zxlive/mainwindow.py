@@ -162,6 +162,7 @@ class MainWindow(QMainWindow):
         rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
+        menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
     def open_demo_graph(self) -> None:
