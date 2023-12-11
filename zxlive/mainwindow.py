@@ -545,7 +545,7 @@ class MainWindow(QMainWindow):
         lhs_graph = self.active_panel.proof_model.graphs[0]
         rhs_graph = self.active_panel.proof_model.graphs[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        save_rule_dialog(rule, self)
+        save_rule_dialog(rule, self, name + ".zxr" if name else "")
 
     def update_colors(self) -> None:
         if self.active_panel is not None:
