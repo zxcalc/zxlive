@@ -137,12 +137,11 @@ class ProofModel(QAbstractListModel):
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
-        initial_graph_tikz = self.graphs[0].to_json()
-        proof_steps = []
-        for step in self.steps:
-            proof_steps.append(step.to_json())
+        initial_graph = self.graphs[0].to_json()
+        proof_steps = [step.to_json() for step in self.steps]
+
         return json.dumps({
-            "initial_graph": initial_graph_tikz,
+            "initial_graph": initial_graph,
             "proof_steps": proof_steps
         })
 
