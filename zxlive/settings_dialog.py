@@ -61,8 +61,8 @@ class SettingsDialog(QDialog):
         vlayout.addWidget(w)
         self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
         self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
-        self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo', 
-                         data={2: "2", 4: "4", 8: "8", 16: "16"})
+        self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo',
+                         data = {'2': "2", '4': "4", '8': "8", '16': "16"})
         self.prev_color_scheme = self.settings.value("color-scheme")
         vlayout.addStretch()
 

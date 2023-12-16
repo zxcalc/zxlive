@@ -21,6 +21,7 @@ from pytestqt.qtbot import QtBot
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
+from zxlive.settings_dialog import SettingsDialog
 
 
 @pytest.fixture
@@ -89,3 +90,8 @@ def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     app.close_action.trigger()
     assert app.tab_widget.count() == 1
     assert not app.export_tikz_proof.isEnabled()
+
+def test_settings_dialog(app: MainWindow) -> None:
+    dialog = SettingsDialog(app)
+    dialog.show()
+    dialog.close()
