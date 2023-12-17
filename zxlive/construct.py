@@ -6,6 +6,10 @@ from .common import GraphT
 def construct_circuit() -> GraphT:
     qubits = 4
 
+    # Note: The qubit numbers in the graph which is returned from this function
+    # will be 4 plus the numbers in vlist and elist, since the input nodes are
+    # numbered from 0 to 3.
+
     # id, qubit number, vertex type (1 = Z, 2 = X).
     vlist = [
         (0, 0, 1), (1, 1, 2), (2, 2, 1), (3, 3, 1), (4, 0, 1), (5, 1, 1),
