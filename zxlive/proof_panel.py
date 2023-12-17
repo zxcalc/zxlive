@@ -249,7 +249,7 @@ class ProofPanel(BasePanel):
             if not ok:
                 return False
             try:
-                phase = string_to_complex(text) if phase_is_complex else string_to_phase(input_, graph)
+                phase = string_to_complex(text) if phase_is_complex else string_to_phase(text, self.graph)
             except ValueError:
                 show_error_msg("Invalid Input", error_msg)
                 return False
