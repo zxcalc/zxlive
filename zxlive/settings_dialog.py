@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any
+from typing import TYPE_CHECKING, Dict, Any, Optional
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (QDialog, QFileDialog,
@@ -183,7 +183,7 @@ class SettingsDialog(QDialog):
         hlayout.addWidget(cancel_button)
 
 
-    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data:Any=None) -> None:
+    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data: Optional[dict[str, str]] = None) -> None:
         val = self.settings.value(name)
         widget: QWidget
         if val is None: val = defaults[name]
@@ -215,7 +215,7 @@ class SettingsDialog(QDialog):
             hlayout.addWidget(button)
         elif ty == 'combo':
             widget = QComboBox()
-            assert isinstance(data, dict)
+            assert data is not None
             widget.addItems(list(data.values()))
             widget.setCurrentText(data[val])
             setattr(widget, "data", data)
