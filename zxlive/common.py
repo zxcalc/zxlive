@@ -34,7 +34,7 @@ SCALE: Final = 64.0
 defaults: Dict[str,Any] = {
     "path/custom-rules": "lemmas/",
     "color-scheme": "modern-red-green",
-    "snap-granularity": 4,
+    "snap-granularity": '4',
 
     "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
     "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
