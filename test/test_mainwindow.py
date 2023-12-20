@@ -15,9 +15,11 @@
 
 
 import pytest
+import os
 from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 
+from zxlive.dialogs import import_diagram_from_file
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
@@ -91,7 +93,24 @@ def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     assert app.tab_widget.count() == 1
     assert not app.export_tikz_proof.isEnabled()
 
+
 def test_settings_dialog(app: MainWindow) -> None:
+    # Warning: Do not actually change the settings in this test as this will impact the app's real settings.
     dialog = SettingsDialog(app)
     dialog.show()
     dialog.close()
+
+
+def test_file_formats_preserved(app: MainWindow) -> None:
+    # Disable the pop-up error message dialog for this test.
+    import zxlive.dialogs
+    zxlive.dialogs.show_error_msg = lambda *args: None
+
+    def check_file_format(filename: str) -> None:
+        assert import_diagram_from_file(os.path.join(os.path.dirname(__file__), filename)), \
+            (f"File format has changed. If this is intentional, please overwrite {filename} in the commit and note in "
+             f"the commit description that this is a breaking change.")
+
+    check_file_format("demo.zxg")
+    check_file_format("demo.zxp")
+    check_file_format("demo.zxr")
