@@ -147,7 +147,10 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
         elif selected_format == FileFormat.QASM:
             return ImportGraphOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph()) # type: ignore
         elif selected_format == FileFormat.TikZ:
-            return ImportGraphOutput(selected_format, file_path, GraphT.from_tikz(data))  # type: ignore
+            try:
+                return ImportGraphOutput(selected_format, file_path, GraphT.from_tikz(data))  # type: ignore
+            except ValueError:
+                raise ValueError("Probable reason: attempted to import a proof from TikZ, which is not supported.")
         else:
             assert selected_format == FileFormat.All
             try:
