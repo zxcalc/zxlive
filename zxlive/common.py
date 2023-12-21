@@ -151,7 +151,7 @@ class Colors(object):
     w_output_pressed: QColor = QColor("#444444")
     outline: QColor = QColor("#000000")
 
-    def __init__(self, color_scheme:str='modern-red-green'):
+    def __init__(self, color_scheme:str):
         self.set_color_scheme(color_scheme)
 
     def set_color_scheme(self, color_scheme: str) -> None:
@@ -193,7 +193,7 @@ class Colors(object):
 
 settings = QSettings("zxlive", "zxlive")
 color_scheme = settings.value("color-scheme")
-if color_scheme is None: color_scheme = 'modern-red-green'
+if color_scheme is None: color_scheme = str(defaults["color-scheme"])
 else: color_scheme = str(color_scheme)
 colors = Colors(color_scheme)
 
