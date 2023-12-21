@@ -3,10 +3,10 @@ from __future__ import annotations
 import copy
 from typing import Iterator
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
-from pyzx import EdgeType, VertexType
+from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
 from pyzx.symbolic import Poly
 
@@ -73,11 +73,18 @@ class GraphEditPanel(EditorBasePanel):
         self.start_derivation_signal.emit(new_g)
 
     def _input_circuit(self) -> None:
+        settings = QSettings("zxlive", "zxlive")
+        flavor = settings.value("qasm-flavor")
         qasm = create_circuit_dialog(self)
         if qasm is not None:
             new_g = copy.deepcopy(self.graph_scene.g)
             try:
-                circ = QASMParser().parse(qasm, strict=False).to_graph()
+                if flavor == 'sqasm':
+                    circ = sqasm(qasm)
+                elif flavor == 'sqasm-no-simplification':
+                    circ = sqasm(qasm, simplify=False)
+                else:
+                    circ = QASMParser().parse(qasm, strict=False).to_graph()
             except TypeError as err:
                 show_error_msg("Invalid circuit", str(err))
                 return
