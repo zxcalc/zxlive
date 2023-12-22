@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog,
 
 import pyzx
 
-from .common import set_pyzx_tikz_settings, colors, setting, color_schemes, defaults
+from .common import set_pyzx_tikz_settings, colors, setting, color_schemes, input_circuit_formats, defaults
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -63,6 +63,7 @@ class SettingsDialog(QDialog):
         self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
         self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo',
                          data = {'2': "2", '4': "4", '8': "8", '16': "16"})
+        self.add_setting(form_general, "input-circuit-format", "Input Circuit as", 'combo', data=input_circuit_formats)
         self.prev_color_scheme = self.settings.value("color-scheme")
         vlayout.addStretch()
 

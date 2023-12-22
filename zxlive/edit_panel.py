@@ -3,16 +3,16 @@ from __future__ import annotations
 import copy
 from typing import Iterator
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
-from pyzx import EdgeType, VertexType
+from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
 from pyzx.symbolic import Poly
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import GraphT
+from .common import GraphT, input_circuit_formats
 from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
@@ -73,20 +73,36 @@ class GraphEditPanel(EditorBasePanel):
         self.start_derivation_signal.emit(new_g)
 
     def _input_circuit(self) -> None:
-        qasm = create_circuit_dialog(self)
+        settings = QSettings("zxlive", "zxlive")
+        circuit_format = str(settings.value("input-circuit-format"))
+        explanations = {
+            'openqasm': "Write a circuit in QASM format.",
+            'sqasm': "Write a circuit in Spider QASM format.",
+            'sqasm-no-simplification': "Write a circuit in Spider QASM format. No simplification will be performed.",
+        }
+        examples = {
+            'openqasm': "qreg q[3];\ncx q[0], q[1];\nh q[2];\nccx q[0], q[1], q[2];",
+            'sqasm': "qreg q[1];\nqreg A[2];\n;s A[1];\n;cx q[0], A[0];\n;cx q[0], A[1];",
+            'sqasm-no-simplification': "qreg q[1];\nqreg Z[2];\ncx q[0], Z[0];\ncx q[0], Z[1];\ns Z[1];",
+        }
+        qasm = create_circuit_dialog(explanations[circuit_format], examples[circuit_format], self)
         if qasm is not None:
             new_g = copy.deepcopy(self.graph_scene.g)
             try:
-                circ = QASMParser().parse(qasm, strict=False).to_graph()
+                if circuit_format == 'sqasm':
+                    circ = sqasm(qasm)
+                elif circuit_format == 'sqasm-no-simplification':
+                    circ = sqasm(qasm, simplify=False)
+                else:
+                    circ = QASMParser().parse(qasm, strict=False).to_graph()
             except TypeError as err:
                 show_error_msg("Invalid circuit", str(err))
                 return
             except Exception:
-                show_error_msg("Invalid circuit", "Couldn't parse QASM code")
+                show_error_msg("Invalid circuit", f"Couldn't parse code as {input_circuit_formats[circuit_format]}.")
                 return
 
             new_verts, new_edges = new_g.merge(circ)
             cmd = UpdateGraph(self.graph_view, new_g)
             self.undo_stack.push(cmd)
             self.graph_scene.select_vertices(new_verts)
-
