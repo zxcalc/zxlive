@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
                             QSettings, QTextStream, Qt)
@@ -443,7 +443,7 @@ class MainWindow(QMainWindow):
         if name is None: name = "New Graph"
         self._new_panel(panel, name)
 
-    def open_graph_from_notebook(self, graph: GraphT, name: str = None) -> None:
+    def open_graph_from_notebook(self, graph: GraphT, name: str) -> None:
         """Opens a ZXLive window from within a notebook to edit a graph.
 
         Replaces the graph in an existing tab if it has the same name."""
@@ -451,15 +451,17 @@ class MainWindow(QMainWindow):
         for i in range(self.tab_widget.count()):
             if self.tab_widget.tabText(i) == name or self.tab_widget.tabText(i) == name + "*":
                 self.tab_widget.setCurrentIndex(i)
+                assert self.active_panel
                 self.active_panel.replace_graph(graph)
                 return
         self.new_graph(copy.deepcopy(graph), name)
 
-    def get_copy_of_graph(self, name: str):
+    def get_copy_of_graph(self, name: str) -> Optional[GraphT]:
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             if self.tab_widget.tabText(i) == name or self.tab_widget.tabText(i) == name + "*":
-                return copy.deepcopy(self.tab_widget.widget(i).graph_scene.g)
+                panel = cast(BasePanel, self.tab_widget.widget(i))
+                return cast(GraphT, copy.deepcopy(panel.graph_scene.g))
         return None
 
     def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:

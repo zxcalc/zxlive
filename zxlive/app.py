@@ -24,7 +24,7 @@ import sys
 
 from .mainwindow import MainWindow
 from .common import get_data, GraphT
-from typing import Optional
+from typing import Optional, cast
 
 # The following hack is needed on windows in order to show the icon in the taskbar
 # See https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
@@ -73,8 +73,9 @@ class ZXLive(QApplication):
         self.main_window.show()
         self.main_window.open_graph_from_notebook(g, name)
 
-    def get_copy_of_graph(self, name: str) -> GraphT:
+    def get_copy_of_graph(self, name: str) -> Optional[GraphT]:
         """Returns a copy of the graph which has the given name."""
+        assert self.main_window
         return self.main_window.get_copy_of_graph(name)
 
 
@@ -82,7 +83,7 @@ def get_embedded_app() -> ZXLive:
     """Main entry point for ZXLive as an embedded app inside a jupyter notebook."""
     app = QApplication.instance() or ZXLive()
     app.__class__ = ZXLive
-    return app
+    return cast(ZXLive, app)
 
 
 def main() -> None:
