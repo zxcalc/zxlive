@@ -35,7 +35,7 @@ defaults: Dict[str,Any] = {
     "path/custom-rules": "lemmas/",
     "color-scheme": "modern-red-green",
     "snap-granularity": '4',
-    "qasm-flavor": 'openqasm',
+    "input-circuit-format": 'openqasm',
 
     "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
     "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
@@ -83,7 +83,7 @@ color_schemes = {
     'gidney': "Gidney's Black & White",
 }
 
-qasm_flavor = {
+input_circuit_formats = {
     'openqasm': "standard OpenQASM",
     'sqasm': "Spider QASM",
     'sqasm-no-simplification': "Spider QASM (no simplification)",
