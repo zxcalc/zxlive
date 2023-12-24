@@ -168,6 +168,7 @@ class VItem(QGraphicsPathItem):
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
                 pen.setColor(colors.boundary_pressed)
+            self.prepareGeometryChange()
             self.setPen(pen)
 
         if self.phase_item:

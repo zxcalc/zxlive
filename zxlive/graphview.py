@@ -80,6 +80,8 @@ class GraphView(QGraphicsView):
         # self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         #self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # This has to be enabled based on keyboard shortcuts
+        self.setCacheMode(QGraphicsView.CacheModeFlag.CacheBackground);
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate);
 
         # We implement the rubberband logic ourselves. Note that there is also
         # the option to set `self.setDragMode(QGraphicsView.RubberBandDrag)`,
