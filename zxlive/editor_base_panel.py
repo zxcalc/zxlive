@@ -190,15 +190,15 @@ class EditorBasePanel(BasePanel):
         if len(graph.variable_types) != len(old_variables):
             new_vars = graph.variable_types.keys() - old_variables.keys()
             #self.graph.variable_types.update(graph.variable_types)
-            for v in new_vars:
-                self.variable_viewer.add_item(v)
+            for nv in new_vars:
+                self.variable_viewer.add_item(nv)
 
 
 class VariableViewer(QScrollArea):
 
     def __init__(self, parent: EditorBasePanel) -> None:
         super().__init__()
-        self.parent = parent
+        self.parent_panel = parent
         self._widget = QWidget()
         lpal = QApplication.palette("QListWidget")  # type: ignore
         palette = QPalette()
@@ -238,7 +238,7 @@ class VariableViewer(QScrollArea):
 
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
 
-        for name in self.parent.graph.variable_types.keys():
+        for name in self.parent_panel.graph.variable_types.keys():
             self.add_item(name)
 
         self.setWidget(self._widget)
@@ -259,7 +259,7 @@ class VariableViewer(QScrollArea):
     def add_item(self, name: str) -> None:
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
-        if self.parent.graph.variable_types[name]:
+        if self.parent_panel.graph.variable_types[name]:
             combobox.setCurrentIndex(1)
         else:
             combobox.setCurrentIndex(0)
@@ -280,9 +280,9 @@ class VariableViewer(QScrollArea):
 
     def _text_changed(self, name: str, text: str) -> None:
         if text == "Parametric":
-            self.parent.graph.variable_types[name] = False
+            self.parent_panel.graph.variable_types[name] = False
         elif text == "Boolean":
-            self.parent.graph.variable_types[name] = True
+            self.parent_panel.graph.variable_types[name] = True
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
@@ -315,7 +315,7 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
 def create_list_widget(parent: EditorBasePanel,
                        data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
                        onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None],
-                       ondoubleclick: Callable[[VertexType.Type, None] | Callable[[EdgeType.Type], None]]) \
+                       ondoubleclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) \
                           -> QListWidget:
     list_widget = QListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
@@ -333,7 +333,7 @@ def create_list_widget(parent: EditorBasePanel,
 def populate_list_widget(list_widget: QListWidget,
                          data: dict[VertexType.Type, DrawPanelNodeType] | dict[EdgeType.Type, DrawPanelNodeType],
                          onclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None],
-                         ondoubleclick: Callable[[VertexType.Type, None] | Callable[[EdgeType.Type], None]]) \
+                         ondoubleclick: Callable[[VertexType.Type], None] | Callable[[EdgeType.Type], None]) \
                             -> None:
     row = list_widget.currentRow()
     list_widget.clear()
