@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING, Iterable, Any, Optional, cast
+from typing import Callable, TYPE_CHECKING, Iterable, Any, Optional, cast, Union
 
 import pyzx
-from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex
+from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex
 
 from .animations import make_animation
 from .commands import AddRewriteStep
@@ -158,7 +158,8 @@ class RewriteActionTreeModel(QAbstractItemModel):
             proof_panel
         )
 
-    def index(self, row: int, column: int, parent: QModelIndex = None) -> QModelIndex:
+    def index(self, row: int, column: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> \
+            QModelIndex:
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
 
