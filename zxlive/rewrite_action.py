@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING, Iterable, Any, Optional, cast
 
 import pyzx
 from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex
@@ -58,15 +58,16 @@ class RewriteAction:
 
         try:
             g, rem_verts = self.apply_rewrite(g, matches)
-        except Exception as e:
-            show_error_msg('Error while applying rewrite rule', str(e))
+        except Exception as ex:
+            show_error_msg('Error while applying rewrite rule', str(ex))
             return
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches, rem_verts)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
-    def apply_rewrite(self, g: GraphT, matches: list):
+    # TODO: Narrow down the type of the first return value.
+    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[Any, Optional[Iterable[VT]]]:
         if self.returns_new_graph:
             return self.rule(g, matches), None
 
@@ -128,14 +129,14 @@ class RewriteActionTree:
     def from_dict(cls, d: dict, header: str = "", parent: RewriteActionTree | None = None) -> RewriteActionTree:
         if is_rewrite_data(d):
             return RewriteActionTree(
-                header, RewriteAction.from_rewrite_data(d), [], parent
+                header, RewriteAction.from_rewrite_data(cast(RewriteData, d)), [], parent
             )
         ret = RewriteActionTree(header, None, [], parent)
         for group, actions in d.items():
             ret.append_child(cls.from_dict(actions, group, ret))
         return ret
 
-    def update_on_selection(self, g, selection, edges):
+    def update_on_selection(self, g, selection, edges) -> None:
         for child in self.child_items:
             child.update_on_selection(g, selection, edges)
         if self.rewrite is not None:
@@ -161,9 +162,9 @@ class RewriteActionTreeModel(QAbstractItemModel):
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
 
-        parentItem = parent.internalPointer() if parent.isValid() else self.root_item
+        parent_item = parent.internalPointer() if parent.isValid() else self.root_item
 
-        if childItem := parentItem.child(row):
+        if childItem := parent_item.child(row):
             return self.createIndex(row, column, childItem)
         return QModelIndex()
 
@@ -171,18 +172,18 @@ class RewriteActionTreeModel(QAbstractItemModel):
         if not index.isValid():
             return QModelIndex()
 
-        parentItem = index.internalPointer().parent
+        parent_item = index.internalPointer().parent
 
-        if parentItem == self.root_item:
+        if parent_item == self.root_item:
             return QModelIndex()
 
-        return self.createIndex(parentItem.row(), 0, parentItem)
+        return self.createIndex(parent_item.row(), 0, parent_item)
 
     def rowCount(self, parent: QModelIndex = None) -> int:
         if parent.column() > 0:
             return 0
-        parentItem = parent.internalPointer() if parent.isValid() else self.root_item
-        return parentItem.child_count()
+        parent_item = parent.internalPointer() if parent.isValid() else self.root_item
+        return parent_item.child_count()
 
     def columnCount(self, parent: QModelIndex = None) -> int:
         return 1
