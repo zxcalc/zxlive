@@ -122,7 +122,7 @@ class ProofModel(QAbstractListModel):
         assert isinstance(copy, GraphT)  # type: ignore
         return copy
 
-    def rename_step(self, index: int, name: str):
+    def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""
         old_step = self.steps[index]
 

@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any, Optional
+from typing import TYPE_CHECKING, Dict, Any, Optional, Union
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (QDialog, QFileDialog,
@@ -186,7 +186,7 @@ class SettingsDialog(QDialog):
 
     def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data: Optional[dict[str, str]] = None) -> None:
         val = self.settings.value(name)
-        widget: QWidget
+        widget: Union[QWidget, QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox]
         if val is None: val = defaults[name]
         if ty == 'str':
             widget = QLineEdit()
@@ -203,8 +203,7 @@ class SettingsDialog(QDialog):
             hlayout = QHBoxLayout()
             widget.setLayout(hlayout)
             widget_line = QLineEdit()
-            val = str(val)
-            widget_line.setText(val)
+            widget_line.setText(str(val))
             def browse() -> None:
                 directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.Option.ShowDirsOnly)
                 if directory:
@@ -218,7 +217,7 @@ class SettingsDialog(QDialog):
             widget = QComboBox()
             assert data is not None
             widget.addItems(list(data.values()))
-            widget.setCurrentText(data[val])
+            widget.setCurrentText(data[str(val)])
             setattr(widget, "data", data)
 
 

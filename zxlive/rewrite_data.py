@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import copy
 import os
-from typing import Callable, Literal, TypedDict
+from typing import Callable, Literal, cast, Optional
+from typing_extensions import TypedDict, NotRequired
 
 import pyzx
 from pyzx import simplify, extract_circuit
@@ -25,8 +26,8 @@ class RewriteData(TypedDict):
     rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[ET, VT]]
     type: MatchType
     tooltip: str
-    copy_first: bool | None
-    returns_new_graph: bool | None
+    copy_first: NotRequired[bool]
+    returns_new_graph: NotRequired[bool]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -79,7 +80,7 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
 const_true = lambda graph, matches: matches
 
 
-def apply_simplification(simplification: Callable[[GraphT], GraphT]) -> Callable[
+def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[
     [GraphT, list], pyzx.rules.RewriteOutputType[ET, VT]]:
     def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[ET, VT]:
         simplification(g)
@@ -91,7 +92,7 @@ def apply_simplification(simplification: Callable[[GraphT], GraphT]) -> Callable
 def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
     graph.auto_detect_io()
     simplify.full_reduce(graph)
-    return extract_circuit(graph).to_graph()
+    return cast(GraphT, extract_circuit(graph).to_graph())
 
 
 simplifications: dict[str, RewriteData] = {

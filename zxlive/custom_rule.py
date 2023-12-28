@@ -1,6 +1,7 @@
 
 import json
-from typing import TYPE_CHECKING, Callable
+from fractions import Fraction
+from typing import TYPE_CHECKING, Callable, Sequence, Dict, Union
 
 import networkx as nx
 import numpy as np
@@ -11,12 +12,13 @@ from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType, get_w_io
 from shapely import Polygon
 
-from pyzx.symbolic import Poly
+from pyzx.symbolic import Poly, Var
 
 from .common import ET, VT, GraphT
 
 if TYPE_CHECKING:
     from .rewrite_data import RewriteData
+
 
 class CustomRule:
     def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
@@ -91,15 +93,15 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
-    def unfuse_subgraph_for_rewrite(self, graph, vertices):
-        def get_adjacent_boundary_vertices(graph, v):
-            return [n for n in graph.neighbors(v) if graph.nodes()[n]['type'] == VertexType.BOUNDARY]
+    def unfuse_subgraph_for_rewrite(self, graph, vertices) -> None:
+        def get_adjacent_boundary_vertices(g, v) -> Sequence[VT]:
+            return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
 
         subgraph_nx_without_boundaries = nx.Graph(to_networkx(graph).subgraph(vertices))
         lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
         lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
-            node_match=categorical_node_match('type', 1))
+                                     node_match=categorical_node_match('type', 1))
         matching = list(graph_matcher.match())[0]
 
         subgraph_nx, _ = create_subgraph(graph, vertices)
@@ -119,26 +121,26 @@ class CustomRule:
             elif vtype == VertexType.W_OUTPUT or vtype == VertexType.W_INPUT:
                 self.unfuse_w_vertex(graph, subgraph_nx, matching[v], vtype)
 
-    def unfuse_update_edges(self, graph, subgraph_nx, old_v, new_v):
+    def unfuse_update_edges(self, graph, subgraph_nx, old_v, new_v) -> None:
         neighbors = list(graph.neighbors(old_v))
         for b in neighbors:
             if b not in subgraph_nx.nodes:
                 graph.add_edge((new_v, b), graph.edge_type((old_v, b)))
                 graph.remove_edge(graph.edge(old_v, b))
 
-    def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype):
+    def unfuse_zx_vertex(self, graph, subgraph_nx, v, vtype) -> None:
         new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
         self.unfuse_update_edges(graph, subgraph_nx, v, new_v)
         graph.add_edge(graph.edge(new_v, v))
 
-    def unfuse_h_box_vertex(self, graph, subgraph_nx, v):
+    def unfuse_h_box_vertex(self, graph, subgraph_nx, v) -> None:
         new_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v)+0.3, row=graph.row(v)+0.3)
         new_mid_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v), row=graph.row(v))
         self.unfuse_update_edges(graph, subgraph_nx, v, new_h)
         graph.add_edge((new_mid_h, v))
         graph.add_edge((new_h, new_mid_h))
 
-    def unfuse_w_vertex(self, graph, subgraph_nx, v, vtype):
+    def unfuse_w_vertex(self, graph, subgraph_nx, v, vtype) -> None:
         w_in, w_out = get_w_io(graph, v)
         new_w_in = graph.add_vertex(VertexType.W_INPUT, qubit=graph.qubit(w_in), row=graph.row(w_in))
         new_w_out = graph.add_vertex(VertexType.W_OUTPUT, qubit=graph.qubit(w_out), row=graph.row(w_out))
@@ -229,16 +231,16 @@ def get_linear(v):
     return coeff, var, const
 
 
-def match_symbolic_parameters(match, left, right):
-    params = {}
+def match_symbolic_parameters(match, left: nx.Graph, right: nx.Graph) -> Dict[Var, Union[float, complex, Fraction]]:
+    params: Dict[Var, Union[float, complex, Fraction]] = {}
     left_phase = left.nodes.data('phase', default=0)
     right_phase = right.nodes.data('phase', default=0)
 
-    def check_phase_equality(v):
+    def check_phase_equality(v) -> None:
         if left_phase[v] != right_phase[match[v]]:
             raise ValueError("Parameters do not match")
 
-    def update_params(v, var, coeff, const):
+    def update_params(v, var, coeff, const) -> None:
         var_value = (right_phase[match[v]] - const) / coeff
         if var in params and params[var] != var_value:
             raise ValueError("Symbolic parameters do not match")

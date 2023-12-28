@@ -94,14 +94,15 @@ settings = QSettings("zxlive", "zxlive")
 for key, value in defaults.items():
     if not settings.contains(key):
         settings.setValue(key, value)
-        
+
 
 class Settings(object):
     SNAP_DIVISION = 4  # Should be an integer dividing SCALE
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.update()
 
-    def update(self):
+    def update(self) -> None:
         settings = QSettings("zxlive", "zxlive")
         self.SNAP_DIVISION = int(settings.value("snap-granularity"))
         self.SNAP = SCALE / self.SNAP_DIVISION
