@@ -65,11 +65,11 @@ class ProofPanel(BasePanel):
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
-        self.step_view.doubleClicked.connect(self.__doubleClickHandler)
+        self.step_view.doubleClicked.connect(self._double_click_handler)
 
         self.splitter.addWidget(self.step_view)
 
-    def __doubleClickHandler(self, index: QModelIndex | QPersistentModelIndex):
+    def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
         # The first row in the item list is the START step, which is not interactive
         if index.row() == 0:
             return
@@ -79,7 +79,7 @@ class ProofPanel(BasePanel):
         if ok:
             # Subtract 1 from index since the START step isn't part of the model
             old_name = self.proof_model.steps[index.row()-1].display_name
-            cmd = UndoableChange(self,
+            cmd = UndoableChange(self.graph_view,
                 lambda: self.proof_model.rename_step(index.row()-1, old_name),
                 lambda: self.proof_model.rename_step(index.row()-1, new_name)
             )
@@ -300,7 +300,7 @@ class ProofPanel(BasePanel):
         ).normalized()
 
         perp_dir = QVector2D(mouse_dir - QPointF(self.graph.row(v)/SCALE, self.graph.qubit(v)/SCALE)).normalized()
-        perp_dir -= QVector2D.dotProduct(perp_dir, par_dir) * par_dir
+        perp_dir -= par_dir * QVector2D.dotProduct(perp_dir, par_dir)
         perp_dir.normalize()
 
         out_offset_x = par_dir.x() * 0.5 + perp_dir.x() * 0.5
@@ -328,7 +328,8 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
         self.undo_stack.push(cmd, anim_after=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: FractionLike) -> None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> \
+            None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
