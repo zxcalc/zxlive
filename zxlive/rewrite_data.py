@@ -97,7 +97,7 @@ def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
 
 simplifications: dict[str, RewriteData] = {
     'bialg_simp': {
-        "text": "bialgebra",
+        "text": "bialgebra simp",
         "tooltip": "bialg_simp",
         "matcher": const_true,
         "rule": apply_simplification(simplify.bialg_simp),
