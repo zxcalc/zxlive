@@ -423,6 +423,10 @@ class GoToRewriteStep(SetGraph):
     def __init__(self, graph_view: GraphView, step_view: QListView, old_step: int, step: int) -> None:
         proof_model = step_view.model()
         assert isinstance(proof_model, ProofModel)
+
+        # Save any vertex rearrangements to the proof step
+        proof_model.set_graph(old_step, graph_view.graph_scene.g)
+
         SetGraph.__init__(self, graph_view, proof_model.get_graph(step))
         self.step_view = step_view
         self.step = step
@@ -445,20 +449,3 @@ class GoToRewriteStep(SetGraph):
         self.step_view.selectionModel().blockSignals(False)
         self.step_view.update(idx)
         super().undo()
-
-
-@dataclass
-class MoveNodeInStep(MoveNode):
-    step_view: QListView
-
-    def redo(self) -> None:
-        super().redo()
-        model = self.step_view.model()
-        assert isinstance(model, ProofModel)
-        model.set_graph(self.step_view.currentIndex().row(), self.g)
-
-    def undo(self) -> None:
-        super().undo()
-        model = self.step_view.model()
-        assert isinstance(model, ProofModel)
-        model.set_graph(self.step_view.currentIndex().row(), self.g)

@@ -95,6 +95,19 @@ def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
     return cast(GraphT, extract_circuit(graph).to_graph())
 
 
+# The OCM action simply saves the current graph without modifying anything.
+# This can be used to make repositioning the vertices an explicit proof step.
+def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[ET, VT]:
+    return ({}, [], [], True)
+
+ocm_action: RewriteData = {
+        "text": "OCM",
+        "tooltip": "Saves the graph with the current vertex positions",
+        "matcher": const_true,
+        "rule": ocm_rule,
+        "type": MATCHES_VERTICES,
+}
+
 simplifications: dict[str, RewriteData] = {
     'bialg_simp': {
         "text": "bialgebra simp",
@@ -239,7 +252,7 @@ rules_zxw = {"spider", "fuse_w", "z_to_z_box"}
 rules_zh = {"had2edge", "fuse_hbox", "mult_hbox"}
 
 action_groups = {
-    "Basic rules": {key: operations[key] for key in rules_basic},
+    "Basic rules": {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,
     "ZXW rules": {key: operations[key] for key in rules_zxw},
