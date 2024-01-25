@@ -322,7 +322,6 @@ def create_list_widget(parent: EditorBasePanel,
     list_widget.setViewMode(QListView.ViewMode.IconMode)
     list_widget.setMovement(QListView.Movement.Static)
     list_widget.setUniformItemSizes(True)
-    list_widget.setGridSize(QSize(60, 64))
     list_widget.setWordWrap(True)
     list_widget.setIconSize(QSize(24, 24))
     populate_list_widget(list_widget, data, onclick, ondoubleclick)
