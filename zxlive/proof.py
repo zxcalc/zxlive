@@ -14,7 +14,7 @@ class Rewrite(NamedTuple):
 
     display_name: str # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
-    graph: GraphT  # Diff from the last step to this step
+    graph: GraphT  # New graph after applying the rewrite
 
     def to_json(self) -> str:
         """Serializes the rewrite to JSON."""
@@ -58,7 +58,8 @@ class ProofModel(QAbstractListModel):
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index-1] = new_step
 
-    def graphs(self) -> [GraphT]:
+
+    def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
     def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int=Qt.ItemDataRole.DisplayRole) -> Any:
@@ -114,7 +115,7 @@ class ProofModel(QAbstractListModel):
         return rewrite, rewrite.graph
 
     def get_graph(self, index: int) -> GraphT:
-        """Returns the grap at a given position in the proof."""
+        """Returns the graph at a given position in the proof."""
         if index == 0:
             return self.initial_graph.copy()
         else:
