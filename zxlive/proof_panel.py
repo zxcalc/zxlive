@@ -421,6 +421,10 @@ class ProofPanel(BasePanel):
         # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
         self.graph_scene.selectionChanged.connect(model.update_on_selection)
 
+    def shutdown(self):
+        if hasattr(self, 'graph_scene'):
+            self.graph_scene.shutdown() 
+
 
 class ProofStepItemDelegate(QStyledItemDelegate):
     """This class controls the painting of items in the proof steps list view.

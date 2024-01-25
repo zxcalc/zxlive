@@ -106,3 +106,7 @@ class BasePanel(QWidget):
 
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
+
+    def shutdown(self):
+        if hasattr(self, 'graph_scene'):
+            self.graph_scene.shutdown()    

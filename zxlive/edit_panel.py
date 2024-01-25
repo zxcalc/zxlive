@@ -106,3 +106,7 @@ class GraphEditPanel(EditorBasePanel):
             cmd = UpdateGraph(self.graph_view, new_g)
             self.undo_stack.push(cmd)
             self.graph_scene.select_vertices(new_verts)
+
+    def shutdown(self):
+        if hasattr(self, 'graph_scene'):
+            self.graph_scene.shutdown() 

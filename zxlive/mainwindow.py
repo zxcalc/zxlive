@@ -223,6 +223,12 @@ class MainWindow(QMainWindow):
 
 
     def closeEvent(self, e: QCloseEvent) -> None:
+        #Call shutdown on all tabs before closing
+        for i in range(self.tab_widget.count()):
+            widget = self.tab_widget.widget(i)
+            if isinstance(widget, BasePanel):
+                widget.shutdown()
+
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
             success = self.handle_close_action()
             if not success:

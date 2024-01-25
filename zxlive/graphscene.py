@@ -195,6 +195,20 @@ class GraphScene(QGraphicsScene):
         for it in self.items():
             it.setSelected(True)
 
+    def shutdown(self):
+
+        """
+        Perform necessary cleanup to avoid RunTimeError when the application closes.
+        Call this method before the application closes. 
+        """        
+
+        #Clear all items from the scene to ensure no dangling references remain
+        self.clear()
+
+
+        #explicity remove references to Qt object that may be deleted
+        self.vertex_map.clear()
+        self.edge_map.clear()
 
 class EditGraphScene(GraphScene):
     """A graph scene tracking additional mouse events for graph editing."""
