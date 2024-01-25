@@ -14,14 +14,14 @@ class Rewrite(NamedTuple):
 
     display_name: str # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
-    diff: GraphDiff  # Diff from the last step to this step
+    graph: GraphT  # New graph after applying the rewrite
 
     def to_json(self) -> str:
         """Serializes the rewrite to JSON."""
         return json.dumps({
             "display_name": self.display_name,
             "rule": self.rule,
-            "diff": self.diff.to_json()
+            "graph": self.graph.to_json()
         })
 
     @staticmethod
@@ -32,7 +32,7 @@ class Rewrite(NamedTuple):
         return Rewrite(
             display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
             rule=d["rule"],
-            diff=GraphDiff.from_json(d["diff"])
+            graph=GraphT.from_json(d["graph"]),
         )
 
 class ProofModel(QAbstractListModel):
@@ -42,29 +42,29 @@ class ProofModel(QAbstractListModel):
     rewrite that was used to go from one graph to next.
     """
 
-    graphs: list[GraphT]  # n graphs
-    steps: list[Rewrite]  # n-1 rewrite steps
+    initial_graph: GraphT
+    steps: list[Rewrite]
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
-        self.graphs = [start_graph]
+        self.initial_graph = start_graph
         self.steps = []
 
-    def set_data(self, graphs: list[GraphT], steps: list[Rewrite]) -> None:
-        """Sets the model data.
+    def set_graph(self, index: int, graph: GraphT):
+        if index == 0:
+            self.initial_graph = graph
+        else:
+            old_step = self.steps[index-1]
+            new_step = Rewrite(old_step.display_name, old_step.rule, graph)
+            self.steps[index-1] = new_step
 
-        Can be used to load the model from a saved state.
-        """
-        assert len(steps) == len(graphs) - 1
-        self.beginResetModel()
-        self.graphs = graphs
-        self.steps = steps
-        self.endResetModel()
+    def graphs(self) -> list[GraphT]:
+        return [self.initial_graph] + [step.graph for step in self.steps]
 
     def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int=Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
 
-        if index.row() >= len(self.graphs) or index.column() >= 1:
+        if index.row() >= len(self.steps)+1 or index.column() >= 1:
             return None
 
         if role == Qt.ItemDataRole.DisplayRole:
@@ -93,14 +93,13 @@ class ProofModel(QAbstractListModel):
         # user has to specify the index of the parent. In a list, we always expect the
         # parent to be `None` or the empty `QModelIndex()`
         if not index or not index.isValid():
-            return len(self.graphs)
+            return len(self.steps)+1
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite, new_graph: GraphT) -> None:
+    def add_rewrite(self, rewrite: Rewrite) -> None:
         """Adds a rewrite step to the model."""
-        self.beginInsertRows(QModelIndex(), len(self.graphs), len(self.graphs))
-        self.graphs.append(new_graph)
+        self.beginInsertRows(QModelIndex(), len(self.steps), len(self.steps))
         self.steps.append(rewrite)
         self.endInsertRows()
 
@@ -109,40 +108,41 @@ class ProofModel(QAbstractListModel):
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
         """
-        self.beginRemoveRows(QModelIndex(), len(self.graphs) - 1, len(self.graphs) - 1)
+        self.beginRemoveRows(QModelIndex(), len(self.steps), len(self.steps))
         rewrite = self.steps.pop()
-        graph = self.graphs.pop()
         self.endRemoveRows()
-        return rewrite, graph
+        return rewrite, rewrite.graph
 
     def get_graph(self, index: int) -> GraphT:
-        """Returns the grap at a given position in the proof."""
-        copy = self.graphs[index].copy()
-        # Mypy issue: https://github.com/python/mypy/issues/11673
-        assert isinstance(copy, GraphT)  # type: ignore
-        return copy
+        """Returns the graph at a given position in the proof."""
+        if index == 0:
+            return self.initial_graph.copy()
+        else:
+            copy = self.steps[index-1].graph.copy()
+            # Mypy issue: https://github.com/python/mypy/issues/11673
+            assert isinstance(copy, GraphT)  # type: ignore
+            return copy
 
     def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""
-        old_step = self.steps[index]
+        old_step = self.steps[index-1]
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.diff)
+        self.steps[index-1] = Rewrite(name, old_step.rule, old_step.graph)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
-        modelIndex = self.createIndex(index, 0)
+        modelIndex = self.createIndex(index-1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
-        initial_graph_tikz = self.graphs[0].to_json()
-        proof_steps = []
-        for step in self.steps:
-            proof_steps.append(step.to_json())
+        initial_graph = self.initial_graph.to_json()
+        proof_steps = [step.to_json() for step in self.steps]
+
         return json.dumps({
-            "initial_graph": initial_graph_tikz,
+            "initial_graph": initial_graph,
             "proof_steps": proof_steps
         })
 
@@ -156,8 +156,5 @@ class ProofModel(QAbstractListModel):
         model = ProofModel(initial_graph)
         for step in d["proof_steps"]:
             rewrite = Rewrite.from_json(step)
-            rewritten_graph = rewrite.diff.apply_diff(model.graphs[-1])
-            # Mypy issue: https://github.com/python/mypy/issues/11673
-            assert isinstance(rewritten_graph, GraphT)  # type: ignore
-            model.add_rewrite(rewrite, rewritten_graph)
+            model.add_rewrite(rewrite)
         return model

@@ -282,7 +282,7 @@ class MainWindow(QMainWindow):
             if isinstance(out, ImportGraphOutput):
                 self.new_graph(out.g, name)
             elif isinstance(out, ImportProofOutput):
-                graph = out.p.graphs[-1]
+                graph = out.p.graphs()[-1]
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
                 proof_panel: ProofPanel = self.active_panel
@@ -544,8 +544,8 @@ class MainWindow(QMainWindow):
         name, description = get_lemma_name_and_description(self)
         if name is None or description is None:
             return
-        lhs_graph = self.active_panel.proof_model.graphs[0]
-        rhs_graph = self.active_panel.proof_model.graphs[-1]
+        lhs_graph = self.active_panel.proof_model.graphs()[0]
+        rhs_graph = self.active_panel.proof_model.graphs()[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
         save_rule_dialog(rule, self, name + ".zxr" if name else "")
 

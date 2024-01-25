@@ -385,8 +385,7 @@ class AddRewriteStep(SetGraph):
         for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
             self._old_steps.append(self.proof_model.pop_rewrite())
 
-        diff = self.diff or GraphDiff(self.g, self.new_g)
-        self.proof_model.add_rewrite(Rewrite(self.name, self.name, diff), self.new_g)
+        self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
 
         # Select the added step
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
@@ -403,7 +402,7 @@ class AddRewriteStep(SetGraph):
 
         # Add back steps that were previously removed
         for rewrite, graph in reversed(self._old_steps):
-            self.proof_model.add_rewrite(rewrite, graph)
+            self.proof_model.add_rewrite(rewrite)
 
         # Select the previously selected step
         assert self._old_selected is not None
@@ -456,10 +455,10 @@ class MoveNodeInStep(MoveNode):
         super().redo()
         model = self.step_view.model()
         assert isinstance(model, ProofModel)
-        model.graphs[self.step_view.currentIndex().row()] = self.g
+        model.set_graph(self.step_view.currentIndex().row(), self.g)
 
     def undo(self) -> None:
         super().undo()
         model = self.step_view.model()
         assert isinstance(model, ProofModel)
-        model.graphs[self.step_view.currentIndex().row()] = self.g
+        model.set_graph(self.step_view.currentIndex().row(), self.g)

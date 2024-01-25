@@ -15,7 +15,7 @@ def proof_to_tikz(proof: ProofModel) -> str:
     yoffset = -10
     idoffset = 0
     total_verts, total_edges = [], []
-    for i, g in enumerate(proof.graphs):
+    for i, g in enumerate(proof.graphs()):
         # Compute graph dimensions
         width = max(g.row(v) for v in g.vertices()) - min(g.row(v) for v in g.vertices())
         height = max(g.qubit(v) for v in g.vertices()) - min(g.qubit(v) for v in g.vertices())
