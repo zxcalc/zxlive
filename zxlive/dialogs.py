@@ -76,9 +76,9 @@ class ImportRuleOutput:
     file_path: str
     r: CustomRule
 
-def show_error_msg(title: str, description: Optional[str] = None) -> None:
+def show_error_msg(title: str, description: Optional[str] = None, parent: Optional[QWidget] = None) -> None:
     """Displays an error message box."""
-    msg = QMessageBox()
+    msg = QMessageBox(parent) # Set the parent of the QMessageBox
     msg.setText(title)
     msg.setIcon(QMessageBox.Icon.Critical)
     if description is not None:
@@ -108,14 +108,14 @@ def create_circuit_dialog(explanation: str, example: str, parent: QWidget) -> Op
     return s if success else None
 
 
-def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter) -> \
+def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter, parent: Optional[QWidget] = None) -> \
         Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
     """Imports a diagram from a given file path.
 
     Returns the imported graph or `None` if the import failed."""
     file = QFile(file_path)
     if not file.open(QIODevice.OpenModeFlag.ReadOnly | QIODevice.OpenModeFlag.Text):
-        show_error_msg(f"Could not open file: {file_path}.")
+        show_error_msg(f"Could not open file: {file_path}.", parent=parent)
         return None
     stream = QTextStream(file)
     data = stream.readAll()
