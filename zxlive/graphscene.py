@@ -201,11 +201,8 @@ class GraphScene(QGraphicsScene):
         Perform necessary cleanup to avoid RunTimeError when the application closes.
         Call this method before the application closes. 
         """        
-
         #Clear all items from the scene to ensure no dangling references remain
         self.clear()
-
-
         #explicity remove references to Qt object that may be deleted
         self.vertex_map.clear()
         self.edge_map.clear()

@@ -81,6 +81,3 @@ class RulePanel(EditorBasePanel):
                           self.name_field.text(),
                           self.description_field.text())
     
-    def shutdown(self):
-        if hasattr(self, 'graph_scene'):
-            self.graph_scene.shutdown() 
