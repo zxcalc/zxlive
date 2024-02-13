@@ -51,6 +51,8 @@ def read_custom_rules() -> list[RewriteData]:
 # So we add them to operations
 
 rewrites_graph_theoretic: dict[str, RewriteData] = {
+    "lcomp": operations["lcomp"],
+    "pivot": operations["pivot"],
     "pivot_boundary": {"text": "boundary pivot",
                        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
                        "matcher": pyzx.rules.match_pivot_boundary,
