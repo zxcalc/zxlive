@@ -13,8 +13,8 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Aleks Kissinger" },
-    { email = "aleks0@gmail.com" }
+    { name = "ZXLive contributors" },
+    { email = "john@vdwetering.name" }
 ]
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "PySide6",
-    "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
+    "pyzx >= 0.8.0",
     "networkx",
     "numpy",
     "shapely",
@@ -39,7 +39,6 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "PySide6-stubs",
-    "shapely-stubs @ git+https://github.com/ciscorn/shapely-stubs.git",
     "mypy",
     "pyproject-flake8",
     "pylint",
