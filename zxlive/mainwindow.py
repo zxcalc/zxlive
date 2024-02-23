@@ -308,7 +308,8 @@ class MainWindow(QMainWindow):
         if i == -1:
             return False
         widget = self.tab_widget.widget(i)
-        if isinstance(widget, BasePanel) and not widget.undo_stack.isClean():
+        assert isinstance(widget, BasePanel)
+        if not widget.undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
@@ -320,6 +321,7 @@ class MainWindow(QMainWindow):
                 val = self.handle_save_file_action()
                 if not val:
                     return False
+        widget.graph_scene.clearSelection()
         self.tab_widget.removeTab(i)
         if self.tab_widget.count() == 0:
             self._reset_menus(False)
