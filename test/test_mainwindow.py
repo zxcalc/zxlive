@@ -114,3 +114,14 @@ def test_file_formats_preserved(app: MainWindow) -> None:
     check_file_format("demo.zxg")
     check_file_format("demo.zxp")
     check_file_format("demo.zxr")
+
+
+def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
+    # Regression test to check that the app doesn't crash when closing a proof tab with a derivation in progress,
+    # due to accessing the graph after it has been deallocated.
+    # See https://github.com/Quantomatic/zxlive/issues/218 for context.
+    assert app.active_panel is not None
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    app.select_all_action.trigger()
+    app.close_action.trigger()
