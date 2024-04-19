@@ -341,7 +341,10 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
         elif isinstance(self.active_panel, RulePanel):
-            check_rule(self.active_panel.get_rule(), show_error=True)
+            try:
+                check_rule(self.active_panel.get_rule(), show_error=True)
+            except Exception as e:
+                show_error_msg("Warning!", str(e), parent=self)
             data = self.active_panel.get_rule().to_json()
         elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
@@ -366,7 +369,10 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, ProofPanel):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
-            check_rule(self.active_panel.get_rule(), show_error=True)
+            try:
+                check_rule(self.active_panel.get_rule(), show_error=True)
+            except Exception as e:
+                show_error_msg("Warning!", str(e), parent=self)
             out = save_rule_dialog(self.active_panel.get_rule(), self)
         else:
             out = save_diagram_dialog(self.active_panel.graph_scene.g, self)

@@ -315,30 +315,28 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.Graph, boundary_vertex_map
     ret: dict[NodeView, tuple[float, float]] = nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
     return ret
 
+
 def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
         len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
         if show_error:
-            from .dialogs import show_error_msg
-            show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
+            raise ValueError("The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
         return False
     if not rule.lhs_graph.variable_types and not rule.rhs_graph.variable_types:
         left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
         if not np.allclose(left_matrix, right_matrix):
             if show_error:
-                from .dialogs import show_error_msg
                 if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                    show_error_msg("Warning!", "The left-hand side and right-hand side of the rule differ by a scalar.")
+                    raise ValueError("The left-hand side and right-hand side of the rule differ by a scalar.")
                 else:
-                    show_error_msg("Warning!", "The left-hand side and right-hand side of the rule have different semantics.")
+                    raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
             return False
     else:
         if not (rule.rhs_graph.variable_types.items() <= rule.lhs_graph.variable_types.items()):
             if show_error:
-                from .dialogs import show_error_msg
-                show_error_msg("Warning!", "The right-hand side has more free variables than the left-hand side.")
+                raise ValueError("The right-hand side has more free variables than the left-hand side.")
             return False
         for vertex in rule.lhs_graph.vertices():
             if isinstance(rule.lhs_graph.phase(vertex), Poly):
@@ -346,7 +344,6 @@ def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
                     get_linear(rule.lhs_graph.phase(vertex))
                 except ValueError as e:
                     if show_error:
-                        from .dialogs import show_error_msg
-                        show_error_msg("Warning!", str(e))
+                        raise ValueError(f"Error in left-hand side phase: {str(e)}")
                     return False
     return True
