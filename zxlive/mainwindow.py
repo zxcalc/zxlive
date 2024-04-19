@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
             self._open_file_from_output(out)
 
     def open_file_from_path(self, file_path: str) -> None:
-        out = import_diagram_from_file(file_path)
+        out = import_diagram_from_file(file_path, parent=self)
         if out is not None:
             self._open_file_from_output(out)
 
@@ -335,7 +335,8 @@ class MainWindow(QMainWindow):
             return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
             show_error_msg("Can't save to circuit file",
-                "You imported this file from a circuit description. You can currently only save it in a graph format.")
+                           "You imported this file from a circuit description. You can currently only save it in a graph format.",
+                           parent=self)
             return self.handle_save_as_action()
 
         if isinstance(self.active_panel, ProofPanel):
@@ -352,7 +353,7 @@ class MainWindow(QMainWindow):
 
         file = QFile(self.active_panel.file_path)
         if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
-            show_error_msg("Could not write to file")
+            show_error_msg("Could not write to file", parent=self)
             return False
         out = QTextStream(file)
         out << data
@@ -384,7 +385,7 @@ class MainWindow(QMainWindow):
         assert isinstance(self.active_panel, ProofPanel)
         path = export_proof_dialog(self)
         if path is None:
-            show_error_msg("Export failed", "Invalid path")
+            show_error_msg("Export failed", "Invalid path", parent=self)
             return False
         with open(path, "w") as f:
             f.write(proof_to_tikz(self.active_panel.proof_model))
@@ -414,7 +415,7 @@ class MainWindow(QMainWindow):
         if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
             and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
-    
+
     def paste_graph_from_clipboard(self) -> None:
         assert self.active_panel is not None
         if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel): 
@@ -519,12 +520,13 @@ class MainWindow(QMainWindow):
             self.active_panel.graph.auto_detect_io()
             matrix = self.active_panel.graph.to_matrix()
         except AttributeError:
-            show_error_msg("Can't show matrix", "Showing matrices for parametrized diagrams is not supported yet.")
+            show_error_msg("Can't show matrix",
+                           "Showing matrices for parametrized diagrams is not supported yet.", parent=self)
             return
         except Exception as e:
-            show_error_msg("Can't show matrix", str(e))
+            show_error_msg("Can't show matrix", str(e), parent=self)
             return
-        dialog = QDialog()
+        dialog = QDialog(self)
         dialog.setWindowTitle("Matrix")
         table = QTableWidget()
         table.setRowCount(matrix.shape[0])

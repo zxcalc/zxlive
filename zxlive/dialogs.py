@@ -99,7 +99,7 @@ def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | Impor
         # This happens if the user clicks on cancel
         return None
 
-    return import_diagram_from_file(file_path, selected_filter)
+    return import_diagram_from_file(file_path, selected_filter, parent)
 
 
 def create_circuit_dialog(explanation: str, example: str, parent: QWidget) -> Optional[str]:
@@ -127,7 +127,7 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
         try:
             selected_format = next(f for f in FileFormat if f.extension == ext)
         except StopIteration:
-            show_error_msg("Failed to import file", f"Couldn't determine filetype: {file_path}.")
+            show_error_msg("Failed to import file", f"Couldn't determine filetype: {file_path}.", parent=parent)
             return None
 
     # TODO: This would be nicer with match statements (requires python 3.10 though)...
@@ -157,17 +157,18 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
                     try:
                         return ImportGraphOutput(FileFormat.TikZ, file_path, GraphT.from_tikz(data))  # type: ignore
                     except:
-                        show_error_msg(f"Failed to import {selected_format.name} file", f"Couldn't determine filetype: {file_path}.")
+                        show_error_msg(f"Failed to import {selected_format.name} file",
+                                       f"Couldn't determine filetype: {file_path}.", parent=parent)
                         return None
 
     except Exception as e:
-        show_error_msg(f"Failed to import {selected_format.name} file: {file_path}", str(e))
+        show_error_msg(f"Failed to import {selected_format.name} file: {file_path}", str(e), parent=parent)
         return None
 
-def write_to_file(file_path: str, data: str) -> bool:
+def write_to_file(file_path: str, data: str, parent: QWidget) -> bool:
     file = QFile(file_path)
     if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
-        show_error_msg("Could not write to file")
+        show_error_msg("Could not write to file", parent=parent)
         return False
     out = QTextStream(file)
     out << data
@@ -192,7 +193,7 @@ def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = 
             ext = file_path.split(".")[-1]
             selected_format = next(f for f in FileFormat if f.extension == ext)
         except StopIteration:
-            show_error_msg("Unable to determine file format.")
+            show_error_msg("Unable to determine file format.", parent=parent)
             return None
 
     # Add file extension if it's not already there
@@ -213,14 +214,14 @@ def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, F
         try:
             circuit = extract_circuit(graph)
         except Exception as e:
-            show_error_msg("Failed to convert the diagram to a circuit", str(e))
+            show_error_msg("Failed to convert the diagram to a circuit", str(e), parent=parent)
             return None
         data = circuit.to_qasm()
     else:
         assert selected_format == FileFormat.TikZ
         data = graph.to_tikz()
 
-    if not write_to_file(file_path, data):
+    if not write_to_file(file_path, data, parent):
         return None
 
     return file_path, selected_format
@@ -230,7 +231,7 @@ def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str, filename
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
     file_path, selected_format = file_path_and_format
-    if not write_to_file(file_path, data):
+    if not write_to_file(file_path, data, parent):
         return None
     return file_path, selected_format
 
@@ -247,7 +248,7 @@ def export_proof_dialog(parent: QWidget) -> Optional[str]:
     return file_path_and_format[0]
 
 def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], Optional[str]]:
-    dialog = QDialog()
+    dialog = QDialog(parent)
     rewrite_form = QFormLayout(dialog)
     name = QLineEdit()
     rewrite_form.addRow("Name", name)
@@ -262,7 +263,7 @@ def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], O
     return None, None
 
 def create_new_rewrite(parent: MainWindow) -> None:
-    dialog = QDialog()
+    dialog = QDialog(parent)
     rewrite_form = QFormLayout(dialog)
     name = QLineEdit()
     rewrite_form.addRow("Name", name)
