@@ -251,7 +251,7 @@ class ProofPanel(BasePanel):
             try:
                 phase = string_to_complex(text) if phase_is_complex else string_to_phase(text, self.graph)
             except ValueError:
-                show_error_msg("Invalid Input", error_msg)
+                show_error_msg("Invalid Input", error_msg, parent=self)
                 return False
         elif self.graph.type(vertex) != VertexType.W_OUTPUT:
             if self.graph.type(vertex) == VertexType.Z_BOX:

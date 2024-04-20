@@ -63,7 +63,7 @@ class GraphEditPanel(EditorBasePanel):
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():
-            show_error_msg("Graph is not well-formed")
+            show_error_msg("Graph is not well-formed", parent=self)
             return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         for vert in new_g.vertices():
@@ -96,10 +96,11 @@ class GraphEditPanel(EditorBasePanel):
                 else:
                     circ = QASMParser().parse(qasm, strict=False).to_graph()
             except TypeError as err:
-                show_error_msg("Invalid circuit", str(err))
+                show_error_msg("Invalid circuit", str(err), parent=self)
                 return
             except Exception:
-                show_error_msg("Invalid circuit", f"Couldn't parse code as {input_circuit_formats[circuit_format]}.")
+                show_error_msg("Invalid circuit",
+                               f"Couldn't parse code as {input_circuit_formats[circuit_format]}.", parent=self)
                 return
 
             new_verts, new_edges = new_g.merge(circ)

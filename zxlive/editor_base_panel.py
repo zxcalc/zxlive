@@ -182,7 +182,7 @@ class EditorBasePanel(BasePanel):
         try:
             new_phase = string_to_complex(input_) if phase_is_complex else string_to_phase(input_, graph)
         except ValueError:
-            show_error_msg("Invalid Input", error_msg)
+            show_error_msg("Invalid Input", error_msg, parent=self)
             return None
         cmd = ChangePhase(self.graph_view, v, new_phase)
         self.undo_stack.push(cmd)
