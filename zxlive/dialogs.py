@@ -76,6 +76,7 @@ class ImportRuleOutput:
     file_path: str
     r: CustomRule
 
+
 def show_error_msg(title: str, description: Optional[str] = None, parent: Optional[QWidget] = None) -> None:
     """Displays an error message box."""
     msg = QMessageBox(parent) #Set the parent of the QMessageBox
@@ -290,12 +291,16 @@ def create_new_rewrite(parent: MainWindow) -> None:
     rewrite_form.addRow(right_button)
     button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     rewrite_form.addRow(button_box)
+
     def add_rewrite() -> None:
         nonlocal left_graph, right_graph
         if left_graph is None or right_graph is None or name.text() == "" or description.toPlainText() == "":
             return
         rule = CustomRule(left_graph, right_graph, name.text(), description.toPlainText())
-        check_rule(rule, show_error=True)
+        try:
+            check_rule(rule)
+        except Exception as e:
+            show_error_msg("Warning!", str(e), parent=parent)
         if save_rule_dialog(rule, parent):
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
