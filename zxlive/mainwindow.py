@@ -342,7 +342,7 @@ class MainWindow(QMainWindow):
             data = self.active_panel.proof_model.to_json()
         elif isinstance(self.active_panel, RulePanel):
             try:
-                check_rule(self.active_panel.get_rule(), show_error=True)
+                check_rule(self.active_panel.get_rule())
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             data = self.active_panel.get_rule().to_json()
@@ -370,7 +370,7 @@ class MainWindow(QMainWindow):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
             try:
-                check_rule(self.active_panel.get_rule(), show_error=True)
+                check_rule(self.active_panel.get_rule())
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             out = save_rule_dialog(self.active_panel.get_rule(), self)

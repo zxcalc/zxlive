@@ -316,34 +316,25 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.Graph, boundary_vertex_map
     return ret
 
 
-def check_rule(rule: CustomRule, show_error: bool = True) -> bool:
+def check_rule(rule: CustomRule) -> None:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
         len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
-        if show_error:
-            raise ValueError("The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
-        return False
+        raise ValueError("The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
     if not rule.lhs_graph.variable_types and not rule.rhs_graph.variable_types:
         left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
         if not np.allclose(left_matrix, right_matrix):
-            if show_error:
-                if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                    raise ValueError("The left-hand side and right-hand side of the rule differ by a scalar.")
-                else:
-                    raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
-            return False
+            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
+                raise ValueError("The left-hand side and right-hand side of the rule differ by a scalar.")
+            else:
+                raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
     else:
         if not (rule.rhs_graph.variable_types.items() <= rule.lhs_graph.variable_types.items()):
-            if show_error:
-                raise ValueError("The right-hand side has more free variables than the left-hand side.")
-            return False
+            raise ValueError("The right-hand side has more free variables than the left-hand side.")
         for vertex in rule.lhs_graph.vertices():
             if isinstance(rule.lhs_graph.phase(vertex), Poly):
                 try:
                     get_linear(rule.lhs_graph.phase(vertex))
                 except ValueError as e:
-                    if show_error:
-                        raise ValueError(f"Error in left-hand side phase: {str(e)}")
-                    return False
-    return True
+                    raise ValueError(f"Error in left-hand side phase: {str(e)}")

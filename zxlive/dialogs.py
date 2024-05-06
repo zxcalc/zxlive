@@ -297,7 +297,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
             return
         rule = CustomRule(left_graph, right_graph, name.text(), description.toPlainText())
         try:
-            check_rule(rule, show_error=True)
+            check_rule(rule)
         except Exception as e:
             show_error_msg("Warning!", str(e), parent=parent)
         if save_rule_dialog(rule, parent):
