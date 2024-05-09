@@ -363,10 +363,11 @@ class ProofPanel(BasePanel):
             avg_left = -avg_right
 
         dist = 0.25 if QVector2D.dotProduct(avg_left, avg_right) != 0 else 0.35
-        # Put the phase on the left hand side if the mouse direction is further
-        # away from the average direction of the left neighbours than the right.
+        # Put the phase on the left hand side if the mouse direction is closer
+        # to the average direction of the left neighbours than the right, i.e.,
+        # associate the phase to the larger sliced area.
         phase_left = QVector2D.dotProduct(QVector2D(mouse_dir), avg_left) \
-            <= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
+            >= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
 
         new_g = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v),
