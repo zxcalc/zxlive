@@ -67,7 +67,7 @@ class RewriteAction:
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Narrow down the type of the first return value.
-    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[Any, Optional[Iterable[VT]]]:
+    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[Any, Optional[list[VT]]]:
         if self.returns_new_graph:
             return self.rule(g, matches), None
 
@@ -136,7 +136,7 @@ class RewriteActionTree:
             ret.append_child(cls.from_dict(actions, group, ret))
         return ret
 
-    def update_on_selection(self, g, selection, edges) -> None:
+    def update_on_selection(self, g: GraphT, selection: list[VT], edges: list[ET]) -> None:
         for child in self.child_items:
             child.update_on_selection(g, selection, edges)
         if self.rewrite is not None:
@@ -146,13 +146,13 @@ class RewriteActionTree:
 class RewriteActionTreeModel(QAbstractItemModel):
     root_item: RewriteActionTree
 
-    def __init__(self, data: RewriteActionTree, proof_panel: ProofPanel):
+    def __init__(self, data: RewriteActionTree, proof_panel: ProofPanel) -> None:
         super().__init__(proof_panel)
         self.proof_panel = proof_panel
         self.root_item = data
 
     @classmethod
-    def from_dict(cls, d: dict, proof_panel: ProofPanel):
+    def from_dict(cls, d: dict, proof_panel: ProofPanel) -> RewriteActionTreeModel:
         return RewriteActionTreeModel(
             RewriteActionTree.from_dict(d),
             proof_panel
@@ -170,7 +170,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         return QModelIndex()
 
     def parent(self, index: QModelIndex = None) -> QModelIndex:
-        if not index.isValid():
+        if index is None or not index.isValid():
             return QModelIndex()
 
         parent_item = index.internalPointer().parent
@@ -181,7 +181,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         return self.createIndex(parent_item.row(), 0, parent_item)
 
     def rowCount(self, parent: QModelIndex = None) -> int:
-        if parent.column() > 0:
+        if parent is None or parent.column() > 0:
             return 0
         parent_item = parent.internalPointer() if parent.isValid() else self.root_item
         return parent_item.child_count()

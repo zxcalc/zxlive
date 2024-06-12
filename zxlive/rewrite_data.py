@@ -51,32 +51,54 @@ def read_custom_rules() -> list[RewriteData]:
 # So we add them to operations
 
 rewrites_graph_theoretic: dict[str, RewriteData] = {
-    "lcomp": operations["lcomp"],
-    "pivot": operations["pivot"],
-    "pivot_boundary": {"text": "boundary pivot",
-                       "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
-                       "matcher": pyzx.rules.match_pivot_boundary,
-                       "rule": pyzx.rules.pivot,
-                       "type": MATCHES_EDGES,
-                       "copy_first": True},
-    "pivot_gadget": {"text": "gadget pivot",
-                     "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
-                     "matcher": pyzx.rules.match_pivot_gadget,
-                     "rule": pyzx.rules.pivot,
-                     "type": MATCHES_EDGES,
-                     "copy_first": True},
-    "phase_gadget_fuse": {"text": "Fuse phase gadgets",
-                          "tooltip": "Fuses two phase gadgets with the same connectivity.",
-                          "matcher": pyzx.rules.match_phase_gadgets,
-                          "rule": pyzx.rules.merge_phase_gadgets,
-                          "type": MATCHES_VERTICES,
-                          "copy_first": True},
-    "supplementarity": {"text": "Supplementarity",
-                        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
-                        "matcher": pyzx.rules.match_supplementarity,
-                        "rule": pyzx.rules.apply_supplementarity,
-                        "type": MATCHES_VERTICES,
-                        "copy_first": False},
+    "lcomp": {
+        "text": "local complementation",
+        "tooltip": "Deletes a spider with a pi/2 phase by performing a local complementation on its neighbors",
+        "matcher": pyzx.rules.match_lcomp_parallel,
+        "rule": pyzx.rules.lcomp,
+        "type": MATCHES_VERTICES,
+        "copy_first": True
+    },
+    "pivot": {
+        "text": "pivot",
+        "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
+        "matcher": lambda g, matchf: pyzx.rules.match_pivot_parallel(g, matchf, check_edge_types=True),
+        "rule": pyzx.rules.pivot,
+        "type": MATCHES_EDGES,
+        "copy_first": True
+    },
+    "pivot_boundary": {
+        "text": "boundary pivot",
+        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
+        "matcher": pyzx.rules.match_pivot_boundary,
+        "rule": pyzx.rules.pivot,
+        "type": MATCHES_EDGES,
+        "copy_first": True
+    },
+    "pivot_gadget": {
+        "text": "gadget pivot",
+        "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
+        "matcher": pyzx.rules.match_pivot_gadget,
+        "rule": pyzx.rules.pivot,
+        "type": MATCHES_EDGES,
+        "copy_first": True
+    },
+    "phase_gadget_fuse": {
+        "text": "Fuse phase gadgets",
+        "tooltip": "Fuses two phase gadgets with the same connectivity.",
+        "matcher": pyzx.rules.match_phase_gadgets,
+        "rule": pyzx.rules.merge_phase_gadgets,
+        "type": MATCHES_VERTICES,
+        "copy_first": True
+    },
+    "supplementarity": {
+        "text": "Supplementarity",
+        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
+        "matcher": pyzx.rules.match_supplementarity,
+        "rule": pyzx.rules.apply_supplementarity,
+        "type": MATCHES_VERTICES,
+        "copy_first": False
+    },
 }
 
 const_true = lambda graph, matches: matches
@@ -102,12 +124,13 @@ def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
 def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[ET, VT]:
     return ({}, [], [], True)
 
+
 ocm_action: RewriteData = {
-        "text": "OCM",
-        "tooltip": "Saves the graph with the current vertex positions",
-        "matcher": const_true,
-        "rule": ocm_rule,
-        "type": MATCHES_VERTICES,
+    "text": "OCM",
+    "tooltip": "Saves the graph with the current vertex positions",
+    "matcher": const_true,
+    "rule": ocm_rule,
+    "type": MATCHES_VERTICES,
 }
 
 simplifications: dict[str, RewriteData] = {
