@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "PySide6",
-    "pyzx >= 0.8.0",
+    "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
     "networkx",
     "numpy",
     "shapely",
