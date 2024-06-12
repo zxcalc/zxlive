@@ -313,12 +313,12 @@ class RuleEditGraphView(GraphView):
         super().mousePressEvent(e)
 
 
-SPARKLE_COLOR = "#900090"
+SPARKLE_COLOR = ["#900090", "#ff9999", "#3333ff", "#99ff99"]
 SPARKLE_COUNT = 1
-SPARKLE_MAX_SPEED = 50.0
+SPARKLE_MAX_SPEED = 100.0
 SPARKLE_MIN_SPEED = 10.0
-MAX_SPARKLES = 100
-SPARKLE_STEPS = 40
+MAX_SPARKLES = 500
+SPARKLE_STEPS = 60
 
 
 class Sparkles(QObject):
@@ -378,7 +378,8 @@ class Sparkle(QGraphicsEllipseItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
-        self.setBrush(QBrush(QColor(SPARKLE_COLOR)))
+        col = SPARKLE_COLOR[random.randint(0,3)]
+        self.setBrush(QBrush(QColor(col)))
         self.setPen(QPen(Qt.PenStyle.NoPen))
 
         scene.addItem(self)

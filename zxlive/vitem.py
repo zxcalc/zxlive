@@ -435,7 +435,7 @@ class PhaseItem(QGraphicsTextItem):
         vertex_type = self.v_item.g.type(self.v_item.v)
         if vertex_type == VertexType.Z_BOX:
             self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
-        else:
+        elif vertex_type != VertexType.BOUNDARY:
             phase = self.v_item.g.phase(self.v_item.v)
             self.setPlainText(phase_to_s(phase, vertex_type))
         p = self.v_item.pos()
