@@ -15,11 +15,12 @@
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
+from pyzx.graph.scalar import Scalar
 
 import math
 import random
 from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
-from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem
+from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
 
 from .graphscene import GraphScene, VItem, EItem, EditGraphScene
@@ -98,15 +99,32 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = False
         self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
+        
+        self.scalar_label = QLabel(parent=self)
+        self.scalar_label.move(10, 10)
+        self.scalar_label.show()
+
+        self.__update_scalar_label(Scalar())
 
     def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
+        self.__update_scalar_label(g.scalar)
 
     def update_graph(self, g: GraphT, select_new: bool = False) -> None:
         self.graph_scene.update_graph(g, select_new)
+        self.__update_scalar_label(g.scalar)
+            
+    def __update_scalar_label(self, scalar: complex) -> None:
+        if scalar.is_zero:
+            colour = "red"
+        else:
+            colour = "black"
+        button_string = f" Scalar: {scalar.polar_str()} "
+        self.scalar_label.setText(f"<span style='color:{colour}'>{button_string}</span>")
+        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, button_string, 0).width())
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
