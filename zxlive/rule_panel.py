@@ -10,7 +10,7 @@ from pyzx.symbolic import Poly
 
 
 from .base_panel import ToolbarSection
-from .common import GraphT, ToolType
+from .common import GraphT, ToolType, VT, ET
 from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
@@ -80,3 +80,26 @@ class RulePanel(EditorBasePanel):
                           self.graph_scene_right.g,
                           self.name_field.text(),
                           self.description_field.text())
+
+    def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
+        super().vert_moved(vs)
+        self.update_io_labels(self.graph_scene)
+
+    def add_vert(self, x: float, y: float) -> None:
+        super().add_vert(x, y)
+        self.update_io_labels(self.graph_scene)
+
+    def add_edge(self, u: VT, v: VT) -> None:
+        super().add_edge(u, v)
+        self.update_io_labels(self.graph_scene)
+
+    def update_io_labels(self, scene: EditGraphScene) -> None:
+        try:
+            scene.g.auto_detect_io()
+            for v in scene.g.vertices():
+                if v in scene.g.inputs():
+                    scene.vertex_map[v].phase_item.setPlainText("in-" + str(scene.g.inputs().index(v)))
+                elif v in scene.g.outputs():
+                    scene.vertex_map[v].phase_item.setPlainText("out-" + str(scene.g.outputs().index(v)))
+        except TypeError:
+            return
