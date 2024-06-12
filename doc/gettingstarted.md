@@ -22,11 +22,13 @@ When you open ZXLive for the first time, you will see a window that looks someth
 
 The ZXLive editor window
 ```
-This is the ***editor mode***. In this mode you can freely edit the diagram.
+This is the ***editor mode***. In this mode you can freely edit the diagram. There are three main tools
 
 ```{figure} _static/toolbar.png
 :scale: 100 %
 :alt: ZXLive toolbar
 
-The editing tools.
+The editing tools: Select (s), Add vertex (v), and Add edge (e).
 ```
+With the Select tool active you can select any part of the graph by dragging a box, or directly clicking on vertices or edges, using the left mouse button. Control- or shift-clicking adds to the selection.
+With the Add vertex tool or Add edge
