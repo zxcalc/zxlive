@@ -22,6 +22,10 @@ def get_custom_rules_path() -> str:
 VT: TypeAlias = int
 ET: TypeAlias = tuple[int, int, int]
 GraphT: TypeAlias = pyzx.graph.multigraph.Multigraph
+def new_graph() -> GraphT:
+    g = GraphT()
+    g.set_auto_simplify(False)
+    return g
 
 class ToolType(IntEnum):
     SELECT = 0
