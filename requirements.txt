@@ -10,3 +10,8 @@ pyperclip>=1.8.1
 mypy
 pylint
 pyproject-flake8
+sphinx>=2.3,<7  # see: https://github.com/readthedocs/readthedocs.org/issues/10279
+sphinx_autodoc_typehints>=1.10
+sphinx_rtd_theme>=0.4
+sphinxcontrib-svg2pdfconverter>=1.2.2
+myst-parser>=3.0.0

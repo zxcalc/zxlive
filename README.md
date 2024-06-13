@@ -13,3 +13,12 @@ To install from source, you need Python >= 3.9 and pip. If you have those, just 
 
 Then, you can run ZXLive by typing `python3 -m zxlive`.
 
+# Documentation
+
+This project uses Sphinx to build a ReadTheDocs page. In addition, it uses the MyST preprocessor to allow us to write documentation in a Markdown-like format rather than Sphinx's native rich structured text format.
+
+The documentation can be built with
+
+```
+cd doc; make html
+```
