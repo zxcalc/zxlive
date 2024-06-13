@@ -108,6 +108,7 @@ class EditorBasePanel(BasePanel):
 
     def _ety_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
+        self.graph_scene.curr_ety = ety
 
     def _ety_double_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
