@@ -237,23 +237,12 @@ class AddEdge(BaseCommand):
     v: VT
     ety: EdgeType.Type
 
-    _old_ety: Optional[EdgeType.Type] = field(default=None, init=False)
-
     def undo(self) -> None:
-        u, v = self.u, self.v
-        e = self.g.edge(u, v)
-        if self._old_ety:
-            self.g.add_edge(e, self._old_ety)
-        else:
-            self.g.remove_edge(e)
+        self.g.remove_edge((self.u, self.v, self.ety))
         self.update_graph_view()
 
     def redo(self) -> None:
-        u, v = self.u, self.v
-        e = self.g.edge(u, v)
-
-        self._old_ety = None
-        self.g.add_edge(e, self.ety)
+        self.g.add_edge(((self.u, self.v)), self.ety)
         self.update_graph_view()
 
 
