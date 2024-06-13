@@ -35,7 +35,7 @@ HAD_EDGE_BLUE = "#0077ff"
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem) -> None:
+    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -45,7 +45,7 @@ class EItem(QGraphicsPathItem):
         self.e = e
         self.s_item = s_item
         self.t_item = t_item
-        self.curve_distance = 0.3
+        self.curve_distance = curve_distance
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
         self.selection_node = QGraphicsEllipseItem(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)

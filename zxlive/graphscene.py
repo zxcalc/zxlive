@@ -119,6 +119,9 @@ class GraphScene(QGraphicsScene):
             if e_item.selection_node:
                 self.removeItem(e_item.selection_node)
             self.removeItem(e_item)
+            self.edge_map.pop(e)
+            s, t = self.g.edge_st(e)
+            self.update_edge_curves(s, t)
 
         new_g = diff.apply_diff(self.g)
         # Mypy issue: https://github.com/python/mypy/issues/11673
@@ -141,6 +144,7 @@ class GraphScene(QGraphicsScene):
             e = (s,t,typ)
             e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
             self.edge_map[e] = e_item
+            self.update_edge_curves(s, t)
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
 
@@ -167,6 +171,13 @@ class GraphScene(QGraphicsScene):
             self.edge_map[e].refresh()
 
         self.select_vertices(selected_vertices)
+
+    def update_edge_curves(self, s, t):
+        edges = [e for e in self.g.edges(s,t) if e in self.edge_map]
+        midpoint_index = 0.5 * (len(edges) - 1)
+        for n, edge in enumerate(edges):
+            self.edge_map[edge].curve_distance = (n - midpoint_index) * 0.5
+            self.edge_map[edge].refresh()
 
     def update_colors(self) -> None:
         for v in self.vertex_map.values():
