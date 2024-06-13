@@ -204,13 +204,15 @@ class GraphScene(QGraphicsScene):
             self.addItem(vi.phase_item)  # add the phase label to the scene
 
         self.edge_map = {}
-        for e in self.g.edges():
+        for e in set(self.g.edges()):
             s, t = self.g.edge_st(e)
-            ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
-            self.addItem(ei)
-            self.addItem(ei.selection_node)
-            edge_key = (e, self.g.graph[s][t].get_edge_count(e[2]) - 1)
-            self.edge_map[edge_key] = ei
+            for i in range(self.g.graph[s][t].get_edge_count(e[2])):
+                ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
+                self.addItem(ei)
+                self.addItem(ei.selection_node)
+                edge_key = (e, i)
+                self.edge_map[edge_key] = ei
+            self.update_edge_curves(s, t)
 
     def select_all(self) -> None:
         """Selects all vertices and edges in the scene."""
