@@ -16,11 +16,13 @@
 from __future__ import annotations
 
 import copy
+import random
 from typing import Callable, Optional, cast
 
-from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream, Qt)
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
+from PySide6.QtCore import (QByteArray, QDir, QEvent, QFile, QFileInfo,
+                            QIODevice, QSettings, QTextStream, Qt, QUrl)
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut
+from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
@@ -42,6 +44,7 @@ from zxlive.settings_dialog import open_settings_dialog
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
+from .sfx import SFXEnum
 from .tikz import proof_to_tikz
 
 
@@ -164,6 +167,12 @@ class MainWindow(QMainWindow):
 
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
+
+        self.effect = QSoundEffect()
+        self.effect.setLoopCount(1)
+
+        self.sfx_on = False
+        QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self._toggle_sfx)
 
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
@@ -362,6 +371,8 @@ class MainWindow(QMainWindow):
         out << data
         file.close()
         self.active_panel.undo_stack.setClean()
+        if random.random() < 0.1:
+            self.play_sound(SFXEnum.IRANIAN_BUS)
         return True
 
 
@@ -444,6 +455,7 @@ class MainWindow(QMainWindow):
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
+        panel.play_sound_signal.connect(self.play_sound)
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
         _graph = graph or GraphT()
@@ -562,3 +574,18 @@ class MainWindow(QMainWindow):
     def update_colors(self) -> None:
         if self.active_panel is not None:
             self.active_panel.update_colors()
+
+    def play_sound(self, s: SFXEnum) -> None:
+        if self.sfx_on:
+            fullpath = QDir.current().absoluteFilePath(s.value)
+            url = QUrl.fromLocalFile(fullpath)
+            self.effect.setSource(url)
+            self.effect.play()
+
+    def _toggle_sfx(self) -> None:
+        self.sfx_on = not self.sfx_on
+        if self.sfx_on:
+            self.play_sound(random.choice([
+                SFXEnum.WELCOME_EVERYBODY,
+                SFXEnum.OK_IM_GONNA_START,
+            ]))

@@ -30,6 +30,7 @@ from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
 from .editor_base_panel import string_to_complex
 from .rewrite_data import action_groups, refresh_custom_rules
 from .rewrite_action import RewriteActionTreeModel
+from .sfx import SFXEnum
 
 
 class ProofPanel(BasePanel):
@@ -182,11 +183,13 @@ class ProofPanel(BasePanel):
             pyzx.basicrules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "fuse spiders")
+            self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
+            self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
