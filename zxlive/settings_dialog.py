@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog,
                                QPushButton, QWidget,
                                QVBoxLayout, QSpinBox, QDoubleSpinBox,
                                QLabel, QHBoxLayout, QTabWidget,
-                                QComboBox)
+                                QComboBox, QCheckBox)
 
 import pyzx
 
@@ -64,6 +64,7 @@ class SettingsDialog(QDialog):
         self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo',
                          data = {'2': "2", '4': "4", '8': "8", '16': "16"})
         self.add_setting(form_general, "input-circuit-format", "Input Circuit as", 'combo', data=input_circuit_formats)
+        self.add_setting(form_general, "sound-effects", "Sound Effects", "checkbox")
         self.prev_color_scheme = self.settings.value("color-scheme")
         vlayout.addStretch()
 
@@ -219,6 +220,9 @@ class SettingsDialog(QDialog):
             widget.addItems(list(data.values()))
             widget.setCurrentText(data[str(val)])
             setattr(widget, "data", data)
+        elif ty == 'checkbox':
+            widget = QCheckBox()
+            widget.setChecked(val)
 
 
         form.addRow(label, widget)
@@ -239,6 +243,8 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, val)
             elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
                 self.settings.setValue(name, widget.text_value)
+            elif isinstance(widget, QCheckBox):
+                self.settings.setValue(name, widget.isChecked())
         set_pyzx_tikz_settings()
         setting.update()
         if self.settings.value("color-scheme") != self.prev_color_scheme:

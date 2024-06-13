@@ -36,6 +36,7 @@ defaults: Dict[str,Any] = {
     "color-scheme": "modern-red-green",
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
+    "sound-effects": False,
 
     "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
     "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],

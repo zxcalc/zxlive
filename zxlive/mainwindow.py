@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
         self.effect = QSoundEffect()
         self.effect.setLoopCount(1)
 
-        self.sfx_on = False
+        self.sfx_on = self.settings.value("sound-effects")
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self._toggle_sfx)
 
     def open_demo_graph(self) -> None:
