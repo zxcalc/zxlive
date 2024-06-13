@@ -108,8 +108,9 @@ class GraphScene(QGraphicsScene):
                 self.removeItem(v_item.phase_item)
             for anim in v_item.active_animations.copy():
                 anim.stop()
-            for e in self.g.incident_edges(v):
-                removed_edges.add(e)
+            for s, t in self.g.incident_edges(v):
+                for e in self.g.edges(s, t):
+                    removed_edges.add(e)
 
             selected_vertices.discard(v)
             self.removeItem(v_item)
