@@ -251,12 +251,9 @@ class AddEdge(BaseCommand):
     def redo(self) -> None:
         u, v = self.u, self.v
         e = self.g.edge(u, v)
-        if self.g.connected(u, v):
-            self._old_ety = self.g.edge_type(e)
-            self.g.set_edge_type(e, self.ety)
-        else:
-            self._old_ety = None
-            self.g.add_edge(e, self.ety)
+
+        self._old_ety = None
+        self.g.add_edge(e, self.ety)
         self.update_graph_view()
 
 

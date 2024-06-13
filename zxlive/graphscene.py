@@ -136,8 +136,9 @@ class GraphScene(QGraphicsScene):
             if select_new:
                 selected_vertices.add(v)
 
-        for e, e_type in diff.new_edges:
+        for e, typ in diff.new_edges:
             s, t = self.g.edge_st(e)
+            e = (s,t,typ)
             e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
             self.edge_map[e] = e_item
             self.addItem(e_item)
