@@ -52,7 +52,7 @@ class GraphScene(QGraphicsScene):
         self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
         self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
         self.vertex_map: dict[VT, VItem] = {}
-        self.edge_map: dict[ET, EItem] = {}
+        self.edge_map: dict[tuple[ET, int], EItem] = {}
 
     @property
     def selected_vertices(self) -> Iterator[VT]:
@@ -115,11 +115,12 @@ class GraphScene(QGraphicsScene):
             self.removeItem(v_item)
 
         for e in removed_edges:
-            e_item = self.edge_map[e]
+            edge_key = (e, self.g.graph[e[0]][e[1]].get_edge_count(e[2]) - 1)
+            e_item = self.edge_map[edge_key]
             if e_item.selection_node:
                 self.removeItem(e_item.selection_node)
             self.removeItem(e_item)
-            self.edge_map.pop(e)
+            self.edge_map.pop(edge_key)
             s, t = self.g.edge_st(e)
             self.update_edge_curves(s, t)
 
@@ -141,9 +142,10 @@ class GraphScene(QGraphicsScene):
 
         for e, typ in diff.new_edges:
             s, t = self.g.edge_st(e)
+            cur_edge_type_idx = self.g.graph[s][t].get_edge_count(typ) - 1
             e = (s,t,typ)
             e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
-            self.edge_map[e] = e_item
+            self.edge_map[(e, cur_edge_type_idx)] = e_item
             self.update_edge_curves(s, t)
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
@@ -168,12 +170,18 @@ class GraphScene(QGraphicsScene):
             v_item.set_vitem_rotation()
 
         for e in diff.changed_edge_types:
-            self.edge_map[e].refresh()
+            for i in range(self.g.graph[e[0]][e[1]].get_edge_count(e[2])):
+                self.edge_map[(e, i)].refresh()
 
         self.select_vertices(selected_vertices)
 
     def update_edge_curves(self, s, t):
-        edges = [e for e in self.g.edges(s,t) if e in self.edge_map]
+        edges = []
+        for e in set(self.g.edges(s, t)):
+            for i in range(self.g.graph[s][t].get_edge_count(e[2])):
+                edge_key = (e, i)
+                if edge_key in self.edge_map:
+                    edges.append(edge_key)
         midpoint_index = 0.5 * (len(edges) - 1)
         for n, edge in enumerate(edges):
             self.edge_map[edge].curve_distance = (n - midpoint_index) * 0.5
@@ -200,7 +208,8 @@ class GraphScene(QGraphicsScene):
             ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
             self.addItem(ei)
             self.addItem(ei.selection_node)
-            self.edge_map[e] = ei
+            edge_key = (e, self.g.graph[s][t].get_edge_count(e[2]) - 1)
+            self.edge_map[edge_key] = ei
 
     def select_all(self) -> None:
         """Selects all vertices and edges in the scene."""
