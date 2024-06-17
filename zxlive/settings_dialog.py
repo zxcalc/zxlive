@@ -222,7 +222,7 @@ class SettingsDialog(QDialog):
             setattr(widget, "data", data)
         elif ty == 'checkbox':
             widget = QCheckBox()
-            widget.setChecked(val)
+            widget.setChecked(str(val) == "True")
 
 
         form.addRow(label, widget)
