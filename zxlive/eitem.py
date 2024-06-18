@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from __future__ import annotations
+from math import sqrt
 from typing import Optional, Any, TYPE_CHECKING
 
 from PySide6.QtCore import QPointF
@@ -34,7 +35,7 @@ HAD_EDGE_BLUE = "#0077ff"
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
-    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem) -> None:
+    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -44,6 +45,7 @@ class EItem(QGraphicsPathItem):
         self.e = e
         self.s_item = s_item
         self.t_item = t_item
+        self.curve_distance = curve_distance
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
         self.selection_node = QGraphicsEllipseItem(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
@@ -75,19 +77,16 @@ class EItem(QGraphicsPathItem):
             pen.setColor(QColor("#000000"))
         self.setPen(QPen(pen))
 
-        # set path as a straight line from source to target
         path = QPainterPath()
+        control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
         path.moveTo(self.s_item.pos())
-        path.lineTo(self.t_item.pos())
+        path.quadTo(control_point, self.t_item.pos())
         self.setPath(path)
 
-        avg_x = 0.5*(self.s_item.pos().x() + self.t_item.pos().x())
-        avg_y = 0.5*(self.s_item.pos().y() + self.t_item.pos().y())
-        self.selection_node.setPos(avg_x,avg_y)
-        if self.isSelected():
-            self.selection_node.setVisible(True)
-        else:
-            self.selection_node.setVisible(False)
+        curve_midpoint = self.s_item.pos() * 0.25 + control_point * 0.5 + self.t_item.pos() * 0.25
+        self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
+        self.selection_node.setVisible(self.isSelected())
+
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
@@ -143,3 +142,12 @@ class EDragItem(QGraphicsPathItem):
         path.lineTo(self.mouse_pos)
         self.setPath(path)
 
+def calculate_control_point(source_pos, target_pos, curve_distance):
+    """Calculate the control point for the curve"""
+    direction = target_pos - source_pos
+    direction /= sqrt(direction.x()**2 + direction.y()**2)  # Normalize the direction
+    perpendicular = QPointF(-direction.y(), direction.x())
+    midpoint = (source_pos + target_pos) / 2
+    offset = perpendicular * curve_distance * SCALE
+    control_point = midpoint + offset
+    return control_point

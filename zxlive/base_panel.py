@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
 
 from .animations import AnimatedUndoStack
 from .commands import SetGraph
-from .common import GraphT
+from .common import GraphT, new_graph
 from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -83,7 +83,7 @@ class BasePanel(QWidget):
         raise NotImplementedError
 
     def clear_graph(self) -> None:
-        empty_graph = GraphT()
+        empty_graph = new_graph()
         cmd = SetGraph(self.graph_view, empty_graph)
         self.undo_stack.push(cmd)
 
