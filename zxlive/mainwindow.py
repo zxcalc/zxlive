@@ -44,7 +44,7 @@ from zxlive.settings_dialog import open_settings_dialog
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
-from .sfx import SFXEnum
+from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
 
 
@@ -168,8 +168,7 @@ class MainWindow(QMainWindow):
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
-        self.effect = QSoundEffect()
-        self.effect.setLoopCount(1)
+        self.effects = {e: load_sfx(e) for e in SFXEnum}
 
         self.sfx_on = self.settings.value("sound-effects")
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self._toggle_sfx)
@@ -577,10 +576,7 @@ class MainWindow(QMainWindow):
 
     def play_sound(self, s: SFXEnum) -> None:
         if self.sfx_on:
-            fullpath = QDir.current().absoluteFilePath(s.value)
-            url = QUrl.fromLocalFile(fullpath)
-            self.effect.setSource(url)
-            self.effect.play()
+            self.effects[s].play()
 
     def _toggle_sfx(self) -> None:
         self.sfx_on = not self.sfx_on
