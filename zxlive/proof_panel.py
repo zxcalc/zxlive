@@ -175,14 +175,15 @@ class ProofPanel(BasePanel):
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
-        if pyzx.basicrules.check_fuse(self.graph, v, w):
-            g = copy.deepcopy(self.graph)
+        g = copy.deepcopy(self.graph)
+        if self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
+            basicrules.color_change(g, w)
+        if pyzx.basicrules.check_fuse(g, v, w):
             pyzx.basicrules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "fuse spiders")
             self.undo_stack.push(cmd, anim_before=anim)
-        elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
-            g = copy.deepcopy(self.graph)
+        elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
@@ -402,7 +403,6 @@ class ProofPanel(BasePanel):
     def _vert_double_clicked(self, v: VT) -> None:
         if self.graph.type(v) == VertexType.BOUNDARY:
             return
-
         new_g = copy.deepcopy(self.graph)
         basicrules.color_change(new_g, v)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")

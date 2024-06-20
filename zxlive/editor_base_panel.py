@@ -108,6 +108,7 @@ class EditorBasePanel(BasePanel):
 
     def _ety_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
+        self.graph_scene.curr_ety = ety
 
     def _ety_double_clicked(self, ety: EdgeType.Type) -> None:
         self._curr_ety = ety
@@ -171,8 +172,8 @@ class EditorBasePanel(BasePanel):
             error_msg = "Please enter a valid input (e.g., -1+2j)."
 
         else:
-            prompt = "Enter desired phase value (in units of pi):"
-            error_msg = "Please enter a valid input (e.g., 1/2, 2, 0.25, 2a+b)."
+            prompt = "Enter desired phase value (non-variables are multiples of pi):"
+            error_msg = "Please enter a valid input. (e.g. pi/2, 1/2, 0.25, a+b)."
 
         input_, ok = QInputDialog.getText(
             self, "Change Phase", prompt
