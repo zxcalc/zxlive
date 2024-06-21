@@ -193,7 +193,7 @@ def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:
     # if any of the output edges of the lhs_graph is a Hadamard edge, then the rewrite is not unfusable
     for v in lhs_graph.outputs():
         for n in lhs_graph.neighbors(v):
-            if lhs_graph.edge_type((v, n)) == EdgeType.HADAMARD:
+            if lhs_graph.graph[v][n].h != 0:
                 return False
     # all nodes must be connected to at most one boundary node
     for v in lhs_graph.vertices():
@@ -282,7 +282,7 @@ def to_networkx(graph: GraphT) -> nx.Graph:
     for i, output_vertex in enumerate(graph.outputs()):
         v_data[output_vertex]["boundary_index"] = f'output_{i}'
     G.add_nodes_from([(v, v_data[v]) for v in graph.vertices()])
-    G.add_edges_from([(*v, {"type": graph.edge_type(v)}) for v in  graph.edges()])
+    G.add_edges_from([(source, target, {"type": typ}) for source, target, typ in  graph.edges()])
     return G
 
 def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str, int]]:

@@ -14,3 +14,4 @@ dist
 .env
 *.zxr
 .ipynb_checkpoints
+doc/_build/*
