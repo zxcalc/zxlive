@@ -33,6 +33,7 @@ class ToolbarSection:
 class BasePanel(QWidget):
     """Base class implementing functionality shared between the edit and
     proof panels."""
+    splitter_sizes = dict()
 
     graph_scene: GraphScene
     graph_view: GraphView
@@ -55,6 +56,7 @@ class BasePanel(QWidget):
 
         self.splitter = QSplitter(self)
         self.layout().addWidget(self.splitter)
+        self.splitter.splitterMoved.connect(self.sync_splitter_sizes)
 
         self.file_path = None
         self.file_type = None
@@ -106,3 +108,10 @@ class BasePanel(QWidget):
 
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
+
+    def sync_splitter_sizes(self):
+        self.splitter_sizes[self.__class__] = self.splitter.sizes()
+
+    def set_splitter_size(self):
+        if splitter_sizes := self.splitter_sizes.get(self.__class__, ()):
+            self.splitter.setSizes(splitter_sizes)
