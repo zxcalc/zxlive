@@ -122,7 +122,7 @@ class GraphView(QGraphicsView):
         scalar_string = f" Scalar: {scalar.polar_str()}"
         if reduces_to_zero:
             colour = "red"
-            button_text = f"{scalar_string}, The diagram reduces to zero"
+            button_text = f"{scalar_string}, The diagram likely reduces to zero"
         else:
             colour = "black"
             button_text = f"{scalar_string}"
