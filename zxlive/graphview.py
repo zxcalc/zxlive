@@ -19,6 +19,7 @@ from pyzx.graph.scalar import Scalar
 
 import math
 import random
+import numpy
 from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
@@ -104,27 +105,30 @@ class GraphView(QGraphicsView):
         self.scalar_label.move(10, 10)
         self.scalar_label.show()
 
-        self.__update_scalar_label(Scalar())
+        self.__update_scalar_label(Scalar(), False)
 
     def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
-        self.__update_scalar_label(g.scalar)
+        self.__update_scalar_label(g.scalar, numpy.all(g.to_matrix() < 0.0000001))
 
     def update_graph(self, g: GraphT, select_new: bool = False) -> None:
         self.graph_scene.update_graph(g, select_new)
-        self.__update_scalar_label(g.scalar)
+        self.__update_scalar_label(g.scalar , numpy.all(g.to_matrix() < 0.0000001))
             
-    def __update_scalar_label(self, scalar: complex) -> None:
-        if scalar.is_zero:
+    def __update_scalar_label(self, scalar: complex, reduces_to_zero: bool) -> None:
+        scalar_string = f" Scalar: {scalar.polar_str()}"
+        if reduces_to_zero:
             colour = "red"
+            button_text = f"{scalar_string}, The diagram reduces to zero"
         else:
             colour = "black"
-        button_string = f" Scalar: {scalar.polar_str()} "
-        self.scalar_label.setText(f"<span style='color:{colour}'>{button_string}</span>")
-        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, button_string, 0).width())
+            button_text = f"{scalar_string}"
+
+        self.scalar_label.setText(f"<span style='color:{colour}'>{button_text}</span>")
+        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, button_text, 0).width())
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
