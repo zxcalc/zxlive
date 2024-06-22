@@ -113,5 +113,5 @@ class BasePanel(QWidget):
         self.splitter_sizes[self.__class__] = self.splitter.sizes()
 
     def set_splitter_size(self):
-        if splitter_sizes := self.splitter_sizes.get(self.__class__, ()):
-            self.splitter.setSizes(splitter_sizes)
+        if self.__class__ in self.splitter_sizes:
+            self.splitter.setSizes(self.splitter_sizes[self.__class__])
