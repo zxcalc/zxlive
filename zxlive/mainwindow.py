@@ -258,6 +258,7 @@ class MainWindow(QMainWindow):
         if self.active_panel:
             self.active_panel.update_colors()
             self._reset_menus(True)
+            self.active_panel.set_splitter_size()
 
     def _undo_changed(self) -> None:
         if self.active_panel:
