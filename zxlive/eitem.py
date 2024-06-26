@@ -142,10 +142,14 @@ class EDragItem(QGraphicsPathItem):
         path.lineTo(self.mouse_pos)
         self.setPath(path)
 
-def calculate_control_point(source_pos, target_pos, curve_distance):
+def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float):
     """Calculate the control point for the curve"""
     direction = target_pos - source_pos
-    direction /= sqrt(direction.x()**2 + direction.y()**2)  # Normalize the direction
+    norm = sqrt(direction.x()**2 + direction.y()**2)
+    if norm == 0:
+        direction = QPointF(1, 0)
+        norm = 1.
+    direction = direction / norm
     perpendicular = QPointF(-direction.y(), direction.x())
     midpoint = (source_pos + target_pos) / 2
     offset = perpendicular * curve_distance * SCALE
