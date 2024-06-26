@@ -78,14 +78,15 @@ class EItem(QGraphicsPathItem):
         self.setPen(QPen(pen))
 
         path = QPainterPath()
-        if self.s_item == self.t_item:
-            # self-loop
-            cd = self.curve_distance + 1
-            path.moveTo(self.s_item.pos())
-            path.cubicTo(self.s_item.pos() + QPointF(1, -1) * cd * SCALE,
-                         self.s_item.pos() + QPointF(-1, -1) * cd * SCALE,
-                         self.s_item.pos())
-            curve_midpoint = self.s_item.pos() + QPointF(0, -0.75) *  cd * SCALE
+        if self.s_item == self.t_item: # self-loop
+            cd = self.curve_distance
+            cd = cd + 0.5 if cd >= 0 else cd - 0.5
+            s_pos = self.s_item.pos()
+            path.moveTo(s_pos)
+            path.cubicTo(s_pos + QPointF(1, -1) * cd * SCALE,
+                         s_pos + QPointF(-1, -1) * cd * SCALE,
+                         s_pos)
+            curve_midpoint = s_pos + QPointF(0, -0.75) * cd * SCALE
         else:
             control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
             path.moveTo(self.s_item.pos())
