@@ -100,24 +100,16 @@ class GraphScene(QGraphicsScene):
 
         diff = GraphDiff(self.g, new)
 
-        removed_edges = diff.removed_edges
-
         for v in diff.removed_verts:
             v_item = self.vertex_map[v]
             if v_item.phase_item:
                 self.removeItem(v_item.phase_item)
             for anim in v_item.active_animations.copy():
                 anim.stop()
-            for s, t in self.g.incident_edges(v):
-                if s in diff.removed_verts and t in diff.removed_verts:
-                    continue
-                for e in self.g.edges(s, t):
-                    removed_edges.append(e)
-
             selected_vertices.discard(v)
             self.removeItem(v_item)
 
-        for e in removed_edges:
+        for e in diff.removed_edges:
             edge_idx = len(self.edge_map[e]) - 1
             e_item = self.edge_map[e][edge_idx]
             if e_item.selection_node:
