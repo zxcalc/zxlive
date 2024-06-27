@@ -24,7 +24,7 @@ from .common import (ET, VT, GraphT, get_data,
 from .dialogs import show_error_msg
 from .eitem import EItem
 from .graphscene import GraphScene
-from .graphview import GraphTool, GraphView, WandTrace
+from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel
 from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
 from .editor_base_panel import string_to_complex
@@ -42,7 +42,7 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
 
 
-        self.graph_view = GraphView(self.graph_scene)
+        self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 

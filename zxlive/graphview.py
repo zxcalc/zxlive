@@ -101,34 +101,16 @@ class GraphView(QGraphicsView):
         self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
 
-        self.scalar_label = QLabel(parent=self)
-        self.scalar_label.move(10, 10)
-        self.scalar_label.show()
 
-        self.__update_scalar_label(Scalar())
 
     def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
-        self.__update_scalar_label(g.scalar)
 
     def update_graph(self, g: GraphT, select_new: bool = False) -> None:
         self.graph_scene.update_graph(g, select_new)
-        self.__update_scalar_label(g.scalar)
-
-    def __update_scalar_label(self, scalar: complex) -> None:
-        scalar_string = f" Scalar: {scalar.polar_str()}"
-        if scalar.is_zero:
-            colour = "red"
-            button_text = f"{scalar_string}, The global scalar is zero"
-        else:
-            colour = "black"
-            button_text = f"{scalar_string}"
-
-        self.scalar_label.setText(f"<span style='color:{colour}'>{button_text}</span>")
-        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, button_text, 0).width())
 
     def mousePressEvent(self, e: QMouseEvent) -> None:
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
@@ -303,6 +285,35 @@ class GraphView(QGraphicsView):
         painter.drawLines(lines)
         painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
+
+
+class ProofGraphView(GraphView):
+    def __init__(self, graph_scene: GraphScene) -> None:
+        super().__init__(graph_scene)
+        self.scalar_label = QLabel(parent=self)
+        self.scalar_label.move(10, 10)
+        self.scalar_label.show()
+        self.__update_scalar_label(Scalar())
+
+    def set_graph(self, g: GraphT) -> None:
+        super().set_graph(g)
+        self.__update_scalar_label(g.scalar)
+
+    def update_graph(self, g: GraphT, select_new: bool = False) -> None:
+        super().update_graph(g, select_new)
+        self.__update_scalar_label(g.scalar)
+
+    def __update_scalar_label(self, scalar: Scalar) -> None:
+        scalar_string = f" Scalar: {scalar.polar_str()}"
+        if scalar.is_zero:
+            colour = "red"
+            text = f"{scalar_string}, The global scalar is zero"
+        else:
+            colour = "black"
+            text = f"{scalar_string}"
+
+        self.scalar_label.setText(f"<span style='color:{colour}'>{text}</span>")
+        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, text, 0).width())
 
 
 class RuleEditGraphView(GraphView):
