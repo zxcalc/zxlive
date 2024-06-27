@@ -287,9 +287,6 @@ class EditGraphScene(GraphScene):
         assert self._drag is not None
         self.removeItem(self._drag)
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
-            # TODO: Think about if we want to allow self loops here?
-            #  For example, if had edge is selected this would mean that
-            #  right clicking adds pi to the phase...
-            if isinstance(it, VItem) and it != self._drag.start:
+            if isinstance(it, VItem):
                 self.edge_added.emit(self._drag.start.v, it.v)
         self._drag = None
