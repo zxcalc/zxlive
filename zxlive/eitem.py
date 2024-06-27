@@ -78,12 +78,21 @@ class EItem(QGraphicsPathItem):
         self.setPen(QPen(pen))
 
         path = QPainterPath()
-        control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
-        path.moveTo(self.s_item.pos())
-        path.quadTo(control_point, self.t_item.pos())
+        if self.s_item == self.t_item: # self-loop
+            cd = self.curve_distance
+            cd = cd + 0.5 if cd >= 0 else cd - 0.5
+            s_pos = self.s_item.pos()
+            path.moveTo(s_pos)
+            path.cubicTo(s_pos + QPointF(1, -1) * cd * SCALE,
+                         s_pos + QPointF(-1, -1) * cd * SCALE,
+                         s_pos)
+            curve_midpoint = s_pos + QPointF(0, -0.75) * cd * SCALE
+        else:
+            control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
+            path.moveTo(self.s_item.pos())
+            path.quadTo(control_point, self.t_item.pos())
+            curve_midpoint = self.s_item.pos() * 0.25 + control_point * 0.5 + self.t_item.pos() * 0.25
         self.setPath(path)
-
-        curve_midpoint = self.s_item.pos() * 0.25 + control_point * 0.5 + self.t_item.pos() * 0.25
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
@@ -142,10 +151,11 @@ class EDragItem(QGraphicsPathItem):
         path.lineTo(self.mouse_pos)
         self.setPath(path)
 
-def calculate_control_point(source_pos, target_pos, curve_distance):
+def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float):
     """Calculate the control point for the curve"""
     direction = target_pos - source_pos
-    direction /= sqrt(direction.x()**2 + direction.y()**2)  # Normalize the direction
+    norm = sqrt(direction.x()**2 + direction.y()**2)
+    direction = direction / norm
     perpendicular = QPointF(-direction.y(), direction.x())
     midpoint = (source_pos + target_pos) / 2
     offset = perpendicular * curve_distance * SCALE
