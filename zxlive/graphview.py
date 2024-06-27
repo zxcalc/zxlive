@@ -19,7 +19,6 @@ from pyzx.graph.scalar import Scalar
 
 import math
 import random
-import numpy
 from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
@@ -100,8 +99,6 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = False
         self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
-
-
 
     def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
