@@ -100,29 +100,29 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = False
         self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
-        
+
         self.scalar_label = QLabel(parent=self)
         self.scalar_label.move(10, 10)
         self.scalar_label.show()
 
-        self.__update_scalar_label(Scalar(), False)
+        self.__update_scalar_label(Scalar())
 
     def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
         self.graph_scene.set_graph(g)
-        self.__update_scalar_label(g.scalar, numpy.all(g.to_matrix() < 0.0000001))
+        self.__update_scalar_label(g.scalar)
 
     def update_graph(self, g: GraphT, select_new: bool = False) -> None:
         self.graph_scene.update_graph(g, select_new)
-        self.__update_scalar_label(g.scalar , numpy.all(g.to_matrix() < 0.0000001))
-            
-    def __update_scalar_label(self, scalar: complex, reduces_to_zero: bool) -> None:
+        self.__update_scalar_label(g.scalar)
+
+    def __update_scalar_label(self, scalar: complex) -> None:
         scalar_string = f" Scalar: {scalar.polar_str()}"
-        if reduces_to_zero:
+        if scalar.is_zero:
             colour = "red"
-            button_text = f"{scalar_string}, The diagram likely reduces to zero"
+            button_text = f"{scalar_string}, The global scalar is zero"
         else:
             colour = "black"
             button_text = f"{scalar_string}"
