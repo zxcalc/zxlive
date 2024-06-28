@@ -176,7 +176,7 @@ class ProofPanel(BasePanel):
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
         g = copy.deepcopy(self.graph)
-        if self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
+        if len(list(self.graph.edges(v, w))) == 1 and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
             basicrules.color_change(g, w)
         if pyzx.basicrules.check_fuse(g, v, w):
             pyzx.basicrules.fuse(g, w, v)
