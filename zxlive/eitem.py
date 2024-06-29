@@ -55,6 +55,8 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPen(pen)
         self.selection_node.setOpacity(0.5)
         # self.selection_node.setVisible(False)
+        self.is_mouse_pressed = False
+        self.is_dragging = False
 
         self.refresh()
 
@@ -114,21 +116,20 @@ class EItem(QGraphicsPathItem):
 
         return super().itemChange(change, value)
 
-    @property
-    def is_dragging(self) -> bool:
-        return self._old_pos is not None
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
         self.refresh()
         self._old_pos = e.pos()
         self._old_curve_distance = self.curve_distance
+        self.is_mouse_pressed = True
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         scene = self.scene()
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
-        if self.is_dragging and len(scene.selectedItems()) == 1 and self._old_pos is not None:
+        if self.is_mouse_pressed and len(scene.selectedItems()) == 1 and self._old_pos is not None:
+            self.is_dragging = True
             distance = e.pos() - self._old_pos
             perpendicular = compute_perpendicular_direction(self.s_item.pos(), self.t_item.pos())
             self.curve_distance += 2 * QPointF.dotProduct(distance, perpendicular) / SCALE
@@ -141,6 +142,8 @@ class EItem(QGraphicsPathItem):
         if self.is_dragging:
             self.graph_scene.edge_dragged.emit(self, self.curve_distance, self._old_curve_distance)
             self._old_pos = None
+        self.is_dragging = False
+        self.is_mouse_pressed = False
 
 
 
