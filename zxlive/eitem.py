@@ -130,7 +130,7 @@ class EItem(QGraphicsPathItem):
         if self.is_dragging and len(scene.selectedItems()) == 1 and self._old_pos is not None:
             distance = e.pos() - self._old_pos
             perpendicular = compute_perpendicular_direction(self.s_item.pos(), self.t_item.pos())
-            self.curve_distance += QPointF.dotProduct(distance, perpendicular) / SCALE
+            self.curve_distance += 2 * QPointF.dotProduct(distance, perpendicular) / SCALE
             self._old_pos = e.pos()
             self.refresh()
         e.ignore()
