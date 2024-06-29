@@ -122,6 +122,7 @@ class EItem(QGraphicsPathItem):
         super().mousePressEvent(e)
         self.refresh()
         self._old_pos = e.pos()
+        self._old_curve_distance = self.curve_distance
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
@@ -137,7 +138,9 @@ class EItem(QGraphicsPathItem):
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(e)
-        self._old_pos = None
+        if self.is_dragging:
+            self.graph_scene.edge_dragged.emit(self, self.curve_distance, self._old_curve_distance)
+            self._old_pos = None
 
 
 

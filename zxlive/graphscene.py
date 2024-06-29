@@ -47,6 +47,9 @@ class GraphScene(QGraphicsScene):
     # Triggers when a vertex is dropped onto another vertex. Actual types: VT, VT
     vertex_dropped_onto = Signal(object, object)
 
+    # Triggers when an edge is dragged. Actual types: EItem, float (old curve_distance), float (new curve_distance)
+    edge_dragged = Signal(object, object, object)
+
     def __init__(self) -> None:
         super().__init__()
         self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
