@@ -55,6 +55,8 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPen(pen)
         self.selection_node.setOpacity(0.5)
         # self.selection_node.setVisible(False)
+        self.is_mouse_pressed = False
+        self.is_dragging = False
 
         self.refresh()
 
@@ -114,9 +116,35 @@ class EItem(QGraphicsPathItem):
 
         return super().itemChange(change, value)
 
+
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
         self.refresh()
+        self._old_pos = e.pos()
+        self._old_curve_distance = self.curve_distance
+        self.is_mouse_pressed = True
+
+    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(e)
+        scene = self.scene()
+        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if self.is_mouse_pressed and len(scene.selectedItems()) == 1 and self._old_pos is not None:
+            self.is_dragging = True
+            distance = e.pos() - self._old_pos
+            perpendicular = compute_perpendicular_direction(self.s_item.pos(), self.t_item.pos())
+            self.curve_distance += 2 * QPointF.dotProduct(distance, perpendicular) / SCALE
+            self._old_pos = e.pos()
+            self.refresh()
+        e.ignore()
+
+    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseReleaseEvent(e)
+        if self.is_dragging:
+            self.graph_scene.edge_dragged.emit(self, self.curve_distance, self._old_curve_distance)
+            self._old_pos = None
+        self.is_dragging = False
+        self.is_mouse_pressed = False
+
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!
@@ -153,11 +181,17 @@ class EDragItem(QGraphicsPathItem):
 
 def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float):
     """Calculate the control point for the curve"""
-    direction = target_pos - source_pos
-    norm = sqrt(direction.x()**2 + direction.y()**2)
-    direction = direction / norm
-    perpendicular = QPointF(-direction.y(), direction.x())
+    perpendicular = compute_perpendicular_direction(source_pos, target_pos)
     midpoint = (source_pos + target_pos) / 2
     offset = perpendicular * curve_distance * SCALE
     control_point = midpoint + offset
     return control_point
+
+def compute_perpendicular_direction(source_pos, target_pos):
+    if source_pos == target_pos:
+        return QPointF(0, -2/3)
+    direction = target_pos - source_pos
+    norm = sqrt(direction.x()**2 + direction.y()**2)
+    direction = direction / norm
+    perpendicular = QPointF(-direction.y(), direction.x())
+    return perpendicular

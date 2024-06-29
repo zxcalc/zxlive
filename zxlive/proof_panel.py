@@ -41,7 +41,6 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
 
-
         self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
@@ -53,6 +52,7 @@ class ProofPanel(BasePanel):
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
+        self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = QListView(self)
         self.proof_model = ProofModel(self.graph_view.graph_scene.g)

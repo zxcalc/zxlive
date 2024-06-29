@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QVBoxLayout, QWidget)
 
 from .animations import AnimatedUndoStack
-from .commands import SetGraph
+from .commands import ChangeEdgeCurve, SetGraph
 from .common import GraphT, new_graph
 from .dialogs import FileFormat
 from .graphscene import GraphScene
@@ -115,3 +115,6 @@ class BasePanel(QWidget):
     def set_splitter_size(self):
         if self.__class__ in self.splitter_sizes:
             self.splitter.setSizes(self.splitter_sizes[self.__class__])
+
+    def change_edge_curves(self, eitem, new_distance, old_distance):
+        self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))

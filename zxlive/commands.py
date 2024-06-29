@@ -15,6 +15,7 @@ from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT, setting
+from .eitem import EItem
 from .graphview import GraphView
 from .proof import ProofModel, Rewrite
 
@@ -267,6 +268,22 @@ class MoveNode(BaseCommand):
             self.g.set_row(v, x)
             self.g.set_qubit(v, y)
         self.update_graph_view()
+
+
+@dataclass
+class ChangeEdgeCurve(BaseCommand):
+    """Changes the curve of an edge."""
+    eitem: EItem
+    new_distance: float
+    old_distance: float
+
+    def undo(self) -> None:
+        self.eitem.curve_distance = self.old_distance
+        self.eitem.refresh()
+
+    def redo(self) -> None:
+        self.eitem.curve_distance = self.new_distance
+        self.eitem.refresh()
 
 
 @dataclass
