@@ -114,9 +114,31 @@ class EItem(QGraphicsPathItem):
 
         return super().itemChange(change, value)
 
+    @property
+    def is_dragging(self) -> bool:
+        return self._old_pos is not None
+
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
         self.refresh()
+        self._old_pos = e.pos()
+
+    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseMoveEvent(e)
+        scene = self.scene()
+        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if self.is_dragging and len(scene.selectedItems()) == 1 and self._old_pos is not None:
+            distance = e.pos() - self._old_pos
+            perpendicular = compute_perpendicular_direction(self.s_item.pos(), self.t_item.pos())
+            self.curve_distance += QPointF.dotProduct(distance, perpendicular) / SCALE
+            self._old_pos = e.pos()
+            self.refresh()
+        e.ignore()
+
+    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseReleaseEvent(e)
+        self._old_pos = None
+
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!
@@ -153,11 +175,15 @@ class EDragItem(QGraphicsPathItem):
 
 def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float):
     """Calculate the control point for the curve"""
-    direction = target_pos - source_pos
-    norm = sqrt(direction.x()**2 + direction.y()**2)
-    direction = direction / norm
-    perpendicular = QPointF(-direction.y(), direction.x())
+    perpendicular = compute_perpendicular_direction(source_pos, target_pos)
     midpoint = (source_pos + target_pos) / 2
     offset = perpendicular * curve_distance * SCALE
     control_point = midpoint + offset
     return control_point
+
+def compute_perpendicular_direction(source_pos, target_pos):
+    direction = target_pos - source_pos
+    norm = sqrt(direction.x()**2 + direction.y()**2)
+    direction = direction / norm
+    perpendicular = QPointF(-direction.y(), direction.x())
+    return perpendicular
