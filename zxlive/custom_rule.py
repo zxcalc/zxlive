@@ -292,12 +292,13 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str,
     boundary_mapping = {}
     i = 0
     for v in verts:
-        for vn in graph.neighbors(v):
-            if vn not in verts:
+        for e in graph.incident_edges(v):
+            s, t = graph.edge_st(e)
+            if s not in verts or t not in verts:
                 boundary_node = 'b' + str(i)
-                boundary_mapping[boundary_node] = vn
+                boundary_mapping[boundary_node] = s if s not in verts else t
                 subgraph_nx.add_node(boundary_node, type=VertexType.BOUNDARY)
-                subgraph_nx.add_edge(v, boundary_node, type=graph.edge_type((v, vn)))
+                subgraph_nx.add_edge(v, boundary_node, type=graph.edge_type(e))
                 i += 1
     return subgraph_nx, boundary_mapping
 

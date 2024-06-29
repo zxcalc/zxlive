@@ -207,6 +207,8 @@ class GraphScene(QGraphicsScene):
                 self.addItem(ei)
                 self.addItem(ei.selection_node)
                 self.edge_map[e][i] = ei
+        for e in self.g.edges():
+            s, t = self.g.edge_st(e)
             self.update_edge_curves(s, t)
 
     def select_all(self) -> None:
