@@ -182,6 +182,8 @@ def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_dist
     return control_point
 
 def compute_perpendicular_direction(source_pos, target_pos):
+    if source_pos == target_pos:
+        return QPointF(0, -2/3)
     direction = target_pos - source_pos
     norm = sqrt(direction.x()**2 + direction.y()**2)
     direction = direction / norm
