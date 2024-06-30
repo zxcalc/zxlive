@@ -84,7 +84,13 @@ class ProofPanel(BasePanel):
         if not selected_indexes:
             return
         indices = [index.row() for index in selected_indexes]
-        self.proof_model.group_steps(indices)
+        if len(indices) < 2:
+            return
+        # Ensure indices are sorted and contiguous
+        indices.sort()
+        if indices[-1] - indices[0] != len(indices) - 1:
+            raise ValueError("Can only group contiguous steps")
+        self.proof_model.group_steps(indices[0] -1, indices[-1] -1)
 
     def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
         # The first row in the item list is the START step, which is not interactive
