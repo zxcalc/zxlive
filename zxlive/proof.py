@@ -125,15 +125,15 @@ class ProofModel(QAbstractListModel):
 
     def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""
-        old_step = self.steps[index-1]
+        old_step = self.steps[index]
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index-1] = Rewrite(name, old_step.rule, old_step.graph)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
-        modelIndex = self.createIndex(index-1, 0)
+        modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def to_json(self) -> str:
