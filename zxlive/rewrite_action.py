@@ -155,7 +155,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.proof_panel = proof_panel
         self.root_item = data
         self.emitter = SignalEmitter()
-        self.emitter.finished.connect(self.on_update_finished)
+        self.emitter.finished.connect(lambda: self.dataChanged.emit(QModelIndex(), QModelIndex(), []))
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     @classmethod
@@ -227,6 +227,3 @@ class RewriteActionTreeModel(QAbstractItemModel):
         g = self.proof_panel.graph_scene.g
         self.root_item.update_on_selection(g, selection, edges)
         QMetaObject.invokeMethod(self.emitter, "finished", Qt.QueuedConnection)
-
-    def on_update_finished(self) -> None:
-        self.dataChanged.emit(QModelIndex(), QModelIndex(), [])
