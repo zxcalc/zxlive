@@ -5,13 +5,13 @@ from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPointF, QRect, QSize, Qt)
+                            QPoint, QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
                            QPainter, QPen, QVector2D, QFontInfo)
 from PySide6.QtWidgets import (QAbstractItemView, QListView,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QToolButton,
-                               QInputDialog, QTreeView)
+                               QInputDialog, QTreeView, QMenu)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType, FractionLike
@@ -59,15 +59,32 @@ class ProofPanel(BasePanel):
         self.step_view.setModel(self.proof_model)
         self.step_view.setPalette(QColor(255, 255, 255))
         self.step_view.setSpacing(0)
-        self.step_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.step_view.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.step_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.step_view.doubleClicked.connect(self._double_click_handler)
+        self.step_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.step_view.customContextMenuRequested.connect(self.show_context_menu)
 
         self.splitter.addWidget(self.step_view)
+
+    def show_context_menu(self, position: QPoint) -> None:
+        context_menu = QMenu(self)
+        group_action = context_menu.addAction("Group Steps")
+        action = context_menu.exec_(self.step_view.mapToGlobal(position))
+
+        if action == group_action:
+            self.group_selected_steps()
+
+    def group_selected_steps(self) -> None:
+        selected_indexes = self.step_view.selectedIndexes()
+        if not selected_indexes:
+            return
+        indices = [index.row() for index in selected_indexes]
+        self.proof_model.group_steps(indices)
 
     def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
         # The first row in the item list is the START step, which is not interactive

@@ -136,6 +136,35 @@ class ProofModel(QAbstractListModel):
         modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
+    def group_steps(self, indices: list[int]) -> None:
+        """Groups contiguous steps based on their indices."""
+        if not indices or len(indices) < 2:
+            return  # Need at least two steps to group
+
+        # Ensure indices are sorted and contiguous
+        indices.sort()
+        if indices[-1] - indices[0] != len(indices) - 1:
+            raise ValueError("Can only group contiguous steps")
+
+        # Group the steps
+        first_index = indices[0]
+        last_index = indices[-1]
+
+        grouped_graph = self.get_graph(last_index + 1)  # Assuming you want the last graph in the group
+        grouped_display_name = "Grouped Steps: " + " -> ".join([self.steps[i].display_name for i in range(first_index, last_index+1)])
+        grouped_rule = "Grouped"
+
+        new_rewrite = Rewrite(grouped_display_name, grouped_rule, grouped_graph)
+
+        # Replace the individual steps with the new grouped step
+        self.beginRemoveRows(QModelIndex(), first_index-1, last_index-1)
+        del self.steps[first_index-1:last_index]
+        self.endRemoveRows()
+
+        self.beginInsertRows(QModelIndex(), first_index-1, first_index-1)
+        self.steps.insert(first_index-1, new_rewrite)
+        self.endInsertRows()
+
     def to_json(self) -> str:
         """Serializes the model to JSON."""
         initial_graph = self.initial_graph.to_json()
