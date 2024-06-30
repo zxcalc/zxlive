@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
 
         new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
             "Create a new tab with an empty graph", alt_shortcut=QKeySequence.StandardKey.AddTab)
+        new_window = self._new_action("New &Window", self.open_new_window, QKeySequence("Ctrl+Shift+N"), "Open a new window")
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
@@ -101,6 +102,7 @@ class MainWindow(QMainWindow):
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
+        file_menu.addAction(new_window)
         file_menu.addAction(open_file)
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
@@ -225,6 +227,10 @@ class MainWindow(QMainWindow):
             return current_widget
         return None
 
+    def open_new_window(self) -> None:
+        new_window = MainWindow()
+        new_window.new_graph()
+        new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
