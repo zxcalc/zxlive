@@ -1,5 +1,5 @@
 import json
-from typing import NamedTuple, Union, Any
+from typing import NamedTuple, Optional, Union, Any
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex, QPersistentModelIndex,
                             Qt, QAbstractItemModel)
@@ -50,7 +50,7 @@ class ProofModel(QAbstractListModel):
         self.initial_graph = start_graph
         self.steps = []
 
-    def set_graph(self, index: int, graph: GraphT):
+    def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
             self.initial_graph = graph
         else:
@@ -97,19 +97,23 @@ class ProofModel(QAbstractListModel):
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite) -> None:
+    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
-        self.beginInsertRows(QModelIndex(), len(self.steps), len(self.steps))
-        self.steps.append(rewrite)
+        if position is None:
+            position = len(self.steps)
+        self.beginInsertRows(QModelIndex(), position + 1, position + 1)
+        self.steps.insert(position, rewrite)
         self.endInsertRows()
 
-    def pop_rewrite(self) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
         """
-        self.beginRemoveRows(QModelIndex(), len(self.steps), len(self.steps))
-        rewrite = self.steps.pop()
+        if position is None:
+            position = len(self.steps) - 1
+        self.beginRemoveRows(QModelIndex(), position + 1, position + 1)
+        rewrite = self.steps.pop(position)
         self.endRemoveRows()
         return rewrite, rewrite.graph
 
@@ -143,12 +147,9 @@ class ProofModel(QAbstractListModel):
             [self.steps[i].display_name for i in range(start_index, end_index+1)])
         grouped_rule = "Grouped"
         new_rewrite = Rewrite(grouped_display_name, grouped_rule, grouped_graph)
-        self.beginRemoveRows(QModelIndex(), start_index, end_index)
-        self.steps = self.steps[:start_index] + self.steps[end_index + 1:]
-        self.endRemoveRows()
-        self.beginInsertRows(QModelIndex(), start_index, start_index)
-        self.steps.insert(start_index, new_rewrite)
-        self.endInsertRows()
+        for _ in range(end_index - start_index + 1):
+            self.pop_rewrite(start_index)
+        self.add_rewrite(new_rewrite, start_index)
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
