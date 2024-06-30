@@ -184,6 +184,7 @@ class GraphView(QGraphicsView):
                     items = [it for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()) if isinstance(it, VItem)]
                     for it in items:
                         it.setSelected(not (len(items) == 1 or e.modifiers() & Qt.KeyboardModifier.ShiftModifier) or not it.isSelected())
+                    self.graph_scene.selection_changed_custom.emit()
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
                     if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):

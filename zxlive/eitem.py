@@ -144,6 +144,7 @@ class EItem(QGraphicsPathItem):
             self._old_pos = None
         self.is_dragging = False
         self.is_mouse_pressed = False
+        self.graph_scene.selection_changed_custom.emit()
 
 
 
