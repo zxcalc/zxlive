@@ -142,7 +142,7 @@ class ProofModel(QAbstractListModel):
 
     def group_steps(self, start_index: int, end_index: int) -> None:
         # Replace the individual steps with the new grouped step
-        grouped_graph = self.get_graph(end_index + 1)  # Assuming you want the last graph in the group
+        grouped_graph = self.get_graph(end_index + 1)
         grouped_display_name = "Grouped Steps: " + " -> ".join(
             [self.steps[i].display_name for i in range(start_index, end_index+1)])
         grouped_rule = "Grouped"
@@ -150,6 +150,9 @@ class ProofModel(QAbstractListModel):
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)
         self.add_rewrite(new_rewrite, start_index)
+
+        modelIndex = self.createIndex(start_index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
