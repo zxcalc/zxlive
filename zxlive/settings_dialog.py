@@ -61,10 +61,14 @@ class SettingsDialog(QDialog):
         vlayout.addWidget(w)
         self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
         self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
+        self.add_setting(form_general, "tab-bar-location", "Tab bar location", 'combo', data={
+            QTabWidget.TabPosition.North: "Top", QTabWidget.TabPosition.South: "Bottom",
+            QTabWidget.TabPosition.West: "Left", QTabWidget.TabPosition.East: "Right"})
         self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo',
                          data = {'2': "2", '4': "4", '8': "8", '16': "16"})
         self.add_setting(form_general, "input-circuit-format", "Input Circuit as", 'combo', data=input_circuit_formats)
         self.prev_color_scheme = self.settings.value("color-scheme")
+        self.prev_tab_bar_location = self.settings.value("tab-bar-location")
         vlayout.addStretch()
 
         ##### Tikz Export settings #####
@@ -184,7 +188,7 @@ class SettingsDialog(QDialog):
         hlayout.addWidget(cancel_button)
 
 
-    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data: Optional[dict[str, str]] = None) -> None:
+    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data: Optional[dict[Any, str]] = None) -> None:
         val = self.settings.value(name)
         widget: Union[QWidget, QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox]
         if val is None: val = defaults[name]
@@ -217,7 +221,7 @@ class SettingsDialog(QDialog):
             widget = QComboBox()
             assert data is not None
             widget.addItems(list(data.values()))
-            widget.setCurrentText(data[str(val)])
+            widget.setCurrentText(data[val])
             setattr(widget, "data", data)
 
 
@@ -246,6 +250,10 @@ class SettingsDialog(QDialog):
             assert isinstance(theme, str)
             colors.set_color_scheme(theme)
             self.main_window.update_colors()
+        if self.settings.value("tab-bar-location") != self.prev_tab_bar_location:
+            pos = self.settings.value("tab-bar-location")
+            assert isinstance(pos, QTabWidget.TabPosition)
+            self.main_window.tab_widget.setTabPosition(pos)
         self.accept()
 
     def cancel(self) -> None:

@@ -73,6 +73,9 @@ class MainWindow(QMainWindow):
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
         tab_widget.setMovable(True)
+        tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
+        assert isinstance(tab_position, QTabWidget.TabPosition)
+        tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.

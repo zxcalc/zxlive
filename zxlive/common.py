@@ -5,6 +5,7 @@ from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QColor
+from PySide6.QtWidgets import QTabWidget
 
 import pyzx
 
@@ -38,6 +39,7 @@ SCALE: Final = 64.0
 defaults: Dict[str,Any] = {
     "path/custom-rules": "lemmas/",
     "color-scheme": "modern-red-green",
+    "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
 
