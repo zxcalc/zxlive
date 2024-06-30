@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from typing import Callable, TYPE_CHECKING, Iterable, Any, Optional, cast, Union
 
 import pyzx
-from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex
+from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, Signal, QObject, QMetaObject
+from concurrent.futures import ThreadPoolExecutor
 
 from .animations import make_animation
 from .commands import AddRewriteStep
@@ -143,6 +144,9 @@ class RewriteActionTree:
             self.rewrite.update_active(g, selection, edges)
 
 
+class SignalEmitter(QObject):
+    finished = Signal()
+
 class RewriteActionTreeModel(QAbstractItemModel):
     root_item: RewriteActionTree
 
@@ -150,6 +154,9 @@ class RewriteActionTreeModel(QAbstractItemModel):
         super().__init__(proof_panel)
         self.proof_panel = proof_panel
         self.root_item = data
+        self.emitter = SignalEmitter()
+        self.emitter.finished.connect(self.on_update_finished)
+        self.executor = ThreadPoolExecutor(max_workers=1)
 
     @classmethod
     def from_dict(cls, d: dict, proof_panel: ProofPanel) -> RewriteActionTreeModel:
@@ -218,6 +225,8 @@ class RewriteActionTreeModel(QAbstractItemModel):
     def update_on_selection(self) -> None:
         selection, edges = self.proof_panel.parse_selection()
         g = self.proof_panel.graph_scene.g
-
         self.root_item.update_on_selection(g, selection, edges)
+        QMetaObject.invokeMethod(self.emitter, "finished", Qt.QueuedConnection)
+
+    def on_update_finished(self) -> None:
         self.dataChanged.emit(QModelIndex(), QModelIndex(), [])
