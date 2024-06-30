@@ -50,6 +50,8 @@ class GraphScene(QGraphicsScene):
     # Triggers when an edge is dragged. Actual types: EItem, float (old curve_distance), float (new curve_distance)
     edge_dragged = Signal(object, object, object)
 
+    selection_changed_custom = Signal()
+
     def __init__(self) -> None:
         super().__init__()
         self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
@@ -74,6 +76,7 @@ class GraphScene(QGraphicsScene):
             if isinstance(it, VItem) and it.v in vs:
                 it.setSelected(True)
                 vs.remove(it.v)
+        self.selection_changed_custom.emit()
 
     def set_graph(self, g: GraphT) -> None:
         """Set the PyZX graph for the scene.
@@ -218,6 +221,7 @@ class GraphScene(QGraphicsScene):
         """Selects all vertices and edges in the scene."""
         for it in self.items():
             it.setSelected(True)
+        self.selection_changed_custom.emit()
 
 
 class EditGraphScene(GraphScene):
