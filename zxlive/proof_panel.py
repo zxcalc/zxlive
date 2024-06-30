@@ -18,7 +18,7 @@ from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, GoToRewriteStep, MoveNode, UndoableChange
+from .commands import AddRewriteStep, GoToRewriteStep, GroupRewriteSteps, MoveNode, UndoableChange
 from .common import (ET, VT, GraphT, get_data,
                      pos_from_view, pos_to_view, colors)
 from .dialogs import show_error_msg
@@ -90,12 +90,8 @@ class ProofPanel(BasePanel):
         indices.sort()
         if indices[-1] - indices[0] != len(indices) - 1:
             raise ValueError("Can only group contiguous steps")
-        self.proof_model.group_steps(indices[0] - 1, indices[-1] - 1)
-        idx = self.step_view.model().index(indices[0], 0, QModelIndex())
-        self.step_view.clearSelection()
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
+        cmd = GroupRewriteSteps(self.graph_view, self.step_view, indices[0] - 1, indices[-1] - 1)
+        self.undo_stack.push(cmd)
 
     def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
         # The first row in the item list is the START step, which is not interactive

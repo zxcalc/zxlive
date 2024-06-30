@@ -140,18 +140,27 @@ class ProofModel(QAbstractListModel):
         modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
-    def group_steps(self, start_index: int, end_index: int) -> None:
+    def group_steps(self, start_index: int, end_index: int) -> list[Rewrite]:
         # Replace the individual steps with the new grouped step
         grouped_graph = self.get_graph(end_index + 1)
         grouped_display_name = "Grouped Steps: " + " -> ".join(
             [self.steps[i].display_name for i in range(start_index, end_index+1)])
         grouped_rule = "Grouped"
         new_rewrite = Rewrite(grouped_display_name, grouped_rule, grouped_graph)
+        removed_rewrites = []
         for _ in range(end_index - start_index + 1):
-            self.pop_rewrite(start_index)
+            removed_rewrites.append(self.pop_rewrite(start_index)[0])
         self.add_rewrite(new_rewrite, start_index)
-
         modelIndex = self.createIndex(start_index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
+        return removed_rewrites
+
+    def ungroup_steps(self, index: int, steps: list[Rewrite]) -> None:
+        # Replace the grouped step with the individual steps
+        self.pop_rewrite(index)
+        for i, step in enumerate(steps):
+            self.add_rewrite(step, index + i)
+        modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def to_json(self) -> str:

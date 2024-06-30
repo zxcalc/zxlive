@@ -452,3 +452,30 @@ class GoToRewriteStep(SetGraph):
         self.step_view.selectionModel().blockSignals(False)
         self.step_view.update(idx)
         super().undo()
+
+@dataclass
+class GroupRewriteSteps(BaseCommand):
+    step_view: QListView
+    start_index: int
+    end_index: int
+    removed_rewrites: Optional[list[Rewrite]] = field(default=None, init=False)
+
+    def redo(self) -> None:
+        proof_model = self.step_view.model()
+        assert isinstance(proof_model, ProofModel)
+        self.removed_rewrites = proof_model.group_steps(self.start_index, self.end_index)
+        self.set_selection_index(self.start_index + 1)
+
+    def undo(self) -> None:
+        proof_model = self.step_view.model()
+        assert isinstance(proof_model, ProofModel)
+        assert self.removed_rewrites is not None
+        proof_model.ungroup_steps(self.start_index, self.removed_rewrites)
+        self.set_selection_index(self.end_index + 1)
+
+    def set_selection_index(self, index: int) -> None:
+        idx = self.step_view.model().index(index, 0, QModelIndex())
+        self.step_view.clearSelection()
+        self.step_view.selectionModel().blockSignals(True)
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
