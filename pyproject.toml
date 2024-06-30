@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "PySide6",
-    "pyzx >= 0.8.0",
+    "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
     "networkx",
     "numpy",
     "shapely",
@@ -43,6 +43,13 @@ test = [
     "pyproject-flake8",
     "pylint",
     "pytest-qt",
+]
+doc = [
+    "sphinx>=2.3,<7",  # see: https://github.com/readthedocs/readthedocs.org/issues/10279
+    "sphinx_autodoc_typehints>=1.10",
+    "sphinx_rtd_theme>=0.4,",
+    "sphinxcontrib-svg2pdfconverter>=1.2.2",
+    "myst-parser>=3.0.0"
 ]
 
 [project.urls]

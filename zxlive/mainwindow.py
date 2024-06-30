@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
 import pyperclip
 
 from .base_panel import BasePanel
-from .common import GraphT, get_data, to_tikz, from_tikz
+from .common import GraphT, get_data, new_graph, to_tikz, from_tikz
 from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -266,6 +266,7 @@ class MainWindow(QMainWindow):
         if self.active_panel:
             self.active_panel.update_colors()
             self._reset_menus(True)
+            self.active_panel.set_splitter_size()
 
     def _undo_changed(self) -> None:
         if self.active_panel:
@@ -457,7 +458,7 @@ class MainWindow(QMainWindow):
         panel.play_sound_signal.connect(self.play_sound)
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
-        _graph = graph or GraphT()
+        _graph = graph or new_graph()
         panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
@@ -486,8 +487,8 @@ class MainWindow(QMainWindow):
 
     def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:
         if rule is None:
-            graph1 = GraphT()
-            graph2 = GraphT()
+            graph1 = new_graph()
+            graph2 = new_graph()
             rule_name = ""
             rule_description = ""
         else:

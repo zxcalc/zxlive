@@ -9,8 +9,8 @@ from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QVBoxLayout, QWidget)
 
 from .animations import AnimatedUndoStack
-from .commands import SetGraph
-from .common import GraphT
+from .commands import ChangeEdgeCurve, SetGraph
+from .common import GraphT, new_graph
 from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -34,6 +34,7 @@ class ToolbarSection:
 class BasePanel(QWidget):
     """Base class implementing functionality shared between the edit and
     proof panels."""
+    splitter_sizes = dict()
 
     graph_scene: GraphScene
     graph_view: GraphView
@@ -58,6 +59,7 @@ class BasePanel(QWidget):
 
         self.splitter = QSplitter(self)
         self.layout().addWidget(self.splitter)
+        self.splitter.splitterMoved.connect(self.sync_splitter_sizes)
 
         self.file_path = None
         self.file_type = None
@@ -86,7 +88,7 @@ class BasePanel(QWidget):
         raise NotImplementedError
 
     def clear_graph(self) -> None:
-        empty_graph = GraphT()
+        empty_graph = new_graph()
         cmd = SetGraph(self.graph_view, empty_graph)
         self.undo_stack.push(cmd)
 
@@ -109,3 +111,13 @@ class BasePanel(QWidget):
 
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
+
+    def sync_splitter_sizes(self):
+        self.splitter_sizes[self.__class__] = self.splitter.sizes()
+
+    def set_splitter_size(self):
+        if self.__class__ in self.splitter_sizes:
+            self.splitter.setSizes(self.splitter_sizes[self.__class__])
+
+    def change_edge_curves(self, eitem, new_distance, old_distance):
+        self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))

@@ -15,6 +15,7 @@ from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT, setting
+from .eitem import EItem
 from .graphview import GraphView
 from .proof import ProofModel, Rewrite
 
@@ -237,26 +238,12 @@ class AddEdge(BaseCommand):
     v: VT
     ety: EdgeType.Type
 
-    _old_ety: Optional[EdgeType.Type] = field(default=None, init=False)
-
     def undo(self) -> None:
-        u, v = self.u, self.v
-        e = self.g.edge(u, v)
-        if self._old_ety:
-            self.g.add_edge(e, self._old_ety)
-        else:
-            self.g.remove_edge(e)
+        self.g.remove_edge((self.u, self.v, self.ety))
         self.update_graph_view()
 
     def redo(self) -> None:
-        u, v = self.u, self.v
-        e = self.g.edge(u, v)
-        if self.g.connected(u, v):
-            self._old_ety = self.g.edge_type(e)
-            self.g.set_edge_type(e, self.ety)
-        else:
-            self._old_ety = None
-            self.g.add_edge(e, self.ety)
+        self.g.add_edge(((self.u, self.v)), self.ety)
         self.update_graph_view()
 
 
@@ -281,6 +268,22 @@ class MoveNode(BaseCommand):
             self.g.set_row(v, x)
             self.g.set_qubit(v, y)
         self.update_graph_view()
+
+
+@dataclass
+class ChangeEdgeCurve(BaseCommand):
+    """Changes the curve of an edge."""
+    eitem: EItem
+    new_distance: float
+    old_distance: float
+
+    def undo(self) -> None:
+        self.eitem.curve_distance = self.old_distance
+        self.eitem.refresh()
+
+    def redo(self) -> None:
+        self.eitem.curve_distance = self.new_distance
+        self.eitem.refresh()
 
 
 @dataclass

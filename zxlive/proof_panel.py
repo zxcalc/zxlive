@@ -24,7 +24,7 @@ from .common import (ET, VT, GraphT, get_data,
 from .dialogs import show_error_msg
 from .eitem import EItem
 from .graphscene import GraphScene
-from .graphview import GraphTool, GraphView, WandTrace
+from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel
 from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
 from .editor_base_panel import string_to_complex
@@ -42,8 +42,7 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
 
-
-        self.graph_view = GraphView(self.graph_scene)
+        self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 
@@ -54,6 +53,7 @@ class ProofPanel(BasePanel):
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
+        self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = QListView(self)
         self.proof_model = ProofModel(self.graph_view.graph_scene.g)
@@ -177,7 +177,7 @@ class ProofPanel(BasePanel):
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
         g = copy.deepcopy(self.graph)
-        if self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
+        if len(list(self.graph.edges(v, w))) == 1 and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
             basicrules.color_change(g, w)
         if pyzx.basicrules.check_fuse(g, v, w):
             pyzx.basicrules.fuse(g, w, v)
@@ -422,8 +422,7 @@ class ProofPanel(BasePanel):
         model = RewriteActionTreeModel.from_dict(action_groups, self)
         self.rewrites_panel.setModel(model)
         self.rewrites_panel.clicked.connect(model.do_rewrite)
-        # TODO: Right now this calls for every single vertex selected, even if we select many at the same time
-        self.graph_scene.selectionChanged.connect(model.update_on_selection)
+        self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):

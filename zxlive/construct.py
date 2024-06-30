@@ -1,6 +1,6 @@
 from pyzx.utils import EdgeType, VertexType
 
-from .common import GraphT
+from .common import GraphT, new_graph
 
 
 def construct_circuit() -> GraphT:
@@ -50,7 +50,7 @@ def construct_circuit() -> GraphT:
 
     cur_row = [1] * qubits
 
-    g = GraphT()
+    g = new_graph()
 
     # Adding vertices to the graph
     for (_, qu, tp) in nvlist:
