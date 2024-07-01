@@ -90,6 +90,7 @@ class ProofPanel(BasePanel):
         indices.sort()
         if indices[-1] - indices[0] != len(indices) - 1:
             raise ValueError("Can only group contiguous steps")
+        GoToRewriteStep(self.graph_view, self.step_view, indices[0], indices[-1] - 1).redo()
         cmd = GroupRewriteSteps(self.graph_view, self.step_view, indices[0] - 1, indices[-1] - 1)
         self.undo_stack.push(cmd)
 
