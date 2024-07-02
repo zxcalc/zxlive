@@ -411,8 +411,16 @@ class ProofPanel(BasePanel):
     def _proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
-        cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
-        self.undo_stack.push(cmd)
+        step_index = selected.first().topLeft().row()
+        idx = self.step_view.model().index(step_index, 0, QModelIndex())
+        self.step_view.clearSelection()
+        self.step_view.selectionModel().blockSignals(True)
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
+        self.step_view.update(idx)
+        proof_model = self.step_view.model()
+        assert isinstance(proof_model, ProofModel)
+        self.graph_view.set_graph(proof_model.get_graph(step_index))
 
     def _refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
