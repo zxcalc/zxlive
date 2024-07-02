@@ -269,6 +269,36 @@ class MoveNode(BaseCommand):
             self.g.set_qubit(v, y)
         self.update_graph_view()
 
+@dataclass
+class MoveNodeProofMode(MoveNode):
+    step_view: QListView
+
+    def __init__(self, graph_view: GraphView, vs: list[tuple[VT, float, float]], step_view: QListView) -> None:
+        super().__init__(graph_view, vs)
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.set_selection_index(self.proof_step_index)
+        super().undo()
+
+    def redo(self) -> None:
+        self.set_selection_index(self.proof_step_index)
+        super().redo()
+        proof_model = self.step_view.model()
+        assert isinstance(proof_model, ProofModel)
+        # Save any vertex rearrangements to the proof step
+        proof_model.set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+    def set_selection_index(self, index: int) -> None:
+        idx = self.step_view.model().index(index, 0, QModelIndex())
+        self.step_view.clearSelection()
+        self.step_view.selectionModel().blockSignals(True)
+        self.step_view.setCurrentIndex(idx)
+        self.step_view.selectionModel().blockSignals(False)
+        proof_model = self.step_view.model()
+        assert isinstance(proof_model, ProofModel)
+        self.graph_view.set_graph(proof_model.get_graph(index))
 
 @dataclass
 class ChangeEdgeCurve(BaseCommand):

@@ -18,7 +18,7 @@ from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, GoToRewriteStep, MoveNode, UndoableChange
+from .commands import AddRewriteStep, GoToRewriteStep, MoveNode, MoveNodeProofMode, UndoableChange
 from .common import (ET, VT, GraphT, get_data,
                      pos_from_view, pos_to_view, colors)
 from .dialogs import show_error_msg
@@ -156,7 +156,7 @@ class ProofPanel(BasePanel):
         return selection, list(edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(self.graph_view, vs)
+        cmd = MoveNodeProofMode(self.graph_view, vs, self.step_view)
         self.undo_stack.push(cmd)
 
     def _selection_clicked(self) -> None:
