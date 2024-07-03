@@ -11,7 +11,24 @@ To install from source, you need Python >= 3.9 and pip. If you have those, just 
     cd zxlive
     pip install .
 
-Then, you can run ZXLive by typing `python3 -m zxlive`.
+Then, you can run ZXLive by typing `zxlive`.
+
+# Testing
+
+To ensure the quality and correctness of this project, several testing and linting tools are utilized.
+Below are the steps to run the tests and checks:
+
+## 1. Static Type Checks with mypy
+
+You can run mypy to perform static type checking:
+ 
+    mypy zxlive
+
+## 2. Unit Tests with pytest
+
+Execute the test suite using pytest to ensure all tests pass:
+
+    pytest
 
 # Documentation
 
@@ -19,6 +36,5 @@ This project uses Sphinx to build a ReadTheDocs page. In addition, it uses the M
 
 The documentation can be built with
 
-```
-cd doc; make html
-```
+    cd doc
+    make html
