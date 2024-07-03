@@ -152,7 +152,7 @@ class EItem(QGraphicsPathItem):
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
-    def __init__(self, g: GraphT, ety: EdgeType.Type, start: VItem, mouse_pos: QPointF) -> None:
+    def __init__(self, g: GraphT, ety: EdgeType, start: VItem, mouse_pos: QPointF) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.g = g

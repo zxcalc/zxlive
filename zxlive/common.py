@@ -1,6 +1,8 @@
 import os
 from enum import IntEnum
 from typing import Final, Dict, Any
+
+from pyzx import EdgeType
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
@@ -21,7 +23,7 @@ def get_custom_rules_path() -> str:
 
 
 VT: TypeAlias = int
-ET: TypeAlias = tuple[int, int, int]
+ET: TypeAlias = tuple[int, int, EdgeType]
 GraphT: TypeAlias = pyzx.graph.multigraph.Multigraph
 def new_graph() -> GraphT:
     g = GraphT()
