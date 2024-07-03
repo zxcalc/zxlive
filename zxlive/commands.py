@@ -101,11 +101,11 @@ class UpdateGraph(BaseCommand):
 class ChangeNodeType(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: list[VT] | set[VT]
-    vty: VertexType.Type
+    vty: VertexType
 
     WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
-    _old_vtys: Optional[list[VertexType.Type]] = field(default=None, init=False)
+    _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
     _old_w_info: Optional[dict[VT, WInfo]] = field(default=None, init=False)
     _new_w_inputs: Optional[list[VT]] = field(default=None, init=False)
 
@@ -170,7 +170,7 @@ class ChangeNodeType(BaseCommand):
 class ChangeEdgeColor(BaseCommand):
     """Changes the color of a set of edges"""
     es: Iterable[ET]
-    ety: EdgeType.Type
+    ety: EdgeType
 
     _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
 
@@ -192,7 +192,7 @@ class AddNode(BaseCommand):
     """Adds a new spider at a given position."""
     x: float
     y: float
-    vty: VertexType.Type
+    vty: VertexType
 
     _added_vert: Optional[VT] = field(default=None, init=False)
 
@@ -236,7 +236,7 @@ class AddEdge(BaseCommand):
     """Adds an edge between two spiders."""
     u: VT
     v: VT
-    ety: EdgeType.Type
+    ety: EdgeType
 
     def undo(self) -> None:
         self.g.remove_edge((self.u, self.v, self.ety))
@@ -291,7 +291,7 @@ class AddIdentity(BaseCommand):
     """Adds an X or Z identity spider on an edge between two vertices."""
     u: VT
     v: VT
-    vty: VertexType.Type
+    vty: VertexType
 
     _new_vert: Optional[VT] = field(default=None, init=False)
 

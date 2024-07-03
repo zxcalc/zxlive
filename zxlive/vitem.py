@@ -105,8 +105,8 @@ class VItem(QGraphicsPathItem):
         return self.graph_scene.g
 
     @property
-    def ty(self) -> VertexType.Type:
-        _ty: VertexType.Type = self.g.type(self.v)
+    def ty(self) -> VertexType:
+        _ty: VertexType = self.g.type(self.v)
         return _ty
 
     @property

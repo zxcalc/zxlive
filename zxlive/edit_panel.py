@@ -25,8 +25,8 @@ class GraphEditPanel(EditorBasePanel):
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
 
-    _curr_ety: EdgeType.Type
-    _curr_vty: VertexType.Type
+    _curr_ety: EdgeType
+    _curr_vty: VertexType
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)

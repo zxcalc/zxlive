@@ -206,7 +206,7 @@ class ProofPanel(BasePanel):
         t = self.graph.edge_t(item.e)
 
         if self.identity_choice[0].isChecked():
-            vty: VertexType.Type = VertexType.Z
+            vty: VertexType = VertexType.Z
         elif self.identity_choice[1].isChecked():
             vty = VertexType.X
         else:
