@@ -23,10 +23,8 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
     - name: Install dependecies
-      run: |
-        sudo apt-get install -y libegl1
+      run:
         pip install ".[test]"
-        pyside6-genpyi QtCore QtGui QtWidgets
     - name: Flake8
       continue-on-error: true
       run:
