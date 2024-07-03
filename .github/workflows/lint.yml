@@ -24,8 +24,9 @@ jobs:
         cache: 'pip'
     - name: Install dependecies
       run: |
+        sudo apt-get install -y libegl1
         pip install ".[test]"
-        pyside6-genpyi all
+        pyside6-genpyi QtCore QtGui QtWidgets
     - name: Flake8
       continue-on-error: true
       run:
