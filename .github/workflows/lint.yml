@@ -23,8 +23,9 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
     - name: Install dependecies
-      run:
+      run: |
         pip install ".[test]"
+        pyside6-genpyi all
     - name: Flake8
       continue-on-error: true
       run:
