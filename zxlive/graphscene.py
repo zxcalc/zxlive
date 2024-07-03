@@ -177,7 +177,7 @@ class GraphScene(QGraphicsScene):
 
         self.select_vertices(selected_vertices)
 
-    def update_edge_curves(self, s, t):
+    def update_edge_curves(self, s: VT, t: VT) -> None:
         edges = []
         for e in set(self.g.edges(s, t)):
             for i in self.edge_map[e]:

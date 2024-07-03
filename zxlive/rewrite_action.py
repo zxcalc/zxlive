@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING, Iterable, Any, Optional, cast, Union
+from typing import Callable, TYPE_CHECKING, Any, Optional, cast, Union
 
 import pyzx
 from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, Signal, QObject, QMetaObject
@@ -24,7 +24,7 @@ operations = copy.deepcopy(pyzx.editor.operations)
 class RewriteAction:
     name: str
     matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[ET, VT]]
+    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]
     match_type: MatchType
     tooltip: str
     # Whether the graph should be copied before trying to test whether it matches.
@@ -170,14 +170,14 @@ class RewriteActionTreeModel(QAbstractItemModel):
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
 
-        parent_item = parent.internalPointer() if parent.isValid() else self.root_item
+        parent_item = cast(RewriteActionTree, parent.internalPointer()) if parent.isValid() else self.root_item
 
         if childItem := parent_item.child(row):
             return self.createIndex(row, column, childItem)
         return QModelIndex()
 
-    def parent(self, index: QModelIndex = None) -> QModelIndex:
-        if index is None or not index.isValid():
+    def parent(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> QModelIndex:
+        if not index.isValid():
             return QModelIndex()
 
         parent_item = index.internalPointer().parent
@@ -187,27 +187,29 @@ class RewriteActionTreeModel(QAbstractItemModel):
 
         return self.createIndex(parent_item.row(), 0, parent_item)
 
-    def rowCount(self, parent: QModelIndex = None) -> int:
-        if parent is None or parent.column() > 0:
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+        if parent.column() > 0:
             return 0
-        parent_item = parent.internalPointer() if parent.isValid() else self.root_item
+        parent_item = cast(RewriteActionTree, parent.internalPointer()) if parent.isValid() else self.root_item
         return parent_item.child_count()
 
-    def columnCount(self, parent: QModelIndex = None) -> int:
+    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         return 1
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         if index.isValid():
             return Qt.ItemFlag.ItemIsEnabled if index.internalPointer().enabled() else Qt.ItemFlag.NoItemFlags
         return Qt.ItemFlag.ItemIsEnabled
 
-    def data(self, index: QModelIndex, role: Qt.ItemDataRole = Qt.ItemDataRole.DisplayRole) -> str:
-        if index.isValid() and role == Qt.ItemDataRole.DisplayRole:
-            return index.internalPointer().header()
-        if index.isValid() and role == Qt.ItemDataRole.ToolTipRole:
-            return index.internalPointer().tooltip()
-        elif not index.isValid():
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: Qt.ItemDataRole = Qt.ItemDataRole.DisplayRole) -> str | None:
+        if not index.isValid():
             return self.root_item.header()
+        rewrite_action_tree = cast(RewriteActionTree, index.internalPointer())
+        if role == Qt.ItemDataRole.DisplayRole:
+            return rewrite_action_tree.header()
+        if role == Qt.ItemDataRole.ToolTipRole:
+            return rewrite_action_tree.tooltip()
+        return None
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: Qt.ItemDataRole = Qt.ItemDataRole.DisplayRole) -> str:
@@ -226,4 +228,4 @@ class RewriteActionTreeModel(QAbstractItemModel):
         selection, edges = self.proof_panel.parse_selection()
         g = self.proof_panel.graph_scene.g
         self.root_item.update_on_selection(g, selection, edges)
-        QMetaObject.invokeMethod(self.emitter, "finished", Qt.QueuedConnection)
+        QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
