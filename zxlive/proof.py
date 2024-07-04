@@ -251,15 +251,18 @@ class ProofStepView(QListView):
 
     def group_selected_steps(self) -> None:
         from .commands import GroupRewriteSteps
+        from .dialogs import show_error_msg
         selected_indexes = self.selectedIndexes()
         if not selected_indexes or len(selected_indexes) < 2:
-            return # Nothing to group
+            raise ValueError("Can only group two or more steps")
 
         indices = sorted(index.row() for index in selected_indexes)
         if indices[-1] - indices[0] != len(indices) - 1:
-            raise ValueError("Can only group contiguous steps")
+            show_error_msg("Can only group contiguous steps")
+            return
         if indices[0] == 0:
-            raise ValueError("Cannot group the first step")
+            show_error_msg("Cannot group the first step")
+            return
 
         self.move_to_step(indices[-1] - 1)
         cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
@@ -269,11 +272,11 @@ class ProofStepView(QListView):
         from .commands import UngroupRewriteSteps
         selected_indexes = self.selectedIndexes()
         if not selected_indexes or len(selected_indexes) != 1:
-            return # Can only ungroup one step at a time
+            raise ValueError("Can only ungroup one step")
 
         index = selected_indexes[0].row()
         if index == 0 or self.proof_model.steps[index - 1].grouped_rewrites is None:
-            return # Can only ungroup a grouped step
+            raise ValueError("Step is not grouped")
 
         self.move_to_step(index - 1)
         cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
