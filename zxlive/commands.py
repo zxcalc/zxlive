@@ -285,10 +285,7 @@ class MoveNodeProofMode(MoveNode):
     def redo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
         super().redo()
-        proof_model = self.step_view.model()
-        assert isinstance(proof_model, ProofModel)
-        # Save any vertex rearrangements to the proof step
-        proof_model.set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
 
 
 @dataclass
