@@ -60,8 +60,8 @@ def construct_circuit() -> GraphT:
         g.add_vertex(tp, qu, rw)
         cur_row[qu] += 1
 
-    es1 = [edge[:2] for edge in nelist if not edge[2]]
-    es2 = [edge[:2] for edge in nelist if edge[2]]
+    es1 = [edge[:2] for edge in nelist if edge[2] == EdgeType.SIMPLE]
+    es2 = [edge[:2] for edge in nelist if edge[2] == EdgeType.HADAMARD]
 
     # TODO: add the phase part
     # for w, phase in phases.items():
