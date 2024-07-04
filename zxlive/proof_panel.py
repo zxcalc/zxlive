@@ -25,7 +25,7 @@ from .dialogs import show_error_msg
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
-from .proof import ProofModel
+from .proof import ProofStepView
 from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
 from .editor_base_panel import string_to_complex
 from .rewrite_data import action_groups, refresh_custom_rules
@@ -54,17 +54,10 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
-        self.step_view = QListView(self)
-        self.proof_model = ProofModel(self.graph_view.graph_scene.g)
-        self.step_view.setModel(self.proof_model)
-        self.step_view.setPalette(QColor(255, 255, 255))
-        self.step_view.setSpacing(0)
-        self.step_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.step_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.step_view = ProofStepView(self)
+        self.proof_model = self.step_view.model()
         self.step_view.setItemDelegate(ProofStepItemDelegate())
-        self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
-        self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.step_view.doubleClicked.connect(self._double_click_handler)
 
         self.splitter.addWidget(self.step_view)
@@ -412,15 +405,7 @@ class ProofPanel(BasePanel):
         if not selected or not deselected:
             return
         step_index = selected.first().topLeft().row()
-        idx = self.step_view.model().index(step_index, 0, QModelIndex())
-        self.step_view.clearSelection()
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
-        self.step_view.update(idx)
-        proof_model = self.step_view.model()
-        assert isinstance(proof_model, ProofModel)
-        self.graph_view.set_graph(proof_model.get_graph(step_index))
+        self.step_view.move_to_step(step_index)
 
     def _refresh_rewrites_model(self) -> None:
         refresh_custom_rules()

@@ -1,10 +1,13 @@
 import json
-from typing import NamedTuple, Union, Any
+from typing import TYPE_CHECKING, Any, NamedTuple, Union
 
-from PySide6.QtCore import (QAbstractListModel, QModelIndex, QPersistentModelIndex,
-                            Qt, QAbstractItemModel)
-from PySide6.QtGui import QFont
-from pyzx.graph import GraphDiff
+if TYPE_CHECKING:
+    from .proof_panel import ProofPanel
+
+from PySide6.QtCore import (QAbstractListModel, QModelIndex,
+                            QPersistentModelIndex, Qt)
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import QAbstractItemView, QListView
 
 from .common import GraphT
 
@@ -50,7 +53,7 @@ class ProofModel(QAbstractListModel):
         self.initial_graph = start_graph
         self.steps = []
 
-    def set_graph(self, index: int, graph: GraphT):
+    def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
             self.initial_graph = graph
         else:
@@ -158,3 +161,36 @@ class ProofModel(QAbstractListModel):
             rewrite = Rewrite.from_json(step)
             model.add_rewrite(rewrite)
         return model
+
+class ProofStepView(QListView):
+    """A view for displaying the steps in a proof."""
+
+    def __init__(self, parent: 'ProofPanel'):
+        super().__init__(parent)
+        self.graph_view = parent.graph_view
+        self.proof_model = ProofModel(self.graph_view.graph_scene.g)
+        self.setModel(self.proof_model)
+        self.setCurrentIndex(self.proof_model.index(0, 0))
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setPalette(QColor(255, 255, 255))
+        self.setSpacing(0)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setResizeMode(QListView.ResizeMode.Adjust)
+        self.setWordWrap(True)
+        self.setUniformItemSizes(True)
+        self.setAlternatingRowColors(True)
+        self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
+
+    # overriding this method to change the return type and stop mypy from complaining
+    def model(self) -> ProofModel:
+        return self.proof_model
+
+    def move_to_step(self, index: int) -> None:
+        idx = self.model().index(index, 0, QModelIndex())
+        self.clearSelection()
+        self.selectionModel().blockSignals(True)
+        self.setCurrentIndex(idx)
+        self.selectionModel().blockSignals(False)
+        self.update(idx)
+        self.graph_view.set_graph(self.proof_model.get_graph(index))
