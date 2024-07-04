@@ -33,12 +33,13 @@ class Rewrite(NamedTuple):
     def from_json(json_str: str) -> "Rewrite":
         """Deserializes the rewrite from JSON."""
         d = json.loads(json_str)
+        grouped_rewrites = d.get("grouped_rewrites")
 
         return Rewrite(
             display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
             rule=d["rule"],
             graph=GraphT.from_json(d["graph"]),
-            grouped_rewrites=[Rewrite.from_json(r) for r in d["grouped_rewrites"]] if d["grouped_rewrites"] else None
+            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
         )
 
 class ProofModel(QAbstractListModel):
