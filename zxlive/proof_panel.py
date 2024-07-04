@@ -55,7 +55,6 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = ProofStepView(self)
-        self.proof_model = self.step_view.model()
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.doubleClicked.connect(self._double_click_handler)
@@ -71,10 +70,10 @@ class ProofPanel(BasePanel):
 
         if ok:
             # Subtract 1 from index since the START step isn't part of the model
-            old_name = self.proof_model.steps[index.row()-1].display_name
+            old_name = self.step_view.model().steps[index.row()-1].display_name
             cmd = UndoableChange(self.graph_view,
-                lambda: self.proof_model.rename_step(index.row()-1, old_name),
-                lambda: self.proof_model.rename_step(index.row()-1, new_name)
+                lambda: self.step_view.model().rename_step(index.row()-1, old_name),
+                lambda: self.step_view.model().rename_step(index.row()-1, new_name)
             )
 
             self.undo_stack.push(cmd)

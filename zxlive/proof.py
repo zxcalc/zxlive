@@ -203,9 +203,8 @@ class ProofStepView(QListView):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
-        self.proof_model = ProofModel(self.graph_view.graph_scene.g)
-        self.setModel(self.proof_model)
-        self.setCurrentIndex(self.proof_model.index(0, 0))
+        self.setModel(ProofModel(self.graph_view.graph_scene.g))
+        self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setPalette(QColor(255, 255, 255))
         self.setSpacing(0)
@@ -220,7 +219,9 @@ class ProofStepView(QListView):
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
-        return self.proof_model
+        model = super().model()
+        assert isinstance(model, ProofModel)
+        return model
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -229,7 +230,7 @@ class ProofStepView(QListView):
         self.setCurrentIndex(idx)
         self.selectionModel().blockSignals(False)
         self.update(idx)
-        self.graph_view.set_graph(self.proof_model.get_graph(index))
+        self.graph_view.set_graph(self.model().get_graph(index))
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
@@ -244,7 +245,7 @@ class ProofStepView(QListView):
 
         if len(selected_indexes) == 1:
             index = selected_indexes[0].row()
-            if index != 0 and self.proof_model.steps[index - 1].grouped_rewrites is not None:
+            if index != 0 and self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
 
@@ -278,7 +279,7 @@ class ProofStepView(QListView):
             raise ValueError("Can only ungroup one step")
 
         index = selected_indexes[0].row()
-        if index == 0 or self.proof_model.steps[index - 1].grouped_rewrites is None:
+        if index == 0 or self.model().steps[index - 1].grouped_rewrites is None:
             raise ValueError("Step is not grouped")
 
         self.move_to_step(index - 1)
