@@ -4,12 +4,15 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractListModel, QItemSelection, QModelIndex,
-                            QPersistentModelIndex, Qt, QPoint)
-from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QAbstractItemView, QInputDialog, QListView, QMenu
+from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
+                            QItemSelection, QModelIndex, QPersistentModelIndex,
+                            QPoint, QPointF, QRect, QSize, Qt)
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
+                               QStyle, QStyledItemDelegate,
+                               QStyleOptionViewItem, QWidget)
 
-from .common import GraphT
+from .common import GraphT, colors
 
 
 class Rewrite(NamedTuple):
@@ -222,6 +225,7 @@ class ProofStepView(QListView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
+        self.setItemDelegate(ProofStepItemDelegate(self))
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -307,3 +311,89 @@ class ProofStepView(QListView):
         self.move_to_step(index - 1)
         cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
         self.undo_stack.push(cmd)
+
+
+class ProofStepItemDelegate(QStyledItemDelegate):
+    """This class controls the painting of items in the proof steps list view.
+
+    We paint a "git-style" line with circles to denote individual steps in a proof.
+    """
+
+    line_width = 3
+    line_padding = 13
+    vert_padding = 10
+
+    circle_radius = 4
+    circle_radius_selected = 6
+    circle_outline_width = 3
+
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        painter.save()
+        assert hasattr(option, "state") and hasattr(option, "rect") and hasattr(option, "font")
+
+        # Draw background
+        painter.setPen(Qt.GlobalColor.transparent)
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.setBrush(QColor(204, 232, 255))
+        elif option.state & QStyle.StateFlag.State_MouseOver:
+            painter.setBrush(QColor(229, 243, 255))
+        else:
+            painter.setBrush(Qt.GlobalColor.white)
+        painter.drawRect(option.rect)
+
+        # Draw line
+        is_last = index.row() == index.model().rowCount() - 1
+        line_rect = QRect(
+            self.line_padding,
+            int(option.rect.y()),
+            self.line_width,
+            int(option.rect.height() if not is_last else option.rect.height() / 2)
+        )
+        painter.setBrush(Qt.GlobalColor.black)
+        painter.drawRect(line_rect)
+
+        # Draw circle
+        painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
+        painter.setBrush(colors.z_spider)
+        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
+        painter.drawEllipse(
+            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),
+            circle_radius,
+            circle_radius
+        )
+
+        # Draw text
+        text = index.data(Qt.ItemDataRole.DisplayRole)
+        text_height = QFontMetrics(option.font).height()
+        text_rect = QRect(
+            int(option.rect.x() + self.line_width + 2 * self.line_padding),
+            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),
+            option.rect.width(),
+            text_height
+        )
+        if option.state & QStyle.StateFlag.State_Selected:
+            option.font.setWeight(QFont.Weight.Bold)
+        painter.setFont(option.font)
+        painter.setPen(Qt.GlobalColor.black)
+        painter.setBrush(Qt.GlobalColor.black)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
+
+        painter.restore()
+
+    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
+        size = super().sizeHint(option, index)
+        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
+        return QLineEdit(parent)
+
+    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        assert isinstance(editor, QLineEdit)
+        value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+        editor.setText(str(value))
+
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        assert isinstance(editor, QLineEdit)
+        step_view.rename_proof_step(editor.text(), index.row() - 1)

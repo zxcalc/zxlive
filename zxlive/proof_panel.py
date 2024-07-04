@@ -4,13 +4,10 @@ import copy
 from typing import Iterator, Union, cast
 
 import pyzx
-from PySide6.QtCore import (QAbstractItemModel, QModelIndex, QPersistentModelIndex,
-                            QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
-                           QIcon, QPainter, QPen, QVector2D)
-from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QLineEdit, QStyle,
-                               QStyledItemDelegate, QStyleOptionViewItem,
-                               QToolButton, QTreeView, QWidget)
+from PySide6.QtCore import QPointF, QSize
+from PySide6.QtGui import QAction, QFontInfo, QIcon, QVector2D
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QToolButton,
+                               QTreeView)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -19,8 +16,7 @@ from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, MoveNodeProofMode
-from .common import (ET, VT, GraphT, colors, get_data, pos_from_view,
-                     pos_to_view)
+from .common import ET, VT, GraphT, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
@@ -55,7 +51,6 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = ProofStepView(self)
-        self.step_view.setItemDelegate(ProofStepItemDelegate(self.step_view))
 
         self.splitter.addWidget(self.step_view)
 
@@ -391,89 +386,3 @@ class ProofPanel(BasePanel):
         self.rewrites_panel.setModel(model)
         self.rewrites_panel.clicked.connect(model.do_rewrite)
         self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
-
-
-class ProofStepItemDelegate(QStyledItemDelegate):
-    """This class controls the painting of items in the proof steps list view.
-
-    We paint a "git-style" line with circles to denote individual steps in a proof.
-    """
-
-    line_width = 3
-    line_padding = 13
-    vert_padding = 10
-
-    circle_radius = 4
-    circle_radius_selected = 6
-    circle_outline_width = 3
-
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        painter.save()
-        assert hasattr(option, "state") and hasattr(option, "rect") and hasattr(option, "font")
-
-        # Draw background
-        painter.setPen(Qt.GlobalColor.transparent)
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.setBrush(QColor(204, 232, 255))
-        elif option.state & QStyle.StateFlag.State_MouseOver:
-            painter.setBrush(QColor(229, 243, 255))
-        else:
-            painter.setBrush(Qt.GlobalColor.white)
-        painter.drawRect(option.rect)
-
-        # Draw line
-        is_last = index.row() == index.model().rowCount() - 1
-        line_rect = QRect(
-            self.line_padding,
-            int(option.rect.y()),
-            self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)
-        )
-        painter.setBrush(Qt.GlobalColor.black)
-        painter.drawRect(line_rect)
-
-        # Draw circle
-        painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
-        painter.setBrush(colors.z_spider)
-        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
-        painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),
-            circle_radius,
-            circle_radius
-        )
-
-        # Draw text
-        text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()
-        text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),
-            option.rect.width(),
-            text_height
-        )
-        if option.state & QStyle.StateFlag.State_Selected:
-            option.font.setWeight(QFont.Weight.Bold)
-        painter.setFont(option.font)
-        painter.setPen(Qt.GlobalColor.black)
-        painter.setBrush(Qt.GlobalColor.black)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
-
-        painter.restore()
-
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
-        size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
-
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
-        return QLineEdit(parent)
-
-    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        assert isinstance(editor, QLineEdit)
-        value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-        editor.setText(str(value))
-
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        step_view = self.parent()
-        assert isinstance(step_view, ProofStepView)
-        assert isinstance(editor, QLineEdit)
-        step_view.rename_proof_step(editor.text(), index.row() - 1)
