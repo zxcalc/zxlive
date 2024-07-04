@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractListModel, QModelIndex,
+from PySide6.QtCore import (QAbstractListModel, QItemSelection, QModelIndex,
                             QPersistentModelIndex, Qt, QPoint)
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QAbstractItemView, QListView, QMenu
+from PySide6.QtWidgets import QAbstractItemView, QInputDialog, QListView, QMenu
 
 from .common import GraphT
 
@@ -81,6 +81,11 @@ class ProofModel(QAbstractListModel):
                 return self.steps[index.row()-1].display_name
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
+
+    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
+        if index.row() == 0:
+            return super().flags(index)
+        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -205,7 +210,7 @@ class ProofStepView(QListView):
         self.undo_stack = parent.undo_stack
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
-        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
         self.setPalette(QColor(255, 255, 255))
         self.setSpacing(0)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
@@ -216,6 +221,7 @@ class ProofStepView(QListView):
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
+        self.selectionModel().selectionChanged.connect(self.proof_step_selected)
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -239,19 +245,35 @@ class ProofStepView(QListView):
         context_menu = QMenu(self)
         action_function_map = {}
 
+        index = selected_indexes[0].row()
         if len(selected_indexes) > 1:
             group_action = context_menu.addAction("Group Steps")
             action_function_map[group_action] = self.group_selected_steps
-
-        if len(selected_indexes) == 1:
-            index = selected_indexes[0].row()
-            if index != 0 and self.model().steps[index - 1].grouped_rewrites is not None:
+        elif index != 0:
+            rename_action = context_menu.addAction("Rename Step")
+            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+            if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
+
+    def rename_proof_step(self, new_name: str, index: int) -> None:
+        from .commands import UndoableChange
+        old_name = self.model().steps[index].display_name
+        cmd = UndoableChange(self.graph_view,
+            lambda: self.model().rename_step(index, old_name),
+            lambda: self.model().rename_step(index, new_name)
+        )
+        self.undo_stack.push(cmd)
+
+    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        if not selected or not deselected:
+            return
+        step_index = selected.first().topLeft().row()
+        self.move_to_step(step_index)
 
     def group_selected_steps(self) -> None:
         from .commands import GroupRewriteSteps

@@ -4,13 +4,13 @@ import copy
 from typing import Iterator, Union, cast
 
 import pyzx
-from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
+from PySide6.QtCore import (QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
                            QIcon, QPainter, QPen, QVector2D)
-from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QStyle,
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QLineEdit, QStyle,
                                QStyledItemDelegate, QStyleOptionViewItem,
-                               QToolButton, QTreeView)
+                               QToolButton, QTreeView, QWidget)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -18,7 +18,7 @@ from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, MoveNodeProofMode, UndoableChange
+from .commands import AddRewriteStep, MoveNodeProofMode
 from .common import (ET, VT, GraphT, colors, get_data, pos_from_view,
                      pos_to_view)
 from .dialogs import show_error_msg
@@ -55,32 +55,13 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = ProofStepView(self)
-        self.step_view.setItemDelegate(ProofStepItemDelegate())
-        self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
-        self.step_view.doubleClicked.connect(self._double_click_handler)
+        self.step_view.setItemDelegate(ProofStepItemDelegate(self.step_view))
 
         self.splitter.addWidget(self.step_view)
 
     @property
     def proof_model(self) -> ProofModel:
         return self.step_view.model()
-
-    def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
-        # The first row in the item list is the START step, which is not interactive
-        if index.row() == 0:
-            return
-
-        new_name, ok = QInputDialog.getText(self, "Rename proof step", "Enter new name")
-
-        if ok:
-            # Subtract 1 from index since the START step isn't part of the model
-            old_name = self.proof_model.steps[index.row()-1].display_name
-            cmd = UndoableChange(self.graph_view,
-                lambda: self.proof_model.rename_step(index.row()-1, old_name),
-                lambda: self.proof_model.rename_step(index.row()-1, new_name)
-            )
-
-            self.undo_stack.push(cmd)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         icon_size = QSize(32, 32)
@@ -404,12 +385,6 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
         self.undo_stack.push(cmd)
 
-    def _proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        if not selected or not deselected:
-            return
-        step_index = selected.first().topLeft().row()
-        self.step_view.move_to_step(step_index)
-
     def _refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self)
@@ -489,3 +464,16 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         size = super().sizeHint(option, index)
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
 
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
+        return QLineEdit(parent)
+
+    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        assert isinstance(editor, QLineEdit)
+        value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+        editor.setText(str(value))
+
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        assert isinstance(editor, QLineEdit)
+        step_view.rename_proof_step(editor.text(), index.row() - 1)
