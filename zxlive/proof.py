@@ -144,12 +144,12 @@ class ProofModel(QAbstractListModel):
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def group_steps(self, start_index: int, end_index: int) -> list[Rewrite]:
-        # Replace the individual steps with the new grouped step
-        grouped_graph = self.get_graph(end_index + 1)
-        grouped_display_name = "Grouped Steps: " + " -> ".join(
-            [self.steps[i].display_name for i in range(start_index, end_index+1)])
-        grouped_rule = "Grouped"
-        new_rewrite = Rewrite(grouped_display_name, grouped_rule, grouped_graph)
+        """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
+        new_rewrite = Rewrite(
+            "Grouped Steps: " + " -> ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
+            "Grouped",
+            self.get_graph(end_index + 1)
+        )
         removed_rewrites = []
         for _ in range(end_index - start_index + 1):
             removed_rewrites.append(self.pop_rewrite(start_index)[0])
@@ -158,13 +158,14 @@ class ProofModel(QAbstractListModel):
         self.dataChanged.emit(modelIndex, modelIndex, [])
         return removed_rewrites
 
-    def ungroup_steps(self, index: int, steps: list[Rewrite]) -> None:
-        # Replace the grouped step with the individual steps
+    def ungroup_steps(self, index: int, individual_steps: list[Rewrite]) -> None:
+        """Replace the grouped step at `index` with the `individual_steps`"""
         self.pop_rewrite(index)
-        for i, step in enumerate(steps):
+        for i, step in enumerate(individual_steps):
             self.add_rewrite(step, index + i)
-        modelIndex = self.createIndex(index, 0)
-        self.dataChanged.emit(modelIndex, modelIndex, [])
+        self.dataChanged.emit(self.createIndex(index, 0),
+                              self.createIndex(index + len(individual_steps), 0),
+                              [])
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
