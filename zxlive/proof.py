@@ -18,6 +18,7 @@ class Rewrite(NamedTuple):
     display_name: str # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
+    grouped_rewrites: Optional[list['Rewrite']] = None # Optional field to store the grouped rewrites
 
     def to_json(self) -> str:
         """Serializes the rewrite to JSON."""
@@ -143,23 +144,25 @@ class ProofModel(QAbstractListModel):
         modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
-    def group_steps(self, start_index: int, end_index: int) -> list[Rewrite]:
+    def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
         new_rewrite = Rewrite(
             "Grouped Steps: " + " -> ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
-            self.get_graph(end_index + 1)
+            self.get_graph(end_index + 1),
+            self.steps[start_index:end_index + 1]
         )
-        removed_rewrites = []
         for _ in range(end_index - start_index + 1):
-            removed_rewrites.append(self.pop_rewrite(start_index)[0])
+            self.pop_rewrite(start_index)[0]
         self.add_rewrite(new_rewrite, start_index)
         modelIndex = self.createIndex(start_index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
-        return removed_rewrites
 
-    def ungroup_steps(self, index: int, individual_steps: list[Rewrite]) -> None:
-        """Replace the grouped step at `index` with the `individual_steps`"""
+    def ungroup_steps(self, index: int) -> None:
+        """Replace the grouped step at `index` with the individual_steps"""
+        individual_steps = self.steps[index].grouped_rewrites
+        if individual_steps is None:
+            raise ValueError("Step is not grouped")
         self.pop_rewrite(index)
         for i, step in enumerate(individual_steps):
             self.add_rewrite(step, index + i)

@@ -440,13 +440,11 @@ class GroupRewriteSteps(BaseCommand):
     step_view: ProofStepView
     start_index: int
     end_index: int
-    removed_rewrites: Optional[list[Rewrite]] = field(default=None, init=False)
 
     def redo(self) -> None:
-        self.removed_rewrites = self.step_view.model().group_steps(self.start_index, self.end_index)
+        self.step_view.model().group_steps(self.start_index, self.end_index)
         self.step_view.move_to_step(self.start_index + 1)
 
     def undo(self) -> None:
-        assert self.removed_rewrites is not None
-        self.step_view.model().ungroup_steps(self.start_index, self.removed_rewrites)
+        self.step_view.model().ungroup_steps(self.start_index)
         self.step_view.move_to_step(self.end_index + 1)
