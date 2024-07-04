@@ -82,6 +82,17 @@ class ProofModel(QAbstractListModel):
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
 
+    def setData(self, index: Union[QModelIndex, QPersistentModelIndex], value: Any, role: int=Qt.ItemDataRole.EditRole) -> bool:
+        if role == Qt.EditRole:
+            self.rename_step(index.row()-1, value)
+            return True
+        return False
+
+    def flags(self, index):
+        if index.row() == 0:
+            return super().flags(index)
+        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
+
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.headerData`.
@@ -205,7 +216,7 @@ class ProofStepView(QListView):
         self.undo_stack = parent.undo_stack
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
-        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
         self.setPalette(QColor(255, 255, 255))
         self.setSpacing(0)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
@@ -216,7 +227,7 @@ class ProofStepView(QListView):
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
-        self.doubleClicked.connect(self.double_click_handler)
+        # self.doubleClicked.connect(self.double_click_handler)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
 
     # overriding this method to change the return type and stop mypy from complaining
@@ -256,11 +267,11 @@ class ProofStepView(QListView):
         if action in action_function_map:
             action_function_map[action]()
 
-    def double_click_handler(self, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        # The first row in the item list is the START step, which is not interactive
-        if index.row() == 0:
-            return
-        self.rename_proof_step(index.row()-1)
+    # def double_click_handler(self, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    #     # The first row in the item list is the START step, which is not interactive
+    #     if index.row() == 0:
+    #         return
+    #     self.rename_proof_step(index.row()-1)
 
     def rename_proof_step(self, index: int) -> None:
         from .commands import UndoableChange

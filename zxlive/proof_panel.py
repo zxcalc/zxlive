@@ -8,7 +8,7 @@ from PySide6.QtCore import (QModelIndex, QPersistentModelIndex,
                             QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
                            QIcon, QPainter, QPen, QVector2D)
-from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QStyle,
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QLineEdit, QStyle,
                                QStyledItemDelegate, QStyleOptionViewItem,
                                QToolButton, QTreeView)
 from pyzx import VertexType, basicrules
@@ -464,3 +464,12 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         size = super().sizeHint(option, index)
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
 
+    def createEditor(self, parent, option, index):
+        return QLineEdit(parent)
+
+    def setEditorData(self, editor, index):
+        value = index.model().data(index, Qt.DisplayRole)
+        editor.setText(str(value))
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.text(), Qt.EditRole)
