@@ -448,3 +448,16 @@ class GroupRewriteSteps(BaseCommand):
     def undo(self) -> None:
         self.step_view.model().ungroup_steps(self.start_index)
         self.step_view.move_to_step(self.end_index + 1)
+
+@dataclass
+class UngroupRewriteSteps(BaseCommand):
+    step_view: ProofStepView
+    group_index: int
+
+    def redo(self) -> None:
+        self.step_view.model().ungroup_steps(self.group_index)
+        self.step_view.move_to_step(self.group_index + 1)
+
+    def undo(self) -> None:
+        self.step_view.model().group_steps(self.group_index, self.group_index + 1)
+        self.step_view.move_to_step(self.group_index + 1)
