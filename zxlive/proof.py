@@ -83,12 +83,12 @@ class ProofModel(QAbstractListModel):
             return QFont("monospace", 12)
 
     def setData(self, index: Union[QModelIndex, QPersistentModelIndex], value: Any, role: int=Qt.ItemDataRole.EditRole) -> bool:
-        if role == Qt.EditRole:
+        if role == Qt.ItemDataRole.EditRole:
             self.rename_step(index.row()-1, value)
             return True
         return False
 
-    def flags(self, index):
+    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
             return super().flags(index)
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable

@@ -4,13 +4,13 @@ import copy
 from typing import Iterator, Union, cast
 
 import pyzx
-from PySide6.QtCore import (QModelIndex, QPersistentModelIndex,
+from PySide6.QtCore import (QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
                            QIcon, QPainter, QPen, QVector2D)
 from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QLineEdit, QStyle,
                                QStyledItemDelegate, QStyleOptionViewItem,
-                               QToolButton, QTreeView)
+                               QToolButton, QTreeView, QWidget)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -464,12 +464,14 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         size = super().sizeHint(option, index)
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
 
-    def createEditor(self, parent, option, index):
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
 
-    def setEditorData(self, editor, index):
-        value = index.model().data(index, Qt.DisplayRole)
+    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        assert isinstance(editor, QLineEdit)
+        value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
         editor.setText(str(value))
 
-    def setModelData(self, editor, model, index):
-        model.setData(index, editor.text(), Qt.EditRole)
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        assert isinstance(editor, QLineEdit)
+        model.setData(index, editor.text(), Qt.ItemDataRole.EditRole)
