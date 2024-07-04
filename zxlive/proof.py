@@ -1,13 +1,13 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex,
-                            QPersistentModelIndex, Qt)
+                            QPersistentModelIndex, Qt, QPoint)
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QAbstractItemView, QListView
+from PySide6.QtWidgets import QAbstractItemView, QListView, QMenu
 
 from .common import GraphT
 
@@ -18,24 +18,28 @@ class Rewrite(NamedTuple):
     display_name: str # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
+    grouped_rewrites: Optional[list['Rewrite']] = None # Optional field to store the grouped rewrites
 
     def to_json(self) -> str:
         """Serializes the rewrite to JSON."""
         return json.dumps({
             "display_name": self.display_name,
             "rule": self.rule,
-            "graph": self.graph.to_json()
+            "graph": self.graph.to_json(),
+            "grouped_rewrites": [r.to_json() for r in self.grouped_rewrites] if self.grouped_rewrites else None
         })
 
     @staticmethod
     def from_json(json_str: str) -> "Rewrite":
         """Deserializes the rewrite from JSON."""
         d = json.loads(json_str)
+        grouped_rewrites = d.get("grouped_rewrites")
 
         return Rewrite(
             display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
             rule=d["rule"],
             graph=GraphT.from_json(d["graph"]),
+            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
         )
 
 class ProofModel(QAbstractListModel):
@@ -100,19 +104,23 @@ class ProofModel(QAbstractListModel):
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite) -> None:
+    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
-        self.beginInsertRows(QModelIndex(), len(self.steps), len(self.steps))
-        self.steps.append(rewrite)
+        if position is None:
+            position = len(self.steps)
+        self.beginInsertRows(QModelIndex(), position + 1, position + 1)
+        self.steps.insert(position, rewrite)
         self.endInsertRows()
 
-    def pop_rewrite(self) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
         """
-        self.beginRemoveRows(QModelIndex(), len(self.steps), len(self.steps))
-        rewrite = self.steps.pop()
+        if position is None:
+            position = len(self.steps) - 1
+        self.beginRemoveRows(QModelIndex(), position + 1, position + 1)
+        rewrite = self.steps.pop(position)
         self.endRemoveRows()
         return rewrite, rewrite.graph
 
@@ -132,12 +140,38 @@ class ProofModel(QAbstractListModel):
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
         modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
+
+    def group_steps(self, start_index: int, end_index: int) -> None:
+        """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
+        new_rewrite = Rewrite(
+            "Grouped Steps: " + " -> ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
+            "Grouped",
+            self.get_graph(end_index + 1),
+            self.steps[start_index:end_index + 1]
+        )
+        for _ in range(end_index - start_index + 1):
+            self.pop_rewrite(start_index)[0]
+        self.add_rewrite(new_rewrite, start_index)
+        modelIndex = self.createIndex(start_index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
+
+    def ungroup_steps(self, index: int) -> None:
+        """Replace the grouped step at `index` with the individual_steps"""
+        individual_steps = self.steps[index].grouped_rewrites
+        if individual_steps is None:
+            raise ValueError("Step is not grouped")
+        self.pop_rewrite(index)
+        for i, step in enumerate(individual_steps):
+            self.add_rewrite(step, index + i)
+        self.dataChanged.emit(self.createIndex(index, 0),
+                              self.createIndex(index + len(individual_steps), 0),
+                              [])
 
     def to_json(self) -> str:
         """Serializes the model to JSON."""
@@ -168,23 +202,26 @@ class ProofStepView(QListView):
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
-        self.proof_model = ProofModel(self.graph_view.graph_scene.g)
-        self.setModel(self.proof_model)
-        self.setCurrentIndex(self.proof_model.index(0, 0))
+        self.undo_stack = parent.undo_stack
+        self.setModel(ProofModel(self.graph_view.graph_scene.g))
+        self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setPalette(QColor(255, 255, 255))
         self.setSpacing(0)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setWordWrap(True)
         self.setUniformItemSizes(True)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
-        return self.proof_model
+        model = super().model()
+        assert isinstance(model, ProofModel)
+        return model
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -193,4 +230,58 @@ class ProofStepView(QListView):
         self.setCurrentIndex(idx)
         self.selectionModel().blockSignals(False)
         self.update(idx)
-        self.graph_view.set_graph(self.proof_model.get_graph(index))
+        self.graph_view.set_graph(self.model().get_graph(index))
+
+    def show_context_menu(self, position: QPoint) -> None:
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
+            return
+        context_menu = QMenu(self)
+        action_function_map = {}
+
+        if len(selected_indexes) > 1:
+            group_action = context_menu.addAction("Group Steps")
+            action_function_map[group_action] = self.group_selected_steps
+
+        if len(selected_indexes) == 1:
+            index = selected_indexes[0].row()
+            if index != 0 and self.model().steps[index - 1].grouped_rewrites is not None:
+                ungroup_action = context_menu.addAction("Ungroup Steps")
+                action_function_map[ungroup_action] = self.ungroup_selected_step
+
+        action = context_menu.exec_(self.mapToGlobal(position))
+        if action in action_function_map:
+            action_function_map[action]()
+
+    def group_selected_steps(self) -> None:
+        from .commands import GroupRewriteSteps
+        from .dialogs import show_error_msg
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes or len(selected_indexes) < 2:
+            raise ValueError("Can only group two or more steps")
+
+        indices = sorted(index.row() for index in selected_indexes)
+        if indices[-1] - indices[0] != len(indices) - 1:
+            show_error_msg("Can only group contiguous steps")
+            raise ValueError("Can only group contiguous steps")
+        if indices[0] == 0:
+            show_error_msg("Cannot group the first step")
+            raise ValueError("Cannot group the first step")
+
+        self.move_to_step(indices[-1] - 1)
+        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
+        self.undo_stack.push(cmd)
+
+    def ungroup_selected_step(self) -> None:
+        from .commands import UngroupRewriteSteps
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes or len(selected_indexes) != 1:
+            raise ValueError("Can only ungroup one step")
+
+        index = selected_indexes[0].row()
+        if index == 0 or self.model().steps[index - 1].grouped_rewrites is None:
+            raise ValueError("Step is not grouped")
+
+        self.move_to_step(index - 1)
+        cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
+        self.undo_stack.push(cmd)

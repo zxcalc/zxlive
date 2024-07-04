@@ -26,7 +26,7 @@ from .editor_base_panel import string_to_complex
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
-from .proof import ProofStepView
+from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeModel
 from .rewrite_data import action_groups, refresh_custom_rules
 from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
@@ -55,12 +55,15 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = ProofStepView(self)
-        self.proof_model = self.step_view.model()
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.doubleClicked.connect(self._double_click_handler)
 
         self.splitter.addWidget(self.step_view)
+
+    @property
+    def proof_model(self) -> ProofModel:
+        return self.step_view.model()
 
     def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
         # The first row in the item list is the START step, which is not interactive
