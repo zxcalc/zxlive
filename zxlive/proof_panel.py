@@ -74,10 +74,10 @@ class ProofPanel(BasePanel):
 
         if ok:
             # Subtract 1 from index since the START step isn't part of the model
-            old_name = self.step_view.model().steps[index.row()-1].display_name
+            old_name = self.proof_model.steps[index.row()-1].display_name
             cmd = UndoableChange(self.graph_view,
-                lambda: self.step_view.model().rename_step(index.row()-1, old_name),
-                lambda: self.step_view.model().rename_step(index.row()-1, new_name)
+                lambda: self.proof_model.rename_step(index.row()-1, old_name),
+                lambda: self.proof_model.rename_step(index.row()-1, new_name)
             )
 
             self.undo_stack.push(cmd)
