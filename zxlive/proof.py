@@ -229,15 +229,25 @@ class ProofStepView(QListView):
         self.graph_view.set_graph(self.proof_model.get_graph(index))
 
     def show_context_menu(self, position: QPoint) -> None:
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
+            return
         context_menu = QMenu(self)
-        group_action = context_menu.addAction("Group Steps")
-        ungroup_action = context_menu.addAction("Ungroup Steps")
-        action = context_menu.exec_(self.mapToGlobal(position))
+        action_function_map = {}
 
-        if action == group_action:
-            self.group_selected_steps()
-        elif action == ungroup_action:
-            self.ungroup_selected_step()
+        if len(selected_indexes) > 1:
+            group_action = context_menu.addAction("Group Steps")
+            action_function_map[group_action] = self.group_selected_steps
+
+        if len(selected_indexes) == 1:
+            index = selected_indexes[0].row()
+            if index != 0 and self.proof_model.steps[index - 1].grouped_rewrites is not None:
+                ungroup_action = context_menu.addAction("Ungroup Steps")
+                action_function_map[ungroup_action] = self.ungroup_selected_step
+
+        action = context_menu.exec_(self.mapToGlobal(position))
+        if action in action_function_map:
+            action_function_map[action]()
 
     def group_selected_steps(self) -> None:
         from .commands import GroupRewriteSteps
