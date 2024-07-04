@@ -258,6 +258,8 @@ class ProofStepView(QListView):
         indices = sorted(index.row() for index in selected_indexes)
         if indices[-1] - indices[0] != len(indices) - 1:
             raise ValueError("Can only group contiguous steps")
+        if indices[0] == 0:
+            raise ValueError("Cannot group the first step")
 
         self.move_to_step(indices[-1] - 1)
         cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
