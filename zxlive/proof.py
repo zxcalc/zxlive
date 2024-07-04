@@ -137,7 +137,7 @@ class ProofModel(QAbstractListModel):
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
