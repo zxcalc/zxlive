@@ -297,8 +297,7 @@ class MainWindow(QMainWindow):
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
                 proof_panel: ProofPanel = self.active_panel
-                proof_panel.proof_model = out.p
-                proof_panel.step_view.setModel(proof_panel.proof_model)
+                proof_panel.step_view.setModel(out.p)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
                 proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             elif isinstance(out, ImportRuleOutput):
