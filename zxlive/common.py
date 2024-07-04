@@ -1,6 +1,6 @@
 import os
 from enum import IntEnum
-from typing import Final, Dict, Any
+from typing import Final, Dict, Any, Optional
 
 from pyzx import EdgeType
 from typing_extensions import TypeAlias
@@ -248,7 +248,7 @@ set_pyzx_tikz_settings()  # Call it once on startup
 def to_tikz(g: GraphT) -> str:
     return pyzx.tikz.to_tikz(g)  # type: ignore
 
-def from_tikz(s: str) -> GraphT:
+def from_tikz(s: str) -> Optional[GraphT]:
     try:
         return pyzx.tikz.tikz_to_graph(s)
     except Exception as e:
