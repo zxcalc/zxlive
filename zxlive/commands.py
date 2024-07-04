@@ -281,6 +281,7 @@ class MoveNodeProofMode(MoveNode):
     def undo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
         super().undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
 
     def redo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
