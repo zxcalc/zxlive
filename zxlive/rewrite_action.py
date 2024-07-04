@@ -68,9 +68,9 @@ class RewriteAction:
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Narrow down the type of the first return value.
-    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[Any, Optional[list[VT]]]:
+    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[Any, list[VT]]:
         if self.returns_new_graph:
-            return self.rule(g, matches), None
+            return self.rule(g, matches), []
 
         etab, rem_verts, rem_edges, check_isolated_vertices = self.rule(g, matches)
         g.remove_edges(rem_edges)
