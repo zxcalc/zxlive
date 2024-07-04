@@ -241,13 +241,14 @@ class ProofStepView(QListView):
         context_menu = QMenu(self)
         action_function_map = {}
 
+        index = selected_indexes[0].row()
         if len(selected_indexes) > 1:
             group_action = context_menu.addAction("Group Steps")
             action_function_map[group_action] = self.group_selected_steps
-
-        if len(selected_indexes) == 1:
-            index = selected_indexes[0].row()
-            if index != 0 and self.model().steps[index - 1].grouped_rewrites is not None:
+        elif index != 0:
+            rename_action = context_menu.addAction("Rename Step")
+            action_function_map[rename_action] = lambda: self.rename_proof_step(index - 1)
+            if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
 
@@ -256,17 +257,19 @@ class ProofStepView(QListView):
             action_function_map[action]()
 
     def double_click_handler(self, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        from .commands import UndoableChange
         # The first row in the item list is the START step, which is not interactive
         if index.row() == 0:
             return
+        self.rename_proof_step(index.row()-1)
+
+    def rename_proof_step(self, index: int) -> None:
+        from .commands import UndoableChange
         new_name, ok = QInputDialog.getText(self, "Rename proof step", "Enter new name")
         if ok:
-            # Subtract 1 from index since the START step isn't part of the model
-            old_name = self.model().steps[index.row()-1].display_name
+            old_name = self.model().steps[index].display_name
             cmd = UndoableChange(self.graph_view,
-                lambda: self.model().rename_step(index.row()-1, old_name),
-                lambda: self.model().rename_step(index.row()-1, new_name)
+                lambda: self.model().rename_step(index, old_name),
+                lambda: self.model().rename_step(index, new_name)
             )
             self.undo_stack.push(cmd)
 
