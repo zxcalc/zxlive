@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractListModel, QModelIndex,
+from PySide6.QtCore import (QAbstractListModel, QItemSelection, QModelIndex,
                             QPersistentModelIndex, Qt, QPoint)
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QAbstractItemView, QListView, QMenu
+from PySide6.QtWidgets import QAbstractItemView, QInputDialog, QListView, QMenu
 
 from .common import GraphT
 
@@ -216,6 +216,8 @@ class ProofStepView(QListView):
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
+        self.doubleClicked.connect(self.double_click_handler)
+        self.selectionModel().selectionChanged.connect(self.proof_step_selected)
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -252,6 +254,27 @@ class ProofStepView(QListView):
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
+
+    def double_click_handler(self, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        from .commands import UndoableChange
+        # The first row in the item list is the START step, which is not interactive
+        if index.row() == 0:
+            return
+        new_name, ok = QInputDialog.getText(self, "Rename proof step", "Enter new name")
+        if ok:
+            # Subtract 1 from index since the START step isn't part of the model
+            old_name = self.model().steps[index.row()-1].display_name
+            cmd = UndoableChange(self.graph_view,
+                lambda: self.model().rename_step(index.row()-1, old_name),
+                lambda: self.model().rename_step(index.row()-1, new_name)
+            )
+            self.undo_stack.push(cmd)
+
+    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        if not selected or not deselected:
+            return
+        step_index = selected.first().topLeft().row()
+        self.move_to_step(step_index)
 
     def group_selected_steps(self) -> None:
         from .commands import GroupRewriteSteps
