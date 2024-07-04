@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -9,7 +9,6 @@ from PySide6.QtCore import (QAbstractListModel, QModelIndex,
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QAbstractItemView, QListView, QMenu
 
-from .commands import GroupRewriteSteps
 from .common import GraphT
 
 
@@ -235,6 +234,7 @@ class ProofStepView(QListView):
             self.group_selected_steps()
 
     def group_selected_steps(self) -> None:
+        from .commands import GroupRewriteSteps
         selected_indexes = self.selectedIndexes()
         if not selected_indexes:
             return
