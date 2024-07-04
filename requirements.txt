@@ -2,8 +2,7 @@ pyzx>=0.8.0
 networkx~=3.1
 numpy~=1.25.2
 pytest-qt~=4.2.0
-PySide6~=6.5.2
-PySide6-stubs
+PySide6~=6.7.2,
 shapely~=2.0.1
 shapely-stubs @ git+https://github.com/ciscorn/shapely-stubs.git
 pyperclip>=1.8.1
