@@ -6,30 +6,30 @@ from typing import Iterator, Union, cast
 import pyzx
 from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
-                           QPainter, QPen, QVector2D, QFontInfo)
-from PySide6.QtWidgets import (QAbstractItemView, QListView,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QToolButton,
-                               QInputDialog, QTreeView)
+from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
+                           QIcon, QPainter, QPen, QVector2D)
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QStyle,
+                               QStyledItemDelegate, QStyleOptionViewItem,
+                               QToolButton, QTreeView)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType, FractionLike
+from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
+                        set_z_box_label)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, GoToRewriteStep, MoveNode, UndoableChange
-from .common import (ET, VT, GraphT, get_data,
-                     pos_from_view, pos_to_view, colors)
+from .commands import AddRewriteStep, MoveNodeProofMode, UndoableChange
+from .common import (ET, VT, GraphT, colors, get_data, pos_from_view,
+                     pos_to_view)
 from .dialogs import show_error_msg
+from .editor_base_panel import string_to_complex
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
-from .proof import ProofModel
-from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
-from .editor_base_panel import string_to_complex
-from .rewrite_data import action_groups, refresh_custom_rules
+from .proof import ProofStepView
 from .rewrite_action import RewriteActionTreeModel
+from .rewrite_data import action_groups, refresh_custom_rules
+from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 
 
 class ProofPanel(BasePanel):
@@ -54,17 +54,10 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
-        self.step_view = QListView(self)
-        self.proof_model = ProofModel(self.graph_view.graph_scene.g)
-        self.step_view.setModel(self.proof_model)
-        self.step_view.setPalette(QColor(255, 255, 255))
-        self.step_view.setSpacing(0)
-        self.step_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.step_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.step_view = ProofStepView(self)
+        self.proof_model = self.step_view.model()
         self.step_view.setItemDelegate(ProofStepItemDelegate())
-        self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
-        self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.step_view.doubleClicked.connect(self._double_click_handler)
 
         self.splitter.addWidget(self.step_view)
@@ -156,7 +149,7 @@ class ProofPanel(BasePanel):
         return selection, list(edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(self.graph_view, vs)
+        cmd = MoveNodeProofMode(self.graph_view, vs, self.step_view)
         self.undo_stack.push(cmd)
 
     def _selection_clicked(self) -> None:
@@ -411,8 +404,8 @@ class ProofPanel(BasePanel):
     def _proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
-        cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
-        self.undo_stack.push(cmd)
+        step_index = selected.first().topLeft().row()
+        self.step_view.move_to_step(step_index)
 
     def _refresh_rewrites_model(self) -> None:
         refresh_custom_rules()

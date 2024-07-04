@@ -17,7 +17,7 @@ from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_i
 from .common import ET, VT, W_INPUT_OFFSET, GraphT, setting
 from .eitem import EItem
 from .graphview import GraphView
-from .proof import ProofModel, Rewrite
+from .proof import ProofModel, ProofStepView, Rewrite
 
 
 @dataclass
@@ -269,6 +269,25 @@ class MoveNode(BaseCommand):
             self.g.set_qubit(v, y)
         self.update_graph_view()
 
+@dataclass
+class MoveNodeProofMode(MoveNode):
+    step_view: ProofStepView
+
+    def __init__(self, graph_view: GraphView, vs: list[tuple[VT, float, float]], step_view: ProofStepView) -> None:
+        super().__init__(graph_view, vs)
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
 
 @dataclass
 class ChangeEdgeCurve(BaseCommand):
@@ -413,42 +432,4 @@ class AddRewriteStep(SetGraph):
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
-        super().undo()
-
-
-@dataclass
-class GoToRewriteStep(SetGraph):
-    """Shows the graph at some step in the proof.
-
-    Undoing returns to the previously selected proof step.
-    """
-
-    def __init__(self, graph_view: GraphView, step_view: QListView, old_step: int, step: int) -> None:
-        proof_model = step_view.model()
-        assert isinstance(proof_model, ProofModel)
-
-        # Save any vertex rearrangements to the proof step
-        proof_model.set_graph(old_step, graph_view.graph_scene.g)
-
-        SetGraph.__init__(self, graph_view, proof_model.get_graph(step))
-        self.step_view = step_view
-        self.step = step
-        self.old_step = old_step
-
-    def redo(self) -> None:
-        idx = self.step_view.model().index(self.step, 0, QModelIndex())
-        self.step_view.clearSelection()
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
-        self.step_view.update(idx)
-        super().redo()
-
-    def undo(self) -> None:
-        idx = self.step_view.model().index(self.old_step, 0, QModelIndex())
-        self.step_view.clearSelection()
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
-        self.step_view.update(idx)
         super().undo()
