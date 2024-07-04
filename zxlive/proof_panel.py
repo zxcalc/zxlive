@@ -55,7 +55,7 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self.step_view = ProofStepView(self)
-        self.step_view.setItemDelegate(ProofStepItemDelegate())
+        self.step_view.setItemDelegate(ProofStepItemDelegate(self.step_view))
 
         self.splitter.addWidget(self.step_view)
 
@@ -473,5 +473,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         editor.setText(str(value))
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
         assert isinstance(editor, QLineEdit)
-        model.setData(index, editor.text(), Qt.ItemDataRole.EditRole)
+        step_view.rename_proof_step(editor.text(), index.row() - 1)

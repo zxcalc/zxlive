@@ -82,12 +82,6 @@ class ProofModel(QAbstractListModel):
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
 
-    def setData(self, index: Union[QModelIndex, QPersistentModelIndex], value: Any, role: int=Qt.ItemDataRole.EditRole) -> bool:
-        if role == Qt.ItemDataRole.EditRole:
-            self.rename_step(index.row()-1, value)
-            return True
-        return False
-
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
             return super().flags(index)
@@ -227,7 +221,6 @@ class ProofStepView(QListView):
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
-        # self.doubleClicked.connect(self.double_click_handler)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
 
     # overriding this method to change the return type and stop mypy from complaining
@@ -258,7 +251,7 @@ class ProofStepView(QListView):
             action_function_map[group_action] = self.group_selected_steps
         elif index != 0:
             rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.rename_proof_step(index - 1)
+            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
@@ -267,22 +260,14 @@ class ProofStepView(QListView):
         if action in action_function_map:
             action_function_map[action]()
 
-    # def double_click_handler(self, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-    #     # The first row in the item list is the START step, which is not interactive
-    #     if index.row() == 0:
-    #         return
-    #     self.rename_proof_step(index.row()-1)
-
-    def rename_proof_step(self, index: int) -> None:
+    def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange
-        new_name, ok = QInputDialog.getText(self, "Rename proof step", "Enter new name")
-        if ok:
-            old_name = self.model().steps[index].display_name
-            cmd = UndoableChange(self.graph_view,
-                lambda: self.model().rename_step(index, old_name),
-                lambda: self.model().rename_step(index, new_name)
-            )
-            self.undo_stack.push(cmd)
+        old_name = self.model().steps[index].display_name
+        cmd = UndoableChange(self.graph_view,
+            lambda: self.model().rename_step(index, old_name),
+            lambda: self.model().rename_step(index, new_name)
+        )
+        self.undo_stack.push(cmd)
 
     def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
