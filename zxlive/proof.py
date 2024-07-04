@@ -205,7 +205,6 @@ class ProofStepView(QListView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setWordWrap(True)
         self.setUniformItemSizes(True)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
