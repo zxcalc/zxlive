@@ -5,7 +5,7 @@ from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPointF, QRect, QSize, Qt)
+                            QPoint, QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
                            QIcon, QPainter, QPen, QVector2D)
 from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QStyle,
@@ -18,7 +18,7 @@ from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, MoveNodeProofMode, UndoableChange
+from .commands import AddRewriteStep, GroupRewriteSteps, MoveNodeProofMode, UndoableChange
 from .common import (ET, VT, GraphT, colors, get_data, pos_from_view,
                      pos_to_view)
 from .dialogs import show_error_msg
@@ -59,8 +59,33 @@ class ProofPanel(BasePanel):
         self.step_view.setItemDelegate(ProofStepItemDelegate())
         self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
         self.step_view.doubleClicked.connect(self._double_click_handler)
+        self.step_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.step_view.customContextMenuRequested.connect(self.show_context_menu)
 
         self.splitter.addWidget(self.step_view)
+
+    def show_context_menu(self, position: QPoint) -> None:
+        context_menu = QMenu(self)
+        group_action = context_menu.addAction("Group Steps")
+        action = context_menu.exec_(self.step_view.mapToGlobal(position))
+
+        if action == group_action:
+            self.group_selected_steps()
+
+    def group_selected_steps(self) -> None:
+        selected_indexes = self.step_view.selectedIndexes()
+        if not selected_indexes:
+            return
+        indices = [index.row() for index in selected_indexes]
+        if len(indices) < 2:
+            return
+        # Ensure indices are sorted and contiguous
+        indices.sort()
+        if indices[-1] - indices[0] != len(indices) - 1:
+            raise ValueError("Can only group contiguous steps")
+        GoToRewriteStep(self.graph_view, self.step_view, indices[0], indices[-1] - 1).redo()
+        cmd = GroupRewriteSteps(self.graph_view, self.step_view, indices[0] - 1, indices[-1] - 1)
+        self.undo_stack.push(cmd)
 
     def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
         # The first row in the item list is the START step, which is not interactive

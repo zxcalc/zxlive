@@ -100,19 +100,23 @@ class ProofModel(QAbstractListModel):
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite) -> None:
+    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
-        self.beginInsertRows(QModelIndex(), len(self.steps), len(self.steps))
-        self.steps.append(rewrite)
+        if position is None:
+            position = len(self.steps)
+        self.beginInsertRows(QModelIndex(), position + 1, position + 1)
+        self.steps.insert(position, rewrite)
         self.endInsertRows()
 
-    def pop_rewrite(self) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
         """
-        self.beginRemoveRows(QModelIndex(), len(self.steps), len(self.steps))
-        rewrite = self.steps.pop()
+        if position is None:
+            position = len(self.steps) - 1
+        self.beginRemoveRows(QModelIndex(), position + 1, position + 1)
+        rewrite = self.steps.pop(position)
         self.endRemoveRows()
         return rewrite, rewrite.graph
 
@@ -136,6 +140,29 @@ class ProofModel(QAbstractListModel):
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
+        modelIndex = self.createIndex(index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
+
+    def group_steps(self, start_index: int, end_index: int) -> list[Rewrite]:
+        # Replace the individual steps with the new grouped step
+        grouped_graph = self.get_graph(end_index + 1)
+        grouped_display_name = "Grouped Steps: " + " -> ".join(
+            [self.steps[i].display_name for i in range(start_index, end_index+1)])
+        grouped_rule = "Grouped"
+        new_rewrite = Rewrite(grouped_display_name, grouped_rule, grouped_graph)
+        removed_rewrites = []
+        for _ in range(end_index - start_index + 1):
+            removed_rewrites.append(self.pop_rewrite(start_index)[0])
+        self.add_rewrite(new_rewrite, start_index)
+        modelIndex = self.createIndex(start_index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
+        return removed_rewrites
+
+    def ungroup_steps(self, index: int, steps: list[Rewrite]) -> None:
+        # Replace the grouped step with the individual steps
+        self.pop_rewrite(index)
+        for i, step in enumerate(steps):
+            self.add_rewrite(step, index + i)
         modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
