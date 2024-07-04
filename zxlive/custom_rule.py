@@ -36,7 +36,7 @@ class CustomRule:
             self.lhs_graph_without_boundaries_nx = nx.Graph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
-    def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[ET,VT]:
+    def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[VT, ET]:
         if self.is_rewrite_unfusable:
             self.unfuse_subgraph_for_rewrite(graph, vertices)
 
@@ -93,7 +93,7 @@ class CustomRule:
 
         return etab, vertices_to_remove, [], True
 
-    def unfuse_subgraph_for_rewrite(self, graph, vertices) -> None:
+    def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
         def get_adjacent_boundary_vertices(g, v) -> Sequence[VT]:
             return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
 
