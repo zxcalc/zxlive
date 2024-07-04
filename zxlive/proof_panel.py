@@ -6,30 +6,30 @@ from typing import Iterator, Union, cast
 import pyzx
 from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
-                           QPainter, QPen, QVector2D, QFontInfo)
-from PySide6.QtWidgets import (QAbstractItemView, QListView,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QToolButton,
-                               QInputDialog, QTreeView)
+from PySide6.QtGui import (QAction, QColor, QFont, QFontInfo, QFontMetrics,
+                           QIcon, QPainter, QPen, QVector2D)
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QStyle,
+                               QStyledItemDelegate, QStyleOptionViewItem,
+                               QToolButton, QTreeView)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType, FractionLike
+from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
+                        set_z_box_label)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, GoToRewriteStep, MoveNode, MoveNodeProofMode, UndoableChange
-from .common import (ET, VT, GraphT, get_data,
-                     pos_from_view, pos_to_view, colors)
+from .commands import AddRewriteStep, MoveNodeProofMode, UndoableChange
+from .common import (ET, VT, GraphT, colors, get_data, pos_from_view,
+                     pos_to_view)
 from .dialogs import show_error_msg
+from .editor_base_panel import string_to_complex
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofStepView
-from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
-from .editor_base_panel import string_to_complex
-from .rewrite_data import action_groups, refresh_custom_rules
 from .rewrite_action import RewriteActionTreeModel
+from .rewrite_data import action_groups, refresh_custom_rules
+from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 
 
 class ProofPanel(BasePanel):
