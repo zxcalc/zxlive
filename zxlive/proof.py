@@ -158,7 +158,7 @@ class ProofModel(QAbstractListModel):
     def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
         new_rewrite = Rewrite(
-            "Grouped Steps: " + " -> ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
+            "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
             self.steps[start_index:end_index + 1]
