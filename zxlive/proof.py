@@ -25,7 +25,8 @@ class Rewrite(NamedTuple):
         return json.dumps({
             "display_name": self.display_name,
             "rule": self.rule,
-            "graph": self.graph.to_json()
+            "graph": self.graph.to_json(),
+            "grouped_rewrites": [r.to_json() for r in self.grouped_rewrites] if self.grouped_rewrites else None
         })
 
     @staticmethod
@@ -37,6 +38,7 @@ class Rewrite(NamedTuple):
             display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
             rule=d["rule"],
             graph=GraphT.from_json(d["graph"]),
+            grouped_rewrites=[Rewrite.from_json(r) for r in d["grouped_rewrites"]] if d["grouped_rewrites"] else None
         )
 
 class ProofModel(QAbstractListModel):
