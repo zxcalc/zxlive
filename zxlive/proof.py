@@ -5,10 +5,11 @@ if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex,
-                            QPersistentModelIndex, Qt)
+                            QPersistentModelIndex, Qt, QPoint)
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QAbstractItemView, QListView
+from PySide6.QtWidgets import QAbstractItemView, QListView, QMenu
 
+from .commands import GroupRewriteSteps
 from .common import GraphT
 
 
@@ -195,19 +196,22 @@ class ProofStepView(QListView):
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
+        self.undo_stack = parent.undo_stack
         self.proof_model = ProofModel(self.graph_view.graph_scene.g)
         self.setModel(self.proof_model)
         self.setCurrentIndex(self.proof_model.index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setPalette(QColor(255, 255, 255))
         self.setSpacing(0)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setWordWrap(True)
         self.setUniformItemSizes(True)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -221,3 +225,26 @@ class ProofStepView(QListView):
         self.selectionModel().blockSignals(False)
         self.update(idx)
         self.graph_view.set_graph(self.proof_model.get_graph(index))
+
+    def show_context_menu(self, position: QPoint) -> None:
+        context_menu = QMenu(self)
+        group_action = context_menu.addAction("Group Steps")
+        action = context_menu.exec_(self.mapToGlobal(position))
+
+        if action == group_action:
+            self.group_selected_steps()
+
+    def group_selected_steps(self) -> None:
+        selected_indexes = self.selectedIndexes()
+        if not selected_indexes:
+            return
+        indices = [index.row() for index in selected_indexes]
+        if len(indices) < 2:
+            return
+        # Ensure indices are sorted and contiguous
+        indices.sort()
+        if indices[-1] - indices[0] != len(indices) - 1:
+            raise ValueError("Can only group contiguous steps")
+        self.move_to_step(indices[-1] - 1)
+        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
+        self.undo_stack.push(cmd)
