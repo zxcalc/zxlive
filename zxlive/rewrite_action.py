@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING, Any, Optional, cast, Union
+from typing import Callable, TYPE_CHECKING, Any, cast, Union
 
 import pyzx
 from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, Signal, QObject, QMetaObject
@@ -176,16 +176,17 @@ class RewriteActionTreeModel(QAbstractItemModel):
             return self.createIndex(row, column, childItem)
         return QModelIndex()
 
-    def parent(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> QModelIndex:
+    def parent(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> QModelIndex:  # type: ignore[override]
         if not index.isValid():
             return QModelIndex()
 
         parent_item = cast(RewriteActionTree, index.internalPointer()).parent
+        row = parent_item is None or parent_item.row()
 
-        if parent_item == self.root_item:
+        if row is None or parent_item == self.root_item:
             return QModelIndex()
 
-        return self.createIndex(parent_item.row(), 0, parent_item)
+        return self.createIndex(row, 0, parent_item)
 
     def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         if parent.column() > 0:
