@@ -180,7 +180,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         if not index.isValid():
             return QModelIndex()
 
-        parent_item = index.internalPointer().parent
+        parent_item = cast(RewriteActionTree, index.internalPointer()).parent
 
         if parent_item == self.root_item:
             return QModelIndex()
@@ -198,10 +198,11 @@ class RewriteActionTreeModel(QAbstractItemModel):
 
     def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         if index.isValid():
-            return Qt.ItemFlag.ItemIsEnabled if index.internalPointer().enabled() else Qt.ItemFlag.NoItemFlags
+            rewrite_action_tree = cast(RewriteActionTree, index.internalPointer())
+            return Qt.ItemFlag.ItemIsEnabled if rewrite_action_tree.enabled() else Qt.ItemFlag.NoItemFlags
         return Qt.ItemFlag.ItemIsEnabled
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, role: Qt.ItemDataRole = Qt.ItemDataRole.DisplayRole) -> str | None:
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> str | None:
         if not index.isValid():
             return self.root_item.header()
         rewrite_action_tree = cast(RewriteActionTree, index.internalPointer())
@@ -212,7 +213,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         return None
 
     def headerData(self, section: int, orientation: Qt.Orientation,
-                   role: Qt.ItemDataRole = Qt.ItemDataRole.DisplayRole) -> str:
+                   role: int = Qt.ItemDataRole.DisplayRole) -> str:
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return self.root_item.header()
         return ""
@@ -220,7 +221,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
     def do_rewrite(self, index: QModelIndex) -> None:
         if not index.isValid():
             return
-        node = index.internalPointer()
+        node = cast(RewriteActionTree, index.internalPointer())
         if node.is_rewrite:
             node.rewrite_action.do_rewrite(self.proof_panel)
 
