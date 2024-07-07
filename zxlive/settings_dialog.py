@@ -15,22 +15,96 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Any, Optional, Union
+from enum import IntEnum
+from typing import TYPE_CHECKING, Dict, Any, TypeVar, Type
+from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import (QDialog, QFileDialog,
-                               QFormLayout, QLineEdit,
-                               QPushButton, QWidget,
-                               QVBoxLayout, QSpinBox, QDoubleSpinBox,
-                               QLabel, QHBoxLayout, QTabWidget,
-                                QComboBox)
+from PySide6.QtWidgets import (
+    QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
+    QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
+    QComboBox
+)
 
-import pyzx
-
-from .common import set_pyzx_tikz_settings, colors, setting, color_schemes, input_circuit_formats, defaults
+from .settings import (set_pyzx_tikz_settings, colors, setting, color_schemes,
+                     input_circuit_formats, defaults)
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
+
+
+T = TypeVar('T')
+
+
+class FormInputType(IntEnum):
+    Str = 0
+    Int = 1
+    Float = 2
+    Folder = 3
+    Combo = 4
+
+
+class SettingsData(TypedDict):
+    id: str
+    label: str
+    type: FormInputType
+    data: NotRequired[dict[Any, str]]
+
+
+tab_positioning_data = {
+    QTabWidget.TabPosition.North: "Top",
+    QTabWidget.TabPosition.South: "Bottom",
+    QTabWidget.TabPosition.West: "Left",
+    QTabWidget.TabPosition.East: "Right"
+}
+
+snap_to_grpid_data = {'2': "2", '4': "4", '8': "8", '16': "16"}
+
+general_settings: list[SettingsData] = [
+    {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
+    {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_schemes},
+    {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
+    {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grpid_data},
+    {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
+]
+
+tikz_export_settings: list[SettingsData] = [
+    {"id": "tikz/Z-spider-export", "label": "Z-spider", "type": FormInputType.Str},
+    {"id": "tikz/Z-phase-export", "label": "Z-spider with phase", "type": FormInputType.Str},
+    {"id": "tikz/X-spider-export", "label": "X-spider", "type": FormInputType.Str},
+    {"id": "tikz/X-phase-export", "label": "X-spider with phase", "type": FormInputType.Str},
+    {"id": "tikz/Hadamard-export", "label": "Hadamard", "type": FormInputType.Str},
+    {"id": "tikz/w-input-export", "label": "W input", "type": FormInputType.Str},
+    {"id": "tikz/w-output-export", "label": "W output", "type": FormInputType.Str},
+    {"id": "tikz/z-box-export", "label": "Z box", "type": FormInputType.Str},
+    {"id": "tikz/edge-W-export", "label": "W io edge", "type": FormInputType.Str},
+]
+
+tikz_import_settings: list[SettingsData] = [
+    {"id": "tikz/Z-spider-import", "label": "Z-spider", "type": FormInputType.Str},
+    {"id": "tikz/w-input-import", "label": "W input", "type": FormInputType.Str},
+    {"id": "tikz/w-output-import", "label": "W output", "type": FormInputType.Str},
+    {"id": "tikz/z-box-import", "label": "Z box", "type": FormInputType.Str},
+    {"id": "tikz/edge-W-import", "label": "W io edge", "type": FormInputType.Str},
+]
+
+tikz_layout_settings: list[SettingsData] = [
+    {"id": "tikz/layout/hspace", "label": "Horizontal spacing", "type": FormInputType.Float},
+    {"id": "tikz/layout/vspace", "label": "Vertical spacing", "type": FormInputType.Float},
+    {"id": "tikz/layout/max-width", "label": "Maximum width", "type": FormInputType.Float},
+]
+
+tikz_rule_name_settings: list[SettingsData] = [
+    {"id": "tikz/names/fuse spiders", "label": "fuse spiders", "type": FormInputType.Str},
+    {"id": "tikz/names/bialgebra", "label": "bialgebra", "type": FormInputType.Str},
+    {"id": "tikz/names/change color to Z", "label": "change color to Z", "type": FormInputType.Str},
+    {"id": "tikz/names/change color to X", "label": "change color to X", "type": FormInputType.Str},
+    {"id": "tikz/names/remove identity", "label": "remove identity", "type": FormInputType.Str},
+    {"id": "tikz/names/Add Z identity", "label": "add Z identity", "type": FormInputType.Str},
+    {"id": "tikz/names/copy 0/pi spider", "label": "copy 0/pi spider", "type": FormInputType.Str},
+    {"id": "tikz/names/push Pauli", "label": "push Pauli", "type": FormInputType.Str},
+    {"id": "tikz/names/decompose hadamard", "label": "decompose hadamard", "type": FormInputType.Str},
+]
 
 
 class SettingsDialog(QDialog):
@@ -38,144 +112,53 @@ class SettingsDialog(QDialog):
         super().__init__(main_window)
         self.main_window = main_window
         self.setWindowTitle("Settings")
+
         self.settings = QSettings("zxlive", "zxlive")
-        self.value_dict: Dict[str,QWidget] = {}
+        self.value_dict: Dict[str, QWidget] = {}
+        self.prev_color_scheme = self.get_settings_value("color-scheme", str)
+        self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
 
         layout = QVBoxLayout()
-        self.setLayout(layout)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        self.setLayout(layout)
 
         tab_widget = QTabWidget()
         layout.addWidget(tab_widget)
 
-        ##### General settings #####
-        panel_base_settings = QWidget()
-        vlayout = QVBoxLayout()
-        panel_base_settings.setLayout(vlayout)
-        tab_widget.addTab(panel_base_settings, "General")
-        vlayout.addWidget(QLabel("General ZXLive settings"))
-        form_general = QFormLayout()
-        w = QWidget()
-        w.setLayout(form_general)
-        vlayout.addWidget(w)
-        self.add_setting(form_general, "path/custom-rules", "Custom rules path", 'folder')
-        self.add_setting(form_general, "color-scheme", "Color scheme", 'combo',data=color_schemes)
-        self.add_setting(form_general, "tab-bar-location", "Tab bar location", 'combo', data={
-            QTabWidget.TabPosition.North: "Top", QTabWidget.TabPosition.South: "Bottom",
-            QTabWidget.TabPosition.West: "Left", QTabWidget.TabPosition.East: "Right"})
-        self.add_setting(form_general, "snap-granularity", "Snap-to-grid granularity", 'combo',
-                         data = {'2': "2", '4': "4", '8': "8", '16': "16"})
-        self.add_setting(form_general, "input-circuit-format", "Input Circuit as", 'combo', data=input_circuit_formats)
-        self.prev_color_scheme = self.settings.value("color-scheme")
-        self.prev_tab_bar_location = self.settings.value("tab-bar-location")
-        vlayout.addStretch()
+        self.add_settings_tab(tab_widget, "General", "Tikz rule name settings", general_settings)
 
-        ##### Tikz Export settings #####
-        panel_tikz_export = QWidget()
-        vlayout = QVBoxLayout()
-        panel_tikz_export.setLayout(vlayout)
-        tab_widget.addTab(panel_tikz_export, "Tikz export")
+        self.add_settings_tab(tab_widget, "Tikz rule names", "General ZXLive settings", tikz_rule_name_settings)
 
-        vlayout.addWidget(QLabel("Tikz export settings"))
-        vlayout.addWidget(QLabel("These are the class names that will be used when exporting to tikz."))
+        self.add_settings_tab(tab_widget, "Tikz export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
 
-        form_export = QFormLayout()
-        w = QWidget()
-        w.setLayout(form_export)
-        vlayout.addWidget(w)
-        vlayout.addStretch()
+        self.add_settings_tab(tab_widget, "Tikz import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
 
-        self.add_setting(form_export, "tikz/Z-spider-export", "Z-spider", 'str')
-        self.add_setting(form_export, "tikz/Z-phase-export", "Z-spider with phase", 'str')
-        self.add_setting(form_export, "tikz/X-spider-export", "X-spider", 'str')
-        self.add_setting(form_export, "tikz/X-phase-export", "X-spider with phase", 'str')
-        self.add_setting(form_export, "tikz/Hadamard-export", "Hadamard", 'str')
-        self.add_setting(form_export, "tikz/boundary-export", "Boundary", 'str')
-        self.add_setting(form_export, "tikz/edge-export", "Regular Edge", 'str')
-        self.add_setting(form_export, "tikz/edge-H-export", "Hadamard edge", 'str')
+        self.add_settings_tab(tab_widget, "Tikz layout",  "Tikz layout settings", tikz_layout_settings)
 
-        self.add_setting(form_export, "tikz/w-input-export", "W input", 'str')
-        self.add_setting(form_export, "tikz/w-output-export", "W output", 'str')
-        self.add_setting(form_export, "tikz/z-box-export", "Z box", 'str')
-        self.add_setting(form_export, "tikz/edge-W-export", "W io edge", 'str')
+        self.init_okay_cancle_buttons(layout)
 
+    def get_settings_value(self, arg: str, _type: Type[T], default: T | None = None) -> T:
+        if not isinstance(val := self.settings.value(arg, default), _type) and default is None:
+            raise ValueError(f"Unexpected _type for {val}: expected {_type}, got {type(val)}")
+        return val
 
-        ##### Tikz Import settings #####
-        panel_tikz_import = QWidget()
-        vlayout = QVBoxLayout()
-        panel_tikz_import.setLayout(vlayout)
-        tab_widget.addTab(panel_tikz_import, "Tikz import")
-
-        vlayout.addWidget(QLabel("Tikz import settings"))
-        vlayout.addWidget(QLabel("These are the class names that are understood when importing from tikz."))
-
-        form_import = QFormLayout()
-        w = QWidget()
-        w.setLayout(form_import)
-        vlayout.addWidget(w)
-        vlayout.addStretch()
-
-        self.add_setting(form_import, "tikz/Z-spider-import", "Z-spider", 'str')
-        self.add_setting(form_import, "tikz/X-spider-import", "X-spider", 'str')
-        self.add_setting(form_import, "tikz/Hadamard-import", "Hadamard", 'str')
-        self.add_setting(form_import, "tikz/boundary-import", "Boundary", 'str')
-        self.add_setting(form_import, "tikz/edge-import", "Regular Edge", 'str')
-        self.add_setting(form_import, "tikz/edge-H-import", "Hadamard edge", 'str')
-
-        self.add_setting(form_import, "tikz/w-input-import", "W input", 'str')
-        self.add_setting(form_import, "tikz/w-output-import", "W output", 'str')
-        self.add_setting(form_import, "tikz/z-box-import", "Z box", 'str')
-        self.add_setting(form_import, "tikz/edge-W-import", "W io edge", 'str')
-
-        ##### Tikz Layout settings #####
-        panel_tikz_layout = QWidget()
-        vlayout = QVBoxLayout()
-        panel_tikz_layout.setLayout(vlayout)
-        tab_widget.addTab(panel_tikz_layout, "Tikz layout")
-
-        vlayout.addWidget(QLabel("Tikz layout settings"))
-
-        form_layout = QFormLayout()
-        w = QWidget()
-        w.setLayout(form_layout)
-        vlayout.addWidget(w)
-        vlayout.addStretch()
-
-        self.add_setting(form_layout, "tikz/layout/hspace", "Horizontal spacing", "float")
-        self.add_setting(form_layout, "tikz/layout/vspace", "Vertical spacing", "float")
-        self.add_setting(form_layout, "tikz/layout/max-width", "Maximum width", 'float')
-
-
-        ##### Tikz rule name settings #####
+    def add_settings_tab(self, tab_widget: QTabWidget, tab_name: str, label: str, data: list[SettingsData]) -> None:
         panel_tikz_names = QWidget()
         vlayout = QVBoxLayout()
         panel_tikz_names.setLayout(vlayout)
-        tab_widget.addTab(panel_tikz_names, "Tikz rule names")
-
-        vlayout.addWidget(QLabel("Tikz rule name settings"))
-        vlayout.addWidget(QLabel("Mapping of pyzx rule names to tikz display strings"))
-
+        tab_widget.addTab(panel_tikz_names, tab_name)
+        vlayout.addWidget(QLabel(label))
         form_names = QFormLayout()
         w = QWidget()
         w.setLayout(form_names)
         vlayout.addWidget(w)
         vlayout.addStretch()
+        for d in data:
+            self.add_setting_to_form(form_names, d)
 
-        self.add_setting(form_names, "tikz/names/fuse spiders", "fuse spiders", "str")
-        self.add_setting(form_names, "tikz/names/bialgebra", "bialgebra", "str")
-        self.add_setting(form_names, "tikz/names/change color to Z", "change color to Z", "str")
-        self.add_setting(form_names, "tikz/names/change color to X", "change color to X", "str")
-        self.add_setting(form_names, "tikz/names/remove identity", "remove identity", "str")
-        self.add_setting(form_names, "tikz/names/Add Z identity", "add Z identity", "str")
-        self.add_setting(form_names, "tikz/names/copy 0/pi spider", "copy 0/pi spider", "str")
-        self.add_setting(form_names, "tikz/names/push Pauli", "push Pauli", "str")
-        self.add_setting(form_names, "tikz/names/decompose hadamard", "decompose hadamard", "str")
-
-
-
-        ##### Okay/Cancel Buttons #####
-        w= QWidget()
+    def init_okay_cancle_buttons(self, layout: QVBoxLayout) -> None:
+        w = QWidget()
         hlayout = QHBoxLayout()
         hlayout.addStretch()
         w.setLayout(hlayout)
@@ -187,49 +170,80 @@ class SettingsDialog(QDialog):
         cancel_button.clicked.connect(self.cancel)
         hlayout.addWidget(cancel_button)
 
+    def make_str_form_input(self, data: SettingsData) -> QLineEdit:
+        name = data["id"]
+        value = self.get_settings_value(name, str, defaults[name])
+        widget = QLineEdit()
+        widget.setText(value)
+        return widget
 
-    def add_setting(self,form:QFormLayout, name:str, label:str, ty:str, data: Optional[dict[Any, str]] = None) -> None:
-        val = self.settings.value(name)
-        widget: Union[QWidget, QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox]
-        if val is None: val = defaults[name]
-        if ty == 'str':
-            widget = QLineEdit()
-            val = str(val)
-            widget.setText(val)
-        elif ty == 'int':
-            widget = QSpinBox()
-            widget.setValue(int(val))  # type: ignore
-        elif ty == 'float':
-            widget = QDoubleSpinBox()
-            widget.setValue(float(val))  # type: ignore
-        elif ty == 'folder':
-            widget = QWidget()
-            hlayout = QHBoxLayout()
-            widget.setLayout(hlayout)
-            widget_line = QLineEdit()
-            widget_line.setText(str(val))
-            def browse() -> None:
-                directory = QFileDialog.getExistingDirectory(self,"Pick folder",options=QFileDialog.Option.ShowDirsOnly)
-                if directory:
-                    widget_line.setText(directory)
-                    setattr(widget, "text_value", directory)
-            hlayout.addWidget(widget_line)
-            button = QPushButton("Browse")
-            button.clicked.connect(browse)
-            hlayout.addWidget(button)
-        elif ty == 'combo':
-            widget = QComboBox()
-            assert data is not None
-            widget.addItems(list(data.values()))
-            widget.setCurrentText(data[val])
-            setattr(widget, "data", data)
+    def make_int_form_input(self, data: SettingsData) -> QSpinBox:
+        name = data["id"]
+        value = self.get_settings_value(name, int, defaults[name])
+        widget = QSpinBox()
+        widget.setValue(value)
+        return widget
 
+    def make_float_form_input(self, data: SettingsData) -> QDoubleSpinBox:
+        name = data["id"]
+        value = self.get_settings_value(name, float, defaults[name])
+        widget = QDoubleSpinBox()
+        widget.setValue(value)
+        return widget
 
-        form.addRow(label, widget)
-        self.value_dict[name] = widget
+    def make_folder_form_input(self, data: SettingsData) -> QWidget:
+        name = data["id"]
+        value = self.get_settings_value(name, str, defaults[name])
+        widget = QWidget()
+        hlayout = QHBoxLayout()
+        widget.setLayout(hlayout)
+        widget_line = QLineEdit()
+        widget_line.setText(value)
+
+        def browse() -> None:
+            directory = QFileDialog.getExistingDirectory(
+                self,"Pick folder", options=QFileDialog.Option.ShowDirsOnly
+            )
+            if directory:
+                widget_line.setText(directory)
+                setattr(widget, "text_value", directory)
+
+        hlayout.addWidget(widget_line)
+        button = QPushButton("Browse")
+        button.clicked.connect(browse)
+        hlayout.addWidget(button)
+        return widget
+
+    def make_combo_form_input(self, data: SettingsData) -> QComboBox:
+        name, _data = data["id"], data["data"]
+        value = self.get_settings_value(name, str, defaults[name])
+        widget = QComboBox()
+        widget.addItems(list(_data.values()))
+        widget.setCurrentText(_data[value])
+        setattr(widget, "data", _data)
+        return widget
+
+    def add_setting_to_form(self, form: QFormLayout, settings_data: SettingsData) -> None:
+        setting_maker = {
+            FormInputType.Str: self.make_str_form_input,
+            FormInputType.Int: self.make_int_form_input,
+            FormInputType.Float: self.make_float_form_input,
+            FormInputType.Folder: self.make_folder_form_input,
+            FormInputType.Combo: self.make_combo_form_input,
+        }
+        setting_widget_maker = setting_maker[settings_data["type"]]
+        widget: QWidget = setting_widget_maker(settings_data)
+
+        form.addRow(settings_data["label"], widget)
+        self.value_dict[settings_data["id"]] = widget
 
     def okay(self) -> None:
-        for name,widget in self.value_dict.items():
+        self.update_global_settings()
+        self.apply_global_settings()
+        self.accept()
+
+    def update_global_settings(self) -> None:
+        for name, widget in self.value_dict.items():
             if isinstance(widget, QLineEdit):
                 self.settings.setValue(name, widget.text())
             elif isinstance(widget, QSpinBox):
@@ -243,23 +257,20 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, val)
             elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
                 self.settings.setValue(name, widget.text_value)
-        set_pyzx_tikz_settings()
         setting.update()
-        if self.settings.value("color-scheme") != self.prev_color_scheme:
-            theme = self.settings.value("color-scheme")
-            assert isinstance(theme, str)
+
+    def apply_global_settings(self) -> None:
+        set_pyzx_tikz_settings()
+        theme = self.get_settings_value("color-scheme", str)
+        if theme != self.prev_color_scheme:
             colors.set_color_scheme(theme)
             self.main_window.update_colors()
-        if self.settings.value("tab-bar-location") != self.prev_tab_bar_location:
-            pos = self.settings.value("tab-bar-location")
-            assert isinstance(pos, QTabWidget.TabPosition)
+        pos = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        if pos != self.prev_tab_bar_location:
             self.main_window.tab_widget.setTabPosition(pos)
-        self.accept()
 
     def cancel(self) -> None:
         self.reject()
-
-
 
 
 def open_settings_dialog(parent: MainWindow) -> None:
