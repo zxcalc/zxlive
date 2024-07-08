@@ -86,7 +86,7 @@ defaults = general_defaults | tikz_export_defaults | tikz_import_defaults \
            | tikz_layout_defaults | tikz_names_defaults
 
 
-moder_red_green: ColorScheme = {
+modern_red_green: ColorScheme = {
     "id": 'modern-red-green',
     "label": "Modern Red & Green",
     "z_spider": QColor("#ccffcc"),
@@ -104,7 +104,7 @@ moder_red_green: ColorScheme = {
     "outline": QColor("#000000"),
 }
 
-classic_red_green: ColorScheme = moder_red_green | {
+classic_red_green: ColorScheme = modern_red_green | {
     "id": "classic-red-green",
     "label": "Classic Red & Green",
     "z_spider": QColor("#00ff00"),
@@ -113,7 +113,7 @@ classic_red_green: ColorScheme = moder_red_green | {
     "x_spider_pressed": QColor("#dd0b00"),
 }
 
-white_gray: ColorScheme = moder_red_green | {
+white_gray: ColorScheme = modern_red_green | {
     "id": 'white-grey',
     "label": "Dodo book White & Grey",
     "z_spider": QColor("#ffffff"),
@@ -134,7 +134,7 @@ gidney: ColorScheme = white_gray | {
 }
 
 color_schemes = {
-    scheme["id"]: scheme for scheme in [moder_red_green, classic_red_green, white_gray, gidney]
+    scheme["id"]: scheme for scheme in [modern_red_green, classic_red_green, white_gray, gidney]
 }
 
 color_scheme_ids = list(color_schemes.keys())

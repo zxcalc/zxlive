@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import TYPE_CHECKING, Dict, Any, TypeVar, Type, overload
+from typing import TYPE_CHECKING, Dict, Any, Type
 from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
@@ -74,7 +74,7 @@ general_settings: list[SettingsData] = [
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
-    {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grpid_data},
+    {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
 ]
 
