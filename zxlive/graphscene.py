@@ -180,6 +180,8 @@ class GraphScene(QGraphicsScene):
     def update_edge_curves(self, s: VT, t: VT) -> None:
         edges = []
         for e in set(self.g.edges(s, t)):
+            if e not in self.edge_map:
+                continue
             for i in self.edge_map[e]:
                 edges.append(self.edge_map[e][i])
         midpoint_index = 0.5 * (len(edges) - 1)
