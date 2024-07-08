@@ -243,12 +243,16 @@ class MainWindow(QMainWindow):
         self.settings.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
-    def undo(self,e: QEvent) -> None:
-        if self.active_panel is None: return
+    def undo(self, e: QEvent) -> None:
+        if self.active_panel is None:
+            e.ignore()
+            return
         self.active_panel.undo_stack.undo()
 
-    def redo(self,e: QEvent) -> None:
-        if self.active_panel is None: return
+    def redo(self, e: QEvent) -> None:
+        if self.active_panel is None:
+            e.ignore()
+            return
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean:bool) -> None:

@@ -133,6 +133,8 @@ class GraphView(QGraphicsView):
                 self.wand_path.show()
                 if self.sparkle_mode:
                     self.sparkles.emit_sparkles(pos, 10)
+            else:
+                e.ignore()
         else:
             e.ignore()
 
@@ -165,7 +167,8 @@ class GraphView(QGraphicsView):
                             if item not in self.wand_trace.hit:
                                 self.wand_trace.hit[item] = []
                             self.wand_trace.hit[item].append(ipos)
-
+            else:
+                e.ignore()
         else:
             e.ignore()
 
@@ -200,6 +203,8 @@ class GraphView(QGraphicsView):
                     self.wand_path = None
                     self.wand_trace_finished.emit(self.wand_trace)
                     self.wand_trace = None
+                else:
+                    e.ignore()
         else:
             e.ignore()
 
@@ -364,6 +369,7 @@ class Sparkles(QObject):
 
     def timerEvent(self, event: QTimerEvent) -> None:
         if event.timerId() != self.timer_id:
+            event.ignore()
             return
         for sparkle in self.sparkles:
             sparkle.timer_step()

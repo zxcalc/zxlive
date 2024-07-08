@@ -260,6 +260,7 @@ class VItem(QGraphicsPathItem):
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(e)
         if self.is_animated:
+            e.ignore()
             return
         scene = self.scene()
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
@@ -268,12 +269,14 @@ class VItem(QGraphicsPathItem):
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
         if self.is_animated:
+            e.ignore()
             return
         self._old_pos = self.pos()
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         if self.is_animated:
+            e.ignore()
             return
         scene = self.scene()
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
@@ -287,6 +290,7 @@ class VItem(QGraphicsPathItem):
         elif self.is_dragging and self.ty == VertexType.W_INPUT:
             w_out = get_w_partner_vitem(self)
             if w_out is None:
+                e.ignore()
                 return
             w_out.set_vitem_rotation()
         if self.is_dragging and len(scene.selectedItems()) == 1:
@@ -316,6 +320,7 @@ class VItem(QGraphicsPathItem):
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)
         if self.is_animated:
+            e.ignore()
             return
         if e.button() == Qt.MouseButton.LeftButton:
             if self._old_pos != self.pos():
@@ -343,6 +348,8 @@ class VItem(QGraphicsPathItem):
                     scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
                 self._dragged_on = None
                 self._old_pos = None
+            else:
+                e.ignore()
         else:
             e.ignore()
 
