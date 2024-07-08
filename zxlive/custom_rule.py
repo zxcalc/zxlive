@@ -314,6 +314,12 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.Graph, boundary_vertex_map
         area = 1.
     k = (area ** 0.5) / len(rhs_graph)
     ret: dict[NodeView, tuple[float, float]] = nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
+    # if the node type in ret is W_INPUT, move it next to the W_OUTPUT node
+    for v in ret:
+        if rhs_graph.nodes()[v]['type'] == VertexType.W_INPUT:
+            w_out = next((n for n in rhs_graph.neighbors(v) if rhs_graph.edges()[(v, n)]['type'] == EdgeType.W_IO), None)
+            if w_out and rhs_graph.nodes()[w_out]['type'] == VertexType.W_OUTPUT:
+                ret[v] = (ret[w_out][0] - 0.3, ret[w_out][1])
     return ret
 
 
