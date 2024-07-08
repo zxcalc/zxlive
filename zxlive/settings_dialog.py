@@ -49,7 +49,7 @@ class SettingsData(TypedDict):
     id: str
     label: str
     type: FormInputType
-    data: NotRequired[Any]
+    data: NotRequired[dict[Any, str]]
 
 
 color_scheme_data = {
@@ -215,6 +215,7 @@ class SettingsDialog(QDialog):
         return widget_line
 
     def make_combo_form_input(self, data: SettingsData) -> QComboBox:
+        assert "data" in data
         name, _data = data["id"], data["data"]
         value = self.settings.value(name, defaults[name])
         widget = QComboBox()
