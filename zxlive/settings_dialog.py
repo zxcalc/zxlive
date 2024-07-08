@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import TYPE_CHECKING, Dict, Any, Type
+from typing import TYPE_CHECKING, Dict, Any
+
+from PySide6.QtGui import QIcon
 from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
@@ -26,7 +28,7 @@ from PySide6.QtWidgets import (
     QComboBox
 )
 
-from .common import get_settings_value, T
+from .common import get_settings_value, T, get_data
 from .settings import (
     refresh_pyzx_tikz_settings, defaults, display_setting, color_schemes
 )
@@ -137,34 +139,28 @@ class SettingsDialog(QDialog):
         layout.addWidget(tab_widget)
 
         self.add_settings_tab(tab_widget, "General", "Tikz rule name settings", general_settings)
-
         self.add_settings_tab(tab_widget, "Tikz rule names", "General ZXLive settings", tikz_rule_name_settings)
-
         self.add_settings_tab(tab_widget, "Tikz export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
-
         self.add_settings_tab(tab_widget, "Tikz import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
-
         self.add_settings_tab(tab_widget, "Tikz layout",  "Tikz layout settings", tikz_layout_settings)
 
         self.init_okay_cancel_buttons(layout)
 
-    def get_settings_value(self, arg: str, _type: Type[T], default: T | None = None) -> T:
+    def get_settings_value(self, arg: str, _type: type[T], default: T | None = None) -> T:
         return get_settings_value(arg, _type, default, self.settings)
 
-    def get_settings_from_data(self, data: SettingsData, _type: Type[T]) -> T:
+    def get_settings_from_data(self, data: SettingsData, _type: type[T]) -> T:
         name = data["id"]
         assert isinstance(default := defaults[name], _type)
         return self.get_settings_value(name, _type, default)
 
 
     def add_settings_tab(self, tab_widget: QTabWidget, tab_name: str, label: str, data: list[SettingsData]) -> None:
-        panel_tikz_names = QWidget()
-        vlayout = QVBoxLayout()
+        panel_tikz_names, vlayout = QWidget(), QVBoxLayout()
         panel_tikz_names.setLayout(vlayout)
         tab_widget.addTab(panel_tikz_names, tab_name)
         vlayout.addWidget(QLabel(label))
-        form_names = QFormLayout()
-        w = QWidget()
+        form_names, w = QFormLayout(), QWidget()
         w.setLayout(form_names)
         vlayout.addWidget(w)
         vlayout.addStretch()
@@ -172,8 +168,7 @@ class SettingsDialog(QDialog):
             self.add_setting_to_form(form_names, d)
 
     def init_okay_cancel_buttons(self, layout: QVBoxLayout) -> None:
-        w = QWidget()
-        hlayout = QHBoxLayout()
+        w, hlayout = QWidget(), QHBoxLayout()
         hlayout.addStretch()
         w.setLayout(hlayout)
         layout.addWidget(w)
@@ -199,15 +194,9 @@ class SettingsDialog(QDialog):
         widget.setValue(self.get_settings_from_data(data, float))
         return widget
 
-    def make_folder_form_input(self, data: SettingsData) -> QWidget:
-        name = data["id"]
-        assert isinstance(default := defaults[name], str)
-        value = self.get_settings_value(name, str, default)
-        widget = QWidget()
-        hlayout = QHBoxLayout()
-        widget.setLayout(hlayout)
+    def make_folder_form_input(self, data: SettingsData) -> QLineEdit:
         widget_line = QLineEdit()
-        widget_line.setText(value)
+        widget_line.setText(self.get_settings_from_data(data, str))
 
         def browse() -> None:
             directory = QFileDialog.getExistingDirectory(
@@ -215,21 +204,23 @@ class SettingsDialog(QDialog):
             )
             if directory:
                 widget_line.setText(directory)
-                setattr(widget, "text_value", directory)
 
-        hlayout.addWidget(widget_line)
-        button = QPushButton("Browse")
-        button.clicked.connect(browse)
-        hlayout.addWidget(button)
-        return widget
+        action = widget_line.addAction(
+            QIcon(get_data("icons/folder.svg")),QLineEdit.ActionPosition.TrailingPosition
+        )
+        action.setToolTip("Browse...")
+        action.triggered.connect(browse)
+        # It would be nice to highlight the icon on hover
+
+        return widget_line
 
     def make_combo_form_input(self, data: SettingsData) -> QComboBox:
         name, _data = data["id"], data["data"]
         value = self.settings.value(name, defaults[name])
         widget = QComboBox()
-        widget.addItems(list(_data.values()))
+        for k, v in _data.items():
+            widget.addItem(v, userData=k)
         widget.setCurrentText(_data[value])
-        setattr(widget, "data", _data)
         return widget
 
     def add_setting_to_form(self, form: QFormLayout, settings_data: SettingsData) -> None:
@@ -260,12 +251,7 @@ class SettingsDialog(QDialog):
             elif isinstance(widget, QDoubleSpinBox):
                 self.settings.setValue(name, widget.value())
             elif isinstance(widget, QComboBox):
-                s = widget.currentText()
-                assert hasattr(widget, "data")
-                val = next(k for k in widget.data if widget.data[k] == s)
-                self.settings.setValue(name, val)
-            elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
-                self.settings.setValue(name, widget.text_value)
+                self.settings.setValue(name, widget.currentData())
         display_setting.update()
 
     def apply_global_settings(self) -> None:
