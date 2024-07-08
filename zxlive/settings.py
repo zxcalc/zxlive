@@ -85,12 +85,6 @@ tikz_names_defaults: dict[str, str] = {
 defaults = general_defaults | tikz_export_defaults | tikz_import_defaults \
            | tikz_layout_defaults | tikz_names_defaults
 
-input_circuit_formats = {
-    'openqasm': "standard OpenQASM",
-    'sqasm': "Spider QASM",
-    'sqasm-no-simplification': "Spider QASM (no simplification)",
-}
-
 
 moder_red_green: ColorsScheme = {
     "id": 'modern-red-green',
@@ -183,7 +177,7 @@ def refresh_pyzx_tikz_settings() -> None:
     pyzx.tikz.synonyms_wedge = _get_synonyms('tikz/edge-W-import', pyzx.tikz.synonyms_wedge)
 
 
-class DisplaySettings(object):
+class DisplaySettings:
     SNAP_DIVISION = 4  # Should be an integer dividing SCALE
 
     def __init__(self, scheme_id: str) -> None:

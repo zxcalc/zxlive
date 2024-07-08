@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import TYPE_CHECKING, Dict, Any, TypeVar, Type
+from typing import TYPE_CHECKING, Dict, Any, TypeVar, Type, overload
 from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
@@ -28,8 +28,7 @@ from PySide6.QtWidgets import (
 
 from .common import get_settings_value, T
 from .settings import (
-    refresh_pyzx_tikz_settings, input_circuit_formats, defaults,
-    display_setting, color_schemes
+    refresh_pyzx_tikz_settings, defaults, display_setting, color_schemes
 )
 
 if TYPE_CHECKING:
@@ -63,6 +62,13 @@ tab_positioning_data = {
 }
 
 snap_to_grpid_data = {'2': "2", '4': "4", '8': "8", '16': "16"}
+
+input_circuit_formats = {
+    'openqasm': "standard OpenQASM",
+    'sqasm': "Spider QASM",
+    'sqasm-no-simplification': "Spider QASM (no simplification)",
+}
+
 
 general_settings: list[SettingsData] = [
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
@@ -145,6 +151,12 @@ class SettingsDialog(QDialog):
     def get_settings_value(self, arg: str, _type: Type[T], default: T | None = None) -> T:
         return get_settings_value(arg, _type, default, self.settings)
 
+    def get_settings_from_data(self, data: SettingsData, _type: Type[T]) -> T:
+        name = data["id"]
+        assert isinstance(default := defaults[name], _type)
+        return self.get_settings_value(name, _type, default)
+
+
     def add_settings_tab(self, tab_widget: QTabWidget, tab_name: str, label: str, data: list[SettingsData]) -> None:
         panel_tikz_names = QWidget()
         vlayout = QVBoxLayout()
@@ -173,27 +185,18 @@ class SettingsDialog(QDialog):
         hlayout.addWidget(cancel_button)
 
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
-        name = data["id"]
-        assert isinstance(default := defaults[name], str)
-        value: str = self.get_settings_value(name, str, default)
         widget = QLineEdit()
-        widget.setText(value)
+        widget.setText(self.get_settings_from_data(data, str))
         return widget
 
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
-        name = data["id"]
-        assert isinstance(default := defaults[name], int)
-        value: int = self.get_settings_value(name, int, default)
         widget = QSpinBox()
-        widget.setValue(value)
+        widget.setValue(self.get_settings_from_data(data, int))
         return widget
 
     def make_float_form_input(self, data: SettingsData) -> QDoubleSpinBox:
-        name = data["id"]
-        assert isinstance(default := defaults[name], float)
-        value = self.get_settings_value(name, float, default)
         widget = QDoubleSpinBox()
-        widget.setValue(value)
+        widget.setValue(self.get_settings_from_data(data, float))
         return widget
 
     def make_folder_form_input(self, data: SettingsData) -> QWidget:

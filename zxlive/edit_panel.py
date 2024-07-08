@@ -17,7 +17,7 @@ from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
-from .settings import input_circuit_formats
+from .settings_dialog import input_circuit_formats
 
 
 class GraphEditPanel(EditorBasePanel):
