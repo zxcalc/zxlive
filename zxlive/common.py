@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import os
 from enum import IntEnum
-from typing import Final, Optional
+from typing import Final, Optional, TypeVar, Type
 
 from pyzx import EdgeType
 from typing_extensions import TypeAlias
@@ -12,8 +14,20 @@ import pyzx
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
+T = TypeVar('T')
+
+
 def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
+
+
+def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
+    _settings = settings or QSettings("zxlive", "zxlive")
+    if not isinstance(val := _settings.value(arg, default), _type):
+        if default is not None:
+            return default
+        raise ValueError(f"Unexpected type for {val}: expected {_type}, got {type(val)}")
+    return val
 
 def get_custom_rules_path() -> str:
     settings = QSettings("zxlive", "zxlive")
@@ -35,19 +49,6 @@ class ToolType(IntEnum):
     EDGE = 2
 
 SCALE: Final = 64.0
-
-
-class Settings(object):
-    SNAP_DIVISION = 4  # Should be an integer dividing SCALE
-
-    def __init__(self) -> None:
-        self.update()
-
-    def update(self) -> None:
-        self.SNAP_DIVISION = int(type_safe_settings_value("snap-granularity"))
-        self.SNAP = SCALE / self.SNAP_DIVISION
-
-setting = Settings()
 
 # Offsets should be a multiple of SCALE for grid snapping to work properly
 OFFSET_X: Final = 300 * SCALE

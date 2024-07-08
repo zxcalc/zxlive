@@ -7,64 +7,12 @@ from PySide6.QtCore import QSettings
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QTabWidget
 
-general_defaults: Dict[str, Any] = {
-    "path/custom-rules": "lemmas/",
-    "color-scheme": "modern-red-green",
-    "tab-bar-location": QTabWidget.TabPosition.North,
-    "snap-granularity": 4,
-    "input-circuit-format": 'openqasm',
-}
-
-tikz_defaults: dict[str, str | float] = {
-    "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
-    "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
-    "tikz/X-spider-export": pyzx.settings.tikz_classes['X'],
-    "tikz/Z-phase-export": pyzx.settings.tikz_classes['Z phase'],
-    "tikz/X-phase-export": pyzx.settings.tikz_classes['X phase'],
-    "tikz/z-box-export": pyzx.settings.tikz_classes['Z box'],
-    "tikz/Hadamard-export": pyzx.settings.tikz_classes['H'],
-    "tikz/w-output-export": pyzx.settings.tikz_classes['W'],
-    "tikz/w-input-export": pyzx.settings.tikz_classes['W input'],
-    "tikz/edge-export": pyzx.settings.tikz_classes['edge'],
-    "tikz/edge-H-export": pyzx.settings.tikz_classes['H-edge'],
-    "tikz/edge-W-export": pyzx.settings.tikz_classes['W-io-edge'],
-
-    "tikz/boundary-import": ", ".join(pyzx.tikz.synonyms_boundary),
-    "tikz/Z-spider-import": ", ".join(pyzx.tikz.synonyms_z),
-    "tikz/X-spider-import": ", ".join(pyzx.tikz.synonyms_x),
-    "tikz/Hadamard-import": ", ".join(pyzx.tikz.synonyms_hadamard),
-    "tikz/w-input-import": ", ".join(pyzx.tikz.synonyms_w_input),
-    "tikz/w-output-import": ", ".join(pyzx.tikz.synonyms_w_output),
-    "tikz/z-box-import": ", ".join(pyzx.tikz.synonyms_z_box),
-    "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
-    "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
-    "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
-
-    "tikz/layout/hspace": 2.0,
-    "tikz/layout/vspace": 2.0,
-    "tikz/layout/max-width": 10.0,
-
-    "tikz/names/fuse spiders": "f",
-    "tikz/names/bialgebra": "b",
-    "tikz/names/change color to Z": "cc",
-    "tikz/names/change color to X": "cc",
-    "tikz/names/remove identity": "id",
-    "tikz/names/Add Z identity": "id",
-    "tikz/names/copy 0/pi spider": "cp",
-    "tikz/names/push Pauli": "pi",
-    "tikz/names/decompose hadamard": "eu",
-}
-
-input_circuit_formats = {
-    'openqasm': "standard OpenQASM",
-    'sqasm': "Spider QASM",
-    'sqasm-no-simplification': "Spider QASM (no simplification)",
-}
+from common import get_settings_value, SCALE
 
 
 class ColorsScheme(TypedDict):
     id: str
-    name: str
+    label: str
     z_spider: QColor
     z_spider_pressed: QColor
     x_spider: QColor
@@ -80,59 +28,125 @@ class ColorsScheme(TypedDict):
     outline: QColor
 
 
+general_defaults: Dict[str, str | QTabWidget.TabPosition | int] = {
+    "path/custom-rules": "lemmas/",
+    "color-scheme": "modern-red-green",
+    "tab-bar-location": QTabWidget.TabPosition.North,
+    "snap-granularity": '4',
+    "input-circuit-format": 'openqasm',
+}
+
+tikz_export_defaults: dict[str, str] = {
+    "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
+    "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
+    "tikz/X-spider-export": pyzx.settings.tikz_classes['X'],
+    "tikz/Z-phase-export": pyzx.settings.tikz_classes['Z phase'],
+    "tikz/X-phase-export": pyzx.settings.tikz_classes['X phase'],
+    "tikz/z-box-export": pyzx.settings.tikz_classes['Z box'],
+    "tikz/Hadamard-export": pyzx.settings.tikz_classes['H'],
+    "tikz/w-output-export": pyzx.settings.tikz_classes['W'],
+    "tikz/w-input-export": pyzx.settings.tikz_classes['W input'],
+    "tikz/edge-export": pyzx.settings.tikz_classes['edge'],
+    "tikz/edge-H-export": pyzx.settings.tikz_classes['H-edge'],
+    "tikz/edge-W-export": pyzx.settings.tikz_classes['W-io-edge'],
+}
+
+tikz_import_defaults: dict[str, str] = {
+    "tikz/boundary-import": ", ".join(pyzx.tikz.synonyms_boundary),
+    "tikz/Z-spider-import": ", ".join(pyzx.tikz.synonyms_z),
+    "tikz/X-spider-import": ", ".join(pyzx.tikz.synonyms_x),
+    "tikz/Hadamard-import": ", ".join(pyzx.tikz.synonyms_hadamard),
+    "tikz/w-input-import": ", ".join(pyzx.tikz.synonyms_w_input),
+    "tikz/w-output-import": ", ".join(pyzx.tikz.synonyms_w_output),
+    "tikz/z-box-import": ", ".join(pyzx.tikz.synonyms_z_box),
+    "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
+    "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
+    "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
+}
+
+tikz_layout_defaults: dict[str, float] = {
+    "tikz/layout/hspace": 2.0,
+    "tikz/layout/vspace": 2.0,
+    "tikz/layout/max-width": 10.0,
+}
+
+tikz_names_defaults: dict[str, str] = {
+    "tikz/names/fuse spiders": "f",
+    "tikz/names/bialgebra": "b",
+    "tikz/names/change color to Z": "cc",
+    "tikz/names/change color to X": "cc",
+    "tikz/names/remove identity": "id",
+    "tikz/names/Add Z identity": "id",
+    "tikz/names/copy 0/pi spider": "cp",
+    "tikz/names/push Pauli": "pi",
+    "tikz/names/decompose hadamard": "eu",
+}
+
+defaults = general_defaults | tikz_export_defaults | tikz_import_defaults \
+           | tikz_layout_defaults | tikz_names_defaults
+
+input_circuit_formats = {
+    'openqasm': "standard OpenQASM",
+    'sqasm': "Spider QASM",
+    'sqasm-no-simplification': "Spider QASM (no simplification)",
+}
+
+
 moder_red_green: ColorsScheme = {
     "id": 'modern-red-green',
-    "name": "Modern Red & Green",
-    "z_spider": "#ccffcc",
-    "z_spider_pressed": "#64BC90",
-    "x_spider": "#ff8888",
-    "x_spider_pressed": "#bb0f0f",
-    "hadamard": "#ffff00",
-    "hadamard_pressed": "#f1c232",
-    "boundary": "#000000",
-    "boundary_pressed": "#444444",
-    "w_input": "#000000",
-    "w_input_pressed": "#444444",
-    "w_output": "#000000",
-    "w_output_pressed": "#444444",
-    "outline": "#000000",
+    "label": "Modern Red & Green",
+    "z_spider": QColor("#ccffcc"),
+    "z_spider_pressed": QColor("#64BC90"),
+    "x_spider": QColor("#ff8888"),
+    "x_spider_pressed": QColor("#bb0f0f"),
+    "hadamard": QColor("#ffff00"),
+    "hadamard_pressed": QColor("#f1c232"),
+    "boundary": QColor("#000000"),
+    "boundary_pressed": QColor("#444444"),
+    "w_input": QColor("#000000"),
+    "w_input_pressed": QColor("#444444"),
+    "w_output": QColor("#000000"),
+    "w_output_pressed": QColor("#444444"),
+    "outline": QColor("#000000"),
 }
 
 classic_red_green: ColorsScheme = moder_red_green | {
     "id": "classic-red-green",
-    "name": "Classic Red & Green",
-    "z_spider": "#00ff00",
-    "z_spider_pressed": "#00dd00",
-    "x_spider": "#ff0d00",
-    "x_spider_pressed": "#dd0b00",
+    "label": "Classic Red & Green",
+    "z_spider": QColor("#00ff00"),
+    "z_spider_pressed": QColor("#00dd00"),
+    "x_spider": QColor("#ff0d00"),
+    "x_spider_pressed": QColor("#dd0b00"),
 }
 
 white_gray: ColorsScheme = moder_red_green | {
     "id": 'white-grey',
-    "name": "Dodo book White & Grey",
-    "z_spider": "#ffffff",
-    "z_spider_pressed": "#eeeeee",
-    "x_spider": "#b4b4b4",
-    "x_spider_pressed": "#a0a0a0",
-    "hadamard": "#ffffff",
-    "hadamard_pressed": "#dddddd",
+    "label": "Dodo book White & Grey",
+    "z_spider": QColor("#ffffff"),
+    "z_spider_pressed": QColor("#eeeeee"),
+    "x_spider": QColor("#b4b4b4"),
+    "x_spider_pressed": QColor("#a0a0a0"),
+    "hadamard": QColor("#ffffff"),
+    "hadamard_pressed": QColor("#dddddd"),
 }
 
 gidney: ColorsScheme = white_gray | {
     "id": 'gidney',
-    "name": "Gidney's Black & White",
-    "z_spider": "#000000",
-    "z_spider_pressed": "#222222",
-    "x_spider": "#ffffff",
-    "x_spider_pressed": "#dddddd",
+    "label": "Gidney's Black & White",
+    "z_spider": QColor("#000000"),
+    "z_spider_pressed": QColor("#222222"),
+    "x_spider": QColor("#ffffff"),
+    "x_spider_pressed": QColor("#dddddd"),
 }
 
 color_schemes = {
     scheme["id"]: scheme for scheme in [moder_red_green, classic_red_green, white_gray, gidney]
 }
 
+color_scheme_ids = list(color_schemes.keys())
 
-def load_tikz_classes():
+
+def load_tikz_classes() -> dict[str, str]:
     return {
         'boundary': str(settings.value('tikz/boundary-export', pyzx.settings.tikz_classes['boundary'])),
         'Z': str(settings.value('tikz/Z-spider-export', pyzx.settings.tikz_classes['Z'])),
@@ -169,12 +183,28 @@ def refresh_pyzx_tikz_settings() -> None:
     pyzx.tikz.synonyms_wedge = _get_synonyms('tikz/edge-W-import', pyzx.tikz.synonyms_wedge)
 
 
+class DisplaySettings(object):
+    SNAP_DIVISION = 4  # Should be an integer dividing SCALE
+
+    def __init__(self, scheme_id: str) -> None:
+        self.colors = color_schemes[scheme_id]
+        self.update()
+
+    def set_color_scheme(self, scheme_id: str) -> None:
+        self.colors = color_schemes[scheme_id]
+
+    def update(self) -> None:
+        self.SNAP_DIVISION = int(get_settings_value("snap-granularity", str))
+        self.SNAP = SCALE / self.SNAP_DIVISION
+
+
 # Initialise settings
 settings = QSettings("zxlive", "zxlive")
-for key, value in (general_defaults | tikz_defaults).items():
+for key, value in defaults.items():
     if not settings.contains(key):
         settings.setValue(key, value)
 
-colors = str(settings.value("color-scheme"))
-
 refresh_pyzx_tikz_settings()  # Call it once on startup
+
+
+display_setting = DisplaySettings(str(settings.value("color-scheme")))

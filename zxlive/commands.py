@@ -14,7 +14,8 @@ from pyzx.graph import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
-from .common import ET, VT, W_INPUT_OFFSET, GraphT, setting
+from .common import ET, VT, W_INPUT_OFFSET, GraphT
+from settings import display_setting
 from .eitem import EItem
 from .graphview import GraphView
 from .proof import ProofModel, ProofStepView, Rewrite
@@ -202,8 +203,8 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
-        x = round(self.x * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
+        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
+        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         self._added_vert = self.g.add_vertex(self.vty, y,x)
         self.update_graph_view()
 
@@ -224,8 +225,8 @@ class AddWNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
-        x = round(self.x * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
+        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
+        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, y - W_INPUT_OFFSET, self.x)
         self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, y, x)
         self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)

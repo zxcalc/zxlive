@@ -26,14 +26,14 @@ from PySide6.QtWidgets import (
     QComboBox
 )
 
-from .settings import (set_pyzx_tikz_settings, colors, setting, color_schemes,
-                     input_circuit_formats, defaults)
+from .common import get_settings_value, T
+from .settings import (
+    refresh_pyzx_tikz_settings, input_circuit_formats, defaults,
+    display_setting, color_schemes
+)
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
-
-
-T = TypeVar('T')
 
 
 class FormInputType(IntEnum):
@@ -48,8 +48,12 @@ class SettingsData(TypedDict):
     id: str
     label: str
     type: FormInputType
-    data: NotRequired[dict[Any, str]]
+    data: NotRequired[Any]
 
+
+color_scheme_data = {
+    id: scheme["label"] for id, scheme in color_schemes.items()
+}
 
 tab_positioning_data = {
     QTabWidget.TabPosition.North: "Top",
@@ -62,7 +66,7 @@ snap_to_grpid_data = {'2': "2", '4': "4", '8': "8", '16': "16"}
 
 general_settings: list[SettingsData] = [
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
-    {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_schemes},
+    {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grpid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
@@ -139,9 +143,7 @@ class SettingsDialog(QDialog):
         self.init_okay_cancle_buttons(layout)
 
     def get_settings_value(self, arg: str, _type: Type[T], default: T | None = None) -> T:
-        if not isinstance(val := self.settings.value(arg, default), _type) and default is None:
-            raise ValueError(f"Unexpected _type for {val}: expected {_type}, got {type(val)}")
-        return val
+        return get_settings_value(arg, _type, default, self.settings)
 
     def add_settings_tab(self, tab_widget: QTabWidget, tab_name: str, label: str, data: list[SettingsData]) -> None:
         panel_tikz_names = QWidget()
@@ -172,28 +174,32 @@ class SettingsDialog(QDialog):
 
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
         name = data["id"]
-        value = self.get_settings_value(name, str, defaults[name])
+        assert isinstance(default := defaults[name], str)
+        value: str = self.get_settings_value(name, str, default)
         widget = QLineEdit()
         widget.setText(value)
         return widget
 
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
         name = data["id"]
-        value = self.get_settings_value(name, int, defaults[name])
+        assert isinstance(default := defaults[name], int)
+        value: int = self.get_settings_value(name, int, default)
         widget = QSpinBox()
         widget.setValue(value)
         return widget
 
     def make_float_form_input(self, data: SettingsData) -> QDoubleSpinBox:
         name = data["id"]
-        value = self.get_settings_value(name, float, defaults[name])
+        assert isinstance(default := defaults[name], float)
+        value = self.get_settings_value(name, float, default)
         widget = QDoubleSpinBox()
         widget.setValue(value)
         return widget
 
     def make_folder_form_input(self, data: SettingsData) -> QWidget:
         name = data["id"]
-        value = self.get_settings_value(name, str, defaults[name])
+        assert isinstance(default := defaults[name], str)
+        value = self.get_settings_value(name, str, default)
         widget = QWidget()
         hlayout = QHBoxLayout()
         widget.setLayout(hlayout)
@@ -216,7 +222,7 @@ class SettingsDialog(QDialog):
 
     def make_combo_form_input(self, data: SettingsData) -> QComboBox:
         name, _data = data["id"], data["data"]
-        value = self.get_settings_value(name, str, defaults[name])
+        value = self.settings.value(name, defaults[name])
         widget = QComboBox()
         widget.addItems(list(_data.values()))
         widget.setCurrentText(_data[value])
@@ -257,13 +263,13 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, val)
             elif isinstance(widget, QWidget) and hasattr(widget, "text_value"):
                 self.settings.setValue(name, widget.text_value)
-        setting.update()
+        display_setting.update()
 
     def apply_global_settings(self) -> None:
-        set_pyzx_tikz_settings()
+        refresh_pyzx_tikz_settings()
         theme = self.get_settings_value("color-scheme", str)
         if theme != self.prev_color_scheme:
-            colors.set_color_scheme(theme)
+            display_setting.set_color_scheme(theme)
             self.main_window.update_colors()
         pos = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
         if pos != self.prev_tab_bar_location:

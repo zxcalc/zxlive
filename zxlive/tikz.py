@@ -1,15 +1,15 @@
 from PySide6.QtCore import QSettings
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
-from .common import type_safe_settings_value
+from .common import get_settings_value
 from zxlive.proof import ProofModel
 
 
 def proof_to_tikz(proof: ProofModel) -> str:
     settings = QSettings("zxlive", "zxlive")
-    vspace = type_safe_settings_value("tikz/layout/vspace", float)
-    hspace = type_safe_settings_value("tikz/layout/hspace", float)
-    max_width = type_safe_settings_value("tikz/layout/max-width", float)
+    vspace = get_settings_value("tikz/layout/vspace", float, settings=settings)
+    hspace = get_settings_value("tikz/layout/hspace", float, settings=settings)
+    max_width = get_settings_value("tikz/layout/max-width", float, settings=settings)
     draw_scalar = False
 
     xoffset = -max_width
