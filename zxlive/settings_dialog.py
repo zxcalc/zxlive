@@ -138,8 +138,8 @@ class SettingsDialog(QDialog):
         tab_widget = QTabWidget()
         layout.addWidget(tab_widget)
 
-        self.add_settings_tab(tab_widget, "General", "Tikz rule name settings", general_settings)
-        self.add_settings_tab(tab_widget, "Tikz rule names", "General ZXLive settings", tikz_rule_name_settings)
+        self.add_settings_tab(tab_widget, "General", "General ZXLive settings", general_settings)
+        self.add_settings_tab(tab_widget, "Tikz rule names", "Tikz rule name settings", tikz_rule_name_settings)
         self.add_settings_tab(tab_widget, "Tikz export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
         self.add_settings_tab(tab_widget, "Tikz import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
         self.add_settings_tab(tab_widget, "Tikz layout",  "Tikz layout settings", tikz_layout_settings)
@@ -206,7 +206,7 @@ class SettingsDialog(QDialog):
                 widget_line.setText(directory)
 
         action = widget_line.addAction(
-            QIcon(get_data("icons/folder.svg")),QLineEdit.ActionPosition.TrailingPosition
+            QIcon(get_data("icons/folder.svg")), QLineEdit.ActionPosition.TrailingPosition
         )
         action.setToolTip("Browse...")
         action.triggered.connect(browse)
