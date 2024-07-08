@@ -61,7 +61,7 @@ tab_positioning_data = {
     QTabWidget.TabPosition.East: "Right"
 }
 
-snap_to_grpid_data = {'2': "2", '4': "4", '8': "8", '16': "16"}
+snap_to_grid_data = {'2': "2", '4': "4", '8': "8", '16': "16"}
 
 input_circuit_formats = {
     'openqasm': "standard OpenQASM",
@@ -146,7 +146,7 @@ class SettingsDialog(QDialog):
 
         self.add_settings_tab(tab_widget, "Tikz layout",  "Tikz layout settings", tikz_layout_settings)
 
-        self.init_okay_cancle_buttons(layout)
+        self.init_okay_cancel_buttons(layout)
 
     def get_settings_value(self, arg: str, _type: Type[T], default: T | None = None) -> T:
         return get_settings_value(arg, _type, default, self.settings)
@@ -171,7 +171,7 @@ class SettingsDialog(QDialog):
         for d in data:
             self.add_setting_to_form(form_names, d)
 
-    def init_okay_cancle_buttons(self, layout: QVBoxLayout) -> None:
+    def init_okay_cancel_buttons(self, layout: QVBoxLayout) -> None:
         w = QWidget()
         hlayout = QHBoxLayout()
         hlayout.addStretch()

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QTabWidget
 from .common import get_settings_value, SCALE
 
 
-class ColorsScheme(TypedDict):
+class ColorScheme(TypedDict):
     id: str
     label: str
     z_spider: QColor
@@ -86,7 +86,7 @@ defaults = general_defaults | tikz_export_defaults | tikz_import_defaults \
            | tikz_layout_defaults | tikz_names_defaults
 
 
-moder_red_green: ColorsScheme = {
+moder_red_green: ColorScheme = {
     "id": 'modern-red-green',
     "label": "Modern Red & Green",
     "z_spider": QColor("#ccffcc"),
@@ -104,7 +104,7 @@ moder_red_green: ColorsScheme = {
     "outline": QColor("#000000"),
 }
 
-classic_red_green: ColorsScheme = moder_red_green | {
+classic_red_green: ColorScheme = moder_red_green | {
     "id": "classic-red-green",
     "label": "Classic Red & Green",
     "z_spider": QColor("#00ff00"),
@@ -113,7 +113,7 @@ classic_red_green: ColorsScheme = moder_red_green | {
     "x_spider_pressed": QColor("#dd0b00"),
 }
 
-white_gray: ColorsScheme = moder_red_green | {
+white_gray: ColorScheme = moder_red_green | {
     "id": 'white-grey',
     "label": "Dodo book White & Grey",
     "z_spider": QColor("#ffffff"),
@@ -124,7 +124,7 @@ white_gray: ColorsScheme = moder_red_green | {
     "hadamard_pressed": QColor("#dddddd"),
 }
 
-gidney: ColorsScheme = white_gray | {
+gidney: ColorScheme = white_gray | {
     "id": 'gidney',
     "label": "Gidney's Black & White",
     "z_spider": QColor("#000000"),
