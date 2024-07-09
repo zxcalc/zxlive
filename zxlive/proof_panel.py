@@ -340,16 +340,19 @@ class ProofPanel(BasePanel):
         phase_left = QVector2D.dotProduct(QVector2D(mouse_dir), avg_left) \
             >= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
 
-        new_g = copy.deepcopy(self.graph)
+        new_g: GraphT = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v),
                                      qubit=self.graph.qubit(v) + dist*avg_left.y(),
                                      row=self.graph.row(v) + dist*avg_left.x())
         new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
         new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
-        for neighbor in left_neighbours:
-            new_g.add_edge((neighbor, left_vert),
-                           self.graph.edge_type((v, neighbor)))
-            new_g.remove_edge((v, neighbor))
+        for edge in self.graph.incident_edges(v):
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            if neighbor not in left_neighbours:
+                continue
+            new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge))
+            new_g.remove_edge(edge)
         new_g.add_edge((v, left_vert))
         if phase_left:
             if self.graph.type(v) == VertexType.Z_BOX:
