@@ -301,8 +301,7 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
         self.undo_stack.push(cmd, anim_after=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> \
-            None:
+    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
@@ -311,25 +310,24 @@ class ProofPanel(BasePanel):
             if not v.isNull():
                 v.normalize()
 
-        # Compute the average position of left vectors
+        def compute_avg_vector(pos: QPointF, neighbors: list[VT]) -> QVector2D:
+            avg_vector = QVector2D()
+            for n in neighbors:
+                npos = QPointF(self.graph.row(n), self.graph.qubit(n))
+                dir = QVector2D(npos - pos).normalized()
+                avg_vector += dir
+            avg_vector.normalize()
+            return avg_vector
+
         pos = QPointF(self.graph.row(v), self.graph.qubit(v))
-        avg_left = QVector2D()
-        for n in left_neighbours:
-            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
-            dir = QVector2D(npos - pos).normalized()
-            avg_left += dir
-        avg_left.normalize()
-        # And snap it to the grid
+
+        avg_left = compute_avg_vector(pos, left_neighbours)
         snap_vector(avg_left)
-        # Same for right vectors
-        avg_right = QVector2D()
-        for n in self.graph.neighbors(v):
-            if n in left_neighbours: continue
-            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
-            dir = QVector2D(npos - pos).normalized()
-            avg_right += dir
-        avg_right.normalize()
+
+        right_neighbours = [n for n in self.graph.neighbors(v) if n not in left_neighbours]
+        avg_right = compute_avg_vector(pos, right_neighbours)
         snap_vector(avg_right)
+
         if avg_right.isNull():
             avg_right = -avg_left
         elif avg_left.isNull():
