@@ -238,22 +238,25 @@ class ProofPanel(BasePanel):
             start, end = end, start
         pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
         left, right = [], []
-        for neighbor in self.graph.neighbors(vertex):
-            npos = QPointF(*pos_to_view(self.graph.row(neighbor), self.graph.qubit(neighbor)))
-            # Compute whether each neighbor is inside the entry and exit points
-            i1 = cross(start - pos, npos - pos) * cross(start - pos, end - pos) >= 0
-            i2 = cross(end - pos, npos - pos) * cross(end - pos, start - pos) >= 0
-            inside = i1 and i2
-            if inside:
-                left.append(neighbor)
-            else:
-                right.append(neighbor)
+        for edge in set(self.graph.incident_edges(vertex)):
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                # we use the selection node to determine the center of the edge
+                epos = eitem.selection_node.pos()
+                # Compute whether each edge is inside the entry and exit points
+                i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
+                i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
+                inside = i1 and i2
+                if inside:
+                    left.append(eitem)
+                else:
+                    right.append(eitem)
         mouse_dir = ((start + end) * (1/2)) - pos
 
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
             self._unfuse_w(vertex, left, mouse_dir)
         else:
-            self._unfuse(vertex, left, mouse_dir, phase)
+            self._unfuse(vertex, left, right, mouse_dir, phase)
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -263,7 +266,7 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse_w(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
+    def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
         new_g = copy.deepcopy(self.graph)
 
         vi = get_w_partner(self.graph, v)
@@ -292,17 +295,21 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
-        for neighbor in left_neighbours:
-            new_g.add_edge((neighbor, left_vert),
-                           self.graph.edge_type((v, neighbor)))
-            new_g.remove_edge((v, neighbor))
+        for edge in set(self.graph.incident_edges(v)):
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                if eitem not in left_edge_items:
+                    continue
+                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+                new_g.remove_edge(edge)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
         self.undo_stack.push(cmd, anim_after=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> \
-            None:
+    def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
@@ -311,25 +318,24 @@ class ProofPanel(BasePanel):
             if not v.isNull():
                 v.normalize()
 
-        # Compute the average position of left vectors
+        def compute_avg_vector(pos: QPointF, neighbors: list[EItem]) -> QVector2D:
+            avg_vector = QVector2D()
+            for eitem in neighbors:
+                eitem_pos = pos_from_view(eitem.selection_node.pos().x(), eitem.selection_node.pos().y())
+                npos = QPointF(eitem_pos[0], eitem_pos[1])
+                dir = QVector2D(npos - pos).normalized()
+                avg_vector += dir
+            avg_vector.normalize()
+            return avg_vector
+
         pos = QPointF(self.graph.row(v), self.graph.qubit(v))
-        avg_left = QVector2D()
-        for n in left_neighbours:
-            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
-            dir = QVector2D(npos - pos).normalized()
-            avg_left += dir
-        avg_left.normalize()
-        # And snap it to the grid
+
+        avg_left = compute_avg_vector(pos, left_edge_items)
         snap_vector(avg_left)
-        # Same for right vectors
-        avg_right = QVector2D()
-        for n in self.graph.neighbors(v):
-            if n in left_neighbours: continue
-            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
-            dir = QVector2D(npos - pos).normalized()
-            avg_right += dir
-        avg_right.normalize()
+
+        avg_right = compute_avg_vector(pos, right_edge_items)
         snap_vector(avg_right)
+
         if avg_right.isNull():
             avg_right = -avg_left
         elif avg_left.isNull():
@@ -342,17 +348,24 @@ class ProofPanel(BasePanel):
         phase_left = QVector2D.dotProduct(QVector2D(mouse_dir), avg_left) \
             >= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
 
-        new_g = copy.deepcopy(self.graph)
+        new_g: GraphT = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v),
                                      qubit=self.graph.qubit(v) + dist*avg_left.y(),
                                      row=self.graph.row(v) + dist*avg_left.x())
         new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
         new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
-        for neighbor in left_neighbours:
-            new_g.add_edge((neighbor, left_vert),
-                           self.graph.edge_type((v, neighbor)))
-            new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
+
+        for edge in set(self.graph.incident_edges(v)):
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                if eitem not in left_edge_items:
+                    continue
+                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+                new_g.remove_edge(edge)
+
         if phase_left:
             if self.graph.type(v) == VertexType.Z_BOX:
                 set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v) / phase)
