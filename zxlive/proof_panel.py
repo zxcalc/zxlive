@@ -243,7 +243,7 @@ class ProofPanel(BasePanel):
             for eitem in eitems.values():
                 # we use the selection node to determine the center of the edge
                 epos = eitem.selection_node.pos()
-                # Compute whether each neighbor is inside the entry and exit points
+                # Compute whether each edge is inside the entry and exit points
                 i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
                 i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
                 inside = i1 and i2
