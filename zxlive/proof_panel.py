@@ -266,7 +266,7 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse_w(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
+    def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
         new_g = copy.deepcopy(self.graph)
 
         vi = get_w_partner(self.graph, v)
@@ -295,13 +295,15 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
-        for edge in self.graph.incident_edges(v):
+        for edge in set(self.graph.incident_edges(v)):
             edge_st = self.graph.edge_st(edge)
             neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
-            if neighbor not in left_neighbours:
-                continue
-            new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge))
-            new_g.remove_edge(edge)
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                if eitem not in left_edge_items:
+                    continue
+                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+                new_g.remove_edge(edge)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
@@ -352,6 +354,7 @@ class ProofPanel(BasePanel):
                                      row=self.graph.row(v) + dist*avg_left.x())
         new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
         new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
+        new_g.add_edge((v, left_vert))
 
         for edge in set(self.graph.incident_edges(v)):
             edge_st = self.graph.edge_st(edge)
@@ -362,7 +365,6 @@ class ProofPanel(BasePanel):
                     continue
                 new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
                 new_g.remove_edge(edge)
-        new_g.add_edge((v, left_vert))
 
         if phase_left:
             if self.graph.type(v) == VertexType.Z_BOX:
