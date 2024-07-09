@@ -28,7 +28,8 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
 
-from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, setting, pos_to_view, pos_from_view, colors
+from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
+from .settings import display_setting
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -123,20 +124,20 @@ class VItem(QGraphicsPathItem):
         if not self.isSelected():
             t = self.ty
             if t == VertexType.Z or t == VertexType.Z_BOX:
-                self.setBrush(QBrush(colors.z_spider))
+                self.setBrush(QBrush(display_setting.colors["z_spider"]))
             elif t == VertexType.X:
-                self.setBrush(QBrush(colors.x_spider))
+                self.setBrush(QBrush(display_setting.colors["x_spider"]))
             elif t == VertexType.H_BOX:
-                self.setBrush(QBrush(colors.hadamard))
+                self.setBrush(QBrush(display_setting.colors["hadamard"]))
             elif t == VertexType.W_INPUT:
-                self.setBrush(QBrush(colors.w_input))
+                self.setBrush(QBrush(display_setting.colors["w_input"]))
             elif t == VertexType.W_OUTPUT:
-                self.setBrush(QBrush(colors.w_output))
+                self.setBrush(QBrush(display_setting.colors["w_output"]))
             else:
-                self.setBrush(QBrush(colors.boundary))
+                self.setBrush(QBrush(display_setting.colors["boundary"]))
             pen = QPen()
             pen.setWidthF(3)
-            pen.setColor(colors.outline)
+            pen.setColor(display_setting.colors["outline"])
             self.setPen(pen)
 
         if self.isSelected():
@@ -144,30 +145,30 @@ class VItem(QGraphicsPathItem):
             pen.setWidthF(5)
             t = self.ty
             if t == VertexType.Z or t == VertexType.Z_BOX:
-                brush = QBrush(colors.z_spider_pressed)
+                brush = QBrush(display_setting.colors["z_spider_pressed"])
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.X:
-                brush = QBrush(colors.x_spider_pressed)
+                brush = QBrush(display_setting.colors["x_spider_pressed"])
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.H_BOX:
-                brush = QBrush(colors.hadamard_pressed)
+                brush = QBrush(display_setting.colors["hadamard_pressed"])
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.W_INPUT:
-                brush = QBrush(colors.w_input_pressed)
+                brush = QBrush(display_setting.colors["w_input_pressed"])
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             elif t == VertexType.W_OUTPUT:
-                brush = QBrush(colors.w_output_pressed)
+                brush = QBrush(display_setting.colors["w_output_pressed"])
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
             else:
-                brush = QBrush(colors.boundary_pressed)
+                brush = QBrush(display_setting.colors["boundary_pressed"])
                 brush.setStyle(Qt.BrushStyle.Dense1Pattern)
                 self.setBrush(brush)
-                pen.setColor(colors.boundary_pressed)
+                pen.setColor(display_setting.colors["boundary_pressed"])
             self.prepareGeometryChange()
             self.setPen(pen)
 
@@ -184,7 +185,7 @@ class VItem(QGraphicsPathItem):
     def update_shape(self) -> None:
         pen = QPen()
         pen.setWidthF(3)
-        pen.setColor(colors.outline)
+        pen.setColor(display_setting.colors["outline"])
         self.setPen(pen)
 
         path = QPainterPath()
@@ -236,8 +237,8 @@ class VItem(QGraphicsPathItem):
                 x = value.x()
                 y = value.y()
             else:
-                x = round(value.x() / setting.SNAP) * setting.SNAP
-                y = round(value.y() / setting.SNAP) * setting.SNAP
+                x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
+                y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
             return QPointF(x, y)
 
         # When selecting/deselecting items, we move them to the front/back

@@ -19,10 +19,11 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data, colors
+from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
 from .eitem import HAD_EDGE_BLUE
 from .graphscene import EditGraphScene
+from .settings import display_setting
 from .vitem import BLACK
 
 
@@ -40,12 +41,12 @@ class DrawPanelNodeType(TypedDict):
 
 def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
     return {
-        VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, colors.z_spider)},
-        VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, colors.x_spider)},
-        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, colors.hadamard)},
-        VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, colors.z_spider)},
-        VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, colors.w_output)},
-        VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, colors.w_input)},
+        VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, display_setting.colors["z_spider"])},
+        VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, display_setting.colors["x_spider"])},
+        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.colors["hadamard"])},
+        VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.colors["z_spider"])},
+        VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.colors["w_output"])},
+        VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.colors["w_input"])},
     }
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
