@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QToolButton,
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
-                        set_z_box_label)
+                        set_z_box_label, vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
@@ -166,6 +166,34 @@ class ProofPanel(BasePanel):
             return
         elif self._magic_identity(trace):
             return
+        elif self._magic_hopf(trace):
+            return
+
+    def _magic_hopf(self, trace: WandTrace) -> bool:
+        if not all(isinstance(item, EItem) for item in trace.hit):
+            return False
+        edges = [item.e for item in trace.hit]
+        if not all(edge == edges[0] for edge in edges):
+            return False
+        source, target = self.graph.edge_st(edges[0])
+        source_type, target_type = self.graph.type(source), self.graph.type(target)
+        edge_type = self.graph.edge_type(edges[0])
+        if (edge_type == EdgeType.HADAMARD and vertex_is_z_like(source_type) and vertex_is_z_like(target_type)) or \
+           (edge_type == EdgeType.SIMPLE and vertex_is_z_like(source_type) and target_type == VertexType.X) or \
+           (edge_type == EdgeType.SIMPLE and source_type == VertexType.X and vertex_is_z_like(target_type)):
+            new_g = copy.deepcopy(self.graph)
+            num_edges = len(edges)
+            # Remove even number of edges
+            if num_edges % 2 != 0:
+                num_edges -= 1
+            for _ in range(num_edges):
+                new_g.remove_edge(edges[0])
+            # TODO: Add animation for Hopf
+            # anim = anims.hopf(edges, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Hopf")
+            self.undo_stack.push(cmd)
+            return True
+        return False
 
     def _magic_identity(self, trace: WandTrace) -> bool:
         if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
