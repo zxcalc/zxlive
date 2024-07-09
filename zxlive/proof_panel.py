@@ -292,10 +292,13 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
-        for neighbor in left_neighbours:
-            new_g.add_edge((neighbor, left_vert),
-                           self.graph.edge_type((v, neighbor)))
-            new_g.remove_edge((v, neighbor))
+        for edge in self.graph.incident_edges(v):
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            if neighbor not in left_neighbours:
+                continue
+            new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge))
+            new_g.remove_edge(edge)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
