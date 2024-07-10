@@ -109,7 +109,7 @@ class ProofPanel(BasePanel):
                 background-color: #e2f4ff;
             }}
             QTreeView::Item{{
-                height:{display_setting.font.pointSizeF() * 2.2}px;
+                height:{display_setting.font.pointSizeF() * 2.5}px;
             }}
             QTreeView::Item:!enabled {{
                 color: #c0c0c0;
