@@ -103,14 +103,13 @@ class ProofPanel(BasePanel):
     def reset_rewrite_panel_style(self) -> None:
         self.rewrites_panel.setUniformRowHeights(True)
         self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        fi = QFontInfo(display_setting.font)
         self.rewrites_panel.setStyleSheet(
             f'''
             QTreeView::Item:hover {{
                 background-color: #e2f4ff;
             }}
             QTreeView::Item{{
-                height:{fi.pixelSize() * 2.2}px;
+                height:{display_setting.font.pointSizeF() * 2.2}px;
             }}
             QTreeView::Item:!enabled {{
                 color: #c0c0c0;
