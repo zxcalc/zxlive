@@ -16,6 +16,7 @@ from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
 from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES
+from .settings import display_setting
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -39,7 +40,7 @@ class RewriteAction:
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
-        if 'picture' in d:
+        if 'picture' in d and display_setting.PREVIEWS_SHOW:
             pixmap = QPixmap()
             pixmap.load(get_data("tooltips/"+d['picture']))
             buffer = QBuffer()

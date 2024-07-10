@@ -71,6 +71,11 @@ input_circuit_formats = {
     'sqasm-no-simplification': "Spider QASM (no simplification)",
 }
 
+combo_true_false = {
+    'True': 'True',
+    'False': 'False'
+}
+
 
 general_settings: list[SettingsData] = [
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
@@ -78,6 +83,7 @@ general_settings: list[SettingsData] = [
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
+    {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Combo, "data": combo_true_false}
 ]
 
 tikz_export_settings: list[SettingsData] = [

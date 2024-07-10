@@ -34,6 +34,7 @@ general_defaults: Dict[str, str | QTabWidget.TabPosition | int] = {
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
+    "previews-show": 'True'
 }
 
 tikz_export_defaults: dict[str, str] = {
@@ -179,6 +180,7 @@ def refresh_pyzx_tikz_settings() -> None:
 
 class DisplaySettings:
     SNAP_DIVISION = 4  # Should be an integer dividing SCALE
+    PREVIEWS_SHOW = True
 
     def __init__(self, scheme_id: str) -> None:
         self.colors = color_schemes[scheme_id]
@@ -190,6 +192,7 @@ class DisplaySettings:
     def update(self) -> None:
         self.SNAP_DIVISION = int(get_settings_value("snap-granularity", str))
         self.SNAP = SCALE / self.SNAP_DIVISION
+        self.PREVIEWS_SHOW = (get_settings_value("previews-show",str) == "True")
 
 
 # Initialise settings
