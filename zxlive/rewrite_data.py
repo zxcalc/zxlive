@@ -56,7 +56,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "matcher": pyzx.rules.match_lcomp_parallel,
         "rule": pyzx.rules.lcomp,
         "type": MATCHES_VERTICES,
-        "copy_first": True
+        "copy_first": True,
+        "picture": "lcomp.png"
     },
     "pivot": {
         "text": "pivot",
@@ -64,7 +65,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "matcher": lambda g, matchf: pyzx.rules.match_pivot_parallel(g, matchf, check_edge_types=True),
         "rule": pyzx.rules.pivot,
         "type": MATCHES_EDGES,
-        "copy_first": True
+        "copy_first": True,
+        "picture": "pivot_regular.png"
     },
     "pivot_boundary": {
         "text": "boundary pivot",
@@ -72,8 +74,7 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "matcher": pyzx.rules.match_pivot_boundary,
         "rule": pyzx.rules.pivot,
         "type": MATCHES_EDGES,
-        "copy_first": True,
-        "picture": "giftest.gif"
+        "copy_first": True
     },
     "pivot_gadget": {
         "text": "gadget pivot",
@@ -81,7 +82,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "matcher": pyzx.rules.match_pivot_gadget,
         "rule": pyzx.rules.pivot,
         "type": MATCHES_EDGES,
-        "copy_first": True
+        "copy_first": True,
+        "picture": "pivot_gadget.png"
     },
     "phase_gadget_fuse": {
         "text": "Fuse phase gadgets",
@@ -89,7 +91,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "matcher": pyzx.rules.match_phase_gadgets,
         "rule": pyzx.rules.merge_phase_gadgets,
         "type": MATCHES_VERTICES,
-        "copy_first": True
+        "copy_first": True,
+        "picture": "gadget_fuse.png"
     },
     "supplementarity": {
         "text": "Supplementarity",
@@ -127,7 +130,7 @@ def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[VT,
 
 ocm_action: RewriteData = {
     "text": "OCM",
-    "tooltip": "Saves the graph with the current vertex positions",
+    "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
     "matcher": const_true,
     "rule": ocm_rule,
     "type": MATCHES_VERTICES,
@@ -271,6 +274,8 @@ simplifications: dict[str, RewriteData] = {
 }
 
 rules_basic = {"spider", "to_z", "to_x", "rem_id", "copy", "pauli", "bialgebra", "euler"}
+operations["pauli"]["picture"] = "push_pauli.png"
+operations["copy"]["picture"] = "copy.png"]
 
 rules_zxw = {"spider", "fuse_w", "z_to_z_box"}
 

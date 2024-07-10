@@ -41,13 +41,12 @@ class RewriteAction:
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
         if 'picture' in d:
             pixmap = QPixmap()
-            pixmap.load(get_data("icons/"+d['picture']))
+            pixmap.load(get_data("tooltips/"+d['picture']))
             buffer = QBuffer()
             buffer.open(QIODevice.WriteOnly)
-            pixmap.save(buffer, "GIF", quality=100)
+            pixmap.save(buffer, "PNG", quality=100)
             image = bytes(buffer.data().toBase64()).decode()
-            #tooltip = '<img src="data:image/gif;base64,{}">'.format(image) + d['tooltip']
-            tooltip = "<img src=':/icons/giftest.gif'>Message"
+            tooltip = '<img src="data:image/png;base64,{}" width="500">'.format(image) + d['tooltip']
         else:
             tooltip = d['tooltip']
         return cls(
