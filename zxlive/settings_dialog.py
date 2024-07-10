@@ -18,14 +18,14 @@ from __future__ import annotations
 from enum import IntEnum
 from typing import TYPE_CHECKING, Dict, Any
 
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QFontDatabase
 from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
-    QComboBox
+    QComboBox, QApplication
 )
 
 from .common import get_settings_value, T, get_data
@@ -80,6 +80,20 @@ general_settings: list[SettingsData] = [
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
 ]
 
+
+font_settings: list[SettingsData] = [
+    {"id": "font/size", "label": "Font size", "type": FormInputType.Int},
+    # Font families can be loaded after a QGuiApplication is constructed.
+    # load_font_families needs to be called once a QGuiApplication is up.
+    {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Ariel": "Ariel"}},
+]
+
+
+def load_font_families() -> None:
+    index = next(i for i, d in enumerate(font_settings) if d["id"] == "font/family")
+    font_settings[index]["data"] |= {f: f for f in QFontDatabase.families()}
+
+
 tikz_export_settings: list[SettingsData] = [
     {"id": "tikz/Z-spider-export", "label": "Z-spider", "type": FormInputType.Str},
     {"id": "tikz/Z-phase-export", "label": "Z-spider with phase", "type": FormInputType.Str},
@@ -129,6 +143,7 @@ class SettingsDialog(QDialog):
         self.value_dict: Dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        load_font_families()
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -139,6 +154,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(tab_widget)
 
         self.add_settings_tab(tab_widget, "General", "General ZXLive settings", general_settings)
+        self.add_settings_tab(tab_widget, "Font", "Font settings", font_settings)
         self.add_settings_tab(tab_widget, "Tikz rule names", "Tikz rule name settings", tikz_rule_name_settings)
         self.add_settings_tab(tab_widget, "Tikz export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
         self.add_settings_tab(tab_widget, "Tikz import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
@@ -264,6 +280,10 @@ class SettingsDialog(QDialog):
         pos = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
         if pos != self.prev_tab_bar_location:
             self.main_window.tab_widget.setTabPosition(pos)
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            app.setFont(display_setting.font)
+        self.main_window.update_font()
 
     def cancel(self) -> None:
         self.reject()

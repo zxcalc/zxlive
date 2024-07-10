@@ -37,7 +37,8 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       save_rule_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file, show_error_msg,
                       export_proof_dialog)
-from zxlive.settings_dialog import open_settings_dialog
+from .settings import display_setting
+from .settings_dialog import open_settings_dialog
 
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
@@ -67,7 +68,7 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geom)
         self.show()
 
-        tab_widget = QTabWidget()
+        tab_widget = QTabWidget(self)
         w.layout().addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
@@ -575,3 +576,9 @@ class MainWindow(QMainWindow):
     def update_colors(self) -> None:
         if self.active_panel is not None:
             self.active_panel.update_colors()
+
+    def update_font(self) -> None:
+        self.menuBar().setFont(display_setting.font)
+        for i in range(self.tab_widget.count()):
+            w = cast(BasePanel, self.tab_widget.widget(i))
+            w.update_font()

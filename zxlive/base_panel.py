@@ -119,3 +119,6 @@ class BasePanel(QWidget):
 
     def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
         self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))
+
+    def update_font(self) -> None:
+        self.graph_view.update_font()
