@@ -103,14 +103,13 @@ class ProofPanel(BasePanel):
     def reset_rewrite_panel_style(self) -> None:
         self.rewrites_panel.setUniformRowHeights(True)
         self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        fi = QFontInfo(display_setting.font)
         self.rewrites_panel.setStyleSheet(
             f'''
             QTreeView::Item:hover {{
                 background-color: #e2f4ff;
             }}
             QTreeView::Item{{
-                height:{fi.pixelSize() * 2.2}px;
+                height:{display_setting.font.pointSizeF() * 2.2}px;
             }}
             QTreeView::Item:!enabled {{
                 color: #c0c0c0;
@@ -431,5 +430,6 @@ class ProofPanel(BasePanel):
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self)
         self.rewrites_panel.setModel(model)
+        self.rewrites_panel.expand(model.index(0,0))
         self.rewrites_panel.clicked.connect(model.do_rewrite)
         self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))

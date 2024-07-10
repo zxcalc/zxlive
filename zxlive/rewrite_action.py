@@ -225,6 +225,10 @@ class RewriteActionTreeModel(QAbstractItemModel):
         node = cast(RewriteActionTree, index.internalPointer())
         if node.is_rewrite:
             node.rewrite_action.do_rewrite(self.proof_panel)
+        else:
+            self.proof_panel.rewrites_panel.setExpanded(
+                index, not self.proof_panel.rewrites_panel.isExpanded(index)
+            )
 
     def update_on_selection(self) -> None:
         selection, edges = self.proof_panel.parse_selection()
