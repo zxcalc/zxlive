@@ -28,6 +28,10 @@ class RewriteData(TypedDict):
     tooltip: str
     copy_first: NotRequired[bool]
     returns_new_graph: NotRequired[bool]
+    picture: NotRequired[str]
+    custom_rule: NotRequired[bool]
+    lhs: NotRequired[GraphT]
+    rhs: NotRequired[GraphT]
 
 
 def is_rewrite_data(d: dict) -> bool:
