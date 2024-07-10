@@ -431,5 +431,6 @@ class ProofPanel(BasePanel):
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self)
         self.rewrites_panel.setModel(model)
+        self.rewrites_panel.expand(model.index(0,0))
         self.rewrites_panel.clicked.connect(model.do_rewrite)
         self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
