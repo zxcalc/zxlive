@@ -90,7 +90,6 @@ font_settings: list[SettingsData] = [
 
 
 def load_font_families() -> None:
-    # Index 0 is hard coded here. Just making sure that is correct.
     index = next(i for i, d in enumerate(font_settings) if d["id"] == "font/family")
     font_settings[index]["data"] |= {f: f for f in QFontDatabase.families()}
 
