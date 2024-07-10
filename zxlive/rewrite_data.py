@@ -46,7 +46,6 @@ def read_custom_rules() -> list[RewriteData]:
                     custom_rules.append(rule)
     return custom_rules
 
-
 # We want additional actions that are not part of the original PyZX editor
 # So we add them to operations
 
@@ -73,7 +72,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "matcher": pyzx.rules.match_pivot_boundary,
         "rule": pyzx.rules.pivot,
         "type": MATCHES_EDGES,
-        "copy_first": True
+        "copy_first": True,
+        "picture": "giftest.gif"
     },
     "pivot_gadget": {
         "text": "gadget pivot",

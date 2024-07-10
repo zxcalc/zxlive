@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from typing import Callable, TYPE_CHECKING, Iterable, Any, Optional, cast, Union
 
 import pyzx
-from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex
+from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, QIODevice, QBuffer
+from PySide6.QtGui import QPixmap
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT
+from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
 from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES
 
@@ -35,12 +36,23 @@ class RewriteAction:
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
+        if 'picture' in d:
+            pixmap = QPixmap()
+            pixmap.load(get_data("icons/"+d['picture']))
+            buffer = QBuffer()
+            buffer.open(QIODevice.WriteOnly)
+            pixmap.save(buffer, "GIF", quality=100)
+            image = bytes(buffer.data().toBase64()).decode()
+            #tooltip = '<img src="data:image/gif;base64,{}">'.format(image) + d['tooltip']
+            tooltip = "<img src=':/icons/giftest.gif'>Message"
+        else:
+            tooltip = d['tooltip']
         return cls(
             name=d['text'],
             matcher=d['matcher'],
             rule=d['rule'],
             match_type=d['type'],
-            tooltip=d['tooltip'],
+            tooltip=tooltip,
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
         )
