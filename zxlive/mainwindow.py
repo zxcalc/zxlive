@@ -67,7 +67,7 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geom)
         self.show()
 
-        tab_widget = QTabWidget()
+        tab_widget = QTabWidget(self)
         w.layout().addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
@@ -575,3 +575,8 @@ class MainWindow(QMainWindow):
     def update_colors(self) -> None:
         if self.active_panel is not None:
             self.active_panel.update_colors()
+
+    def update_font(self) -> None:
+        for i in range(self.tab_widget.count()):
+            w = cast(BasePanel, self.tab_widget.widget(i))
+            w.update_font()

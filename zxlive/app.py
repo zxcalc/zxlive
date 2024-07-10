@@ -24,6 +24,7 @@ import sys
 
 from .mainwindow import MainWindow
 from .common import get_data, GraphT
+from .settings import display_setting
 from typing import Optional, cast
 
 # The following hack is needed on windows in order to show the icon in the taskbar
@@ -45,6 +46,7 @@ class ZXLive(QApplication):
 
     def __init__(self) -> None:
         super().__init__(sys.argv)
+        self.setFont(display_setting.font)
         self.setApplicationName('ZXLive')
         self.setDesktopFileName('ZXLive')
         self.setApplicationVersion('0.2.0')  # TODO: read this from pyproject.toml if possible
