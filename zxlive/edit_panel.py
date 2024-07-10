@@ -12,11 +12,12 @@ from pyzx.symbolic import Poly
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import GraphT, input_circuit_formats
+from .common import GraphT
 from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
+from .settings_dialog import input_circuit_formats
 
 
 class GraphEditPanel(EditorBasePanel):
@@ -25,8 +26,8 @@ class GraphEditPanel(EditorBasePanel):
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
 
-    _curr_ety: EdgeType.Type
-    _curr_vty: VertexType.Type
+    _curr_ety: EdgeType
+    _curr_vty: VertexType
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -35,6 +36,7 @@ class GraphEditPanel(EditorBasePanel):
         self.graph_scene.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene.vertex_added.connect(self.add_vert)
         self.graph_scene.edge_added.connect(self.add_edge)
+        self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE

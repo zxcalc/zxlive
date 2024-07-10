@@ -72,6 +72,10 @@ class MainWindow(QMainWindow):
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
+        tab_widget.setMovable(True)
+        tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
+        assert isinstance(tab_position, QTabWidget.TabPosition)
+        tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
@@ -82,6 +86,7 @@ class MainWindow(QMainWindow):
 
         new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
             "Create a new tab with an empty graph", alt_shortcut=QKeySequence.StandardKey.AddTab)
+        new_window = self._new_action("New &Window", self.open_new_window, QKeySequence("Ctrl+Shift+N"), "Open a new window")
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
@@ -97,6 +102,7 @@ class MainWindow(QMainWindow):
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
+        file_menu.addAction(new_window)
         file_menu.addAction(open_file)
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
@@ -221,6 +227,10 @@ class MainWindow(QMainWindow):
             return current_widget
         return None
 
+    def open_new_window(self) -> None:
+        new_window = MainWindow()
+        new_window.new_graph()
+        new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
@@ -233,12 +243,16 @@ class MainWindow(QMainWindow):
         self.settings.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
-    def undo(self,e: QEvent) -> None:
-        if self.active_panel is None: return
+    def undo(self, e: QEvent) -> None:
+        if self.active_panel is None:
+            e.ignore()
+            return
         self.active_panel.undo_stack.undo()
 
-    def redo(self,e: QEvent) -> None:
-        if self.active_panel is None: return
+    def redo(self, e: QEvent) -> None:
+        if self.active_panel is None:
+            e.ignore()
+            return
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean:bool) -> None:
@@ -258,6 +272,7 @@ class MainWindow(QMainWindow):
         if self.active_panel:
             self.active_panel.update_colors()
             self._reset_menus(True)
+            self.active_panel.set_splitter_size()
 
     def _undo_changed(self) -> None:
         if self.active_panel:
@@ -286,10 +301,8 @@ class MainWindow(QMainWindow):
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
                 proof_panel: ProofPanel = self.active_panel
-                proof_panel.proof_model = out.p
-                proof_panel.step_view.setModel(proof_panel.proof_model)
+                proof_panel.step_view.setModel(out.p)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
-                proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             elif isinstance(out, ImportRuleOutput):
                 self.new_rule_editor(out.r, name)
             else:

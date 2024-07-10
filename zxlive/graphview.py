@@ -15,11 +15,12 @@
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING
+from pyzx.graph.scalar import Scalar
 
 import math
 import random
 from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
-from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem
+from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
 
 from .graphscene import GraphScene, VItem, EItem, EditGraphScene
@@ -132,6 +133,8 @@ class GraphView(QGraphicsView):
                 self.wand_path.show()
                 if self.sparkle_mode:
                     self.sparkles.emit_sparkles(pos, 10)
+            else:
+                e.ignore()
         else:
             e.ignore()
 
@@ -164,7 +167,8 @@ class GraphView(QGraphicsView):
                             if item not in self.wand_trace.hit:
                                 self.wand_trace.hit[item] = []
                             self.wand_trace.hit[item].append(ipos)
-
+            else:
+                e.ignore()
         else:
             e.ignore()
 
@@ -183,6 +187,7 @@ class GraphView(QGraphicsView):
                     items = [it for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()) if isinstance(it, VItem)]
                     for it in items:
                         it.setSelected(not (len(items) == 1 or e.modifiers() & Qt.KeyboardModifier.ShiftModifier) or not it.isSelected())
+                    self.graph_scene.selection_changed_custom.emit()
             elif self.tool == GraphTool.MagicWand:
                 if self.wand_trace is not None:
                     if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
@@ -198,6 +203,8 @@ class GraphView(QGraphicsView):
                     self.wand_path = None
                     self.wand_trace_finished.emit(self.wand_trace)
                     self.wand_trace = None
+                else:
+                    e.ignore()
         else:
             e.ignore()
 
@@ -283,6 +290,35 @@ class GraphView(QGraphicsView):
         painter.drawLines(thick_lines)
 
 
+class ProofGraphView(GraphView):
+    def __init__(self, graph_scene: GraphScene) -> None:
+        super().__init__(graph_scene)
+        self.scalar_label = QLabel(parent=self)
+        self.scalar_label.move(10, 10)
+        self.scalar_label.show()
+        self.__update_scalar_label(Scalar())
+
+    def set_graph(self, g: GraphT) -> None:
+        super().set_graph(g)
+        self.__update_scalar_label(g.scalar)
+
+    def update_graph(self, g: GraphT, select_new: bool = False) -> None:
+        super().update_graph(g, select_new)
+        self.__update_scalar_label(g.scalar)
+
+    def __update_scalar_label(self, scalar: Scalar) -> None:
+        scalar_string = f" Scalar: {scalar.polar_str()}"
+        if scalar.is_zero:
+            colour = "red"
+            text = f"{scalar_string}, The global scalar is zero"
+        else:
+            colour = "black"
+            text = f"{scalar_string}"
+
+        self.scalar_label.setText(f"<span style='color:{colour}'>{text}</span>")
+        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, text, 0).width())
+
+
 class RuleEditGraphView(GraphView):
     def __init__(self, parent_panel: RulePanel, graph_scene: GraphScene) -> None:
         super().__init__(graph_scene)
@@ -333,6 +369,7 @@ class Sparkles(QObject):
 
     def timerEvent(self, event: QTimerEvent) -> None:
         if event.timerId() != self.timer_id:
+            event.ignore()
             return
         for sparkle in self.sparkles:
             sparkle.timer_step()

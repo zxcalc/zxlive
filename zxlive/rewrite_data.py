@@ -23,7 +23,7 @@ MATCHES_EDGES: MatchType = 2
 class RewriteData(TypedDict):
     text: str
     matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[ET, VT]]
+    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]
     type: MatchType
     tooltip: str
     copy_first: NotRequired[bool]
@@ -105,8 +105,8 @@ const_true = lambda graph, matches: matches
 
 
 def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[
-    [GraphT, list], pyzx.rules.RewriteOutputType[ET, VT]]:
-    def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[ET, VT]:
+    [GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
+    def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
         simplification(g)
         return ({}, [], [], True)
 
@@ -121,7 +121,7 @@ def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
 
 # The OCM action simply saves the current graph without modifying anything.
 # This can be used to make repositioning the vertices an explicit proof step.
-def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[ET, VT]:
+def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
     return ({}, [], [], True)
 
 

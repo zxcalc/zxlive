@@ -14,9 +14,11 @@ from pyzx.graph import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
-from .common import ET, VT, W_INPUT_OFFSET, GraphT, setting
+from .common import ET, VT, W_INPUT_OFFSET, GraphT
+from .settings import display_setting
+from .eitem import EItem
 from .graphview import GraphView
-from .proof import ProofModel, Rewrite
+from .proof import ProofModel, ProofStepView, Rewrite
 
 
 @dataclass
@@ -100,11 +102,11 @@ class UpdateGraph(BaseCommand):
 class ChangeNodeType(BaseCommand):
     """Changes the color of a set of spiders."""
     vs: list[VT] | set[VT]
-    vty: VertexType.Type
+    vty: VertexType
 
     WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
-    _old_vtys: Optional[list[VertexType.Type]] = field(default=None, init=False)
+    _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
     _old_w_info: Optional[dict[VT, WInfo]] = field(default=None, init=False)
     _new_w_inputs: Optional[list[VT]] = field(default=None, init=False)
 
@@ -169,7 +171,7 @@ class ChangeNodeType(BaseCommand):
 class ChangeEdgeColor(BaseCommand):
     """Changes the color of a set of edges"""
     es: Iterable[ET]
-    ety: EdgeType.Type
+    ety: EdgeType
 
     _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
 
@@ -191,7 +193,7 @@ class AddNode(BaseCommand):
     """Adds a new spider at a given position."""
     x: float
     y: float
-    vty: VertexType.Type
+    vty: VertexType
 
     _added_vert: Optional[VT] = field(default=None, init=False)
 
@@ -201,8 +203,8 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
-        x = round(self.x * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
+        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
+        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         self._added_vert = self.g.add_vertex(self.vty, y,x)
         self.update_graph_view()
 
@@ -223,8 +225,8 @@ class AddWNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
-        x = round(self.x * setting.SNAP_DIVISION) / setting.SNAP_DIVISION
+        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
+        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, y - W_INPUT_OFFSET, self.x)
         self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, y, x)
         self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
@@ -235,7 +237,7 @@ class AddEdge(BaseCommand):
     """Adds an edge between two spiders."""
     u: VT
     v: VT
-    ety: EdgeType.Type
+    ety: EdgeType
 
     def undo(self) -> None:
         self.g.remove_edge((self.u, self.v, self.ety))
@@ -268,13 +270,48 @@ class MoveNode(BaseCommand):
             self.g.set_qubit(v, y)
         self.update_graph_view()
 
+@dataclass
+class MoveNodeProofMode(MoveNode):
+    step_view: ProofStepView
+
+    def __init__(self, graph_view: GraphView, vs: list[tuple[VT, float, float]], step_view: ProofStepView) -> None:
+        super().__init__(graph_view, vs)
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+
+@dataclass
+class ChangeEdgeCurve(BaseCommand):
+    """Changes the curve of an edge."""
+    eitem: EItem
+    new_distance: float
+    old_distance: float
+
+    def undo(self) -> None:
+        self.eitem.curve_distance = self.old_distance
+        self.eitem.refresh()
+
+    def redo(self) -> None:
+        self.eitem.curve_distance = self.new_distance
+        self.eitem.refresh()
+
 
 @dataclass
 class AddIdentity(BaseCommand):
     """Adds an X or Z identity spider on an edge between two vertices."""
     u: VT
     v: VT
-    vty: VertexType.Type
+    vty: VertexType
 
     _new_vert: Optional[VT] = field(default=None, init=False)
 
@@ -400,38 +437,28 @@ class AddRewriteStep(SetGraph):
 
 
 @dataclass
-class GoToRewriteStep(SetGraph):
-    """Shows the graph at some step in the proof.
-
-    Undoing returns to the previously selected proof step.
-    """
-
-    def __init__(self, graph_view: GraphView, step_view: QListView, old_step: int, step: int) -> None:
-        proof_model = step_view.model()
-        assert isinstance(proof_model, ProofModel)
-
-        # Save any vertex rearrangements to the proof step
-        proof_model.set_graph(old_step, graph_view.graph_scene.g)
-
-        SetGraph.__init__(self, graph_view, proof_model.get_graph(step))
-        self.step_view = step_view
-        self.step = step
-        self.old_step = old_step
+class GroupRewriteSteps(BaseCommand):
+    step_view: ProofStepView
+    start_index: int
+    end_index: int
 
     def redo(self) -> None:
-        idx = self.step_view.model().index(self.step, 0, QModelIndex())
-        self.step_view.clearSelection()
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
-        self.step_view.update(idx)
-        super().redo()
+        self.step_view.model().group_steps(self.start_index, self.end_index)
+        self.step_view.move_to_step(self.start_index + 1)
 
     def undo(self) -> None:
-        idx = self.step_view.model().index(self.old_step, 0, QModelIndex())
-        self.step_view.clearSelection()
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
-        self.step_view.update(idx)
-        super().undo()
+        self.step_view.model().ungroup_steps(self.start_index)
+        self.step_view.move_to_step(self.end_index + 1)
+
+@dataclass
+class UngroupRewriteSteps(BaseCommand):
+    step_view: ProofStepView
+    group_index: int
+
+    def redo(self) -> None:
+        self.step_view.model().ungroup_steps(self.group_index)
+        self.step_view.move_to_step(self.group_index + 1)
+
+    def undo(self) -> None:
+        self.step_view.model().group_steps(self.group_index, self.group_index + 1)
+        self.step_view.move_to_step(self.group_index + 1)

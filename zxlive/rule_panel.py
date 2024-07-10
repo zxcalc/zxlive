@@ -24,8 +24,8 @@ class RulePanel(EditorBasePanel):
     graph_scene_right: EditGraphScene
     start_derivation_signal = Signal(object)
 
-    _curr_ety: EdgeType.Type
-    _curr_vty: VertexType.Type
+    _curr_ety: EdgeType
+    _curr_vty: VertexType
 
 
     def __init__(self, graph1: GraphT, graph2: GraphT, name: str, description: str, *actions: QAction) -> None:
@@ -49,11 +49,13 @@ class RulePanel(EditorBasePanel):
         self.graph_scene_left.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene_left.vertex_added.connect(self.add_vert)
         self.graph_scene_left.edge_added.connect(self.add_edge)
+        self.graph_scene_left.edge_dragged.connect(self.change_edge_curves)
 
         self.graph_scene_right.vertices_moved.connect(self.vert_moved)
         self.graph_scene_right.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene_right.vertex_added.connect(self.add_vert)
         self.graph_scene_right.edge_added.connect(self.add_edge)
+        self.graph_scene_right.edge_dragged.connect(self.change_edge_curves)
 
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
