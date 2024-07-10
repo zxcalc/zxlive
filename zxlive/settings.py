@@ -37,7 +37,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
 }
 
 font_defaults: dict[str, str | int | None] = {
-    "font/size": 13,
+    "font/size": 11,
     "font/family": "Ariel",
 }
 
