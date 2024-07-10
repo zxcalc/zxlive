@@ -321,7 +321,9 @@ class ProofGraphView(GraphView):
             text = f"{scalar_string}"
 
         self.scalar_label.setText(f"<span style='color:{colour}'>{text}</span>")
-        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, text, 0).width())
+        font_metrics = self.scalar_label.fontMetrics().size(0, text, 0)
+        self.scalar_label.setFixedWidth(font_metrics.width())
+        self.scalar_label.setFixedHeight(font_metrics.height())
 
     def update_font(self) -> None:
         self.scalar_label.setFont(display_setting.font)
