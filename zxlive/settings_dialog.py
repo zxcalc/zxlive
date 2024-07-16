@@ -25,7 +25,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
-    QComboBox, QApplication
+    QComboBox, QApplication, QCheckBox
 )
 
 from .common import get_settings_value, T, get_data
@@ -43,6 +43,7 @@ class FormInputType(IntEnum):
     Float = 2
     Folder = 3
     Combo = 4
+    Bool = 5
 
 
 class SettingsData(TypedDict):
@@ -78,7 +79,7 @@ general_settings: list[SettingsData] = [
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
-    {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.CheckBox},
+    {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
 ]
 
 
@@ -196,6 +197,11 @@ class SettingsDialog(QDialog):
         cancel_button.clicked.connect(self.cancel)
         hlayout.addWidget(cancel_button)
 
+    def make_bool_form_input(self, data: SettingsData) -> QCheckBox:
+        widget = QCheckBox()
+        widget.setChecked(self.get_settings_from_data(data, bool))
+        return widget
+
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
         widget = QLineEdit()
         widget.setText(self.get_settings_from_data(data, str))
@@ -248,6 +254,7 @@ class SettingsDialog(QDialog):
             FormInputType.Float: self.make_float_form_input,
             FormInputType.Folder: self.make_folder_form_input,
             FormInputType.Combo: self.make_combo_form_input,
+            FormInputType.Bool: self.make_bool_form_input,
         }
         setting_widget_maker = setting_maker[settings_data["type"]]
         widget: QWidget = setting_widget_maker(settings_data)
