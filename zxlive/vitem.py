@@ -354,6 +354,9 @@ class VItem(QGraphicsPathItem):
         else:
             e.ignore()
 
+    def update_font(self) -> None:
+        self.phase_item.setFont(display_setting.font)
+
 
 class VItemAnimation(QVariantAnimation):
     """Animator for vertex graphics items.
@@ -434,7 +437,6 @@ class PhaseItem(QGraphicsTextItem):
         self.setZValue(PHASE_ITEM_Z)
 
         self.setDefaultTextColor(QColor("#006bb3"))
-        self.setFont(QFont("monospace"))
         self.v_item = v_item
         self.refresh()
 

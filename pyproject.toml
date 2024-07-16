@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "PySide6 >= 6.7.2",
-    "pyzx @ git+https://github.com/Quantomatic/pyzx.git",
+    "pyzx @ git+https://github.com/zxcalc/pyzx.git",
     "networkx",
     "numpy",
     "shapely",
@@ -52,9 +52,9 @@ doc = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Quantomatic/zxlive"
-Repository = "https://github.com/Quantomatic/zxlive"
-Issue-Tracker = "https://github.com/Quantomatic/zxlive/issues"
+Homepage = "https://github.com/zxcalc/zxlive"
+Repository = "https://github.com/zxcalc/zxlive"
+Issue-Tracker = "https://github.com/zxcalc/zxlive/issues"
 
 [tool.setuptools]
 packages = [

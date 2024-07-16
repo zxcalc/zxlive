@@ -4,7 +4,7 @@ from typing import Dict, Any, TypedDict
 
 import pyzx
 from PySide6.QtCore import QSettings
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QTabWidget
 
 from .common import get_settings_value, SCALE
@@ -28,13 +28,18 @@ class ColorScheme(TypedDict):
     outline: QColor
 
 
-general_defaults: Dict[str, str | QTabWidget.TabPosition | int] = {
+general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
     "path/custom-rules": "lemmas/",
     "color-scheme": "modern-red-green",
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
     "previews-show": 'True'
+}
+
+font_defaults: dict[str, str | int | None] = {
+    "font/size": 11,
+    "font/family": "Ariel",
 }
 
 tikz_export_defaults: dict[str, str] = {
@@ -83,8 +88,8 @@ tikz_names_defaults: dict[str, str] = {
     "tikz/names/decompose hadamard": "eu",
 }
 
-defaults = general_defaults | tikz_export_defaults | tikz_import_defaults \
-           | tikz_layout_defaults | tikz_names_defaults
+defaults = general_defaults | font_defaults | tikz_export_defaults | \
+           tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
 
 
 modern_red_green: ColorScheme = {
@@ -182,8 +187,8 @@ class DisplaySettings:
     SNAP_DIVISION = 4  # Should be an integer dividing SCALE
     PREVIEWS_SHOW = True
 
-    def __init__(self, scheme_id: str) -> None:
-        self.colors = color_schemes[scheme_id]
+    def __init__(self) -> None:
+        self.colors = color_schemes[str(settings.value("color-scheme"))]
         self.update()
 
     def set_color_scheme(self, scheme_id: str) -> None:
@@ -191,6 +196,10 @@ class DisplaySettings:
 
     def update(self) -> None:
         self.SNAP_DIVISION = int(get_settings_value("snap-granularity", str))
+        self.font = QFont(
+            get_settings_value("font/family", str),
+            get_settings_value("font/size", int)
+        )
         self.SNAP = SCALE / self.SNAP_DIVISION
         self.PREVIEWS_SHOW = (get_settings_value("previews-show",str) == "True")
 
@@ -203,5 +212,4 @@ for key, value in defaults.items():
 
 refresh_pyzx_tikz_settings()  # Call it once on startup
 
-
-display_setting = DisplaySettings(str(settings.value("color-scheme")))
+display_setting = DisplaySettings()

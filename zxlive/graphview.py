@@ -23,13 +23,13 @@ from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QO
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
 
-from .graphscene import GraphScene, VItem, EItem, EditGraphScene
-
 from dataclasses import dataclass
 
-from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM
-from .vitem import PHASE_ITEM_Z
 from . import animations as anims
+from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM
+from .graphscene import GraphScene, VItem, EItem, EditGraphScene
+from .settings import display_setting
+from .vitem import PHASE_ITEM_Z
 
 if TYPE_CHECKING:
     from .rule_panel import RulePanel
@@ -291,6 +291,10 @@ class GraphView(QGraphicsView):
         painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
 
+    def update_font(self) -> None:
+        for i in self.graph_scene.items():
+            if isinstance(i, VItem):
+                i.update_font()
 
 class ProofGraphView(GraphView):
     def __init__(self, graph_scene: GraphScene) -> None:
@@ -309,6 +313,7 @@ class ProofGraphView(GraphView):
         self.__update_scalar_label(g.scalar)
 
     def __update_scalar_label(self, scalar: Scalar) -> None:
+        self.scalar = scalar
         scalar_string = f" Scalar: {scalar.polar_str()}"
         if scalar.is_zero:
             colour = "red"
@@ -318,7 +323,14 @@ class ProofGraphView(GraphView):
             text = f"{scalar_string}"
 
         self.scalar_label.setText(f"<span style='color:{colour}'>{text}</span>")
-        self.scalar_label.setFixedWidth(self.scalar_label.fontMetrics().size(0, text, 0).width())
+        font_metrics = self.scalar_label.fontMetrics().size(0, text, 0)
+        self.scalar_label.setFixedWidth(font_metrics.width())
+        self.scalar_label.setFixedHeight(font_metrics.height())
+
+    def update_font(self) -> None:
+        self.scalar_label.setFont(display_setting.font)
+        self.__update_scalar_label(self.scalar)
+        super().update_font()
 
 
 class RuleEditGraphView(GraphView):

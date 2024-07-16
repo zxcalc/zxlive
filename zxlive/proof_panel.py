@@ -25,6 +25,7 @@ from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeModel
 from .rewrite_data import action_groups, refresh_custom_rules
+from .settings import display_setting
 from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 
 
@@ -96,25 +97,29 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(self.refresh_rules)
 
     def init_rewrites_bar(self) -> None:
+        self.reset_rewrite_panel_style()
+        self._refresh_rewrites_model()
+
+    def reset_rewrite_panel_style(self) -> None:
         self.rewrites_panel.setUniformRowHeights(True)
         self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        fi = QFontInfo(self.font())
-
         self.rewrites_panel.setStyleSheet(
             f'''
             QTreeView::Item:hover {{
                 background-color: #e2f4ff;
             }}
             QTreeView::Item{{
-                height:{fi.pixelSize() * 2}px;
+                height:{display_setting.font.pointSizeF() * 2.5}px;
             }}
             QTreeView::Item:!enabled {{
                 color: #c0c0c0;
             }}
             ''')
 
-        # Set the models
-        self._refresh_rewrites_model()
+    def update_font(self) -> None:
+        self.rewrites_panel.setFont(display_setting.font)
+        self.reset_rewrite_panel_style()
+        super().update_font()
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
@@ -425,5 +430,6 @@ class ProofPanel(BasePanel):
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self)
         self.rewrites_panel.setModel(model)
+        self.rewrites_panel.expand(model.index(0,0))
         self.rewrites_panel.clicked.connect(model.do_rewrite)
         self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
