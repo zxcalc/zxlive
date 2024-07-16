@@ -35,6 +35,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
     "previews-show": 'True'
+    'sound-effects': False,
 }
 
 font_defaults: dict[str, str | int | None] = {

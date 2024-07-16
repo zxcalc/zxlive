@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
 from pyzx.graph.jsonparser import string_to_phase
+from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
@@ -146,6 +147,7 @@ class EditorBasePanel(BasePanel):
     def add_vert(self, x: float, y: float) -> None:
         cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
             else AddNode(self.graph_view, x, y, self._curr_vty)
+        self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
         self.undo_stack.push(cmd)
 
     def add_edge(self, u: VT, v: VT) -> None:

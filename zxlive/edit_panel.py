@@ -48,7 +48,6 @@ class GraphEditPanel(EditorBasePanel):
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
 
-
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
@@ -61,7 +60,6 @@ class GraphEditPanel(EditorBasePanel):
         self.start_derivation.setText("Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
-
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():

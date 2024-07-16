@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator, Optional, Sequence, Type
 
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QVBoxLayout, QWidget)
@@ -43,6 +44,8 @@ class BasePanel(QWidget):
     undo_stack: AnimatedUndoStack
     file_path: Optional[str]
     file_type: Optional[FileFormat]
+
+    play_sound_signal = Signal(object)  # Actual type: SFXEnum
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__()
