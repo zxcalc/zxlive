@@ -25,6 +25,8 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
+    - name: Setup Audio
+      run: sudo apt-get install -y pulseaudio
     - name: Setup QtLibs
       uses:  # See https://pytest-qt.readthedocs.io/en/latest/troubleshooting.html#github-actions
         tlambert03/setup-qt-libs@v1
