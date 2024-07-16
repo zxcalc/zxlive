@@ -277,6 +277,8 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, widget.value())
             elif isinstance(widget, QComboBox):
                 self.settings.setValue(name, widget.currentData())
+            elif isinstance(widget, QCheckBox):
+               self.settings.setValue(name, widget.isChecked())
         display_setting.update()
 
     def apply_global_settings(self) -> None:

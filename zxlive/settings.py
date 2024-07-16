@@ -202,7 +202,8 @@ class DisplaySettings:
             get_settings_value("font/size", int)
         )
         self.SNAP = SCALE / self.SNAP_DIVISION
-        self.PREVIEWS_SHOW = (get_settings_value("previews-show",str) == "True")
+        self.PREVIEWS_SHOW = get_settings_value("previews-show",bool)
+        self.PREVIEWS_SHOW = True
 
 
 # Initialise settings
