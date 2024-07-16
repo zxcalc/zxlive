@@ -34,7 +34,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
-    "previews-show": 'True'
+    "previews-show": True,
     'sound-effects': False,
 }
 
