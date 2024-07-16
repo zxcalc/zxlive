@@ -210,6 +210,10 @@ def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, F
     file_path, selected_format = file_path_and_format
 
     if selected_format in (FileFormat.QGraph, FileFormat.Json):
+        try:
+            graph.auto_detect_io()
+        except TypeError:
+            pass
         data = graph.to_json()
     elif selected_format == FileFormat.QASM:
         try:

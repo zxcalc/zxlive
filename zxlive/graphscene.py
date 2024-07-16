@@ -141,8 +141,7 @@ class GraphScene(QGraphicsScene):
             if select_new:
                 selected_vertices.add(v)
 
-        for e, typ in diff.new_edges:
-            s, t = self.g.edge_st(e)
+        for (s, t), typ in diff.new_edges:
             e = (s,t,typ)
             if e not in self.edge_map:
                 self.edge_map[e] = {}
@@ -178,9 +177,11 @@ class GraphScene(QGraphicsScene):
 
         self.select_vertices(selected_vertices)
 
-    def update_edge_curves(self, s, t):
+    def update_edge_curves(self, s: VT, t: VT) -> None:
         edges = []
         for e in set(self.g.edges(s, t)):
+            if e not in self.edge_map:
+                continue
             for i in self.edge_map[e]:
                 edges.append(self.edge_map[e][i])
         midpoint_index = 0.5 * (len(edges) - 1)
@@ -235,7 +236,7 @@ class EditGraphScene(GraphScene):
 
     # Currently selected edge type for preview when dragging
     # to add a new edge
-    curr_ety: EdgeType.Type
+    curr_ety: EdgeType
     curr_tool: ToolType
 
     # The vertex a right mouse button drag was initiated on

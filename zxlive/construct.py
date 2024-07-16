@@ -11,20 +11,22 @@ def construct_circuit() -> GraphT:
     # numbered from 0 to 3.
 
     # id, qubit number, vertex type (1 = Z, 2 = X).
+    z, x = VertexType.Z, VertexType.X
     vlist = [
-        (0, 0, 1), (1, 1, 2), (2, 2, 1), (3, 3, 1), (4, 0, 1), (5, 1, 1),
-        (6, 2, 2), (7, 3, 1), (8, 0, 1), (9, 1, 2), (10, 2, 1), (11, 3, 1),
-        (12, 0, 2), (13, 1, 2), (14, 2, 1), (15, 3, 2)]
+        (0, 0, z), (1, 1, x), (2, 2, z), (3, 3, z), (4, 0, z), (5, 1, z),
+        (6, 2, x), (7, 3, z), (8, 0, z), (9, 1, x), (10, 2, z), (11, 3, z),
+        (12, 0, x), (13, 1, x), (14, 2, z), (15, 3, x)]
     # id1, id2, edge type (0 = SIMPLE, 1 = HADAMARD)
+    s, h = EdgeType.SIMPLE, EdgeType.HADAMARD
     elist = [
-        (0, 1, 0), (0, 4, 0), (1, 5, 0), (1, 6, 0), (2, 6, 0), (3, 7, 0),
-        (4, 8, 0), (5, 9, 1), (6, 10, 0), (7, 11, 0), (8, 12, 0), (8, 13, 0),
-        (9, 13, 1), (9, 14, 1), (10, 13, 0), (10, 14, 0), (11, 14, 0),
-        (11, 15, 0)]
+        (0, 1, s), (0, 4, s), (1, 5, s), (1, 6, s), (2, 6, s), (3, 7, s),
+        (4, 8, s), (5, 9, h), (6, 10, s), (7, 11, s), (8, 12, s), (8, 13, s),
+        (9, 13, h), (9, 14, h), (10, 13, s), (10, 14, s), (11, 14, s),
+        (11, 15, s)]
 
     nvertices = len(vlist) + (2 * qubits)
 
-    nvlist: list[tuple[int, int, VertexType.Type]] = []
+    nvlist: list[tuple[int, int, VertexType]] = []
     # Adding inputs nodes to the nvlist.
     for i in range(qubits):
         nvlist.append((i, i, VertexType.BOUNDARY))
@@ -37,7 +39,7 @@ def construct_circuit() -> GraphT:
     for i in range(qubits):
         nvlist.append((nvertices - qubits + i, i, VertexType.BOUNDARY))
 
-    nelist = []
+    nelist:  list[tuple[int, int, EdgeType]] = []
 
     # Updating the user provided elist to include input indices
     for edge in elist:
@@ -45,8 +47,8 @@ def construct_circuit() -> GraphT:
 
     # Adding the edges between inputs nodes and output nodes to internal nodes
     for i in range(qubits):
-        nelist.append((i, i+qubits, 0))
-        nelist.append((nvertices - qubits + i, nvertices - (2*qubits) + i, 0))
+        nelist.append((i, i+qubits, EdgeType.SIMPLE))
+        nelist.append((nvertices - qubits + i, nvertices - (2*qubits) + i, EdgeType.SIMPLE))
 
     cur_row = [1] * qubits
 
@@ -58,8 +60,8 @@ def construct_circuit() -> GraphT:
         g.add_vertex(tp, qu, rw)
         cur_row[qu] += 1
 
-    es1 = [edge[:2] for edge in nelist if not edge[2]]
-    es2 = [edge[:2] for edge in nelist if edge[2]]
+    es1 = [edge[:2] for edge in nelist if edge[2] == EdgeType.SIMPLE]
+    es2 = [edge[:2] for edge in nelist if edge[2] == EdgeType.HADAMARD]
 
     # TODO: add the phase part
     # for w, phase in phases.items():

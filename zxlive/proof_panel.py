@@ -4,33 +4,30 @@ import copy
 from typing import Iterator, Union, cast
 
 import pyzx
-from PySide6.QtCore import (QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import (QAction, QColor, QFont, QFontMetrics, QIcon,
-                           QPainter, QPen, QVector2D, QFontInfo)
-from PySide6.QtWidgets import (QAbstractItemView, QListView,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QToolButton,
-                               QInputDialog, QTreeView)
+from PySide6.QtCore import QPointF, QSize
+from PySide6.QtGui import QAction, QFontInfo, QIcon, QVector2D
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QToolButton,
+                               QTreeView)
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import get_z_box_label, set_z_box_label, get_w_partner, EdgeType, FractionLike
+from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
+                        set_z_box_label, vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, GoToRewriteStep, MoveNode, UndoableChange
-from .common import (ET, VT, GraphT, get_data,
-                     pos_from_view, pos_to_view, colors)
+from .commands import AddRewriteStep, MoveNodeProofMode
+from .common import ET, VT, GraphT, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg
+from .editor_base_panel import string_to_complex
 from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
-from .proof import ProofModel
-from .vitem import DragState, VItem, W_INPUT_OFFSET, SCALE
-from .editor_base_panel import string_to_complex
-from .rewrite_data import action_groups, refresh_custom_rules
+from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeModel
+from .rewrite_data import action_groups, refresh_custom_rules
+from .settings import display_setting
 from .sfx import SFXEnum
+from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 
 
 class ProofPanel(BasePanel):
@@ -55,37 +52,13 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
-        self.step_view = QListView(self)
-        self.proof_model = ProofModel(self.graph_view.graph_scene.g)
-        self.step_view.setModel(self.proof_model)
-        self.step_view.setPalette(QColor(255, 255, 255))
-        self.step_view.setSpacing(0)
-        self.step_view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.step_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.step_view.setItemDelegate(ProofStepItemDelegate())
-        self.step_view.setCurrentIndex(self.proof_model.index(0, 0))
-        self.step_view.selectionModel().selectionChanged.connect(self._proof_step_selected)
-        self.step_view.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
-        self.step_view.doubleClicked.connect(self._double_click_handler)
+        self.step_view = ProofStepView(self)
 
         self.splitter.addWidget(self.step_view)
 
-    def _double_click_handler(self, index: QModelIndex | QPersistentModelIndex) -> None:
-        # The first row in the item list is the START step, which is not interactive
-        if index.row() == 0:
-            return
-
-        new_name, ok = QInputDialog.getText(self, "Rename proof step", "Enter new name")
-
-        if ok:
-            # Subtract 1 from index since the START step isn't part of the model
-            old_name = self.proof_model.steps[index.row()-1].display_name
-            cmd = UndoableChange(self.graph_view,
-                lambda: self.proof_model.rename_step(index.row()-1, old_name),
-                lambda: self.proof_model.rename_step(index.row()-1, new_name)
-            )
-
-            self.undo_stack.push(cmd)
+    @property
+    def proof_model(self) -> ProofModel:
+        return self.step_view.model()
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         icon_size = QSize(32, 32)
@@ -125,25 +98,29 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(self.refresh_rules)
 
     def init_rewrites_bar(self) -> None:
+        self.reset_rewrite_panel_style()
+        self._refresh_rewrites_model()
+
+    def reset_rewrite_panel_style(self) -> None:
         self.rewrites_panel.setUniformRowHeights(True)
         self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        fi = QFontInfo(self.font())
-
         self.rewrites_panel.setStyleSheet(
             f'''
             QTreeView::Item:hover {{
                 background-color: #e2f4ff;
             }}
             QTreeView::Item{{
-                height:{fi.pixelSize() * 2}px;
+                height:{display_setting.font.pointSizeF() * 2.5}px;
             }}
             QTreeView::Item:!enabled {{
                 color: #c0c0c0;
             }}
             ''')
 
-        # Set the models
-        self._refresh_rewrites_model()
+    def update_font(self) -> None:
+        self.rewrites_panel.setFont(display_setting.font)
+        self.reset_rewrite_panel_style()
+        super().update_font()
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
@@ -157,7 +134,7 @@ class ProofPanel(BasePanel):
         return selection, list(edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNode(self.graph_view, vs)
+        cmd = MoveNodeProofMode(self.graph_view, vs, self.step_view)
         self.undo_stack.push(cmd)
 
     def _selection_clicked(self) -> None:
@@ -197,6 +174,34 @@ class ProofPanel(BasePanel):
             return
         elif self._magic_identity(trace):
             return
+        elif self._magic_hopf(trace):
+            return
+
+    def _magic_hopf(self, trace: WandTrace) -> bool:
+        if not all(isinstance(item, EItem) for item in trace.hit):
+            return False
+        edges = [item.e for item in trace.hit]
+        if not all(edge == edges[0] for edge in edges):
+            return False
+        source, target = self.graph.edge_st(edges[0])
+        source_type, target_type = self.graph.type(source), self.graph.type(target)
+        edge_type = self.graph.edge_type(edges[0])
+        if (edge_type == EdgeType.HADAMARD and vertex_is_z_like(source_type) and vertex_is_z_like(target_type)) or \
+           (edge_type == EdgeType.SIMPLE and vertex_is_z_like(source_type) and target_type == VertexType.X) or \
+           (edge_type == EdgeType.SIMPLE and source_type == VertexType.X and vertex_is_z_like(target_type)):
+            new_g = copy.deepcopy(self.graph)
+            num_edges = len(edges)
+            # Remove even number of edges
+            if num_edges % 2 != 0:
+                num_edges -= 1
+            for _ in range(num_edges):
+                new_g.remove_edge(edges[0])
+            # TODO: Add animation for Hopf
+            # anim = anims.hopf(edges, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Hopf")
+            self.undo_stack.push(cmd)
+            return True
+        return False
 
     def _magic_identity(self, trace: WandTrace) -> bool:
         if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
@@ -209,7 +214,7 @@ class ProofPanel(BasePanel):
         t = self.graph.edge_t(item.e)
 
         if self.identity_choice[0].isChecked():
-            vty: VertexType.Type = VertexType.Z
+            vty: VertexType = VertexType.Z
         elif self.identity_choice[1].isChecked():
             vty = VertexType.X
         else:
@@ -269,22 +274,25 @@ class ProofPanel(BasePanel):
             start, end = end, start
         pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
         left, right = [], []
-        for neighbor in self.graph.neighbors(vertex):
-            npos = QPointF(*pos_to_view(self.graph.row(neighbor), self.graph.qubit(neighbor)))
-            # Compute whether each neighbor is inside the entry and exit points
-            i1 = cross(start - pos, npos - pos) * cross(start - pos, end - pos) >= 0
-            i2 = cross(end - pos, npos - pos) * cross(end - pos, start - pos) >= 0
-            inside = i1 and i2
-            if inside:
-                left.append(neighbor)
-            else:
-                right.append(neighbor)
+        for edge in set(self.graph.incident_edges(vertex)):
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                # we use the selection node to determine the center of the edge
+                epos = eitem.selection_node.pos()
+                # Compute whether each edge is inside the entry and exit points
+                i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
+                i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
+                inside = i1 and i2
+                if inside:
+                    left.append(eitem)
+                else:
+                    right.append(eitem)
         mouse_dir = ((start + end) * (1/2)) - pos
 
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
             self._unfuse_w(vertex, left, mouse_dir)
         else:
-            self._unfuse(vertex, left, mouse_dir, phase)
+            self._unfuse(vertex, left, right, mouse_dir, phase)
         return True
 
     def _remove_id(self, v: VT) -> None:
@@ -294,7 +302,7 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
 
-    def _unfuse_w(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF) -> None:
+    def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
         new_g = copy.deepcopy(self.graph)
 
         vi = get_w_partner(self.graph, v)
@@ -323,17 +331,21 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
-        for neighbor in left_neighbours:
-            new_g.add_edge((neighbor, left_vert),
-                           self.graph.edge_type((v, neighbor)))
-            new_g.remove_edge((v, neighbor))
+        for edge in set(self.graph.incident_edges(v)):
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                if eitem not in left_edge_items:
+                    continue
+                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+                new_g.remove_edge(edge)
 
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
         self.undo_stack.push(cmd, anim_after=anim)
 
-    def _unfuse(self, v: VT, left_neighbours: list[VT], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> \
-            None:
+    def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
         def snap_vector(v: QVector2D) -> None:
             if abs(v.x()) > abs(v.y()):
                 v.setY(0.0)
@@ -342,25 +354,24 @@ class ProofPanel(BasePanel):
             if not v.isNull():
                 v.normalize()
 
-        # Compute the average position of left vectors
+        def compute_avg_vector(pos: QPointF, neighbors: list[EItem]) -> QVector2D:
+            avg_vector = QVector2D()
+            for eitem in neighbors:
+                eitem_pos = pos_from_view(eitem.selection_node.pos().x(), eitem.selection_node.pos().y())
+                npos = QPointF(eitem_pos[0], eitem_pos[1])
+                dir = QVector2D(npos - pos).normalized()
+                avg_vector += dir
+            avg_vector.normalize()
+            return avg_vector
+
         pos = QPointF(self.graph.row(v), self.graph.qubit(v))
-        avg_left = QVector2D()
-        for n in left_neighbours:
-            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
-            dir = QVector2D(npos - pos).normalized()
-            avg_left += dir
-        avg_left.normalize()
-        # And snap it to the grid
+
+        avg_left = compute_avg_vector(pos, left_edge_items)
         snap_vector(avg_left)
-        # Same for right vectors
-        avg_right = QVector2D()
-        for n in self.graph.neighbors(v):
-            if n in left_neighbours: continue
-            npos = QPointF(self.graph.row(n), self.graph.qubit(n))
-            dir = QVector2D(npos - pos).normalized()
-            avg_right += dir
-        avg_right.normalize()
+
+        avg_right = compute_avg_vector(pos, right_edge_items)
         snap_vector(avg_right)
+
         if avg_right.isNull():
             avg_right = -avg_left
         elif avg_left.isNull():
@@ -373,17 +384,24 @@ class ProofPanel(BasePanel):
         phase_left = QVector2D.dotProduct(QVector2D(mouse_dir), avg_left) \
             >= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
 
-        new_g = copy.deepcopy(self.graph)
+        new_g: GraphT = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v),
                                      qubit=self.graph.qubit(v) + dist*avg_left.y(),
                                      row=self.graph.row(v) + dist*avg_left.x())
         new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
         new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
-        for neighbor in left_neighbours:
-            new_g.add_edge((neighbor, left_vert),
-                           self.graph.edge_type((v, neighbor)))
-            new_g.remove_edge((v, neighbor))
         new_g.add_edge((v, left_vert))
+
+        for edge in set(self.graph.incident_edges(v)):
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                if eitem not in left_edge_items:
+                    continue
+                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+                new_g.remove_edge(edge)
+
         if phase_left:
             if self.graph.type(v) == VertexType.Z_BOX:
                 set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v) / phase)
@@ -411,88 +429,10 @@ class ProofPanel(BasePanel):
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
         self.undo_stack.push(cmd)
 
-    def _proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        if not selected or not deselected:
-            return
-        cmd = GoToRewriteStep(self.graph_view, self.step_view, deselected.first().topLeft().row(), selected.first().topLeft().row())
-        self.undo_stack.push(cmd)
-
     def _refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self)
         self.rewrites_panel.setModel(model)
+        self.rewrites_panel.expand(model.index(0,0))
         self.rewrites_panel.clicked.connect(model.do_rewrite)
         self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
-
-
-class ProofStepItemDelegate(QStyledItemDelegate):
-    """This class controls the painting of items in the proof steps list view.
-
-    We paint a "git-style" line with circles to denote individual steps in a proof.
-    """
-
-    line_width = 3
-    line_padding = 13
-    vert_padding = 10
-
-    circle_radius = 4
-    circle_radius_selected = 6
-    circle_outline_width = 3
-
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
-        painter.save()
-        assert hasattr(option, "state") and hasattr(option, "rect") and hasattr(option, "font")
-
-        # Draw background
-        painter.setPen(Qt.GlobalColor.transparent)
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.setBrush(QColor(204, 232, 255))
-        elif option.state & QStyle.StateFlag.State_MouseOver:
-            painter.setBrush(QColor(229, 243, 255))
-        else:
-            painter.setBrush(Qt.GlobalColor.white)
-        painter.drawRect(option.rect)
-
-        # Draw line
-        is_last = index.row() == index.model().rowCount() - 1
-        line_rect = QRect(
-            self.line_padding,
-            int(option.rect.y()),
-            self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)
-        )
-        painter.setBrush(Qt.GlobalColor.black)
-        painter.drawRect(line_rect)
-
-        # Draw circle
-        painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
-        painter.setBrush(colors.z_spider)
-        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
-        painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),
-            circle_radius,
-            circle_radius
-        )
-
-        # Draw text
-        text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()
-        text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),
-            option.rect.width(),
-            text_height
-        )
-        if option.state & QStyle.StateFlag.State_Selected:
-            option.font.setWeight(QFont.Weight.Bold)
-        painter.setFont(option.font)
-        painter.setPen(Qt.GlobalColor.black)
-        painter.setBrush(Qt.GlobalColor.black)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
-
-        painter.restore()
-
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
-        size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
-

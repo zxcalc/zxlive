@@ -57,6 +57,7 @@ class EItem(QGraphicsPathItem):
         # self.selection_node.setVisible(False)
         self.is_mouse_pressed = False
         self.is_dragging = False
+        self._old_pos: Optional[QPointF] = None
 
         self.refresh()
 
@@ -152,7 +153,7 @@ class EItem(QGraphicsPathItem):
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
-    def __init__(self, g: GraphT, ety: EdgeType.Type, start: VItem, mouse_pos: QPointF) -> None:
+    def __init__(self, g: GraphT, ety: EdgeType, start: VItem, mouse_pos: QPointF) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.g = g
@@ -180,15 +181,15 @@ class EDragItem(QGraphicsPathItem):
         path.lineTo(self.mouse_pos)
         self.setPath(path)
 
-def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float):
+def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float) -> QPointF:
     """Calculate the control point for the curve"""
     perpendicular = compute_perpendicular_direction(source_pos, target_pos)
-    midpoint = (source_pos + target_pos) / 2
+    midpoint: QPointF = (source_pos + target_pos) / 2.
     offset = perpendicular * curve_distance * SCALE
     control_point = midpoint + offset
     return control_point
 
-def compute_perpendicular_direction(source_pos, target_pos):
+def compute_perpendicular_direction(source_pos: QPointF, target_pos: QPointF) -> QPointF:
     if source_pos == target_pos:
         return QPointF(0, -2/3)
     direction = target_pos - source_pos

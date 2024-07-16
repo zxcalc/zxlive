@@ -24,8 +24,8 @@ class RulePanel(EditorBasePanel):
     graph_scene_right: EditGraphScene
     start_derivation_signal = Signal(object)
 
-    _curr_ety: EdgeType.Type
-    _curr_vty: VertexType.Type
+    _curr_ety: EdgeType
+    _curr_vty: VertexType
 
 
     def __init__(self, graph1: GraphT, graph2: GraphT, name: str, description: str, *actions: QAction) -> None:

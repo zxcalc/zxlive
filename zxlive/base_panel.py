@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterator, Optional, Sequence
+from typing import Iterator, Optional, Sequence, Type
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QVBoxLayout, QWidget)
 
+from .eitem import EItem
 from .animations import AnimatedUndoStack
 from .commands import ChangeEdgeCurve, SetGraph
 from .common import GraphT, new_graph
@@ -34,7 +35,7 @@ class ToolbarSection:
 class BasePanel(QWidget):
     """Base class implementing functionality shared between the edit and
     proof panels."""
-    splitter_sizes = dict()
+    splitter_sizes: dict[Type[BasePanel], list[int]] = dict()
 
     graph_scene: GraphScene
     graph_view: GraphView
@@ -112,12 +113,15 @@ class BasePanel(QWidget):
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
 
-    def sync_splitter_sizes(self):
+    def sync_splitter_sizes(self) -> None:
         self.splitter_sizes[self.__class__] = self.splitter.sizes()
 
-    def set_splitter_size(self):
+    def set_splitter_size(self) -> None:
         if self.__class__ in self.splitter_sizes:
             self.splitter.setSizes(self.splitter_sizes[self.__class__])
 
-    def change_edge_curves(self, eitem, new_distance, old_distance):
+    def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
         self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))
+
+    def update_font(self) -> None:
+        self.graph_view.update_font()

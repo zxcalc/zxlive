@@ -265,7 +265,7 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
                        duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 
 
-def make_animation(self: RewriteAction, panel: ProofPanel, g, matches, rem_verts) -> tuple:
+def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:
     anim_before = None
     anim_after = None
     if self.name == operations['spider']['text'] or self.name == operations['fuse_w']['text']:
