@@ -72,13 +72,13 @@ input_circuit_formats = {
     'sqasm-no-simplification': "Spider QASM (no simplification)",
 }
 
-
 general_settings: list[SettingsData] = [
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
+    {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
 ]
 
@@ -277,6 +277,8 @@ class SettingsDialog(QDialog):
                 self.settings.setValue(name, widget.value())
             elif isinstance(widget, QComboBox):
                 self.settings.setValue(name, widget.currentData())
+            elif isinstance(widget, QCheckBox):
+               self.settings.setValue(name, widget.isChecked())
         display_setting.update()
 
     def apply_global_settings(self) -> None:

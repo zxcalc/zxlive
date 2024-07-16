@@ -3,16 +3,24 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 from typing import Callable, TYPE_CHECKING, Any, cast, Union
+from concurrent.futures import ThreadPoolExecutor
 
 import pyzx
-from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, Signal, QObject, QMetaObject
-from concurrent.futures import ThreadPoolExecutor
+
+from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, 
+                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
+from PySide6.QtGui import QPixmap, QColor, QPen
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
+
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT
+from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
 from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES
+from .settings import display_setting
+from .graphscene import GraphScene
+from .graphview import GraphView
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -36,12 +44,57 @@ class RewriteAction:
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
+        if display_setting.PREVIEWS_SHOW and ('picture' in d or 'custom_rule' in d):
+            if 'custom_rule' in d:
+                # We will create a custom tooltip picture representing the custom rewrite
+                graph_scene_left = GraphScene()
+                graph_scene_right = GraphScene()
+                graph_view_left = GraphView(graph_scene_left)
+                graph_view_left.draw_background_lines = False
+                graph_view_left.set_graph(d['lhs'])
+                graph_view_right = GraphView(graph_scene_right)
+                graph_view_right.draw_background_lines = False
+                graph_view_right.set_graph(d['rhs'])
+                graph_view_left.fit_view()
+                graph_view_right.fit_view()
+                graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
+                graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
+                lhs_size = graph_view_left.viewport().size()
+                rhs_size = graph_view_right.viewport().size()
+                # The picture needs to be wide enough to fit both of them and have some space for the = sign
+                pixmap = QPixmap(lhs_size.width()+rhs_size.width()+160,max(lhs_size.height(),rhs_size.height()))
+                pixmap.fill(QColor("#ffffff"))
+                graph_view_left.viewport().render(pixmap)
+                graph_view_right.viewport().render(pixmap,QPoint(lhs_size.width()+160,0))
+                # We create a new scene to render the = sign
+                new_scene = GraphScene()
+                new_view = GraphView(new_scene)
+                new_view.draw_background_lines = False
+                new_scene.addLine(QLineF(QPointF(10,40),QPointF(80,40)),QPen(QColor("#000000"),8))
+                new_scene.addLine(QLineF(QPointF(10,10),QPointF(80,10)),QPen(QColor("#000000"),8))
+                new_view.setSceneRect(new_scene.itemsBoundingRect())
+                new_view.viewport().render(pixmap,QPoint(lhs_size.width(),max(lhs_size.height(),rhs_size.height())/2-20))
+                
+                buffer = QBuffer()
+                buffer.open(QIODevice.WriteOnly)
+                pixmap.save(buffer, "PNG", quality=100)
+                image = bytes(buffer.data().toBase64()).decode()
+            else:
+                pixmap = QPixmap()
+                pixmap.load(get_data("tooltips/"+d['picture']))
+                buffer = QBuffer()
+                buffer.open(QIODevice.WriteOnly)
+                pixmap.save(buffer, "PNG", quality=100)
+                image = bytes(buffer.data().toBase64()).decode()
+            tooltip = '<img src="data:image/png;base64,{}" width="500">'.format(image) + d['tooltip']
+        else:
+            tooltip = d['tooltip']
         return cls(
             name=d['text'],
             matcher=d['matcher'],
             rule=d['rule'],
             match_type=d['type'],
-            tooltip=d['tooltip'],
+            tooltip=tooltip,
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
         )

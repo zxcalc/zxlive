@@ -35,7 +35,6 @@ if os.name == 'nt':
     myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
 
-
 class ZXLive(QApplication):
     """The main ZXLive application
 

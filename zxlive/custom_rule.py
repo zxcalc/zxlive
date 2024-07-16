@@ -186,7 +186,9 @@ class CustomRule:
     def to_rewrite_data(self) -> "RewriteData":
         from .rewrite_data import MATCHES_VERTICES
         return {"text": self.name, "matcher": self.matcher, "rule": self, "type": MATCHES_VERTICES,
-                "tooltip": self.description, 'copy_first': False, 'returns_new_graph': False}
+                "tooltip": self.description, 'copy_first': False, 'returns_new_graph': False,
+                "custom_rule": True, "lhs": self.lhs_graph, "rhs": self.rhs_graph}
+
 
 
 def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:

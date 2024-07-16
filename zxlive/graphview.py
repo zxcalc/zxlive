@@ -65,11 +65,12 @@ GRID_SCALE = SCALE / 2
 class GraphView(QGraphicsView):
     """QtWidget containing a graph
 
-    This widget is view associated with a graph. However, most of the
+    This widget is the view associated with a graph. However, most of the
     interesting stuff happens in `GraphScene`.
     """
 
     wand_trace_finished = Signal(object)
+    draw_background_lines = True
 
     def __init__(self, graph_scene: GraphScene) -> None:
         self.graph_scene = graph_scene
@@ -267,6 +268,7 @@ class GraphView(QGraphicsView):
         painter.setBrush(QColor(255, 255, 255, 255))
         painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
+        if not self.draw_background_lines: return
 
         # Calculate grid lines
         lines, thick_lines = [], []
