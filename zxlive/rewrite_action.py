@@ -8,8 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 import pyzx
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex, 
-                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint)
-from PySide6.QtGui import QPixmap, QColor
+                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
+from PySide6.QtGui import QPixmap, QColor, QPen
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 
 
@@ -46,6 +46,7 @@ class RewriteAction:
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
         if display_setting.PREVIEWS_SHOW and ('picture' in d or 'custom_rule' in d):
             if 'custom_rule' in d:
+                # We will create a custom tooltip picture representing the custom rewrite
                 graph_scene_left = GraphScene()
                 graph_scene_right = GraphScene()
                 graph_view_left = GraphView(graph_scene_left)
@@ -56,16 +57,23 @@ class RewriteAction:
                 graph_view_right.set_graph(d['rhs'])
                 graph_view_left.fit_view()
                 graph_view_right.fit_view()
-                graph_view_left.show()
-                graph_view_right.show()
+                graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
+                graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
                 lhs_size = graph_view_left.viewport().size()
                 rhs_size = graph_view_right.viewport().size()
-                pixmap = QPixmap(lhs_size.width()+rhs_size.width(),max(lhs_size.height(),rhs_size.height()))
+                # The picture needs to be wide enough to fit both of them and have some space for the = sign
+                pixmap = QPixmap(lhs_size.width()+rhs_size.width()+160,max(lhs_size.height(),rhs_size.height()))
                 pixmap.fill(QColor("#ffffff"))
-                #pixmap1 = QPixmap(graph_view_left.viewport().size())
                 graph_view_left.viewport().render(pixmap)
-                #pixmap2 = QPixmap(graph_view_right.viewport().size())
-                graph_view_right.viewport().render(pixmap,QPoint(lhs_size.width(),0))
+                graph_view_right.viewport().render(pixmap,QPoint(lhs_size.width()+160,0))
+                # We create a new scene to render the = sign
+                new_scene = GraphScene()
+                new_view = GraphView(new_scene)
+                new_view.draw_background_lines = False
+                new_scene.addLine(QLineF(QPointF(10,40),QPointF(80,40)),QPen(QColor("#000000"),8))
+                new_scene.addLine(QLineF(QPointF(10,10),QPointF(80,10)),QPen(QColor("#000000"),8))
+                new_view.setSceneRect(new_scene.itemsBoundingRect())
+                new_view.viewport().render(pixmap,QPoint(lhs_size.width(),max(lhs_size.height(),rhs_size.height())/2-20))
                 
                 buffer = QBuffer()
                 buffer.open(QIODevice.WriteOnly)
