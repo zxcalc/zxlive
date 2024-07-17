@@ -44,7 +44,7 @@ class RewriteAction:
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
-        if display_setting.PREVIEWS_SHOW and ('picture' in d or 'custom_rule' in d):
+        if display_setting.previews_show and ('picture' in d or 'custom_rule' in d):
             if 'custom_rule' in d:
                 # We will create a custom tooltip picture representing the custom rewrite
                 graph_scene_left = GraphScene()

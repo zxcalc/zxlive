@@ -177,7 +177,6 @@ class MainWindow(QMainWindow):
 
         self.effects = {e: load_sfx(e) for e in SFXEnum}
 
-        self.sfx_on = self.settings.value("sound-effects")
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self._toggle_sfx)
 
     def open_demo_graph(self) -> None:
@@ -587,6 +586,14 @@ class MainWindow(QMainWindow):
     def update_colors(self) -> None:
         if self.active_panel is not None:
             self.active_panel.update_colors()
+
+    @property
+    def sfx_on(self) -> bool:
+        return self.settings.value("sound-effects")
+
+    @sfx_on.setter
+    def sfx_on(self, value: bool) -> None:
+        self.settings.setValue("sound-effects", value)
 
     def play_sound(self, s: SFXEnum) -> None:
         if self.sfx_on:
