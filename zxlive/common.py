@@ -26,6 +26,9 @@ def get_settings_value(arg: str, _type: Type[T], default: T | None = None, setti
     if _type == bool:
         val = _settings.value(arg, default)
         return str(val) == "True" or str(val) == "true"
+    if _type == int:
+        val = _settings.value(arg, default)
+        return int(str(val))
     if not isinstance(val := _settings.value(arg, default), _type):
         if default is not None:
             return default
