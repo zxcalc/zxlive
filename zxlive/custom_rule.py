@@ -271,11 +271,8 @@ def filter_matchings_if_symbolic_compatible(matchings: list[Dict[VT, VT]], left:
     for matching in matchings:
         if len(matching) != len(left):
             continue
-        try:
-            match_symbolic_parameters(matching, left, right)
-            new_matchings.append(matching)
-        except ValueError:
-            pass
+        match_symbolic_parameters(matching, left, right)
+        new_matchings.append(matching)
     return new_matchings
 
 

@@ -79,6 +79,8 @@ class RewriteAction:
 
         try:
             g, rem_verts = self.apply_rewrite(g, matches)
+        except ValueError as ex:
+            raise ex
         except Exception as ex:
             show_error_msg('Error while applying rewrite rule', str(ex))
             return

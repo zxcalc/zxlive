@@ -97,12 +97,9 @@ class RulePanel(EditorBasePanel):
         self.update_io_labels(self.graph_scene)
 
     def update_io_labels(self, scene: EditGraphScene) -> None:
-        try:
-            scene.g.auto_detect_io()
-            for v in scene.g.vertices():
-                if v in scene.g.inputs():
-                    scene.vertex_map[v].phase_item.setPlainText("in-" + str(scene.g.inputs().index(v)))
-                elif v in scene.g.outputs():
-                    scene.vertex_map[v].phase_item.setPlainText("out-" + str(scene.g.outputs().index(v)))
-        except TypeError:
-            return
+        scene.g.auto_detect_io()
+        for v in scene.g.vertices():
+            if v in scene.g.inputs():
+                scene.vertex_map[v].phase_item.setPlainText("in-" + str(scene.g.inputs().index(v)))
+            elif v in scene.g.outputs():
+                scene.vertex_map[v].phase_item.setPlainText("out-" + str(scene.g.outputs().index(v)))
