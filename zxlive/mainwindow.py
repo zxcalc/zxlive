@@ -38,7 +38,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       save_diagram_dialog, save_proof_dialog,
                       save_rule_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file, show_error_msg,
-                      export_proof_dialog)
+                      export_proof_dialog, export_gif_dialog)
 from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 
@@ -47,6 +47,7 @@ from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
+from pyzx.drawing import graphs_to_gif
 
 
 class MainWindow(QMainWindow):
@@ -103,6 +104,8 @@ class MainWindow(QMainWindow):
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         self.export_tikz_proof = self._new_action("Export to tikz", self.handle_export_tikz_proof_action, None,
             "Exports the proof to tikz")
+        self.export_gif_proof = self._new_action("Export to gif", self.handle_export_gif_proof_action, None,
+            "Exports the proof to gif")
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
@@ -113,6 +116,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.save_file)
         file_menu.addAction(self.save_as)
         file_menu.addAction(self.export_tikz_proof)
+        file_menu.addAction(self.export_gif_proof)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
@@ -197,8 +201,9 @@ class MainWindow(QMainWindow):
         self.fit_view_action.setEnabled(has_active_tab)
         self.show_matrix_action.setEnabled(has_active_tab)
 
-        # Export to tikz is enabled only if there is a proof in the active tab.
+        # Export to tikz and gif are enabled only if there is a proof in the active tab.
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
         self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
@@ -419,6 +424,12 @@ class MainWindow(QMainWindow):
             return False
         with open(path, "w") as f:
             f.write(proof_to_tikz(self.active_panel.proof_model))
+        return True
+        
+    def handle_export_gif_proof_action(self) -> bool:
+        assert isinstance(self.active_panel, ProofPanel)
+        path = export_gif_dialog(self)
+        graphs_to_gif(self.active_panel.proof_model.graphs(),path,1000) # 1000ms per frame
         return True
 
     def cut_graph(self) -> None:
