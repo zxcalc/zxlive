@@ -16,13 +16,11 @@
 from __future__ import annotations
 
 import copy
-import random
 from typing import Callable, Optional, cast
 
-from PySide6.QtCore import (QByteArray, QDir, QEvent, QFile, QFileInfo,
-                            QIODevice, QSettings, QTextStream, Qt, QUrl)
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut
-from PySide6.QtMultimedia import QSoundEffect
+from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
+                            QSettings, QTextStream, Qt)
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget,
                                QVBoxLayout, QWidget)
@@ -30,7 +28,7 @@ from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
 import pyperclip
 
 from .base_panel import BasePanel
-from .common import GraphT, get_data, new_graph, to_tikz, from_tikz
+from .common import GraphT, get_data, to_tikz, from_tikz
 from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -38,15 +36,14 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       save_diagram_dialog, save_proof_dialog,
                       save_rule_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file, show_error_msg,
-                      export_proof_dialog)
-from .settings import display_setting
-from .settings_dialog import open_settings_dialog
+                      export_proof_dialog, export_gif_dialog)
+from zxlive.settings_dialog import open_settings_dialog
 
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
-from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
+from pyzx.drawing import graphs_to_gif
 
 
 class MainWindow(QMainWindow):
@@ -71,15 +68,11 @@ class MainWindow(QMainWindow):
             self.restoreGeometry(geom)
         self.show()
 
-        tab_widget = QTabWidget(self)
+        tab_widget = QTabWidget()
         w.layout().addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
-        tab_widget.setMovable(True)
-        tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
-        assert isinstance(tab_position, QTabWidget.TabPosition)
-        tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
@@ -90,7 +83,6 @@ class MainWindow(QMainWindow):
 
         new_graph = self._new_action("&New", self.new_graph, QKeySequence.StandardKey.New,
             "Create a new tab with an empty graph", alt_shortcut=QKeySequence.StandardKey.AddTab)
-        new_window = self._new_action("New &Window", self.open_new_window, QKeySequence("Ctrl+Shift+N"), "Open a new window")
         open_file = self._new_action("&Open...", self.open_file, QKeySequence.StandardKey.Open,
             "Open a file-picker dialog to choose a new diagram")
         self.close_action = self._new_action("Close", self.handle_close_action, QKeySequence.StandardKey.Close,
@@ -103,16 +95,18 @@ class MainWindow(QMainWindow):
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         self.export_tikz_proof = self._new_action("Export to tikz", self.handle_export_tikz_proof_action, None,
             "Exports the proof to tikz")
+        self.export_gif_proof = self._new_action("Export to gif", self.handle_export_gif_proof_action, None,
+            "Exports the proof to gif")
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
-        file_menu.addAction(new_window)
         file_menu.addAction(open_file)
         file_menu.addSeparator()
         file_menu.addAction(self.close_action)
         file_menu.addAction(self.save_file)
         file_menu.addAction(self.save_as)
         file_menu.addAction(self.export_tikz_proof)
+        file_menu.addAction(self.export_gif_proof)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
@@ -175,11 +169,6 @@ class MainWindow(QMainWindow):
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
-        self.effects = {e: load_sfx(e) for e in SFXEnum}
-
-        self.sfx_on = self.settings.value("sound-effects")
-        QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self._toggle_sfx)
-
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
         self.new_graph(graph)
@@ -197,8 +186,9 @@ class MainWindow(QMainWindow):
         self.fit_view_action.setEnabled(has_active_tab)
         self.show_matrix_action.setEnabled(has_active_tab)
 
-        # Export to tikz is enabled only if there is a proof in the active tab.
+        # Export to tikz and gif are enabled only if there is a proof in the active tab.
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
         self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
@@ -236,10 +226,6 @@ class MainWindow(QMainWindow):
             return current_widget
         return None
 
-    def open_new_window(self) -> None:
-        new_window = MainWindow()
-        new_window.new_graph()
-        new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
         while self.active_panel is not None:  # We close all the tabs and ask the user if they want to save progress
@@ -252,16 +238,12 @@ class MainWindow(QMainWindow):
         self.settings.setValue("main_window_geometry", self.saveGeometry())
         e.accept()
 
-    def undo(self, e: QEvent) -> None:
-        if self.active_panel is None:
-            e.ignore()
-            return
+    def undo(self,e: QEvent) -> None:
+        if self.active_panel is None: return
         self.active_panel.undo_stack.undo()
 
-    def redo(self, e: QEvent) -> None:
-        if self.active_panel is None:
-            e.ignore()
-            return
+    def redo(self,e: QEvent) -> None:
+        if self.active_panel is None: return
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean:bool) -> None:
@@ -281,7 +263,6 @@ class MainWindow(QMainWindow):
         if self.active_panel:
             self.active_panel.update_colors()
             self._reset_menus(True)
-            self.active_panel.set_splitter_size()
 
     def _undo_changed(self) -> None:
         if self.active_panel:
@@ -297,7 +278,7 @@ class MainWindow(QMainWindow):
             self._open_file_from_output(out)
 
     def open_file_from_path(self, file_path: str) -> None:
-        out = import_diagram_from_file(file_path, parent=self)
+        out = import_diagram_from_file(file_path)
         if out is not None:
             self._open_file_from_output(out)
 
@@ -310,8 +291,10 @@ class MainWindow(QMainWindow):
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
                 proof_panel: ProofPanel = self.active_panel
-                proof_panel.step_view.setModel(out.p)
+                proof_panel.proof_model = out.p
+                proof_panel.step_view.setModel(proof_panel.proof_model)
                 proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
+                proof_panel.step_view.selectionModel().selectionChanged.connect(proof_panel._proof_step_selected)
             elif isinstance(out, ImportRuleOutput):
                 self.new_rule_editor(out.r, name)
             else:
@@ -330,8 +313,7 @@ class MainWindow(QMainWindow):
         if i == -1:
             return False
         widget = self.tab_widget.widget(i)
-        assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean():
+        if isinstance(widget, BasePanel) and not widget.undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
@@ -343,7 +325,6 @@ class MainWindow(QMainWindow):
                 val = self.handle_save_file_action()
                 if not val:
                     return False
-        widget.graph_scene.clearSelection()
         self.tab_widget.removeTab(i)
         if self.tab_widget.count() == 0:
             self._reset_menus(False)
@@ -357,17 +338,13 @@ class MainWindow(QMainWindow):
             return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
             show_error_msg("Can't save to circuit file",
-                           "You imported this file from a circuit description. You can currently only save it in a graph format.",
-                           parent=self)
+                "You imported this file from a circuit description. You can currently only save it in a graph format.")
             return self.handle_save_as_action()
 
         if isinstance(self.active_panel, ProofPanel):
             data = self.active_panel.proof_model.to_json()
         elif isinstance(self.active_panel, RulePanel):
-            try:
-                check_rule(self.active_panel.get_rule())
-            except Exception as e:
-                show_error_msg("Warning!", str(e), parent=self)
+            check_rule(self.active_panel.get_rule(), show_error=True)
             data = self.active_panel.get_rule().to_json()
         elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
@@ -378,14 +355,12 @@ class MainWindow(QMainWindow):
 
         file = QFile(self.active_panel.file_path)
         if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
-            show_error_msg("Could not write to file", parent=self)
+            show_error_msg("Could not write to file")
             return False
         out = QTextStream(file)
         out << data
         file.close()
         self.active_panel.undo_stack.setClean()
-        if random.random() < 0.1:
-            self.play_sound(SFXEnum.IRANIAN_BUS)
         return True
 
 
@@ -394,10 +369,7 @@ class MainWindow(QMainWindow):
         if isinstance(self.active_panel, ProofPanel):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
-            try:
-                check_rule(self.active_panel.get_rule())
-            except Exception as e:
-                show_error_msg("Warning!", str(e), parent=self)
+            check_rule(self.active_panel.get_rule(), show_error=True)
             out = save_rule_dialog(self.active_panel.get_rule(), self)
         else:
             out = save_diagram_dialog(self.active_panel.graph_scene.g, self)
@@ -415,10 +387,16 @@ class MainWindow(QMainWindow):
         assert isinstance(self.active_panel, ProofPanel)
         path = export_proof_dialog(self)
         if path is None:
-            show_error_msg("Export failed", "Invalid path", parent=self)
+            show_error_msg("Export failed", "Invalid path")
             return False
         with open(path, "w") as f:
             f.write(proof_to_tikz(self.active_panel.proof_model))
+        return True
+        
+    def handle_export_gif_proof_action(self) -> bool:
+        assert isinstance(self.active_panel, ProofPanel)
+        path = export_gif_dialog(self)
+        graphs_to_gif(self.active_panel.proof_model.graphs(),path,1000) # 1000ms per frame
         return True
 
     def cut_graph(self) -> None:
@@ -445,7 +423,7 @@ class MainWindow(QMainWindow):
         if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
             and self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
-
+    
     def paste_graph_from_clipboard(self) -> None:
         assert self.active_panel is not None
         if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel): 
@@ -468,10 +446,9 @@ class MainWindow(QMainWindow):
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
-        panel.play_sound_signal.connect(self.play_sound)
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
-        _graph = graph or new_graph()
+        _graph = graph or GraphT()
         panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
         if name is None: name = "New Graph"
@@ -500,8 +477,8 @@ class MainWindow(QMainWindow):
 
     def new_rule_editor(self, rule: Optional[CustomRule] = None, name: Optional[str] = None) -> None:
         if rule is None:
-            graph1 = new_graph()
-            graph2 = new_graph()
+            graph1 = GraphT()
+            graph2 = GraphT()
             rule_name = ""
             rule_description = ""
         else:
@@ -551,13 +528,12 @@ class MainWindow(QMainWindow):
             self.active_panel.graph.auto_detect_io()
             matrix = self.active_panel.graph.to_matrix()
         except AttributeError:
-            show_error_msg("Can't show matrix",
-                           "Showing matrices for parametrized diagrams is not supported yet.", parent=self)
+            show_error_msg("Can't show matrix", "Showing matrices for parametrized diagrams is not supported yet.")
             return
         except Exception as e:
-            show_error_msg("Can't show matrix", str(e), parent=self)
+            show_error_msg("Can't show matrix", str(e))
             return
-        dialog = QDialog(self)
+        dialog = QDialog()
         dialog.setWindowTitle("Matrix")
         table = QTableWidget()
         table.setRowCount(matrix.shape[0])
@@ -587,21 +563,3 @@ class MainWindow(QMainWindow):
     def update_colors(self) -> None:
         if self.active_panel is not None:
             self.active_panel.update_colors()
-
-    def play_sound(self, s: SFXEnum) -> None:
-        if self.sfx_on:
-            self.effects[s].play()
-
-    def _toggle_sfx(self) -> None:
-        self.sfx_on = not self.sfx_on
-        if self.sfx_on:
-            self.play_sound(random.choice([
-                SFXEnum.WELCOME_EVERYBODY,
-                SFXEnum.OK_IM_GONNA_START,
-            ]))
-
-    def update_font(self) -> None:
-        self.menuBar().setFont(display_setting.font)
-        for i in range(self.tab_widget.count()):
-            w = cast(BasePanel, self.tab_widget.widget(i))
-            w.update_font()
