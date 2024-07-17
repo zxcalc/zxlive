@@ -33,7 +33,8 @@ dependencies = [
     "networkx",
     "numpy",
     "shapely",
-    "pyperclip"
+    "pyperclip",
+    "imageio"
 ]
 
 [project.optional-dependencies]
