@@ -17,17 +17,19 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 T = TypeVar('T')
 
-
 def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
 
 
 def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
+    if _type == bool:
+        val = _settings.value(arg, default)
+        return str(val) == "True" or str(val) == "true"
     if not isinstance(val := _settings.value(arg, default), _type):
         if default is not None:
             return default
-        raise ValueError(f"Unexpected type for {val}: expected {_type}, got {type(val)}")
+        raise ValueError(f"Unexpected type for {arg} ({val}): expected {_type}, got {type(val)}")
     return val
 
 def get_custom_rules_path() -> str:
