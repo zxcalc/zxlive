@@ -21,7 +21,9 @@ import math
 import random
 from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
-from PySide6.QtGui import QPen, QColor, QPainter, QPainterPath, QTransform, QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence
+from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform, 
+                           QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence,
+                           QKeyEvent)
 
 from dataclasses import dataclass
 
@@ -138,6 +140,24 @@ class GraphView(QGraphicsView):
                 e.ignore()
         else:
             e.ignore()
+
+    def keyPressEvent(self, e: QKeyEvent) -> None:
+        super().keyPressEvent(e)
+        if Qt.KeyboardModifier.ControlModifier & e.modifiers():
+            g = self.graph_scene.g
+            for v in self.graph_scene.selected_vertices:
+                vitem = self.graph_scene.vertex_map[v]
+                x = g.row(v)
+                y = g.qubit(v)
+                if e.key() == Qt.Key.Key_Up:
+                    g.set_position(v,y-0.5,x)
+                elif e.key() == Qt.Key.Key_Down:
+                    g.set_position(v,y+0.5,x)
+                elif e.key() == Qt.Key.Key_Left:
+                    g.set_position(v,y,x-0.5)
+                elif e.key() == Qt.Key.Key_Right:
+                    g.set_position(v,y,x+0.5)
+                vitem.set_pos_from_graph()
 
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         super().mouseMoveEvent(e)
