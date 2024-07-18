@@ -21,13 +21,14 @@ if TYPE_CHECKING:
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
 
-    All = "zxg *.json *.qasm *.tikz *.zxp *.zxr", "All Supported Formats"
+    All = "zxg *.json *.qasm *.tikz *.zxp *.zxr *.gif", "All Supported Formats"
     QGraph = "zxg", "QGraph"  # "file extension", "format name"
     QASM = "qasm", "QASM"
     TikZ = "tikz", "TikZ"
     Json = "json", "JSON"
     ZXProof = "zxp", "ZXProof"
     ZXRule = "zxr", "ZXRule"
+    Gif = "gif", "Gif"
     _value_: str
 
     def __new__(cls, *args, **kwds):  # type: ignore
@@ -248,6 +249,12 @@ def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str ="") -> Op
 
 def export_proof_dialog(parent: QWidget) -> Optional[str]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.TikZ.filter)
+    if file_path_and_format is None or not file_path_and_format[0]:
+        return None
+    return file_path_and_format[0]
+
+def export_gif_dialog(parent: QWidget) -> Optional[str]:
+    file_path_and_format = get_file_path_and_format(parent, FileFormat.Gif.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
     return file_path_and_format[0]
