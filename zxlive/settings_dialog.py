@@ -79,6 +79,7 @@ general_settings: list[SettingsData] = [
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
     {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
+    {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
 ]
 

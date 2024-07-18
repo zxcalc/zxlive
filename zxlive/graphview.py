@@ -28,7 +28,8 @@ from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform,
 from dataclasses import dataclass
 
 from . import animations as anims
-from .common import  GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM
+from .common import (GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM,
+                     get_settings_value, set_settings_value)
 from .graphscene import GraphScene, VItem, EItem, EditGraphScene
 from .settings import display_setting
 from .vitem import PHASE_ITEM_Z
@@ -99,9 +100,16 @@ class GraphView(QGraphicsView):
 
         self.centerOn(OFFSET_X,OFFSET_Y)
 
-        self.sparkle_mode = False
         self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
+
+    @property
+    def sparkle_mode(self) -> bool:
+        return get_settings_value("sparkle-mode", bool)
+
+    @sparkle_mode.setter
+    def sparkle_mode(self, value: bool) -> None:
+        set_settings_value("sparkle-mode", value, bool)
 
     def _toggle_sparkles(self) -> None:
         self.sparkle_mode = not self.sparkle_mode
