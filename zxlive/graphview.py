@@ -150,22 +150,27 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def keyPressEvent(self, e: QKeyEvent) -> None:
-        super().keyPressEvent(e)
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
             g = self.graph_scene.g
+            if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+                distance = 1 / get_settings_value("snap-granularity", int)
+            else:
+                distance = 0.5
             for v in self.graph_scene.selected_vertices:
                 vitem = self.graph_scene.vertex_map[v]
                 x = g.row(v)
                 y = g.qubit(v)
                 if e.key() == Qt.Key.Key_Up:
-                    g.set_position(v,y-0.5,x)
+                    g.set_position(v, y - distance, x)
                 elif e.key() == Qt.Key.Key_Down:
-                    g.set_position(v,y+0.5,x)
+                    g.set_position(v, y + distance, x)
                 elif e.key() == Qt.Key.Key_Left:
-                    g.set_position(v,y,x-0.5)
+                    g.set_position(v, y, x - distance)
                 elif e.key() == Qt.Key.Key_Right:
-                    g.set_position(v,y,x+0.5)
+                    g.set_position(v, y, x + distance)
                 vitem.set_pos_from_graph()
+        else:
+            super().keyPressEvent(e)
 
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         super().mouseMoveEvent(e)
