@@ -150,7 +150,6 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def keyPressEvent(self, e: QKeyEvent) -> None:
-        super().keyPressEvent(e)
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
             g = self.graph_scene.g
             for v in self.graph_scene.selected_vertices:
@@ -166,6 +165,8 @@ class GraphView(QGraphicsView):
                 elif e.key() == Qt.Key.Key_Right:
                     g.set_position(v,y,x+0.5)
                 vitem.set_pos_from_graph()
+        else:
+            super().keyPressEvent(e)
 
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         super().mouseMoveEvent(e)
