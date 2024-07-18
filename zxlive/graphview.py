@@ -152,7 +152,10 @@ class GraphView(QGraphicsView):
     def keyPressEvent(self, e: QKeyEvent) -> None:
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
             g = self.graph_scene.g
-            distance = 1 / get_settings_value("snap-granularity", int)
+            if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+                distance = 1 / get_settings_value("snap-granularity", int)
+            else:
+                distance = 0.5
             for v in self.graph_scene.selected_vertices:
                 vitem = self.graph_scene.vertex_map[v]
                 x = g.row(v)
