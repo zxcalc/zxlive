@@ -34,7 +34,11 @@ class RewriteAction:
     matcher: Callable[[GraphT, Callable], list]
     rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]
     match_type: MatchType
-    tooltip: str
+    tooltip_str: str
+    picture_path: str = field(default=False)
+    #image: bytes = field(default=False)
+    lhs_graph: GraphT = field(default=False)
+    rhs_graph: GraphT = field(default=False)
     # Whether the graph should be copied before trying to test whether it matches.
     # Needed if the matcher changes the graph.
     copy_first: bool = field(default=False)
@@ -44,57 +48,21 @@ class RewriteAction:
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
-        if display_setting.previews_show and ('picture' in d or 'custom_rule' in d):
-            if 'custom_rule' in d:
-                # We will create a custom tooltip picture representing the custom rewrite
-                graph_scene_left = GraphScene()
-                graph_scene_right = GraphScene()
-                graph_view_left = GraphView(graph_scene_left)
-                graph_view_left.draw_background_lines = False
-                graph_view_left.set_graph(d['lhs'])
-                graph_view_right = GraphView(graph_scene_right)
-                graph_view_right.draw_background_lines = False
-                graph_view_right.set_graph(d['rhs'])
-                graph_view_left.fit_view()
-                graph_view_right.fit_view()
-                graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
-                graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
-                lhs_size = graph_view_left.viewport().size()
-                rhs_size = graph_view_right.viewport().size()
-                # The picture needs to be wide enough to fit both of them and have some space for the = sign
-                pixmap = QPixmap(lhs_size.width()+rhs_size.width()+160,max(lhs_size.height(),rhs_size.height()))
-                pixmap.fill(QColor("#ffffff"))
-                graph_view_left.viewport().render(pixmap)
-                graph_view_right.viewport().render(pixmap,QPoint(lhs_size.width()+160,0))
-                # We create a new scene to render the = sign
-                new_scene = GraphScene()
-                new_view = GraphView(new_scene)
-                new_view.draw_background_lines = False
-                new_scene.addLine(QLineF(QPointF(10,40),QPointF(80,40)),QPen(QColor("#000000"),8))
-                new_scene.addLine(QLineF(QPointF(10,10),QPointF(80,10)),QPen(QColor("#000000"),8))
-                new_view.setSceneRect(new_scene.itemsBoundingRect())
-                new_view.viewport().render(pixmap,QPoint(lhs_size.width(),max(lhs_size.height(),rhs_size.height())/2-20))
-                
-                buffer = QBuffer()
-                buffer.open(QIODevice.WriteOnly)
-                pixmap.save(buffer, "PNG", quality=100)
-                image = bytes(buffer.data().toBase64()).decode()
-            else:
-                pixmap = QPixmap()
-                pixmap.load(get_data("tooltips/"+d['picture']))
-                buffer = QBuffer()
-                buffer.open(QIODevice.WriteOnly)
-                pixmap.save(buffer, "PNG", quality=100)
-                image = bytes(buffer.data().toBase64()).decode()
-            tooltip = '<img src="data:image/png;base64,{}" width="500">'.format(image) + d['tooltip']
-        else:
-            tooltip = d['tooltip']
+        if 'custom_rule' in d:
+            picture_path = 'custom'
+        elif 'picture' in d:
+            picture_path = d['picture']
+        else: 
+            picture_path = None
         return cls(
             name=d['text'],
             matcher=d['matcher'],
             rule=d['rule'],
             match_type=d['type'],
-            tooltip=tooltip,
+            tooltip_str=d['tooltip'],
+            picture_path = picture_path,
+            lhs_graph = d.get('lhs', None),
+            rhs_graph = d.get('rhs', None),
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
         )
@@ -139,6 +107,55 @@ class RewriteAction:
             if self.match_type == MATCHES_VERTICES
             else self.matcher(g, lambda e: e in edges)
         )
+
+    @property
+    def tooltip(self):
+        if self.picture_path is None:
+            return self.tooltip_str
+        if self.picture_path == 'custom':
+            # We will create a custom tooltip picture representing the custom rewrite
+            graph_scene_left = GraphScene()
+            graph_scene_right = GraphScene()
+            graph_view_left = GraphView(graph_scene_left)
+            graph_view_left.draw_background_lines = False
+            graph_view_left.set_graph(self.lhs_graph)
+            graph_view_right = GraphView(graph_scene_right)
+            graph_view_right.draw_background_lines = False
+            graph_view_right.set_graph(self.rhs_graph)
+            graph_view_left.fit_view()
+            graph_view_right.fit_view()
+            graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
+            graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
+            lhs_size = graph_view_left.viewport().size()
+            rhs_size = graph_view_right.viewport().size()
+            # The picture needs to be wide enough to fit both of them and have some space for the = sign
+            pixmap = QPixmap(lhs_size.width()+rhs_size.width()+160,max(lhs_size.height(),rhs_size.height()))
+            pixmap.fill(QColor("#ffffff"))
+            graph_view_left.viewport().render(pixmap)
+            graph_view_right.viewport().render(pixmap,QPoint(lhs_size.width()+160,0))
+            # We create a new scene to render the = sign
+            new_scene = GraphScene()
+            new_view = GraphView(new_scene)
+            new_view.draw_background_lines = False
+            new_scene.addLine(QLineF(QPointF(10,40),QPointF(80,40)),QPen(QColor("#000000"),8))
+            new_scene.addLine(QLineF(QPointF(10,10),QPointF(80,10)),QPen(QColor("#000000"),8))
+            new_view.setSceneRect(new_scene.itemsBoundingRect())
+            new_view.viewport().render(pixmap,QPoint(lhs_size.width(),max(lhs_size.height(),rhs_size.height())/2-20))
+                
+            buffer = QBuffer()
+            buffer.open(QIODevice.WriteOnly)
+            pixmap.save(buffer, "PNG", quality=100)
+            image = bytes(buffer.data().toBase64()).decode()
+        else:
+            pixmap = QPixmap()
+            pixmap.load(get_data("tooltips/"+self.picture_path))
+            buffer = QBuffer()
+            buffer.open(QIODevice.WriteOnly)
+            pixmap.save(buffer, "PNG", quality=100)
+            image = bytes(buffer.data().toBase64()).decode()
+        self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
+        self.picture_path = None
+        return self.tooltip_str
 
 
 @dataclass
