@@ -231,7 +231,7 @@ class EditGraphScene(GraphScene):
     # Signals to handle addition of vertices and edges.
     # Note that we have to set the argument types to `object`,
     # otherwise it doesn't work for some reason...
-    vertex_added = Signal(object, object)  # Actual types: float, float
+    vertex_added = Signal(object, object, object)  # Actual types: float, float, list[EItem]
     edge_added = Signal(object, object)  # Actual types: VT, VT
 
     # Currently selected edge type for preview when dragging
@@ -291,7 +291,9 @@ class EditGraphScene(GraphScene):
 
     def add_vertex(self, e: QGraphicsSceneMouseEvent) -> None:
         p = e.scenePos()
-        self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
+        # edges under current mouse position
+        edges: list[EItem] = [e for e in self.items(p, deviceTransform=QTransform()) if isinstance(e,EItem)]
+        self.vertex_added.emit(*pos_from_view(p.x(), p.y()), edges)
 
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
         assert self._drag is not None

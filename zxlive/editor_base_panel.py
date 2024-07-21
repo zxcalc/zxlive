@@ -4,9 +4,9 @@ import copy
 from enum import Enum
 from typing import Callable, Iterator, TypedDict
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QSize, Qt, Signal
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
-                           QPixmap)
+                           QPixmap, QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
                                QListWidgetItem, QScrollArea, QSizePolicy,
@@ -17,12 +17,12 @@ from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
+from .commands import (AddEdge, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
-from .eitem import HAD_EDGE_BLUE
+from .eitem import EItem, HAD_EDGE_BLUE
 from .graphscene import EditGraphScene
 from .settings import display_setting
 from .vitem import BLACK
@@ -67,6 +67,7 @@ class EditorBasePanel(BasePanel):
 
     _curr_ety: EdgeType
     _curr_vty: VertexType
+    snap_vertex_edge = True
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -74,7 +75,7 @@ class EditorBasePanel(BasePanel):
         self._curr_ety = EdgeType.SIMPLE
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
-        yield toolbar_select_node_edge(self)
+        yield from toolbar_select_node_edge(self)
         yield ToolbarSection(*self.actions())
 
     def create_side_bar(self) -> None:
@@ -97,6 +98,9 @@ class EditorBasePanel(BasePanel):
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene.curr_tool = tool
+
+    def _snap_vertex_edge_clicked(self) -> None:
+        self.snap_vertex_edge = not self.snap_vertex_edge
 
     def _vty_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty
@@ -144,9 +148,25 @@ class EditorBasePanel(BasePanel):
             else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
-    def add_vert(self, x: float, y: float) -> None:
-        cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
-            else AddNode(self.graph_view, x, y, self._curr_vty)
+    def add_vert(self, x: float, y: float, edges: list[EItem]) -> None:
+        """Add a vertex at point (x,y). `edges` is a list of EItems that are underneath the current position.
+        We will try to connect the vertex to an edge.
+        """
+        if self.snap_vertex_edge and edges and self._curr_vty != VertexType.W_OUTPUT:
+            # Trying to snap vertex to an edge
+            for it in edges:
+                e = it.e
+                if self.graph_scene.g.edge_type(e) not in (EdgeType.SIMPLE, EdgeType.HADAMARD):
+                    continue
+                cmd = AddNodeSnapped(self.graph_view, x, y, self._curr_vty, e)
+                break
+            else:
+                cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
+                    else AddNode(self.graph_view, x, y, self._curr_vty)
+        else: 
+            cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
+                else AddNode(self.graph_view, x, y, self._curr_vty)
+                
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
         self.undo_stack.push(cmd)
 
@@ -289,7 +309,7 @@ class VariableViewer(QScrollArea):
             self.parent_panel.graph.variable_types[name] = True
 
 
-def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
+def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
     icon_size = QSize(32, 32)
     select = QToolButton(parent)  # Selected by default
     vertex = QToolButton(parent)
@@ -313,7 +333,16 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
     select.clicked.connect(lambda: parent._tool_clicked(ToolType.SELECT))
     vertex.clicked.connect(lambda: parent._tool_clicked(ToolType.VERTEX))
     edge.clicked.connect(lambda: parent._tool_clicked(ToolType.EDGE))
-    return ToolbarSection(select, vertex, edge, exclusive=True)
+    yield ToolbarSection(select, vertex, edge, exclusive=True)
+
+    snap = QToolButton(parent)
+    snap.setCheckable(True)
+    snap.setChecked(True)
+    snap.setText("Vertex-edge snap")
+    snap.setToolTip("Snap newly added vertex to the edge beneath it (f)")
+    snap.setShortcut("f")
+    snap.clicked.connect(lambda: parent._snap_vertex_edge_clicked())
+    yield ToolbarSection(snap)
 
 
 def create_list_widget(parent: EditorBasePanel,
