@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
 import pyperclip
 
 from .base_panel import BasePanel
-from .common import GraphT, get_data, new_graph, to_tikz, from_tikz
+from .common import GraphT, get_data, new_graph, to_tikz, from_tikz, get_settings_value, set_settings_value
 from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -600,11 +600,11 @@ class MainWindow(QMainWindow):
 
     @property
     def sfx_on(self) -> bool:
-        return self.settings.value("sound-effects")
+        return get_settings_value("sound-effects",bool,False,self.settings)
 
     @sfx_on.setter
     def sfx_on(self, value: bool) -> None:
-        self.settings.setValue("sound-effects", value)
+        set_settings_value("sound-effects", value,bool,self.settings)
 
     def play_sound(self, s: SFXEnum) -> None:
         if self.sfx_on:
