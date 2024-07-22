@@ -216,37 +216,36 @@ class AddNodeSnapped(BaseCommand):
     vty: VertexType
     e: ET
 
-    _added_vert: Optional[VT] = field(default=None, init=False)
-    _removed_edge: Optional[ET] = field(default=None, init=False)
-    _s: Optional[VT] = field(default=None, init=False)
-    _t: Optional[VT] = field(default=None, init=False)
+    added_vert: Optional[VT] = field(default=None, init=False)
+    s: Optional[VT] = field(default=None, init=False)
+    t: Optional[VT] = field(default=None, init=False)
     _et: Optional[EdgeType] = field(default=None, init=False)
 
     def undo(self) -> None:
-        assert self._added_vert is not None
-        assert self._s is not None
-        assert self._t is not None
+        assert self.added_vert is not None
+        assert self.s is not None
+        assert self.t is not None
         assert self._et is not None
-        self.g.remove_vertex(self._added_vert)
-        self.g.add_edge(self.g.edge(self._s,self._t), self._et)
+        self.g.remove_vertex(self.added_vert)
+        self.g.add_edge(self.g.edge(self.s,self.t), self._et)
         self.update_graph_view()
 
     def redo(self) -> None:
         y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        self._added_vert = self.g.add_vertex(self.vty, y,x) 
+        self.added_vert = self.g.add_vertex(self.vty, y,x) 
         s,t = self.g.edge_st(self.e)
         self._et = self.g.edge_type(self.e)
         if self._et == EdgeType.SIMPLE:
-            self.g.add_edge(self.g.edge(s, self._added_vert), EdgeType.SIMPLE)
-            self.g.add_edge(self.g.edge(t, self._added_vert), EdgeType.SIMPLE)
+            self.g.add_edge(self.g.edge(s, self.added_vert), EdgeType.SIMPLE)
+            self.g.add_edge(self.g.edge(t, self.added_vert), EdgeType.SIMPLE)
         elif self._et == EdgeType.HADAMARD:
-            self.g.add_edge(self.g.edge(s, self._added_vert), EdgeType.HADAMARD)
-            self.g.add_edge(self.g.edge(t, self._added_vert), EdgeType.SIMPLE)
+            self.g.add_edge(self.g.edge(s, self.added_vert), EdgeType.HADAMARD)
+            self.g.add_edge(self.g.edge(t, self.added_vert), EdgeType.SIMPLE)
         else: 
             raise ValueError("Can't add spider between vertices connected by edge of type", str(self._et))
-        self._s = s
-        self._t = t
+        self.s = s
+        self.t = t
         
         self.g.remove_edge(self.e)
         self.update_graph_view()

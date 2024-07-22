@@ -120,6 +120,8 @@ class GraphScene(QGraphicsScene):
             e_item = self.edge_map[e][edge_idx]
             if e_item.selection_node:
                 self.removeItem(e_item.selection_node)
+            for anim in e_item.active_animations.copy():
+                anim.stop()
             self.removeItem(e_item)
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)

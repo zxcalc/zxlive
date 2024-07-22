@@ -4,7 +4,7 @@ import copy
 from enum import Enum
 from typing import Callable, Iterator, TypedDict
 
-from PySide6.QtCore import QPoint, QPointF, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
                            QPixmap, QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
@@ -22,10 +22,11 @@ from .commands import (AddEdge, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeCol
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
-from .eitem import EItem, HAD_EDGE_BLUE
+from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
 from .graphscene import EditGraphScene
 from .settings import display_setting
 from .vitem import BLACK
+from . import animations
 
 
 class ShapeType(Enum):
@@ -156,15 +157,23 @@ class EditorBasePanel(BasePanel):
             # Trying to snap vertex to an edge
             for it in edges:
                 e = it.e
+                g = self.graph_scene.g
                 if self.graph_scene.g.edge_type(e) not in (EdgeType.SIMPLE, EdgeType.HADAMARD):
                     continue
                 cmd = AddNodeSnapped(self.graph_view, x, y, self._curr_vty, e)
-                break
-            else:
-                cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
-                    else AddNode(self.graph_view, x, y, self._curr_vty)
-        else: 
-            cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
+                self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
+                self.undo_stack.push(cmd)
+                g = cmd.g
+                group = QParallelAnimationGroup()
+                for e in [next(g.edges(cmd.s, cmd.added_vert)), next(g.edges(cmd.t, cmd.added_vert))]:
+                    eitem = self.graph_scene.edge_map[e][0]
+                    anim = animations.edge_thickness(eitem,3,400,
+                                                     QEasingCurve(QEasingCurve.Type.InCubic),start=7)
+                    group.addAnimation(anim)
+                self.undo_stack.set_anim(group)
+                return
+
+        cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
                 else AddNode(self.graph_view, x, y, self._curr_vty)
                 
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
