@@ -181,6 +181,8 @@ class ProofPanel(BasePanel):
         if not all(isinstance(item, EItem) for item in trace.hit):
             return False
         edges = [item.e for item in trace.hit]
+        if len(edges) == 0:
+            return False
         if not all(edge == edges[0] for edge in edges):
             return False
         source, target = self.graph.edge_st(edges[0])
