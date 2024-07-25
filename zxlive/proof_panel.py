@@ -23,7 +23,7 @@ from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
-from .rewrite_action import RewriteActionTreeModel
+from .rewrite_action import RewriteActionTreeModel, RewriteActionTreeView
 from .rewrite_data import action_groups, refresh_custom_rules
 from .settings import display_setting
 from .sfx import SFXEnum
@@ -43,7 +43,7 @@ class ProofPanel(BasePanel):
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 
-        self.rewrites_panel = QTreeView(self)
+        self.rewrites_panel = RewriteActionTreeView(self)
         self.splitter.insertWidget(0, self.rewrites_panel)
         self.init_rewrites_bar()
 
