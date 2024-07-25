@@ -6,8 +6,7 @@ from typing import Iterator, Union, cast
 import pyzx
 from PySide6.QtCore import QPointF, QSize
 from PySide6.QtGui import QAction, QFontInfo, QIcon, QVector2D
-from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QToolButton,
-                               QTreeView)
+from PySide6.QtWidgets import QInputDialog, QToolButton
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -45,7 +44,6 @@ class ProofPanel(BasePanel):
 
         self.rewrites_panel = RewriteActionTreeView(self)
         self.splitter.insertWidget(0, self.rewrites_panel)
-        self.init_rewrites_bar()
 
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
@@ -92,29 +90,9 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
 
-    def init_rewrites_bar(self) -> None:
-        self.reset_rewrite_panel_style()
-        self.rewrites_panel.refresh_rewrites_model()
-
-    def reset_rewrite_panel_style(self) -> None:
-        self.rewrites_panel.setUniformRowHeights(True)
-        self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.rewrites_panel.setStyleSheet(
-            f'''
-            QTreeView::Item:hover {{
-                background-color: #e2f4ff;
-            }}
-            QTreeView::Item{{
-                height:{display_setting.font.pointSizeF() * 2.5}px;
-            }}
-            QTreeView::Item:!enabled {{
-                color: #c0c0c0;
-            }}
-            ''')
-
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
-        self.reset_rewrite_panel_style()
+        self.rewrites_panel.reset_rewrite_panel_style()
         super().update_font()
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:

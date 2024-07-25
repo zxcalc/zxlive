@@ -10,7 +10,7 @@ import pyzx
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen
-from PySide6.QtWidgets import QMenu, QTreeView
+from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView
 
 
 from .animations import make_animation
@@ -313,15 +313,33 @@ class RewriteActionTreeView(QTreeView):
         self.proof_panel = parent
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
+        self.reset_rewrite_panel_style()
+        self.refresh_rewrites_model()
+
+    def reset_rewrite_panel_style(self) -> None:
+        self.setUniformRowHeights(True)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.setStyleSheet(
+            f'''
+            QTreeView::Item:hover {{
+                background-color: #e2f4ff;
+            }}
+            QTreeView::Item{{
+                height:{display_setting.font.pointSizeF() * 2.5}px;
+            }}
+            QTreeView::Item:!enabled {{
+                color: #c0c0c0;
+            }}
+            ''')
 
     def show_context_menu(self, position: QPoint) -> None:
         context_menu = QMenu(self)
         refresh_rules = context_menu.addAction("Refresh rules")
         action = context_menu.exec_(self.mapToGlobal(position))
         if action == refresh_rules:
-            self._refresh_rewrites_model()
+            self.refresh_rewrites_model()
 
-    def _refresh_rewrites_model(self) -> None:
+    def refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
         self.setModel(model)
