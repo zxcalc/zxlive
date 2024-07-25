@@ -94,7 +94,7 @@ class ProofPanel(BasePanel):
 
     def init_rewrites_bar(self) -> None:
         self.reset_rewrite_panel_style()
-        self._refresh_rewrites_model()
+        self.rewrites_panel.refresh_rewrites_model()
 
     def reset_rewrite_panel_style(self) -> None:
         self.rewrites_panel.setUniformRowHeights(True)
@@ -425,11 +425,3 @@ class ProofPanel(BasePanel):
         basicrules.color_change(new_g, v)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
         self.undo_stack.push(cmd)
-
-    def _refresh_rewrites_model(self) -> None:
-        refresh_custom_rules()
-        model = RewriteActionTreeModel.from_dict(action_groups, self)
-        self.rewrites_panel.setModel(model)
-        self.rewrites_panel.expand(model.index(0,0))
-        self.rewrites_panel.clicked.connect(model.do_rewrite)
-        self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
