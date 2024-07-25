@@ -89,13 +89,8 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
 
-        self.refresh_rules = QToolButton(self)
-        self.refresh_rules.setText("Refresh rules")
-        self.refresh_rules.clicked.connect(self._refresh_rewrites_model)
-
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
-        yield ToolbarSection(self.refresh_rules)
 
     def init_rewrites_bar(self) -> None:
         self.reset_rewrite_panel_style()
