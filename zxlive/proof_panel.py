@@ -5,7 +5,7 @@ from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import QPointF, QSize
-from PySide6.QtGui import QAction, QFontInfo, QIcon, QVector2D
+from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
@@ -22,8 +22,7 @@ from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
-from .rewrite_action import RewriteActionTreeModel, RewriteActionTreeView
-from .rewrite_data import action_groups, refresh_custom_rules
+from .rewrite_action import RewriteActionTreeView
 from .settings import display_setting
 from .sfx import SFXEnum
 from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
