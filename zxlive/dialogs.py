@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
 
-    All = "zxg *.json *.qasm *.tikz *.zxp *.zxr *.gif", "All Supported Formats"
+    All = "zxg *.json *.qasm *.tikz *.zxp *.zxr *.gif *.png *.jpg", "All Supported Formats"
     QGraph = "zxg", "QGraph"  # "file extension", "format name"
     QASM = "qasm", "QASM"
     TikZ = "tikz", "TikZ"
@@ -29,6 +29,8 @@ class FileFormat(Enum):
     ZXProof = "zxp", "ZXProof"
     ZXRule = "zxr", "ZXRule"
     Gif = "gif", "Gif"
+    PNG = "png", "PNG"
+    JPEG = "jpg", "JPEG"
     _value_: str
 
     def __new__(cls, *args, **kwds):  # type: ignore
@@ -76,7 +78,6 @@ class ImportRuleOutput:
     file_type: FileFormat
     file_path: str
     r: CustomRule
-
 
 def show_error_msg(title: str, description: Optional[str] = None, parent: Optional[QWidget] = None) -> None:
     """Displays an error message box."""
@@ -258,6 +259,21 @@ def export_gif_dialog(parent: QWidget) -> Optional[str]:
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
     return file_path_and_format[0]
+    
+def import_image_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
+    """Shows a dialog to import a diagram from an image on disk.
+
+    Generates and returns the imported graph or `None` if the import failed."""
+    file_path, selected_filter = QFileDialog.getOpenFileName(
+        parent=parent,
+        caption="Select Image",
+        filter=FileFormat.PNG.filter
+    )
+    if selected_filter == "":
+        # This happens if the user clicks on cancel
+        return None
+    
+    return file_path
 
 def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], Optional[str]]:
     dialog = QDialog(parent)

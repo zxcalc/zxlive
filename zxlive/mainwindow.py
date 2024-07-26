@@ -48,6 +48,7 @@ from .rule_panel import RulePanel
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
 from pyzx.drawing import graphs_to_gif
+from .dodo import action_dodo_image_to_zx, get_local_api_key
 
 
 class MainWindow(QMainWindow):
@@ -104,8 +105,10 @@ class MainWindow(QMainWindow):
             "Opens a file-picker dialog to save the diagram in a chosen file format")
         self.export_tikz_proof = self._new_action("Export to tikz", self.handle_export_tikz_proof_action, None,
             "Exports the proof to tikz")
-        self.export_gif_proof = self._new_action("Export to gif", self.handle_export_gif_proof_action, None,
+        self.export_gif_proof  = self._new_action("Export to gif", self.handle_export_gif_proof_action, None,
             "Exports the proof to gif")
+        self.import_from_image = self._new_action("Import from image (WIP)", self.handle_import_image_action, None,
+            "Imports a ZX-diagram from an image")
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
@@ -117,6 +120,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.save_as)
         file_menu.addAction(self.export_tikz_proof)
         file_menu.addAction(self.export_gif_proof)
+        file_menu.addAction(self.import_from_image)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
@@ -182,6 +186,8 @@ class MainWindow(QMainWindow):
         self.effects = {e: load_sfx(e) for e in SFXEnum}
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(self._toggle_sfx)
+        
+        get_local_api_key() # load the local user's API key
 
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
@@ -429,6 +435,15 @@ class MainWindow(QMainWindow):
         assert isinstance(self.active_panel, ProofPanel)
         path = export_gif_dialog(self)
         graphs_to_gif(self.active_panel.proof_model.graphs(),path,1000) # 1000ms per frame
+        return True
+        
+    def handle_import_image_action(self) -> bool:
+        path = import_image_dialog(self)
+        if path is None:
+            show_error_msg("Export failed", "Invalid path")
+            return False
+        new_graph = action_dodo_image_to_zx(path)
+        self.new_graph(new_graph)
         return True
 
     def cut_graph(self) -> None:

@@ -4,7 +4,7 @@ import copy
 from typing import Iterator
 
 from PySide6.QtCore import Signal, QSettings
-from PySide6.QtGui import QAction
+from PySide6.QtGui import (QAction, QIcon)
 from PySide6.QtWidgets import (QToolButton)
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
@@ -18,6 +18,7 @@ from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
 from .settings_dialog import input_circuit_formats
+from .dodo import action_dodo_hint, action_dodo_query
 
 
 class GraphEditPanel(EditorBasePanel):
@@ -60,6 +61,18 @@ class GraphEditPanel(EditorBasePanel):
         self.start_derivation.setText("Start Derivation")
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
+        
+        self.dodo_hint = QToolButton(self)
+        self.dodo_hint.setIcon(QIcon(get_data("icons/dodo.png")))
+        self.dodo_hint.setToolTip("Dodo Hint")
+        self.dodo_hint.clicked.connect(self._dodo_hint)
+        
+        self.dodo_query = QToolButton(self)
+        self.dodo_query.setIcon(QIcon(get_data("icons/mic.svg")))
+        self.dodo_query.setToolTip("Dodo Query")
+        self.dodo_query.clicked.connect(self._dodo_query)
+        yield ToolbarSection(self.dodo_hint, self.dodo_query)
+
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():
@@ -107,3 +120,9 @@ class GraphEditPanel(EditorBasePanel):
             cmd = UpdateGraph(self.graph_view, new_g)
             self.undo_stack.push(cmd)
             self.graph_scene.select_vertices(new_verts)
+
+    def _dodo_hint(self) -> None:
+        action_dodo_hint(self.graph_scene.g)
+
+    def _dodo_query(self) -> None:
+        action_dodo_query(self.graph_scene.g)
