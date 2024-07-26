@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import random
 from typing import Iterator, Union, cast
 
 import pyzx
@@ -175,6 +176,7 @@ class ProofPanel(BasePanel):
         elif self._magic_identity(trace):
             return
         elif self._magic_hopf(trace):
+            self.play_sound_signal.emit(SFXEnum.THEY_FALL_OFF)
             return
 
     def _magic_hopf(self, trace: WandTrace) -> bool:
@@ -303,6 +305,12 @@ class ProofPanel(BasePanel):
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
+
+        s = random.choice([
+            SFXEnum.THATS_JUST_WIRE_1,
+            SFXEnum.THATS_JUST_WIRE_2
+        ])
+        self.play_sound_signal.emit(s)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
         new_g = copy.deepcopy(self.graph)
