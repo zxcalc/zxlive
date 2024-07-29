@@ -35,6 +35,27 @@ class EdgeType(IntEnum):
     HADAMARD = 2
     W_IO = 3
 
+def get_image_prompt():
+    """Returns the prompt that encourages DODO-GPT to describe the given image like a ZX-diagram."""
+
+    return """
+    Please convert this image into a ZX-diagram.
+
+    Then please provide a csv that lists of the spiders of this ZX-diagram, given the column headers:
+    index,type,phase,x-pos,y-pos
+
+    The type here should be given as either 'Z' or 'X' (ignore boundary spiders). The indexing should start from 0. And the phases should be written in terms of pi. x-pos and y-pos should respectively refer to their horizontal and vertical positions in the image, normalized from 0,0 (top-left) to 1,1 (bottom-right).
+
+    Then please provide a csv that lists the edges of this ZX-diagram, given the column headers:
+    source,target,type
+
+    The type here should be given as 1 for a normal (i.e. black) edge and 2 for a Hadamard (i.e. blue) edge, and the sources and targets should refer to the indices of the relevant spiders. Be sure to only include direct edges connecting two spiders.
+
+    Please ensure the csv's are expressed with comma separators and not in a table format.
+    """
+    #After that, under a clearly marked heading "HINT", please advise me as to what ONE simplification step I should take to help immediately simplify this ZX-diagram. Please be specific to this case and not give general simplification tips.
+    #"""
+
 def get_local_api_key():
     """Get the API key from key.txt file"""
     f = open(GET_MODULE_PATH()+"/user/key.txt", "r")
@@ -151,27 +172,6 @@ def speech_to_text():
 def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
-        
-def get_image_prompt():
-    """Returns the prompt that encourages DODO-GPT to describe the given image like a ZX-diagram."""
-
-    return """
-    Please convert this image into a ZX-diagram.
-
-    Then please provide a csv that lists of the spiders of this ZX-diagram, given the column headers:
-    index,type,phase,x-pos,y-pos
-
-    The type here should be given as either 'Z' or 'X' (ignore boundary spiders). The indexing should start from 0. And the phases should be written in terms of pi. x-pos and y-pos should respectively refer to their horizontal and vertical positions in the image, normalized from 0,0 (top-left) to 1,1 (bottom-right).
-
-    Then please provide a csv that lists the edges of this ZX-diagram, given the column headers:
-    source,target,type
-
-    The type here should be given as 1 for a normal (i.e. black) edge and 2 for a Hadamard (i.e. blue) edge, and the sources and targets should refer to the indices of the relevant spiders. Be sure to only include direct edges connecting two spiders.
-
-    Please ensure the csv's are expressed with comma separators and not in a table format.
-    """
-    #After that, under a clearly marked heading "HINT", please advise me as to what ONE simplification step I should take to help immediately simplify this ZX-diagram. Please be specific to this case and not give general simplification tips.
-    #"""
         
 def image_to_text(image_path):
     """Takes a ZX-diagram-like image and returns DODO-GPT's structured description of it."""
