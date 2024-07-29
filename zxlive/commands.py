@@ -334,7 +334,7 @@ class ChangePhase(BaseCommand):
 
 
 @dataclass
-class AddRewriteStep(SetGraph):
+class AddRewriteStep(UpdateGraph):
     """Adds a new rewrite to the proof.
 
     The rewrite is inserted after the currently selected step. In particular, it
