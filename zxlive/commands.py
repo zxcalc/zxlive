@@ -308,40 +308,6 @@ class ChangeEdgeCurve(BaseCommand):
 
 
 @dataclass
-class AddIdentity(BaseCommand):
-    """Adds an X or Z identity spider on an edge between two vertices."""
-    u: VT
-    v: VT
-    vty: VertexType
-
-    _new_vert: Optional[VT] = field(default=None, init=False)
-
-    def undo(self) -> None:
-        u, v, w = self.u, self.v, self._new_vert
-        assert w is not None
-        g = self.g
-        et = g.edge_type(g.edge(v, w))
-        g.remove_edge(g.edge(u, w))
-        g.remove_edge(g.edge(v, w))
-        g.remove_vertex(w)
-        g.add_edge(g.edge(u, v), et)
-        self.update_graph_view()
-
-    def redo(self) -> None:
-        u, v = self.u, self.v
-        g = self.g
-        uv = g.edge(u, v)
-        r = 0.5 * (g.row(u) + g.row(v))
-        q = 0.5 * (g.qubit(u) + g.qubit(v))
-        self._new_vert = g.add_vertex(self.vty, q, r, 0)
-
-        g.add_edge(g.edge(u, self._new_vert))
-        g.add_edge(g.edge(v, self._new_vert), g.edge_type(uv))
-        g.remove_edge(uv)
-        self.update_graph_view()
-
-
-@dataclass
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
@@ -368,22 +334,7 @@ class ChangePhase(BaseCommand):
 
 
 @dataclass
-class ChangeColor(BaseCommand):
-    """Applies the color-change rule on a set of vertices.
-
-    Changes the spider type using Hadamard conjugation."""
-    vs: Iterable[VT]
-
-    def toggle(self) -> None:
-        for v in self.vs:
-            basicrules.color_change(self.g, v)
-        self.update_graph_view()
-
-    undo = redo = toggle
-
-
-@dataclass
-class AddRewriteStep(UpdateGraph):
+class AddRewriteStep(SetGraph):
     """Adds a new rewrite to the proof.
 
     The rewrite is inserted after the currently selected step. In particular, it
