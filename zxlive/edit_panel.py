@@ -64,12 +64,12 @@ class GraphEditPanel(EditorBasePanel):
         
         self.dodo_hint = QToolButton(self)
         self.dodo_hint.setIcon(QIcon(get_data("icons/dodo.png")))
-        self.dodo_hint.setToolTip("Dodo Hint")
+        self.dodo_hint.setToolTip("Ask DODO-GPT for suggestions on how to rewrite your diagram")
         self.dodo_hint.clicked.connect(self._dodo_hint)
         
         self.dodo_query = QToolButton(self)
         self.dodo_query.setIcon(QIcon(get_data("icons/mic.svg")))
-        self.dodo_query.setToolTip("Dodo Query")
+        self.dodo_query.setToolTip("Ask DODO-GPT anything via mic")
         self.dodo_query.clicked.connect(self._dodo_query)
         yield ToolbarSection(self.dodo_hint, self.dodo_query)
 
