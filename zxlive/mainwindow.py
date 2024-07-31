@@ -89,6 +89,14 @@ class MainWindow(QMainWindow):
             QTabBar::Tab{{
                 padding: 10px
             }}
+            QTabBar::close-button{{
+                background-image: url("zxlive/icons/close.svg");
+                background-position: center;
+                background-repeat: no-repeat;
+                subcontrol-position: right;
+                subcontrol-origin: padding;
+                padding: 10px;
+            }}
             ''')
         self.tab_widget = tab_widget
 
