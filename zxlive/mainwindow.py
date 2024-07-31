@@ -87,7 +87,9 @@ class MainWindow(QMainWindow):
                 background-color: #e2f4ff;
             }}
             QTabBar::Tab{{
-                padding: 10px
+                padding: 8px;
+                min-width: 100px;
+                max-width: 250px;
             }}
             QTabBar::close-button{{
                 background-image: url("zxlive/icons/close.svg");
