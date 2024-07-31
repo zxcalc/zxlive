@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.show_matrix_action)
 
         new_rewrite_from_file = self._new_action("New rewrite from file", lambda: create_new_rewrite(self), None, "New rewrite from file")
-        new_rewrite_editor = self._new_action("New rewrite", self.new_rule_editor, None, "New rewrite")
+        new_rewrite_editor = self._new_action("New rewrite", lambda: self.new_rule_editor(), None, "New rewrite")
         self.proof_as_rewrite_action = self._new_action("Save proof as lemma", self.proof_as_lemma, None, "Save proof as lemma")
         rewrite_menu = menu.addMenu("&Rewrite")
         rewrite_menu.addAction(new_rewrite_editor)
