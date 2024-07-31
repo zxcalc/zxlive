@@ -10,13 +10,14 @@ import pyzx
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen
+from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView
 
 
 from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
-from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES
+from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES, refresh_custom_rules, action_groups
 from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -305,3 +306,43 @@ class RewriteActionTreeModel(QAbstractItemModel):
         g = self.proof_panel.graph_scene.g
         self.root_item.update_on_selection(g, selection, edges)
         QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
+
+class RewriteActionTreeView(QTreeView):
+    def __init__(self, parent: 'ProofPanel'):
+        super().__init__(parent)
+        self.proof_panel = parent
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+        self.reset_rewrite_panel_style()
+        self.refresh_rewrites_model()
+
+    def reset_rewrite_panel_style(self) -> None:
+        self.setUniformRowHeights(True)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.setStyleSheet(
+            f'''
+            QTreeView::Item:hover {{
+                background-color: #e2f4ff;
+            }}
+            QTreeView::Item{{
+                height:{display_setting.font.pointSizeF() * 2.5}px;
+            }}
+            QTreeView::Item:!enabled {{
+                color: #c0c0c0;
+            }}
+            ''')
+
+    def show_context_menu(self, position: QPoint) -> None:
+        context_menu = QMenu(self)
+        refresh_rules = context_menu.addAction("Refresh rules")
+        action = context_menu.exec_(self.mapToGlobal(position))
+        if action == refresh_rules:
+            self.refresh_rewrites_model()
+
+    def refresh_rewrites_model(self) -> None:
+        refresh_custom_rules()
+        model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
+        self.setModel(model)
+        self.expand(model.index(0,0))
+        self.clicked.connect(model.do_rewrite)
+        self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
