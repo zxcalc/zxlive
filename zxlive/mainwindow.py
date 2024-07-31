@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         tab_widget.setStyleSheet(
             f'''
             QTabBar::Tab:hover {{
-                background-color: rgba(100, 190, 255, 50);
+                background-color: rgba(100, 190, 255, 30);
             }}
             QTabBar::Tab{{
                 padding: 8px;
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
                 margin-right: 0px;
             }}
             QTabBar::tab:selected {{
-                background-color: rgba(100, 190, 255, 75);
+                background-color: rgba(100, 190, 255, 50);
             }}
             QTabBar::close-button{{
                 background-image: url("zxlive/icons/close.svg");
@@ -106,6 +106,9 @@ class MainWindow(QMainWindow):
                 subcontrol-position: right;
                 subcontrol-origin: padding;
                 padding: 10px;
+            }}
+            QTabBar::close-button:hover{{
+                background-color: rgba(140, 140, 140, 90);
             }}
             ''')
         self.tab_widget = tab_widget
