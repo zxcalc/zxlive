@@ -91,8 +91,13 @@ class MainWindow(QMainWindow):
                 min-width: 100px;
                 max-width: 250px;
                 border: 0px;
-                border-radius: 6px;
-                margin: 2px;
+                border-right: 1px solid rgba(140, 140, 140, 75);
+                margin: 1px;
+                margin-left: 0px;
+                margin-right: 0px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: rgba(100, 190, 255, 75);
             }}
             QTabBar::close-button{{
                 background-image: url("zxlive/icons/close.svg");
