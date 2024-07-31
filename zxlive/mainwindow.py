@@ -90,6 +90,9 @@ class MainWindow(QMainWindow):
                 padding: 8px;
                 min-width: 100px;
                 max-width: 250px;
+                border: 0px;
+                border-radius: 6px;
+                margin: 2px;
             }}
             QTabBar::close-button{{
                 background-image: url("zxlive/icons/close.svg");
