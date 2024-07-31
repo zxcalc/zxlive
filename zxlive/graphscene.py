@@ -17,16 +17,17 @@ from __future__ import annotations
 
 from typing import Optional, Iterator, Iterable
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QTransform
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
 
 from pyzx.graph.base import EdgeType
 from pyzx.graph import GraphDiff
 
-from .common import VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
+from .common import SCALE, VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
 from .eitem import EItem, EDragItem
+from .settings import display_setting
 
 
 class GraphScene(QGraphicsScene):
@@ -293,8 +294,11 @@ class EditGraphScene(GraphScene):
 
     def add_vertex(self, e: QGraphicsSceneMouseEvent) -> None:
         p = e.scenePos()
+        # create a rectangle around the mouse position which will be used to check of edge intersections
+        snap = display_setting.SNAP_DIVISION
+        rect = QRectF(p.x() - SCALE/(2*snap), p.y() - SCALE/(2*snap), SCALE/snap, SCALE/snap)
         # edges under current mouse position
-        edges: list[EItem] = [e for e in self.items(p, deviceTransform=QTransform()) if isinstance(e,EItem)]
+        edges: list[EItem] = [e for e in self.items(rect, deviceTransform=QTransform()) if isinstance(e,EItem)]
         self.vertex_added.emit(*pos_from_view(p.x(), p.y()), edges)
 
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
