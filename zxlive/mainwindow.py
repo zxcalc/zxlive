@@ -84,7 +84,7 @@ class MainWindow(QMainWindow):
         tab_widget.setStyleSheet(
             f'''
             QTabBar::Tab:hover {{
-                background-color: #e2f4ff;
+                background-color: rgba(100, 190, 255, 50);
             }}
             QTabBar::Tab{{
                 padding: 8px;
