@@ -309,8 +309,11 @@ class EditGraphScene(GraphScene):
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if isinstance(it, VItem):
                 v2 = it
+                break
                 #self.edge_added.emit(self._drag.start.v, it.v)
-        assert v2 is not None
+        else:
+            e.ignore()
+            return
         path = QPainterPath(v1.pos())
         path.lineTo(e.scenePos())
         colliding_verts = []

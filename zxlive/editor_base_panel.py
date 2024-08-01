@@ -189,6 +189,10 @@ class EditorBasePanel(BasePanel):
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
             graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
             return None
+        # We will try to connect all the vertices together in order
+        # First we filter out the vertices that are not compatible with the edge.
+        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT] # we will be adding two edges, which is not compatible with W_INPUT
+        # but first we check if there any vertices that we do want to additionally connect.
         if not self.snap_vertex_edge or not verts:
             cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
             self.undo_stack.push(cmd)
