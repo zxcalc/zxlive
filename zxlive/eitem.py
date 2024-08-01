@@ -233,8 +233,6 @@ class EItemAnimation(QVariantAnimation):
         self.e = None
         self._it = None
         self.scene: Optional[GraphScene] = None
-        #if refresh and property != VItem.Properties.Position:
-        #    raise ValueError("Only position animations require refresh")
         if isinstance(item, EItem):
             self._it = item
         elif scene is None:
