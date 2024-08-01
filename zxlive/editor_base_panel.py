@@ -17,15 +17,16 @@ from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (AddEdge, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
+from .commands import (AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
 from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
+from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene
 from .settings import display_setting
-from .vitem import BLACK
+
 from . import animations
 
 
@@ -179,15 +180,33 @@ class EditorBasePanel(BasePanel):
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
         self.undo_stack.push(cmd)
 
-    def add_edge(self, u: VT, v: VT) -> None:
+    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
+        """
         graph = self.graph_view.graph_scene.g
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
             return None
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
             graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
             return None
-        cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
+        if not self.snap_vertex_edge or not verts:
+            cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
+            self.undo_stack.push(cmd)
+            return
+        
+        ux, uy = graph.row(u), graph.qubit(u)
+        # Line was drawn from u to v, we want to order vs with the earlier items first.
+        def dist(vitem: VItem) -> float:
+            return (graph.row(vitem.v) - ux)**2 + (graph.row(vitem.v) - uy)**2
+        verts.sort(key=dist)
+        vs = [vitem.v for vitem in verts]
+        pairs = [(u, vs[0])]
+        for i in range(1, len(vs)):
+            pairs.append((vs[i-1],vs[i]))
+        pairs.append((vs[-1],v))
+        cmd = AddEdges(self.graph_view, pairs, self._curr_ety)
         self.undo_stack.push(cmd)
+        
 
     def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         self.undo_stack.push(MoveNode(self.graph_view, vs))

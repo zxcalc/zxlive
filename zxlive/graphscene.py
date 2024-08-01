@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import Optional, Iterator, Iterable
 
 from PySide6.QtCore import Qt, Signal, QRectF
-from PySide6.QtGui import QBrush, QColor, QTransform
+from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
 
 from pyzx.graph.base import EdgeType
@@ -235,7 +235,7 @@ class EditGraphScene(GraphScene):
     # Note that we have to set the argument types to `object`,
     # otherwise it doesn't work for some reason...
     vertex_added = Signal(object, object, object)  # Actual types: float, float, list[EItem]
-    edge_added = Signal(object, object)  # Actual types: VT, VT
+    edge_added = Signal(object, object, object)  # Actual types: VT, VT, list[VItem]
 
     # Currently selected edge type for preview when dragging
     # to add a new edge
@@ -304,7 +304,18 @@ class EditGraphScene(GraphScene):
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
         assert self._drag is not None
         self.removeItem(self._drag)
+        v1 = self._drag.start
+        self._drag = None
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if isinstance(it, VItem):
-                self.edge_added.emit(self._drag.start.v, it.v)
-        self._drag = None
+                v2 = it
+                #self.edge_added.emit(self._drag.start.v, it.v)
+        assert v2 is not None
+        path = QPainterPath(v1.pos())
+        path.lineTo(e.scenePos())
+        colliding_verts = []
+        for it in self.items(path, Qt.IntersectsItemShape, Qt.DescendingOrder, deviceTransform=QTransform()):
+            if isinstance(it, VItem) and it not in (v1,v2):
+                colliding_verts.append(it)
+        self.edge_added.emit(v1.v,v2.v,colliding_verts)
+        

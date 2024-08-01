@@ -286,7 +286,23 @@ class AddEdge(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        self.g.add_edge(((self.u, self.v)), self.ety)
+        self.g.add_edge((self.u, self.v), self.ety)
+        self.update_graph_view()
+
+@dataclass
+class AddEdges(BaseCommand):
+    """Adds multiple edges of the same type to a graph."""
+    pairs: list[tuple[VT,VT]]
+    ety: EdgeType
+
+    def undo(self) -> None:
+        for u, v in self.pairs:
+            self.g.remove_edge((u, v, self.ety))
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        for u, v in self.pairs:
+            self.g.add_edge((u, v), self.ety)
         self.update_graph_view()
 
 
