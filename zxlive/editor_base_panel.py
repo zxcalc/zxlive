@@ -23,7 +23,7 @@ from .commands import (AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, Cha
 from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
 from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
-from .vitem import VItem, BLACK
+from .vitem import VItem, BLACK, VItemAnimation
 from .graphscene import EditGraphScene
 from .settings import display_setting
 
@@ -206,7 +206,11 @@ class EditorBasePanel(BasePanel):
         pairs.append((vs[-1],v))
         cmd = AddEdges(self.graph_view, pairs, self._curr_ety)
         self.undo_stack.push(cmd)
-        
+        group = QParallelAnimationGroup()
+        for vitem in verts:
+            anim = animations.scale(vitem,1.0,400,QEasingCurve(QEasingCurve.Type.InCubic),start=1.3)
+            group.addAnimation(anim)
+        self.undo_stack.set_anim(group)
 
     def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         self.undo_stack.push(MoveNode(self.graph_view, vs))
