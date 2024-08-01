@@ -93,7 +93,8 @@ class UpdateGraph(BaseCommand):
 
     def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
-        self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
+        if not self.old_selected:
+            self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
         self.g = self.new_g
         self.update_graph_view(True)
 
@@ -333,7 +334,7 @@ class ChangePhase(BaseCommand):
 
 
 @dataclass
-class AddRewriteStep(SetGraph):
+class AddRewriteStep(UpdateGraph):
     """Adds a new rewrite to the proof.
 
     The rewrite is inserted after the currently selected step. In particular, it
