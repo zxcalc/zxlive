@@ -50,7 +50,7 @@ class RewriteAction:
             picture_path = 'custom'
         elif 'picture' in d:
             picture_path = d['picture']
-        else: 
+        else:
             picture_path = None
         return cls(
             name=d['text'],
@@ -107,7 +107,6 @@ class RewriteAction:
         )
 
     @property
-
     def tooltip(self) -> str:
         if self.picture_path is None:
             return self.tooltip_str

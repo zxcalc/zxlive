@@ -310,8 +310,7 @@ class EditGraphScene(GraphScene):
             if isinstance(it, VItem):
                 v2 = it
                 break
-                #self.edge_added.emit(self._drag.start.v, it.v)
-        else:
+        else: # It wasn't actually dropped on a vertex
             e.ignore()
             return
         path = QPainterPath(v1.pos())

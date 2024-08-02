@@ -374,7 +374,6 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection
     snap = QToolButton(parent)
     snap.setCheckable(True)
     snap.setChecked(True)
-    #snap.setText("Vertex-edge snap")
     snap.setIcon(QIcon(get_data("icons/vertex-snap-to-edge.svg")))
     snap.setToolTip("Snap vertices to the edge beneath them when adding vertices or edges (f)")
     snap.setShortcut("f")
