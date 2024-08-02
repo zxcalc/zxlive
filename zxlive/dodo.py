@@ -4,7 +4,7 @@ import pyzx as zx
 import openai
 try:
     import sounddevice as sd
-except ImportError:
+except:
     print('Unable to import sounddevice. DODO Query will be unavailable.') #TEMP
 import os
 import numpy as np
