@@ -2,7 +2,10 @@
 
 import pyzx as zx
 import openai
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except ImportError:
+    print('Unable to import sounddevice. DODO Query will be unavailable.') #TEMP
 import os
 import numpy as np
 import base64
@@ -17,7 +20,7 @@ API_KEY = 'no-key'
 # Maybe add a config (i.e. to set the api_key, the gpt model, the OpenAI Whisper voice, etc.)
 # Maybe also record your full transripts with DODO-GPT (and have the option of whether to save it to file when you close zxlive)
 
-#TEMP... (# TEMP - this should just be calling xz.utils.VertexType instead (not sure why that doesn't work though?): VertexType(1).name)
+#TEMP... (# TEMP - this should just be calling zx.utils.VertexType instead (not sure why that doesn't work though?): VertexType(1).name)
 class VertexType(IntEnum):
     """Type of a vertex in the graph."""
     BOUNDARY = 0
@@ -28,7 +31,7 @@ class VertexType(IntEnum):
     W_OUTPUT = 5
     Z_BOX = 6
     
-#TEMP... (# TEMP - this should just be calling xz.utils.VertexType instead (not sure why that doesn't work though?): VertexType(1).name)
+#TEMP... (# TEMP - this should just be calling zx.utils.VertexType instead (not sure why that doesn't work though?): VertexType(1).name)
 class EdgeType(IntEnum):
     """Type of an edge in the graph."""
     SIMPLE = 1
