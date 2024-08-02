@@ -125,4 +125,7 @@ class GraphEditPanel(EditorBasePanel):
         action_dodo_hint(self.graph_scene.g)
 
     def _dodo_query(self) -> None:
-        action_dodo_query(self.graph_scene.g)
+        try:
+            action_dodo_query(self.graph_scene.g)
+        except:
+            print("DODO Query failed. Check if API key is valid and sounddevice was properly imported.") #TEMP
