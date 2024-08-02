@@ -17,7 +17,7 @@ from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
+from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
@@ -154,6 +154,7 @@ class EditorBasePanel(BasePanel):
         """Add a vertex at point (x,y). `edges` is a list of EItems that are underneath the current position.
         We will try to connect the vertex to an edge.
         """
+        cmd: BaseCommand
         if self.snap_vertex_edge and edges and self._curr_vty != VertexType.W_OUTPUT:
             # Trying to snap vertex to an edge
             for it in edges:
@@ -183,6 +184,7 @@ class EditorBasePanel(BasePanel):
     def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
         """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
         """
+        cmd: BaseCommand
         graph = self.graph_view.graph_scene.g
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
             return None
@@ -201,7 +203,7 @@ class EditorBasePanel(BasePanel):
         ux, uy = graph.row(u), graph.qubit(u)
         # Line was drawn from u to v, we want to order vs with the earlier items first.
         def dist(vitem: VItem) -> float:
-            return (graph.row(vitem.v) - ux)**2 + (graph.row(vitem.v) - uy)**2
+            return (graph.row(vitem.v) - ux)**2 + (graph.qubit(vitem.v) - uy)**2  # type: ignore
         verts.sort(key=dist)
         vs = [vitem.v for vitem in verts]
         pairs = [(u, vs[0])]

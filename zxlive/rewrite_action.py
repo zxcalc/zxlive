@@ -145,14 +145,14 @@ class RewriteAction:
             buffer = QBuffer()
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode()
+            image = bytes(buffer.data().toBase64()).decode() # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
         else:
             pixmap = QPixmap()
             pixmap.load(get_data("tooltips/"+self.picture_path))
             buffer = QBuffer()
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode()
+            image = bytes(buffer.data().toBase64()).decode() #type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
         self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
         self.picture_path = None
         return self.tooltip_str

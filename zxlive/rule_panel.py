@@ -15,7 +15,8 @@ from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView
-
+from .eitem import EItem
+from .vitem import VItem
 
 class RulePanel(EditorBasePanel):
     """Panel for the Rule editor of ZXLive."""
@@ -87,12 +88,12 @@ class RulePanel(EditorBasePanel):
         super().vert_moved(vs)
         self.update_io_labels(self.graph_scene)
 
-    def add_vert(self, x: float, y: float) -> None:
-        super().add_vert(x, y)
+    def add_vert(self, x: float, y: float, edges: list[EItem]) -> None:
+        super().add_vert(x, y, edges)
         self.update_io_labels(self.graph_scene)
 
-    def add_edge(self, u: VT, v: VT) -> None:
-        super().add_edge(u, v)
+    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        super().add_edge(u, v, verts)
         self.update_io_labels(self.graph_scene)
 
     def update_io_labels(self, scene: EditGraphScene) -> None:

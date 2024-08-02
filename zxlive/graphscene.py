@@ -24,6 +24,8 @@ from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphic
 from pyzx.graph.base import EdgeType
 from pyzx.graph import GraphDiff
 
+
+
 from .common import SCALE, VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
 from .eitem import EItem, EDragItem
@@ -111,8 +113,8 @@ class GraphScene(QGraphicsScene):
             v_item = self.vertex_map[v]
             if v_item.phase_item:
                 self.removeItem(v_item.phase_item)
-            for anim in v_item.active_animations.copy():
-                anim.stop()
+            for anim_v in v_item.active_animations.copy():
+                anim_v.stop()
             selected_vertices.discard(v)
             self.removeItem(v_item)
 
@@ -121,8 +123,8 @@ class GraphScene(QGraphicsScene):
             e_item = self.edge_map[e][edge_idx]
             if e_item.selection_node:
                 self.removeItem(e_item.selection_node)
-            for anim in e_item.active_animations.copy():
-                anim.stop()
+            for anim_e in e_item.active_animations.copy():
+                anim_e.stop()
             self.removeItem(e_item)
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)
@@ -316,7 +318,7 @@ class EditGraphScene(GraphScene):
         path = QPainterPath(v1.pos())
         path.lineTo(e.scenePos())
         colliding_verts = []
-        for it in self.items(path, Qt.IntersectsItemShape, Qt.DescendingOrder, deviceTransform=QTransform()):
+        for it in self.items(path, Qt.ItemSelectionMode.IntersectsItemShape, Qt.SortOrder.DescendingOrder, deviceTransform=QTransform()):
             if isinstance(it, VItem) and it not in (v1,v2):
                 colliding_verts.append(it)
         self.edge_added.emit(v1.v,v2.v,colliding_verts)
