@@ -277,7 +277,7 @@ simplifications: dict[str, RewriteData] = {
     },
 }
 
-rules_basic = {"spider", "to_z", "to_x", "rem_id", "copy", "pauli", "bialgebra", "euler"}
+rules_basic = {"spider", "to_z", "to_x", "rem_id", "copy", "pauli", "bialgebra", "bialgebra_op", "euler"}
 operations["pauli"]["picture"] = "push_pauli.png"
 operations["copy"]["picture"] = "copy_pi.png"
 operations["bialgebra"]["picture"] = "bialgebra.png"
