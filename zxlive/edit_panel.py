@@ -12,7 +12,7 @@ from pyzx.symbolic import Poly
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import GraphT
+from .common import GraphT, get_data
 from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
