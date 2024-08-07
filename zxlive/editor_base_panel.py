@@ -143,7 +143,6 @@ class EditorBasePanel(BasePanel):
                 rem_vertices.append(get_w_partner(self.graph_scene.g, v))
         if not rem_vertices and not selected_edges: return
         new_g = copy.deepcopy(self.graph_scene.g)
-        self.graph_scene.clearSelection()
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(list(set(rem_vertices)))
         cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \

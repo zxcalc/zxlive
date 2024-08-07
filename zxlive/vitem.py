@@ -121,56 +121,38 @@ class VItem(QGraphicsPathItem):
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
         self.update_shape()
+        color_map = {
+            VertexType.Z: "z_spider",
+            VertexType.Z_BOX: "z_spider",
+            VertexType.X: "x_spider",
+            VertexType.H_BOX: "hadamard",
+            VertexType.W_INPUT: "w_input",
+            VertexType.W_OUTPUT: "w_output",
+        }
+        pressed_color_map = {
+            VertexType.Z: "z_spider_pressed",
+            VertexType.Z_BOX: "z_spider_pressed",
+            VertexType.X: "x_spider_pressed",
+            VertexType.H_BOX: "hadamard_pressed",
+            VertexType.W_INPUT: "w_input_pressed",
+            VertexType.W_OUTPUT: "w_output_pressed",
+        }
+        pen = QPen()
         if not self.isSelected():
-            t = self.ty
-            if t == VertexType.Z or t == VertexType.Z_BOX:
-                self.setBrush(QBrush(display_setting.colors["z_spider"]))
-            elif t == VertexType.X:
-                self.setBrush(QBrush(display_setting.colors["x_spider"]))
-            elif t == VertexType.H_BOX:
-                self.setBrush(QBrush(display_setting.colors["hadamard"]))
-            elif t == VertexType.W_INPUT:
-                self.setBrush(QBrush(display_setting.colors["w_input"]))
-            elif t == VertexType.W_OUTPUT:
-                self.setBrush(QBrush(display_setting.colors["w_output"]))
-            else:
-                self.setBrush(QBrush(display_setting.colors["boundary"]))
-            pen = QPen()
+            color_key = color_map.get(self.ty, "boundary")
+            brush = QBrush(display_setting.colors[color_key])
             pen.setWidthF(3)
             pen.setColor(display_setting.colors["outline"])
-            self.setPen(pen)
-
-        if self.isSelected():
-            pen = QPen()
+        else:
+            color_key = pressed_color_map.get(self.ty, "boundary_pressed")
+            brush = QBrush(display_setting.colors[color_key])
+            brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
-            t = self.ty
-            if t == VertexType.Z or t == VertexType.Z_BOX:
-                brush = QBrush(display_setting.colors["z_spider_pressed"])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-                self.setBrush(brush)
-            elif t == VertexType.X:
-                brush = QBrush(display_setting.colors["x_spider_pressed"])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-                self.setBrush(brush)
-            elif t == VertexType.H_BOX:
-                brush = QBrush(display_setting.colors["hadamard_pressed"])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-                self.setBrush(brush)
-            elif t == VertexType.W_INPUT:
-                brush = QBrush(display_setting.colors["w_input_pressed"])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-                self.setBrush(brush)
-            elif t == VertexType.W_OUTPUT:
-                brush = QBrush(display_setting.colors["w_output_pressed"])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-                self.setBrush(brush)
-            else:
-                brush = QBrush(display_setting.colors["boundary_pressed"])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-                self.setBrush(brush)
+            if self.ty not in pressed_color_map:
                 pen.setColor(display_setting.colors["boundary_pressed"])
-            self.prepareGeometryChange()
-            self.setPen(pen)
+        self.prepareGeometryChange()
+        self.setBrush(brush)
+        self.setPen(pen)
 
         if self.phase_item:
             self.phase_item.refresh()

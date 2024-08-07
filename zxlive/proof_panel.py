@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import copy
+import random
 from typing import Iterator, Union, cast
 
 import pyzx
 from PySide6.QtCore import QPointF, QSize
-from PySide6.QtGui import QAction, QFontInfo, QIcon, QVector2D
-from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QToolButton,
-                               QTreeView)
+from PySide6.QtGui import QAction, QIcon, QVector2D
+from PySide6.QtWidgets import QInputDialog, QToolButton
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -23,8 +23,7 @@ from .eitem import EItem
 from .graphscene import GraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
-from .rewrite_action import RewriteActionTreeModel
-from .rewrite_data import action_groups, refresh_custom_rules
+from .rewrite_action import RewriteActionTreeView
 from .settings import display_setting
 from .sfx import SFXEnum
 from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
@@ -43,9 +42,8 @@ class ProofPanel(BasePanel):
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
 
-        self.rewrites_panel = QTreeView(self)
+        self.rewrites_panel = RewriteActionTreeView(self)
         self.splitter.insertWidget(0, self.rewrites_panel)
-        self.init_rewrites_bar()
 
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
@@ -89,37 +87,12 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
 
-        self.refresh_rules = QToolButton(self)
-        self.refresh_rules.setText("Refresh rules")
-        self.refresh_rules.clicked.connect(self._refresh_rewrites_model)
-
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
-        yield ToolbarSection(self.refresh_rules)
-
-    def init_rewrites_bar(self) -> None:
-        self.reset_rewrite_panel_style()
-        self._refresh_rewrites_model()
-
-    def reset_rewrite_panel_style(self) -> None:
-        self.rewrites_panel.setUniformRowHeights(True)
-        self.rewrites_panel.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.rewrites_panel.setStyleSheet(
-            f'''
-            QTreeView::Item:hover {{
-                background-color: #e2f4ff;
-            }}
-            QTreeView::Item{{
-                height:{display_setting.font.pointSizeF() * 2.5}px;
-            }}
-            QTreeView::Item:!enabled {{
-                color: #c0c0c0;
-            }}
-            ''')
 
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
-        self.reset_rewrite_panel_style()
+        self.rewrites_panel.reset_rewrite_panel_style()
         super().update_font()
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
@@ -175,12 +148,15 @@ class ProofPanel(BasePanel):
         elif self._magic_identity(trace):
             return
         elif self._magic_hopf(trace):
+            self.play_sound_signal.emit(SFXEnum.THEY_FALL_OFF)
             return
 
     def _magic_hopf(self, trace: WandTrace) -> bool:
         if not all(isinstance(item, EItem) for item in trace.hit):
             return False
         edges: list[ET] = [item.e for item in trace.hit]  # type: ignore  # We know that the type of `item` is `EItem` because of the check above
+        if len(edges) == 0:
+            return False
         if not all(edge == edges[0] for edge in edges):
             return False
         source, target = self.graph.edge_st(edges[0])
@@ -301,6 +277,12 @@ class ProofPanel(BasePanel):
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
         self.undo_stack.push(cmd, anim_before=anim)
+
+        s = random.choice([
+            SFXEnum.THATS_JUST_WIRE_1,
+            SFXEnum.THATS_JUST_WIRE_2
+        ])
+        self.play_sound_signal.emit(s)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
         new_g = copy.deepcopy(self.graph)
@@ -428,11 +410,3 @@ class ProofPanel(BasePanel):
         basicrules.color_change(new_g, v)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
         self.undo_stack.push(cmd)
-
-    def _refresh_rewrites_model(self) -> None:
-        refresh_custom_rules()
-        model = RewriteActionTreeModel.from_dict(action_groups, self)
-        self.rewrites_panel.setModel(model)
-        self.rewrites_panel.expand(model.index(0,0))
-        self.rewrites_panel.clicked.connect(model.do_rewrite)
-        self.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
