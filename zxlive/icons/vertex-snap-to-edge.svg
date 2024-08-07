@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <!-- Edge Line -->
+  <line x1="20" y1="80" x2="80" y2="80" stroke="black" stroke-width="8"/>
+  
+  <!-- Vertex (Circle) with Fill and Outline -->
+  <circle cx="50" cy="30" r="20" fill="#CCCCCC" stroke="#4D4D4D" stroke-width="4"/>
+
+  <!-- Downward Arrow touching the edge -->
+  <line x1="50" y1="50" x2="50" y2="70" stroke="black" stroke-width="5"/>
+  <polyline points="40,65 50,75 60,65" fill="black"/>
+</svg>

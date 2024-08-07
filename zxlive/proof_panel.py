@@ -154,7 +154,7 @@ class ProofPanel(BasePanel):
     def _magic_hopf(self, trace: WandTrace) -> bool:
         if not all(isinstance(item, EItem) for item in trace.hit):
             return False
-        edges = [item.e for item in trace.hit]
+        edges: list[ET] = [item.e for item in trace.hit]  # type: ignore  # We know that the type of `item` is `EItem` because of the check above
         if len(edges) == 0:
             return False
         if not all(edge == edges[0] for edge in edges):

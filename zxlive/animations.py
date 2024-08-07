@@ -14,6 +14,7 @@ from .rewrite_data import operations
 from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
+from .eitem import EItem, EItemAnimation
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -69,6 +70,13 @@ class AnimatedUndoStack(QUndoStack):
             anim_after.start()
             self.running_anim = anim_after
 
+    def set_anim(self, anim: QAbstractAnimation) -> None:
+        if self.running_anim:
+            self.running_anim.stop()
+        self.running_anim = anim
+        self.running_anim.start()
+
+
 
 def scale(it: VItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> VItemAnimation:
     anim = VItemAnimation(it, VItem.Properties.Scale)
@@ -89,6 +97,13 @@ def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve, start: O
     anim.setEasingCurve(ease)
     return anim
 
+def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
+    anim = EItemAnimation(it, EItem.Properties.Thickness, refresh=True)
+    anim.setDuration(duration)
+    anim.setStartValue(start or it.thickness)
+    anim.setEndValue(target)
+    anim.setEasingCurve(ease)
+    return anim
 
 def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callable[[VT], Optional[VT]],
                 to_end: Callable[[VT], Optional[VT]], duration: int, ease: QEasingCurve) -> QAbstractAnimation:

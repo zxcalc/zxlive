@@ -17,16 +17,19 @@ from __future__ import annotations
 
 from typing import Optional, Iterator, Iterable
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QTransform
+from PySide6.QtCore import Qt, Signal, QRectF
+from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
 
 from pyzx.graph.base import EdgeType
 from pyzx.graph import GraphDiff
 
-from .common import VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
+
+
+from .common import SCALE, VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
 from .eitem import EItem, EDragItem
+from .settings import display_setting
 
 
 class GraphScene(QGraphicsScene):
@@ -110,8 +113,8 @@ class GraphScene(QGraphicsScene):
             v_item = self.vertex_map[v]
             if v_item.phase_item:
                 self.removeItem(v_item.phase_item)
-            for anim in v_item.active_animations.copy():
-                anim.stop()
+            for anim_v in v_item.active_animations.copy():
+                anim_v.stop()
             selected_vertices.discard(v)
             self.removeItem(v_item)
 
@@ -120,6 +123,8 @@ class GraphScene(QGraphicsScene):
             e_item = self.edge_map[e][edge_idx]
             if e_item.selection_node:
                 self.removeItem(e_item.selection_node)
+            for anim_e in e_item.active_animations.copy():
+                anim_e.stop()
             self.removeItem(e_item)
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)
@@ -231,8 +236,8 @@ class EditGraphScene(GraphScene):
     # Signals to handle addition of vertices and edges.
     # Note that we have to set the argument types to `object`,
     # otherwise it doesn't work for some reason...
-    vertex_added = Signal(object, object)  # Actual types: float, float
-    edge_added = Signal(object, object)  # Actual types: VT, VT
+    vertex_added = Signal(object, object, object)  # Actual types: float, float, list[EItem]
+    edge_added = Signal(object, object, object)  # Actual types: VT, VT, list[VItem]
 
     # Currently selected edge type for preview when dragging
     # to add a new edge
@@ -291,12 +296,30 @@ class EditGraphScene(GraphScene):
 
     def add_vertex(self, e: QGraphicsSceneMouseEvent) -> None:
         p = e.scenePos()
-        self.vertex_added.emit(*pos_from_view(p.x(), p.y()))
+        # create a rectangle around the mouse position which will be used to check of edge intersections
+        snap = display_setting.SNAP_DIVISION
+        rect = QRectF(p.x() - SCALE/(2*snap), p.y() - SCALE/(2*snap), SCALE/snap, SCALE/snap)
+        # edges under current mouse position
+        edges: list[EItem] = [e for e in self.items(rect, deviceTransform=QTransform()) if isinstance(e,EItem)]
+        self.vertex_added.emit(*pos_from_view(p.x(), p.y()), edges)
 
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
         assert self._drag is not None
         self.removeItem(self._drag)
+        v1 = self._drag.start
+        self._drag = None
         for it in self.items(e.scenePos(), deviceTransform=QTransform()):
             if isinstance(it, VItem):
-                self.edge_added.emit(self._drag.start.v, it.v)
-        self._drag = None
+                v2 = it
+                break
+        else: # It wasn't actually dropped on a vertex
+            e.ignore()
+            return
+        path = QPainterPath(v1.pos())
+        path.lineTo(e.scenePos())
+        colliding_verts = []
+        for it in self.items(path, Qt.ItemSelectionMode.IntersectsItemShape, Qt.SortOrder.DescendingOrder, deviceTransform=QTransform()):
+            if isinstance(it, VItem) and it not in (v1,v2):
+                colliding_verts.append(it)
+        self.edge_added.emit(v1.v,v2.v,colliding_verts)
+        

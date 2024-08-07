@@ -210,6 +210,48 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
 @dataclass
+class AddNodeSnapped(BaseCommand):
+    """Adds a new spider positioned on an edge, replacing the original edge"""
+    x: float
+    y: float
+    vty: VertexType
+    e: ET
+
+    added_vert: Optional[VT] = field(default=None, init=False)
+    s: Optional[VT] = field(default=None, init=False)
+    t: Optional[VT] = field(default=None, init=False)
+    _et: Optional[EdgeType] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self.added_vert is not None
+        assert self.s is not None
+        assert self.t is not None
+        assert self._et is not None
+        self.g.remove_vertex(self.added_vert)
+        self.g.add_edge(self.g.edge(self.s,self.t), self._et)
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
+        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
+        self.added_vert = self.g.add_vertex(self.vty, y,x) 
+        s,t = self.g.edge_st(self.e)
+        self._et = self.g.edge_type(self.e)
+        if self._et == EdgeType.SIMPLE:
+            self.g.add_edge(self.g.edge(s, self.added_vert), EdgeType.SIMPLE)
+            self.g.add_edge(self.g.edge(t, self.added_vert), EdgeType.SIMPLE)
+        elif self._et == EdgeType.HADAMARD:
+            self.g.add_edge(self.g.edge(s, self.added_vert), EdgeType.HADAMARD)
+            self.g.add_edge(self.g.edge(t, self.added_vert), EdgeType.SIMPLE)
+        else: 
+            raise ValueError("Can't add spider between vertices connected by edge of type", str(self._et))
+        self.s = s
+        self.t = t
+        
+        self.g.remove_edge(self.e)
+        self.update_graph_view()
+
+@dataclass
 class AddWNode(BaseCommand):
     """Adds a new W node at a given position."""
     x: float
@@ -245,7 +287,23 @@ class AddEdge(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        self.g.add_edge(((self.u, self.v)), self.ety)
+        self.g.add_edge((self.u, self.v), self.ety)
+        self.update_graph_view()
+
+@dataclass
+class AddEdges(BaseCommand):
+    """Adds multiple edges of the same type to a graph."""
+    pairs: list[tuple[VT,VT]]
+    ety: EdgeType
+
+    def undo(self) -> None:
+        for u, v in self.pairs:
+            self.g.remove_edge((u, v, self.ety))
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        for u, v in self.pairs:
+            self.g.add_edge((u, v), self.ety)
         self.update_graph_view()
 
 

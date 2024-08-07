@@ -4,9 +4,9 @@ import copy
 from enum import Enum
 from typing import Callable, Iterator, TypedDict
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
-                           QPixmap)
+                           QPixmap, QTransform)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
                                QListWidgetItem, QScrollArea, QSizePolicy,
@@ -17,15 +17,17 @@ from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (AddEdge, AddNode, AddWNode, ChangeEdgeColor,
+from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
 from .dialogs import show_error_msg
-from .eitem import HAD_EDGE_BLUE
+from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
+from .vitem import VItem, BLACK, VItemAnimation
 from .graphscene import EditGraphScene
 from .settings import display_setting
-from .vitem import BLACK
+
+from . import animations
 
 
 class ShapeType(Enum):
@@ -67,6 +69,7 @@ class EditorBasePanel(BasePanel):
 
     _curr_ety: EdgeType
     _curr_vty: VertexType
+    snap_vertex_edge = True
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -74,7 +77,7 @@ class EditorBasePanel(BasePanel):
         self._curr_ety = EdgeType.SIMPLE
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
-        yield toolbar_select_node_edge(self)
+        yield from toolbar_select_node_edge(self)
         yield ToolbarSection(*self.actions())
 
     def create_side_bar(self) -> None:
@@ -97,6 +100,9 @@ class EditorBasePanel(BasePanel):
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene.curr_tool = tool
+
+    def _snap_vertex_edge_clicked(self) -> None:
+        self.snap_vertex_edge = not self.snap_vertex_edge
 
     def _vty_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty
@@ -143,21 +149,73 @@ class EditorBasePanel(BasePanel):
             else UpdateGraph(self.graph_view,new_g)
         self.undo_stack.push(cmd)
 
-    def add_vert(self, x: float, y: float) -> None:
+    def add_vert(self, x: float, y: float, edges: list[EItem]) -> None:
+        """Add a vertex at point (x,y). `edges` is a list of EItems that are underneath the current position.
+        We will try to connect the vertex to an edge.
+        """
+        cmd: BaseCommand
+        if self.snap_vertex_edge and edges and self._curr_vty != VertexType.W_OUTPUT:
+            # Trying to snap vertex to an edge
+            for it in edges:
+                e = it.e
+                g = self.graph_scene.g
+                if self.graph_scene.g.edge_type(e) not in (EdgeType.SIMPLE, EdgeType.HADAMARD):
+                    continue
+                cmd = AddNodeSnapped(self.graph_view, x, y, self._curr_vty, e)
+                self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
+                self.undo_stack.push(cmd)
+                g = cmd.g
+                group = QParallelAnimationGroup()
+                for e in [next(g.edges(cmd.s, cmd.added_vert)), next(g.edges(cmd.t, cmd.added_vert))]:
+                    eitem = self.graph_scene.edge_map[e][0]
+                    anim = animations.edge_thickness(eitem,3,400,
+                                                     QEasingCurve(QEasingCurve.Type.InCubic),start=7)
+                    group.addAnimation(anim)
+                self.undo_stack.set_anim(group)
+                return
+
         cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
-            else AddNode(self.graph_view, x, y, self._curr_vty)
+                else AddNode(self.graph_view, x, y, self._curr_vty)
+                
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
         self.undo_stack.push(cmd)
 
-    def add_edge(self, u: VT, v: VT) -> None:
+    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
+        """
+        cmd: BaseCommand
         graph = self.graph_view.graph_scene.g
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
             return None
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
             graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
             return None
-        cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
+        # We will try to connect all the vertices together in order
+        # First we filter out the vertices that are not compatible with the edge.
+        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT] # we will be adding two edges, which is not compatible with W_INPUT
+        # but first we check if there any vertices that we do want to additionally connect.
+        if not self.snap_vertex_edge or not verts:
+            cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
+            self.undo_stack.push(cmd)
+            return
+        
+        ux, uy = graph.row(u), graph.qubit(u)
+        # Line was drawn from u to v, we want to order vs with the earlier items first.
+        def dist(vitem: VItem) -> float:
+            return (graph.row(vitem.v) - ux)**2 + (graph.qubit(vitem.v) - uy)**2  # type: ignore
+        verts.sort(key=dist)
+        vs = [vitem.v for vitem in verts]
+        pairs = [(u, vs[0])]
+        for i in range(1, len(vs)):
+            pairs.append((vs[i-1],vs[i]))
+        pairs.append((vs[-1],v))
+        cmd = AddEdges(self.graph_view, pairs, self._curr_ety)
         self.undo_stack.push(cmd)
+        group = QParallelAnimationGroup()
+        for vitem in verts:
+            anim = animations.scale(vitem,1.0,400,QEasingCurve(QEasingCurve.Type.InCubic),start=1.3)
+            group.addAnimation(anim)
+        self.undo_stack.set_anim(group)
 
     def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         self.undo_stack.push(MoveNode(self.graph_view, vs))
@@ -288,7 +346,7 @@ class VariableViewer(QScrollArea):
             self.parent_panel.graph.variable_types[name] = True
 
 
-def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
+def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
     icon_size = QSize(32, 32)
     select = QToolButton(parent)  # Selected by default
     vertex = QToolButton(parent)
@@ -312,7 +370,16 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> ToolbarSection:
     select.clicked.connect(lambda: parent._tool_clicked(ToolType.SELECT))
     vertex.clicked.connect(lambda: parent._tool_clicked(ToolType.VERTEX))
     edge.clicked.connect(lambda: parent._tool_clicked(ToolType.EDGE))
-    return ToolbarSection(select, vertex, edge, exclusive=True)
+    yield ToolbarSection(select, vertex, edge, exclusive=True)
+
+    snap = QToolButton(parent)
+    snap.setCheckable(True)
+    snap.setChecked(True)
+    snap.setIcon(QIcon(get_data("icons/vertex-snap-to-edge.svg")))
+    snap.setToolTip("Snap vertices to the edge beneath them when adding vertices or edges (f)")
+    snap.setShortcut("f")
+    snap.clicked.connect(lambda: parent._snap_vertex_edge_clicked())
+    yield ToolbarSection(snap)
 
 
 def create_list_widget(parent: EditorBasePanel,

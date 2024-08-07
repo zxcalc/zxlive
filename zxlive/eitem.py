@@ -15,9 +15,10 @@
 
 from __future__ import annotations
 from math import sqrt
-from typing import Optional, Any, TYPE_CHECKING
+from typing import Optional, Any, TYPE_CHECKING, Union
+from enum import Enum
 
-from PySide6.QtCore import QPointF
+from PySide6.QtCore import QPointF, QVariantAnimation, QAbstractAnimation
 from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsItem, \
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
 from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath
@@ -35,6 +36,13 @@ HAD_EDGE_BLUE = "#0077ff"
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
+    # Set of animations that are currently running on this vertex
+    active_animations: set[EItemAnimation]
+
+    class Properties(Enum):
+        """Properties of an EItem that can be animated."""
+        Thickness = 1
+
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
@@ -46,6 +54,7 @@ class EItem(QGraphicsPathItem):
         self.s_item = s_item
         self.t_item = t_item
         self.curve_distance = curve_distance
+        self.active_animations = set()
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
         self.selection_node = QGraphicsEllipseItem(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
@@ -58,12 +67,17 @@ class EItem(QGraphicsPathItem):
         self.is_mouse_pressed = False
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
+        self.thickness: float = 3
 
         self.refresh()
 
     @property
     def g(self) -> GraphT:
         return self.graph_scene.g
+
+    @property
+    def is_animated(self) -> bool:
+        return len(self.active_animations) > 0
 
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
@@ -72,7 +86,7 @@ class EItem(QGraphicsPathItem):
                      self.g.edge_type(self.e) != EdgeType.W_IO)
         # set color/style according to edge type
         pen = QPen()
-        pen.setWidthF(3)
+        pen.setWidthF(self.thickness)
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
@@ -197,3 +211,68 @@ def compute_perpendicular_direction(source_pos: QPointF, target_pos: QPointF) ->
     direction = direction / norm
     perpendicular = QPointF(-direction.y(), direction.x())
     return perpendicular
+
+
+class EItemAnimation(QVariantAnimation):
+    """Animator for edge graphics items.
+
+    This animator lets the edge know that its being animated which stops any
+    interaction with the user. Furthermore, this animator
+    ensures that it's not garbage collected until the animation is finished, so there is
+    no need to hold onto a reference of this class."""
+
+    _it: Optional[EItem]
+    prop: EItem.Properties
+    refresh: bool  # Whether the item is refreshed at each frame
+
+    e: Optional[ET]
+
+    def __init__(self, item: Union[EItem, ET], property: EItem.Properties,
+                 scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
+        super().__init__()
+        self.e = None
+        self._it = None
+        self.scene: Optional[GraphScene] = None
+        if isinstance(item, EItem):
+            self._it = item
+        elif scene is None:
+            raise ValueError("Scene is required to obtain EItem from edge ET")
+        else:
+            self.e = item
+            self.scene = scene
+        self.prop = property
+        self.refresh = refresh
+        self.stateChanged.connect(self._on_state_changed)
+
+    @property
+    def it(self) -> EItem:
+        if self._it is None and self.scene is not None and self.e is not None:
+            self._it = self.scene.edge_map[self.e]
+        assert self._it is not None
+        return self._it
+
+    def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
+        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+            # Stop all animations that target the same property
+            for anim in self.it.active_animations.copy():
+                if anim.prop == self.prop:
+                    anim.stop()
+            self.it.active_animations.add(self)
+        elif state == QAbstractAnimation.State.Stopped:
+            self.it.active_animations.remove(self)
+        elif state == QAbstractAnimation.State.Paused:
+            # TODO: Once we use pausing, we should decide what to do here.
+            #   Note that we cannot just remove ourselves from the set since the garbage
+            #   collector will eat us in that case. We'll probably need something like
+            #   `it.paused_animations`
+            pass
+
+    def updateCurrentValue(self, value: Any) -> None:
+        if self.state() != QAbstractAnimation.State.Running:
+            return
+
+        if self.prop == EItem.Properties.Thickness:
+            self.it.thickness = value
+
+        if self.refresh:
+            self.it.refresh()
