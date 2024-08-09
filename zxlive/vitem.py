@@ -107,6 +107,7 @@ class VItem(QGraphicsPathItem):
 
     @property
     def ty(self) -> VertexType:
+        # https://github.com/zxcalc/zxlive/pull/281
         _ty: VertexType = self.g.type(self.v)
         return _ty
 
