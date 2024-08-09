@@ -81,6 +81,36 @@ class MainWindow(QMainWindow):
         tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
+        tab_widget.setStyleSheet(
+            f'''
+            QTabBar::Tab:hover {{
+                background-color: rgba(100, 190, 255, 30);
+            }}
+            QTabBar::Tab{{
+                padding: 8px;
+                min-width: 100px;
+                max-width: 250px;
+                border: 0px;
+                border-right: 1px solid rgba(140, 140, 140, 75);
+                margin: 1px;
+                margin-left: 0px;
+                margin-right: 0px;
+            }}
+            QTabBar::tab:selected {{
+                background-color: rgba(100, 190, 255, 50);
+            }}
+            QTabBar::close-button{{
+                background-image: url("zxlive/icons/close.svg");
+                background-position: center;
+                background-repeat: no-repeat;
+                subcontrol-position: right;
+                subcontrol-origin: padding;
+                padding: 10px;
+            }}
+            QTabBar::close-button:hover{{
+                background-color: rgba(140, 140, 140, 90);
+            }}
+            ''')
         self.tab_widget = tab_widget
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
