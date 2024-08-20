@@ -111,9 +111,13 @@ tikz_export_settings: list[SettingsData] = [
 
 tikz_import_settings: list[SettingsData] = [
     {"id": "tikz/Z-spider-import", "label": "Z-spider", "type": FormInputType.Str},
+    {"id": "tikz/X-spider-import", "label": "X-spider", "type": FormInputType.Str},
+    {"id": "tikz/Hadamard-import", "label": "H-box", "type": FormInputType.Str},
     {"id": "tikz/w-input-import", "label": "W input", "type": FormInputType.Str},
     {"id": "tikz/w-output-import", "label": "W output", "type": FormInputType.Str},
     {"id": "tikz/z-box-import", "label": "Z box", "type": FormInputType.Str},
+    {"id": "tikz/edge-import", "label": "regular edge", "type": FormInputType.Str},
+    {"id": "tikz/edge-H-import", "label": "H edge", "type": FormInputType.Str},
     {"id": "tikz/edge-W-import", "label": "W io edge", "type": FormInputType.Str},
 ]
 
