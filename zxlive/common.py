@@ -34,6 +34,9 @@ def get_settings_value(arg: str, _type: Type[T], default: T | None = None, setti
     if _type == int:
         val = _settings.value(arg, default)
         return int(str(val))
+    if _type == float:
+        val = _settings.value(arg, default)
+        return float(str(val))
     if not isinstance(val := _settings.value(arg, default), _type):
         if default is not None:
             return default
