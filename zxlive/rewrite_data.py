@@ -23,7 +23,7 @@ MATCHES_EDGES: MatchType = 2
 class RewriteData(TypedDict):
     text: str
     matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]
+    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
     type: MatchType
     tooltip: str
     copy_first: NotRequired[bool]
@@ -237,13 +237,6 @@ simplifications: dict[str, RewriteData] = {
         "tooltip": "full_reduce",
         "matcher": const_true,
         "rule": apply_simplification(simplify.full_reduce),
-        "type": MATCHES_VERTICES,
-    },
-    'teleport_reduce': {
-        "text": "teleport reduce",
-        "tooltip": "teleport_reduce",
-        "matcher": const_true,
-        "rule": apply_simplification(simplify.teleport_reduce),
         "type": MATCHES_VERTICES,
     },
     'reduce_scalar': {

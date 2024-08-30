@@ -38,11 +38,13 @@ class Rewrite(NamedTuple):
         """Deserializes the rewrite from JSON."""
         d = json.loads(json_str)
         grouped_rewrites = d.get("grouped_rewrites")
+        graph = GraphT.from_json(d["graph"])
+        assert isinstance(graph, GraphT)
 
         return Rewrite(
             display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
             rule=d["rule"],
-            graph=GraphT.from_json(d["graph"]),
+            graph=graph,
             grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
         )
 
@@ -136,12 +138,11 @@ class ProofModel(QAbstractListModel):
     def get_graph(self, index: int) -> GraphT:
         """Returns the graph at a given position in the proof."""
         if index == 0:
-            return self.initial_graph.copy()
+            copy = self.initial_graph.copy()
         else:
             copy = self.steps[index-1].graph.copy()
-            # Mypy issue: https://github.com/python/mypy/issues/11673
-            assert isinstance(copy, GraphT)  # type: ignore
-            return copy
+        assert isinstance(copy, GraphT)
+        return copy
 
     def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""

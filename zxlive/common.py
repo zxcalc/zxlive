@@ -94,7 +94,9 @@ def to_tikz(g: GraphT) -> str:
 
 def from_tikz(s: str) -> Optional[GraphT]:
     try:
-        return pyzx.tikz.tikz_to_graph(s)
+        g = pyzx.tikz.tikz_to_graph(s, backend = 'multigraph')
+        assert isinstance(g, GraphT)
+        return g
     except Exception as e:
         from . import dialogs
         dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")

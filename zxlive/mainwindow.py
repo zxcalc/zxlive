@@ -47,6 +47,7 @@ from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
+from pyzx.graph.base import BaseGraph
 from pyzx.drawing import graphs_to_gif
 
 
@@ -424,11 +425,15 @@ class MainWindow(QMainWindow):
         with open(path, "w") as f:
             f.write(proof_to_tikz(self.active_panel.proof_model))
         return True
-        
+
     def handle_export_gif_proof_action(self) -> bool:
         assert isinstance(self.active_panel, ProofPanel)
         path = export_gif_dialog(self)
-        graphs_to_gif(self.active_panel.proof_model.graphs(),path,1000) # 1000ms per frame
+        if path is None:
+            show_error_msg("Export failed", "Invalid path", parent=self)
+            return False
+        graphs: list[BaseGraph] = list(self.active_panel.proof_model.graphs())
+        graphs_to_gif(graphs, path, 1000) # 1000ms per frame
         return True
 
     def cut_graph(self) -> None:

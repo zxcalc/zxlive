@@ -32,7 +32,7 @@ operations = copy.deepcopy(pyzx.editor.operations)
 class RewriteAction:
     name: str
     matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]
+    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
     match_type: MatchType
     tooltip_str: str
     picture_path: Optional[str] = field(default=None)
@@ -88,11 +88,15 @@ class RewriteAction:
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Narrow down the type of the first return value.
-    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[Any, list[VT]]:
+    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[GraphT, list[VT]]:
         if self.returns_new_graph:
-            return self.rule(g, matches), []
+            graph = self.rule(g, matches)
+            assert isinstance(graph, GraphT)
+            return graph, []
 
-        etab, rem_verts, rem_edges, check_isolated_vertices = self.rule(g, matches)
+        rewrite = self.rule(g, matches)
+        assert isinstance(rewrite, tuple) and len(rewrite) == 4
+        etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
         g.remove_edges(rem_edges)
         g.remove_vertices(rem_verts)
         g.add_edge_table(etab)
