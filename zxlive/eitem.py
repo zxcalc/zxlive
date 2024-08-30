@@ -198,7 +198,8 @@ class EDragItem(QGraphicsPathItem):
 def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float) -> QPointF:
     """Calculate the control point for the curve"""
     perpendicular = compute_perpendicular_direction(source_pos, target_pos)
-    midpoint: QPointF = (source_pos + target_pos) / 2.
+    source_plus_target = source_pos + target_pos
+    midpoint = QPointF(source_plus_target.x() / 2, source_plus_target.y() / 2)
     offset = perpendicular * curve_distance * SCALE
     control_point = midpoint + offset
     return control_point
@@ -208,7 +209,7 @@ def compute_perpendicular_direction(source_pos: QPointF, target_pos: QPointF) ->
         return QPointF(0, -2/3)
     direction = target_pos - source_pos
     norm = sqrt(direction.x()**2 + direction.y()**2)
-    direction = direction / norm
+    direction = QPointF(direction.x() / norm, direction.y() / norm)
     perpendicular = QPointF(-direction.y(), direction.x())
     return perpendicular
 
