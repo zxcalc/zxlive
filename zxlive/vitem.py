@@ -140,12 +140,12 @@ class VItem(QGraphicsPathItem):
         pen = QPen()
         if not self.isSelected():
             color_key = color_map.get(self.ty, "boundary")
-            brush = QBrush(display_setting.colors[color_key])
+            brush = QBrush(display_setting.colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
             pen.setColor(display_setting.colors["outline"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            brush = QBrush(display_setting.colors[color_key])
+            brush = QBrush(display_setting.colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
             if self.ty not in pressed_color_map:

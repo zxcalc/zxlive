@@ -112,7 +112,8 @@ modern_red_green: ColorScheme = {
     "outline": QColor("#000000"),
 }
 
-classic_red_green: ColorScheme = modern_red_green | {
+classic_red_green: ColorScheme = {
+    **modern_red_green,
     "id": "classic-red-green",
     "label": "Classic Red & Green",
     "z_spider": QColor("#00ff00"),
@@ -121,7 +122,8 @@ classic_red_green: ColorScheme = modern_red_green | {
     "x_spider_pressed": QColor("#dd0b00"),
 }
 
-white_gray: ColorScheme = modern_red_green | {
+white_gray: ColorScheme = {
+    **modern_red_green,
     "id": 'white-grey',
     "label": "Dodo book White & Grey",
     "z_spider": QColor("#ffffff"),
@@ -132,7 +134,8 @@ white_gray: ColorScheme = modern_red_green | {
     "hadamard_pressed": QColor("#dddddd"),
 }
 
-gidney: ColorScheme = white_gray | {
+gidney: ColorScheme = {
+    **white_gray,
     "id": 'gidney',
     "label": "Gidney's Black & White",
     "z_spider": QColor("#000000"),

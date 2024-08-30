@@ -1,7 +1,7 @@
 from PySide6.QtCore import QSettings
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
-from .common import get_settings_value
+from .common import GraphT, get_settings_value
 from zxlive.proof import ProofModel
 
 
@@ -23,7 +23,9 @@ def proof_to_tikz(proof: ProofModel) -> str:
 
         # Translate graph so that the first vertex starts at 0
         min_x = min(g.row(v) for v in g.vertices())
-        g = g.translate(-min_x, 0)
+        g_t = g.translate(-min_x, 0)
+        assert isinstance(g_t, GraphT)
+        g = g_t
 
         if i > 0:
             rewrite = proof.steps[i-1]

@@ -248,7 +248,7 @@ class EItemAnimation(QVariantAnimation):
     @property
     def it(self) -> EItem:
         if self._it is None and self.scene is not None and self.e is not None:
-            self._it = self.scene.edge_map[self.e]
+            self._it = self.scene.edge_map[self.e][0]
         assert self._it is not None
         return self._it
 
