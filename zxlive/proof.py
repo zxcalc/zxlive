@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -24,7 +24,7 @@ class Rewrite(NamedTuple):
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None # Optional field to store the grouped rewrites
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
         return {
             "display_name": self.display_name,
@@ -38,7 +38,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: str|dict[str, Any]) -> "Rewrite":
+    def from_json(json_str: Union[str,Dict[str,Any]]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -190,7 +190,7 @@ class ProofModel(QAbstractListModel):
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> dict[str,Any]:
+    def to_dict(self) -> Dict[str,Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -205,7 +205,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: str|dict[str,Any]) -> "ProofModel":
+    def from_json(json_str: Union[str,Dict[str,Any]]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)

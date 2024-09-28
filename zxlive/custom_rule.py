@@ -1,7 +1,7 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Dict, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Dict, Union, Any
 
 import networkx as nx
 import numpy as np
@@ -175,8 +175,11 @@ class CustomRule:
         })
 
     @classmethod
-    def from_json(cls, json_str: str) -> "CustomRule":
-        d = json.loads(json_str)
+    def from_json(cls, json_str: Union[str,Dict[str,Any]]) -> "CustomRule":
+        if isinstance(json_str, str):
+            d = json.loads(json_str)
+        else:
+            d = json_str
         lhs_graph = GraphT.from_json(d['lhs_graph'])
         rhs_graph = GraphT.from_json(d['rhs_graph'])
         # Mypy issue: https://github.com/python/mypy/issues/11673
