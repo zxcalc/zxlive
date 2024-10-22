@@ -110,6 +110,7 @@ class VItem(QGraphicsPathItem):
         _ty: VertexType = self.g.type(self.v)
         return _ty
 
+
     @property
     def is_dragging(self) -> bool:
         return self._old_pos is not None
@@ -424,7 +425,7 @@ class PhaseItem(QGraphicsTextItem):
 
     def refresh(self) -> None:
         """Call this when a vertex moves or its phase changes"""
-        vertex_type = self.v_item.g.type(self.v_item.v)
+        vertex_type = self.v_item.ty
         if vertex_type == VertexType.Z_BOX:
             self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
         elif vertex_type != VertexType.BOUNDARY:

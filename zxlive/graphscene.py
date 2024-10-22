@@ -117,6 +117,7 @@ class GraphScene(QGraphicsScene):
                 anim_v.stop()
             selected_vertices.discard(v)
             self.removeItem(v_item)
+            del self.vertex_map[v]
 
         for e in diff.removed_edges:
             edge_idx = len(self.edge_map[e]) - 1
@@ -129,6 +130,8 @@ class GraphScene(QGraphicsScene):
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)
             self.update_edge_curves(s, t)
+            if len(self.edge_map[e]) == 0:
+                del self.edge_map[e]
 
         new_g = diff.apply_diff(self.g)
         # Mypy issue: https://github.com/python/mypy/issues/11673
