@@ -4,10 +4,11 @@ import copy
 import random
 from typing import Iterator, Union, cast
 
-import pyzx
 from PySide6.QtCore import QPointF, QSize
 from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
+
+import pyzx
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -404,9 +405,20 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _vert_double_clicked(self, v: VT) -> None:
-        if self.graph.type(v) == VertexType.BOUNDARY:
+        ty = self.graph.type(v)
+        if ty == VertexType.BOUNDARY:
             return
-        new_g = copy.deepcopy(self.graph)
-        basicrules.color_change(new_g, v)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
-        self.undo_stack.push(cmd)
+        if ty in (VertexType.Z, VertexType.X):
+            new_g = copy.deepcopy(self.graph)
+            basicrules.color_change(new_g, v)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
+            self.undo_stack.push(cmd)
+            return
+        if ty == VertexType.H_BOX:
+            new_g = copy.deepcopy(self.graph)
+            if not pyzx.hrules.is_hadamard(new_g, v): 
+                return
+            pyzx.hrules.replace_hadamard(new_g, v)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
+            self.undo_stack.push(cmd)
+            return
