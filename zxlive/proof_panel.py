@@ -38,6 +38,7 @@ class ProofPanel(BasePanel):
         self.graph_scene = GraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+        self.graph_scene.edge_double_clicked.connect(self._edge_double_clicked)
 
         self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
@@ -422,3 +423,11 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
             self.undo_stack.push(cmd)
             return
+
+    def _edge_double_clicked(self, e: VT) -> None:
+        """When an edge is double clicked, we change it to an H-box if it is a Hadamard edge."""
+        new_g = copy.deepcopy(self.graph)
+        if new_g.edge_type(e) == EdgeType.HADAMARD:
+            pyzx.hrules.had_edge_to_hbox(new_g, e)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
+            self.undo_stack.push(cmd)

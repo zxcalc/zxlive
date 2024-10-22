@@ -52,6 +52,7 @@ class GraphScene(QGraphicsScene):
 
     # Triggers when an edge is dragged. Actual types: EItem, float (old curve_distance), float (new curve_distance)
     edge_dragged = Signal(object, object, object)
+    edge_double_clicked = Signal(object)  # Actual type: ET
 
     selection_changed_custom = Signal()
 
