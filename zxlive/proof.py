@@ -47,6 +47,7 @@ class Rewrite(NamedTuple):
         grouped_rewrites = d.get("grouped_rewrites")
         graph = GraphT.from_json(d["graph"])
         assert isinstance(graph, GraphT)
+        graph.set_auto_simplify(False)
 
         return Rewrite(
             display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
@@ -213,7 +214,8 @@ class ProofModel(QAbstractListModel):
             d = json_str
         initial_graph = GraphT.from_json(d["initial_graph"])
         # Mypy issue: https://github.com/python/mypy/issues/11673
-        assert isinstance(initial_graph, GraphT)  # type: ignore
+        if TYPE_CHECKING: assert isinstance(initial_graph, GraphT)
+        initial_graph.set_auto_simplify(False)
         model = ProofModel(initial_graph)
         for step in d["proof_steps"]:
             rewrite = Rewrite.from_json(step)

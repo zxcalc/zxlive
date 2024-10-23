@@ -184,6 +184,8 @@ class CustomRule:
         rhs_graph = GraphT.from_json(d['rhs_graph'])
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))  # type: ignore
+        lhs_graph.set_auto_simplify(False)
+        rhs_graph.set_auto_simplify(False)
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_rewrite_data(self) -> "RewriteData":
