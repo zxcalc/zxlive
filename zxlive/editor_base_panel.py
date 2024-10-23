@@ -182,6 +182,7 @@ class EditorBasePanel(BasePanel):
 
     def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
         """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
+        If self.snap_vertex_edge is true, then we try to connect `u` through all the `vertices` in `verts`, and then to `v`.
         """
         cmd: BaseCommand
         graph = self.graph_view.graph_scene.g
