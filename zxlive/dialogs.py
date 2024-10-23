@@ -159,7 +159,7 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
         else:
             assert selected_format == FileFormat.All
             try:
-                g = Circuit.load(file_path).to_graph(zx=True,backend='multigraph')
+                g = Circuit.load(file_path).to_graph(zh=True,backend='multigraph')
                 if TYPE_CHECKING: assert isinstance(g, GraphT)
                 g.set_auto_simplify(False)
                 return ImportGraphOutput(FileFormat.QASM, file_path, g)  # type: ignore
