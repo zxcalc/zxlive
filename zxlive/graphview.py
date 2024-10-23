@@ -150,6 +150,7 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def keyPressEvent(self, e: QKeyEvent) -> None:
+        """Logic for moving selected vertices with arrow keys"""
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
             g = self.graph_scene.g
             if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
