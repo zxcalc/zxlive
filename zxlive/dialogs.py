@@ -140,15 +140,18 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
             return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
             g = GraphT.from_json(data)
+            if TYPE_CHECKING: assert isinstance(g, GraphT)
             g.set_auto_simplify(False)
             return ImportGraphOutput(selected_format, file_path, g)  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
             g = Circuit.from_qasm(data).to_graph(zh=True,backend='multigraph')
+            if TYPE_CHECKING: assert isinstance(g, GraphT)
             g.set_auto_simplify(False)
             return ImportGraphOutput(selected_format, file_path, ) # type: ignore
         elif selected_format == FileFormat.TikZ:
             try:
                 g = GraphT.from_tikz(data)
+                if TYPE_CHECKING: assert isinstance(g, GraphT)
                 g.set_auto_simplify(False)
                 return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
             except ValueError:
@@ -157,16 +160,19 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
             assert selected_format == FileFormat.All
             try:
                 g = Circuit.load(file_path).to_graph(zx=True,backend='multigraph')
+                if TYPE_CHECKING: assert isinstance(g, GraphT)
                 g.set_auto_simplify(False)
                 return ImportGraphOutput(FileFormat.QASM, file_path, g)  # type: ignore
             except TypeError:
                 try:
                     g = GraphT.from_json(data)
+                    if TYPE_CHECKING: assert isinstance(g, GraphT)
                     g.set_auto_simplify(False)
                     return ImportGraphOutput(FileFormat.QGraph, file_path, g)  # type: ignore
                 except Exception:
                     try:
                         g = GraphT.from_tikz(data)
+                        if TYPE_CHECKING: assert isinstance(g, GraphT)
                         g.set_auto_simplify(False)
                         return ImportGraphOutput(FileFormat.TikZ, file_path, g)  # type: ignore
                     except:
