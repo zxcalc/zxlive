@@ -124,6 +124,8 @@ class ProofPanel(BasePanel):
                 anims.anticipate_fuse(self.graph_scene.vertex_map[w])
             elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
+            elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
@@ -137,12 +139,21 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "fuse spiders")
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
+        elif pyzx.hrules.match_copy(g, lambda x: x in (v, w)):
+            match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, match)
+            g.add_edge_table(etab)
+            g.remove_edges(rem_edges)
+            g.remove_vertices(rem_verts) 
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            self.undo_stack.push(cmd)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
+
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
