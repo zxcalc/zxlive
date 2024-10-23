@@ -139,25 +139,36 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
         elif selected_format == FileFormat.ZXRule:
             return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
-            return ImportGraphOutput(selected_format, file_path, GraphT.from_json(data))  # type: ignore # This is something that needs to be better annotated in PyZX
+            g = GraphT.from_json(data)
+            g.set_auto_simplify(False)
+            return ImportGraphOutput(selected_format, file_path, g)  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
-            return ImportGraphOutput(selected_format, file_path, Circuit.from_qasm(data).to_graph()) # type: ignore
+            g = Circuit.from_qasm(data).to_graph(zh=True,backend='multigraph')
+            g.set_auto_simplify(False)
+            return ImportGraphOutput(selected_format, file_path, ) # type: ignore
         elif selected_format == FileFormat.TikZ:
             try:
-                return ImportGraphOutput(selected_format, file_path, GraphT.from_tikz(data))  # type: ignore
+                g = GraphT.from_tikz(data)
+                g.set_auto_simplify(False)
+                return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
             except ValueError:
                 raise ValueError("Probable reason: attempted to import a proof from TikZ, which is not supported.")
         else:
             assert selected_format == FileFormat.All
             try:
-                circ = Circuit.load(file_path)
-                return ImportGraphOutput(FileFormat.QASM, file_path, circ.to_graph())  # type: ignore
+                g = Circuit.load(file_path).to_graph(zx=True,backend='multigraph')
+                g.set_auto_simplify(False)
+                return ImportGraphOutput(FileFormat.QASM, file_path, g)  # type: ignore
             except TypeError:
                 try:
-                    return ImportGraphOutput(FileFormat.QGraph, file_path, GraphT.from_json(data))  # type: ignore
+                    g = GraphT.from_json(data)
+                    g.set_auto_simplify(False)
+                    return ImportGraphOutput(FileFormat.QGraph, file_path, g)  # type: ignore
                 except Exception:
                     try:
-                        return ImportGraphOutput(FileFormat.TikZ, file_path, GraphT.from_tikz(data))  # type: ignore
+                        g = GraphT.from_tikz(data)
+                        g.set_auto_simplify(False)
+                        return ImportGraphOutput(FileFormat.TikZ, file_path, g)  # type: ignore
                     except:
                         show_error_msg(f"Failed to import {selected_format.name} file",
                                        f"Couldn't determine filetype: {file_path}.", parent=parent)
