@@ -435,7 +435,7 @@ class ProofPanel(BasePanel):
             self.undo_stack.push(cmd)
             return
 
-    def _edge_double_clicked(self, e: VT) -> None:
+    def _edge_double_clicked(self, e: ET) -> None:
         """When an edge is double clicked, we change it to an H-box if it is a Hadamard edge."""
         new_g = copy.deepcopy(self.graph)
         if new_g.edge_type(e) == EdgeType.HADAMARD:
