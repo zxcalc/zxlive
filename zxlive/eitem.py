@@ -161,6 +161,15 @@ class EItem(QGraphicsPathItem):
         self.is_mouse_pressed = False
         self.graph_scene.selection_changed_custom.emit()
 
+    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        super().mouseDoubleClickEvent(e)
+        if self.is_animated:
+            e.ignore()
+            return
+        scene = self.scene()
+        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        scene.edge_double_clicked.emit(self.e)
+
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!
