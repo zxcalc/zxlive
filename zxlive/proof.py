@@ -226,6 +226,7 @@ class ProofStepView(QListView):
     """A view for displaying the steps in a proof."""
 
     def __init__(self, parent: 'ProofPanel'):
+        print("Initializing ProofStepView")
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
@@ -251,14 +252,23 @@ class ProofStepView(QListView):
         assert isinstance(model, ProofModel)
         return model
 
+    def set_model(self, model: ProofModel) -> None:
+        self.setModel(model)
+        # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
+        self.selectionModel().selectionChanged.connect(self.proof_step_selected)  
+        self.setCurrentIndex(model.index(len(model.steps), 0))
+
     def move_to_step(self, index: int) -> None:
+        print("Moving to step", index)
         idx = self.model().index(index, 0, QModelIndex())
         self.clearSelection()
         self.selectionModel().blockSignals(True)
         self.setCurrentIndex(idx)
         self.selectionModel().blockSignals(False)
         self.update(idx)
-        self.graph_view.set_graph(self.model().get_graph(index))
+        g = self.model().get_graph(index)
+        print(g)
+        self.graph_view.set_graph(g)
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()

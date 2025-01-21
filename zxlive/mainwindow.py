@@ -315,8 +315,7 @@ class MainWindow(QMainWindow):
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
                 proof_panel: ProofPanel = self.active_panel
-                proof_panel.step_view.setModel(out.p)
-                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
+                proof_panel.step_view.set_model(out.p)
             elif isinstance(out, ImportRuleOutput):
                 self.new_rule_editor(out.r, name)
             else:
