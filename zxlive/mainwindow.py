@@ -63,8 +63,10 @@ class MainWindow(QMainWindow):
         w = QWidget(self)
         w.setLayout(QVBoxLayout())
         self.setCentralWidget(w)
-        w.layout().setContentsMargins(0, 0, 0, 0)
-        w.layout().setSpacing(0)
+        wlayout = w.layout()
+        assert wlayout is not None # for mypy
+        wlayout.setContentsMargins(0, 0, 0, 0)
+        wlayout.setSpacing(0)
         self.resize(1200, 800)
 
         # restore the window from the last time it was opened
@@ -74,7 +76,7 @@ class MainWindow(QMainWindow):
         self.show()
 
         tab_widget = QTabWidget(self)
-        w.layout().addWidget(tab_widget)
+        wlayout.addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
@@ -315,8 +317,7 @@ class MainWindow(QMainWindow):
                 self.new_deriv(graph, name)
                 assert isinstance(self.active_panel, ProofPanel)
                 proof_panel: ProofPanel = self.active_panel
-                proof_panel.step_view.setModel(out.p)
-                proof_panel.step_view.setCurrentIndex(proof_panel.proof_model.index(len(proof_panel.proof_model.steps), 0))
+                proof_panel.step_view.set_model(out.p)
             elif isinstance(out, ImportRuleOutput):
                 self.new_rule_editor(out.r, name)
             else:
@@ -340,7 +341,7 @@ class MainWindow(QMainWindow):
             name = self.tab_widget.tabText(i).replace("*","")
             answer = QMessageBox.question(self, "Save Changes",
                             f"Do you wish to save your changes to {name} before closing?",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel)
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel) # type: ignore
             if answer == QMessageBox.StandardButton.Cancel:
                 return False
             if answer == QMessageBox.StandardButton.Yes:
@@ -585,7 +586,7 @@ class MainWindow(QMainWindow):
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
         dialog.setLayout(QVBoxLayout())
-        dialog.layout().addWidget(table)
+        dialog.layout().addWidget(table) # type: ignore # mypy thinks this can be None
         dialog.exec()
 
     def proof_as_lemma(self) -> None:

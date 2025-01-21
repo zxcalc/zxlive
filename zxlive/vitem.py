@@ -307,7 +307,7 @@ class VItem(QGraphicsPathItem):
             e.ignore()
             return
         if e.button() == Qt.MouseButton.LeftButton:
-            if self._old_pos != self.pos():
+            if self._old_pos is None or self._old_pos != self.pos():
                 if self.ty == VertexType.W_INPUT:
                     # set the position of w_in to next to w_out at the same angle
                     w_out = get_w_partner_vitem(self)

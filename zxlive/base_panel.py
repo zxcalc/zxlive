@@ -54,12 +54,14 @@ class BasePanel(QWidget):
 
         # Use box layout that fills the entire tab
         self.setLayout(QVBoxLayout())
-        self.layout().setSpacing(0)
+        layout = self.layout()
+        assert layout is not None # for mypy
+        layout.setSpacing(0)
         self.toolbar = QToolBar()
-        self.layout().addWidget(self.toolbar)
+        layout.addWidget(self.toolbar)
 
         self.splitter = QSplitter(self)
-        self.layout().addWidget(self.splitter)
+        layout.addWidget(self.splitter)
         self.splitter.splitterMoved.connect(self.sync_splitter_sizes)
 
         self.file_path = None
