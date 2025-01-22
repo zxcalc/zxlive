@@ -180,11 +180,10 @@ class CustomRule:
             d = json.loads(json_str)
         else:
             d = json_str
-        lhs_graph = GraphT.from_json(d['lhs_graph'])
-        rhs_graph = GraphT.from_json(d['rhs_graph'])
+        lhs_graph = pyzx.graph.jsonparser.json_to_graph(d['lhs_graph'],'multigraph')
+        rhs_graph = pyzx.graph.jsonparser.json_to_graph(d['rhs_graph'],'multigraph')
         # Mypy issue: https://github.com/python/mypy/issues/11673
-        if TYPE_CHECKING:
-            assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))  # type: ignore
+        assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))
         lhs_graph.set_auto_simplify(False)
         rhs_graph.set_auto_simplify(False)
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])

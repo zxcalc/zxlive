@@ -259,7 +259,6 @@ class ProofStepView(QListView):
         self.setCurrentIndex(model.index(len(model.steps), 0))
 
     def move_to_step(self, index: int) -> None:
-        print("Moving to step", index)
         idx = self.model().index(index, 0, QModelIndex())
         self.clearSelection()
         self.selectionModel().blockSignals(True)
@@ -267,7 +266,6 @@ class ProofStepView(QListView):
         self.selectionModel().blockSignals(False)
         self.update(idx)
         g = self.model().get_graph(index)
-        print(g)
         self.graph_view.set_graph(g)
 
     def show_context_menu(self, position: QPoint) -> None:
