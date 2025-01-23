@@ -494,14 +494,19 @@ class MainWindow(QMainWindow):
         self._new_panel(panel, name)
 
     def open_graph_from_notebook(self, graph: GraphT, name: str) -> None:
-        """Opens a ZXLive window from within a notebook to edit a graph.
+        """Opens a ZXLive window from within a Jupyter notebook to edit a graph.
 
         Replaces the graph in an existing tab if it has the same name."""
+
+        if not isinstance(graph, GraphT): # The graph we are given is not a MultiGraph
+            graph = graph.copy(backend='multigraph')
+            graph.set_auto_simplify(False)
+
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             if self.tab_widget.tabText(i) == name or self.tab_widget.tabText(i) == name + "*":
                 self.tab_widget.setCurrentIndex(i)
-                assert self.active_panel
+                assert self.active_panel is not None
                 self.active_panel.replace_graph(graph)
                 return
         self.new_graph(copy.deepcopy(graph), name)
