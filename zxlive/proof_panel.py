@@ -4,10 +4,11 @@ import copy
 import random
 from typing import Iterator, Union, cast
 
-import pyzx
 from PySide6.QtCore import QPointF, QSize
 from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
+
+import pyzx
 from pyzx import VertexType, basicrules
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
@@ -37,6 +38,7 @@ class ProofPanel(BasePanel):
         self.graph_scene = GraphScene()
         self.graph_scene.vertices_moved.connect(self._vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+        self.graph_scene.edge_double_clicked.connect(self._edge_double_clicked)
 
         self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
@@ -122,6 +124,8 @@ class ProofPanel(BasePanel):
                 anims.anticipate_fuse(self.graph_scene.vertex_map[w])
             elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
+            elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
@@ -135,12 +139,21 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "fuse spiders")
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
+        elif pyzx.hrules.match_copy(g, lambda x: x in (v, w)):
+            match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, match)
+            g.add_edge_table(etab)
+            g.remove_edges(rem_edges)
+            g.remove_vertices(rem_verts) 
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            self.undo_stack.push(cmd)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
+
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
@@ -404,9 +417,28 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _vert_double_clicked(self, v: VT) -> None:
-        if self.graph.type(v) == VertexType.BOUNDARY:
+        ty = self.graph.type(v)
+        if ty == VertexType.BOUNDARY:
             return
+        if ty in (VertexType.Z, VertexType.X):
+            new_g = copy.deepcopy(self.graph)
+            basicrules.color_change(new_g, v)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
+            self.undo_stack.push(cmd)
+            return
+        if ty == VertexType.H_BOX:
+            new_g = copy.deepcopy(self.graph)
+            if not pyzx.hrules.is_hadamard(new_g, v): 
+                return
+            pyzx.hrules.replace_hadamard(new_g, v)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
+            self.undo_stack.push(cmd)
+            return
+
+    def _edge_double_clicked(self, e: ET) -> None:
+        """When an edge is double clicked, we change it to an H-box if it is a Hadamard edge."""
         new_g = copy.deepcopy(self.graph)
-        basicrules.color_change(new_g, v)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
-        self.undo_stack.push(cmd)
+        if new_g.edge_type(e) == EdgeType.HADAMARD:
+            pyzx.hrules.had_edge_to_hbox(new_g, e)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
+            self.undo_stack.push(cmd)
