@@ -50,6 +50,24 @@ def read_custom_rules() -> list[RewriteData]:
                     custom_rules.append(rule)
     return custom_rules
 
+const_true = lambda graph, matches: matches
+
+
+def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[
+    [GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
+    def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
+        simplification(g)
+        return ({}, [], [], True)
+
+    return rule
+
+
+def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
+    graph.auto_detect_io()
+    simplify.full_reduce(graph)
+    return cast(GraphT, extract_circuit(graph).to_graph())
+
+
 # We want additional actions that are not part of the original PyZX editor
 # So we add them to operations
 
@@ -67,7 +85,7 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "text": "pivot",
         "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
         "matcher": lambda g, matchf: pyzx.rules.match_pivot_parallel(g, matchf, check_edge_types=True),
-        "rule": pyzx.rules.pivot,
+        "rule": apply_simplification(simplify.pivot_simp),
         "type": MATCHES_EDGES,
         "copy_first": True,
         "picture": "pivot_regular.png"
@@ -107,24 +125,6 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "copy_first": False
     },
 }
-
-const_true = lambda graph, matches: matches
-
-
-def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[
-    [GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
-    def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
-        simplification(g)
-        return ({}, [], [], True)
-
-    return rule
-
-
-def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
-    graph.auto_detect_io()
-    simplify.full_reduce(graph)
-    return cast(GraphT, extract_circuit(graph).to_graph())
-
 
 # The OCM action simply saves the current graph without modifying anything.
 # This can be used to make repositioning the vertices an explicit proof step.
