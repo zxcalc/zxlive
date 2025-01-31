@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zxlive"
-version = "0.2.0"
+version = "0.3.0"
 description = "An interactive tool for the ZX-calculus"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "PySide6 >= 6.7.2",
-    "pyzx @ git+https://github.com/zxcalc/pyzx.git",
+    "pyzx>=0.9.0",
     "networkx",
     "numpy",
     "shapely",
