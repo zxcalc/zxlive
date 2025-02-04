@@ -34,7 +34,11 @@ dependencies = [
     "numpy",
     "shapely",
     "pyperclip",
-    "imageio"
+    "imageio",
+    "openai",
+    "pydub",
+    "sounddevice",
+    "ffmpeg-python"
 ]
 
 [project.optional-dependencies]
