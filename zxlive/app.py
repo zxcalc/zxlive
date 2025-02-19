@@ -48,7 +48,7 @@ class ZXLive(QApplication):
         self.setFont(display_setting.font)
         self.setApplicationName('ZXLive')
         self.setDesktopFileName('ZXLive')
-        self.setApplicationVersion('0.3.0')  # TODO: read this from pyproject.toml if possible
+        self.setApplicationVersion('0.3.1')  # TODO: read this from pyproject.toml if possible
         self.main_window = MainWindow()
         self.main_window.setWindowIcon(QIcon(get_data('icons/logo.png')))
         self.setWindowIcon(self.main_window.windowIcon())
