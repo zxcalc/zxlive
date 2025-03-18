@@ -88,7 +88,7 @@ font_settings: list[SettingsData] = [
     {"id": "font/size", "label": "Font size", "type": FormInputType.Int},
     # Font families can be loaded after a QGuiApplication is constructed.
     # load_font_families needs to be called once a QGuiApplication is up.
-    {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Ariel": "Ariel"}},
+    {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
 ]
 
 
@@ -249,7 +249,7 @@ class SettingsDialog(QDialog):
         widget = QComboBox()
         for k, v in _data.items():
             widget.addItem(v, userData=k)
-        widget.setCurrentText(_data[value])
+        widget.setCurrentText(_data.get(value, defaults[name]))
         return widget
 
     def add_setting_to_form(self, form: QFormLayout, settings_data: SettingsData) -> None:
