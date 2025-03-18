@@ -41,7 +41,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
 
 font_defaults: dict[str, str | int | None] = {
     "font/size": 11,
-    "font/family": "Ariel",
+    "font/family": "Arial",
 }
 
 tikz_export_defaults: dict[str, str] = {
