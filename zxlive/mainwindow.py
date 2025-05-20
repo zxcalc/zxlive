@@ -560,14 +560,20 @@ class MainWindow(QMainWindow):
         self.active_panel.graph_view.fit_view()
 
     def show_matrix(self) -> None:
-        def format_str(c: complex) -> str:
+        from PySide6.QtWidgets import QSpinBox, QPushButton, QHBoxLayout
+        precision: int = get_settings_value("matrix/precision", int, 4, self.settings)
+        def format_str(c: complex, p: int) -> str:
             tol = 1e-8
-            if abs(c.real) < tol and abs(c.imag) < tol: return "0"
-            if abs(c.imag) < tol: return f"{c.real:.4f}"
-            if abs(c.real) < tol: return f"{c.imag:.4f}j"
-            return f"{matrix[i,j]:.2f}"
+            if abs(c.real) < tol and abs(c.imag) < tol:
+                return "0"
+            if abs(c.imag) < tol:
+                return f"{c.real:.{p}f}"
+            if abs(c.real) < tol:
+                return f"{c.imag:.{p}f}j"
+            return f"{c.real:.{p}f} + {c.imag:.{p}f}j"
 
-        if self.active_panel is None: return
+        if self.active_panel is None:
+            return
         try:
             self.active_panel.graph.auto_detect_io()
             matrix = self.active_panel.graph.to_matrix()
@@ -580,18 +586,42 @@ class MainWindow(QMainWindow):
             return
         dialog = QDialog(self)
         dialog.setWindowTitle("Matrix")
-        table = QTableWidget()
-        table.setRowCount(matrix.shape[0])
-        table.setColumnCount(matrix.shape[1])
+        layout = QVBoxLayout()
+        table = QTableWidget(matrix.shape[0], matrix.shape[1])
         for i in range(matrix.shape[0]):
             for j in range(matrix.shape[1]):
-                entry = QTableWidgetItem(format_str(matrix[i, j]))
+                entry = QTableWidgetItem(format_str(matrix[i, j], precision))
                 entry.setFlags(entry.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 table.setItem(i, j, entry)
         table.resizeColumnsToContents()
         table.resizeRowsToContents()
-        dialog.setLayout(QVBoxLayout())
-        dialog.layout().addWidget(table) # type: ignore # mypy thinks this can be None
+        layout.addWidget(table)
+        controls_layout = QHBoxLayout()
+        precision_spin = QSpinBox()
+        precision_spin.setRange(0, 12)
+        precision_spin.setValue(precision)
+        precision_spin.setPrefix("Precision: ")
+        controls_layout.addWidget(precision_spin)
+        copy_btn = QPushButton("Copy to Clipboard")
+        controls_layout.addWidget(copy_btn)
+        layout.addLayout(controls_layout)
+        dialog.setLayout(layout)
+        def update_precision() -> None:
+            p = precision_spin.value()
+            for i in range(matrix.shape[0]):
+                for j in range(matrix.shape[1]):
+                    item = table.item(i, j)
+                    if item is not None:
+                        item.setText(format_str(matrix[i, j], p))
+        precision_spin.valueChanged.connect(update_precision)
+        def copy_matrix() -> None:
+            p = precision_spin.value()
+            rows = [
+                "\t".join(format_str(matrix[i, j], p) for j in range(matrix.shape[1]))
+                for i in range(matrix.shape[0])
+            ]
+            pyperclip.copy("\n".join(rows))
+        copy_btn.clicked.connect(copy_matrix)
         dialog.exec()
 
     def proof_as_lemma(self) -> None:

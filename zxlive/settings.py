@@ -37,6 +37,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
     "previews-show": True,
     "sparkle-mode": True,
     'sound-effects': False,
+    "matrix/precision": 4,
 }
 
 font_defaults: dict[str, str | int | None] = {
