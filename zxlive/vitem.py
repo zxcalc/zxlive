@@ -141,16 +141,16 @@ class VItem(QGraphicsPathItem):
         pen = QPen()
         if not self.isSelected():
             color_key = color_map.get(self.ty, "boundary")
-            brush = QBrush(display_setting.colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
-            pen.setColor(display_setting.colors["outline"])
+            pen.setColor(display_setting.effective_colors["outline"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            brush = QBrush(display_setting.colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
             if self.ty not in pressed_color_map:
-                pen.setColor(display_setting.colors["boundary_pressed"])
+                pen.setColor(display_setting.effective_colors["boundary_pressed"])
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)
@@ -168,7 +168,7 @@ class VItem(QGraphicsPathItem):
     def update_shape(self) -> None:
         pen = QPen()
         pen.setWidthF(3)
-        pen.setColor(display_setting.colors["outline"])
+        pen.setColor(display_setting.effective_colors["outline"])
         self.setPen(pen)
 
         path = QPainterPath()

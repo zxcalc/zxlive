@@ -59,9 +59,15 @@ class GraphScene(QGraphicsScene):
     def __init__(self) -> None:
         super().__init__()
         self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
-        self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+        self.update_background_brush()
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
+
+    def update_background_brush(self) -> None:
+        if display_setting.dark_mode:
+            self.setBackgroundBrush(QBrush(QColor(30, 30, 30)))
+        else:
+            self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
 
     @property
     def selected_vertices(self) -> Iterator[VT]:
@@ -199,6 +205,7 @@ class GraphScene(QGraphicsScene):
             edge.refresh()
 
     def update_colors(self) -> None:
+        self.update_background_brush()
         for v in self.vertex_map.values():
             v.refresh()
         for e in self.edge_map.values():
@@ -326,4 +333,4 @@ class EditGraphScene(GraphScene):
             if isinstance(it, VItem) and it not in (v1,v2):
                 colliding_verts.append(it)
         self.edge_added.emit(v1.v,v2.v,colliding_verts)
-        
+

@@ -44,12 +44,12 @@ class DrawPanelNodeType(TypedDict):
 
 def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
     return {
-        VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, display_setting.colors["z_spider"])},
-        VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, display_setting.colors["x_spider"])},
-        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.colors["hadamard"])},
-        VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.colors["z_spider"])},
-        VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.colors["w_output"])},
-        VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.colors["w_input"])},
+        VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["z_spider"])},
+        VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["x_spider"])},
+        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])},
+        VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])},
+        VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])},
+        VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])},
     }
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
