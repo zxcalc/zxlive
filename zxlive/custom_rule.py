@@ -13,6 +13,7 @@ from pyzx.utils import EdgeType, VertexType, get_w_io
 from shapely import Polygon
 
 from pyzx.symbolic import Poly, Var
+from pyzx.graph import jsonparser
 
 from .common import ET, VT, GraphT
 
@@ -33,7 +34,7 @@ class CustomRule:
         self.last_rewrite_center = None
         self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
         if self.is_rewrite_unfusable:
-            self.lhs_graph_without_boundaries_nx = nx.Graph(self.lhs_graph_nx.subgraph(
+            self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
     def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[VT, ET]:
@@ -44,7 +45,7 @@ class CustomRule:
         graph_matcher = GraphMatcher(self.lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match('type', 1),
             edge_match=categorical_edge_match('type', 1))
-        matchings = graph_matcher.match()
+        matchings = list(graph_matcher.match())
         matchings = filter_matchings_if_symbolic_compatible(matchings, self.lhs_graph_nx, subgraph_nx)
         if len(matchings) == 0:
             raise ValueError("No matchings found")
@@ -67,7 +68,7 @@ class CustomRule:
 
         vertex_positions = get_vertex_positions(graph, self.rhs_graph_nx, boundary_vertex_map)
         self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
-        vertex_map = boundary_vertex_map
+        vertex_map = dict(boundary_vertex_map)
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY:
                 phase = self.rhs_graph_nx.nodes()[v]['phase']
@@ -86,7 +87,7 @@ class CustomRule:
             v1 = vertex_map[v1]
             v2 = vertex_map[v2]
             if data['type'] == EdgeType.W_IO:
-                graph.add_edge(graph.edge(v1, v2), EdgeType.W_IO)
+                graph.add_edge((v1, v2), EdgeType.W_IO)
                 continue
             if (v1, v2) not in etab: etab[(v1, v2)] = [0, 0]
             etab[(v1, v2)][data['type']-1] += 1
@@ -94,12 +95,12 @@ class CustomRule:
         return etab, vertices_to_remove, [], True
 
     def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
-        def get_adjacent_boundary_vertices(g: nx.Graph, v: VT) -> Sequence[VT]:
+        def get_adjacent_boundary_vertices(g: nx.MultiGraph, v: VT) -> Sequence[VT]:
             return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
 
-        subgraph_nx_without_boundaries = nx.Graph(to_networkx(graph).subgraph(vertices))
+        subgraph_nx_without_boundaries = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
         lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
-        lhs_graph_nx = nx.Graph(self.lhs_graph_nx.subgraph(lhs_vertices))
+        lhs_graph_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
                                      node_match=categorical_node_match('type', 1))
         matching = list(graph_matcher.match())[0]
@@ -111,7 +112,7 @@ class CustomRule:
             vtype = self.lhs_graph_nx.nodes()[v]['type']
             outside_verts = get_adjacent_boundary_vertices(subgraph_nx, matching[v])
             if len(outside_verts) == 1 and \
-                subgraph_nx.edges()[(matching[v], outside_verts[0])]['type'] == EdgeType.SIMPLE and \
+                subgraph_nx.get_edge_data(matching[v], outside_verts[0])[0]['type'] == EdgeType.SIMPLE and \
                 vtype != VertexType.W_INPUT:
                 continue
             if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
@@ -121,41 +122,42 @@ class CustomRule:
             elif vtype == VertexType.W_OUTPUT or vtype == VertexType.W_INPUT:
                 self.unfuse_w_vertex(graph, subgraph_nx, matching[v], vtype)
 
-    def unfuse_update_edges(self, graph: GraphT, subgraph_nx: nx.Graph, old_v: VT, new_v: VT) -> None:
-        neighbors = list(graph.neighbors(old_v))
-        for b in neighbors:
+    def unfuse_update_edges(self, graph: GraphT, subgraph_nx: nx.MultiGraph, old_v: VT, new_v: VT) -> None:
+        for e in graph.incident_edges(old_v):
+            s, t = graph.edge_st(e)
+            b = t if s == old_v else s
             if b not in subgraph_nx.nodes:
-                graph.add_edge((new_v, b), graph.edge_type((old_v, b)))
-                graph.remove_edge(graph.edge(old_v, b))
+                graph.add_edge((new_v, b), graph.edge_type(e))
+                graph.remove_edge(e)
 
-    def unfuse_zx_vertex(self, graph: GraphT, subgraph_nx: nx.Graph, v: VT, vtype: VertexType) -> None:
+    def unfuse_zx_vertex(self, graph: GraphT, subgraph_nx: nx.MultiGraph, v: VT, vtype: VertexType) -> None:
         new_v = graph.add_vertex(vtype, qubit=graph.qubit(v), row=graph.row(v))
         self.unfuse_update_edges(graph, subgraph_nx, v, new_v)
-        graph.add_edge(graph.edge(new_v, v))
+        graph.add_edge((new_v, v), EdgeType.SIMPLE)
 
-    def unfuse_h_box_vertex(self, graph: GraphT, subgraph_nx: nx.Graph, v: VT) -> None:
+    def unfuse_h_box_vertex(self, graph: GraphT, subgraph_nx: nx.MultiGraph, v: VT) -> None:
         new_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v)+0.3, row=graph.row(v)+0.3)
         new_mid_h = graph.add_vertex(VertexType.H_BOX, qubit=graph.qubit(v), row=graph.row(v))
         self.unfuse_update_edges(graph, subgraph_nx, v, new_h)
-        graph.add_edge((new_mid_h, v))
-        graph.add_edge((new_h, new_mid_h))
+        graph.add_edge((new_mid_h, v), EdgeType.SIMPLE)
+        graph.add_edge((new_h, new_mid_h), EdgeType.SIMPLE)
 
-    def unfuse_w_vertex(self, graph: GraphT, subgraph_nx: nx.Graph, v: VT, vtype: VertexType) -> None:
+    def unfuse_w_vertex(self, graph: GraphT, subgraph_nx: nx.MultiGraph, v: VT, vtype: VertexType) -> None:
         w_in, w_out = get_w_io(graph, v)
         new_w_in = graph.add_vertex(VertexType.W_INPUT, qubit=graph.qubit(w_in), row=graph.row(w_in))
         new_w_out = graph.add_vertex(VertexType.W_OUTPUT, qubit=graph.qubit(w_out), row=graph.row(w_out))
         self.unfuse_update_edges(graph, subgraph_nx, w_in, new_w_in)
         self.unfuse_update_edges(graph, subgraph_nx, w_out, new_w_out)
         if vtype == VertexType.W_OUTPUT:
-            graph.add_edge((new_w_in, w_out))
+            graph.add_edge((new_w_in, w_out), EdgeType.SIMPLE)
         else:
-            graph.add_edge((w_in, new_w_out))
+            graph.add_edge((w_in, new_w_out), EdgeType.SIMPLE)
         graph.add_edge((new_w_in, new_w_out), EdgeType.W_IO)
 
     def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
         vertices = [v for v in graph.vertices() if in_selection(v)]
         if self.is_rewrite_unfusable:
-            subgraph_nx = nx.Graph(to_networkx(graph).subgraph(vertices))
+            subgraph_nx = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
             lhs_graph_nx = self.lhs_graph_without_boundaries_nx
         else:
             subgraph_nx, _ = create_subgraph(graph, vertices)
@@ -163,7 +165,7 @@ class CustomRule:
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx,
             node_match=categorical_node_match('type', 1),
             edge_match=categorical_edge_match('type', 1))
-        matchings = filter_matchings_if_symbolic_compatible(graph_matcher.match(), lhs_graph_nx, subgraph_nx)
+        matchings = filter_matchings_if_symbolic_compatible(list(graph_matcher.match()), lhs_graph_nx, subgraph_nx)
         return vertices if matchings else []
 
     def to_json(self) -> str:
@@ -180,8 +182,8 @@ class CustomRule:
             d = json.loads(json_str)
         else:
             d = json_str
-        lhs_graph = pyzx.graph.jsonparser.json_to_graph(d['lhs_graph'],'multigraph')
-        rhs_graph = pyzx.graph.jsonparser.json_to_graph(d['rhs_graph'],'multigraph')
+        lhs_graph = jsonparser.json_to_graph(d['lhs_graph'],'multigraph')
+        rhs_graph = jsonparser.json_to_graph(d['rhs_graph'],'multigraph')
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))
         lhs_graph.set_auto_simplify(False)
@@ -238,7 +240,7 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     return coeff, var, const
 
 
-def match_symbolic_parameters(match: Dict[VT, VT], left: nx.Graph, right: nx.Graph) -> Dict[Var, Union[int, float, complex, Fraction]]:
+def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, Union[int, float, complex, Fraction]]:
     params: Dict[Var, Union[int, float, complex, Fraction]] = {}
     left_phase = left.nodes.data('phase', default=0) # type: ignore
     right_phase = right.nodes.data('phase', default=0) # type: ignore
@@ -266,7 +268,7 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.Graph, right: nx.Gra
     return params
 
 
-def filter_matchings_if_symbolic_compatible(matchings: list[Dict[VT, VT]], left: nx.Graph, right: nx.Graph) -> list[Dict[VT, VT]]:
+def filter_matchings_if_symbolic_compatible(matchings: list[Dict[VT, VT]], left: nx.MultiGraph, right: nx.MultiGraph) -> list[Dict[VT, VT]]:
     new_matchings = []
     for matching in matchings:
         if len(matching) != len(left):
@@ -279,8 +281,8 @@ def filter_matchings_if_symbolic_compatible(matchings: list[Dict[VT, VT]], left:
     return new_matchings
 
 
-def to_networkx(graph: GraphT) -> nx.Graph:
-    G = nx.Graph()
+def to_networkx(graph: GraphT) -> nx.MultiGraph:
+    G = nx.MultiGraph()
     v_data = {v: {"type": graph.type(v),
                   "phase": graph.phase(v),}
               for v in graph.vertices()}
@@ -292,10 +294,10 @@ def to_networkx(graph: GraphT) -> nx.Graph:
     G.add_edges_from([(source, target, {"type": typ}) for source, target, typ in  graph.edges()])
     return G
 
-def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str, int]]:
+def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.MultiGraph, dict[str, int]]:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
-    subgraph_nx = nx.Graph(graph_nx.subgraph(verts))
+    subgraph_nx = nx.MultiGraph(graph_nx.subgraph(verts))
     boundary_mapping = {}
     i = 0
     for v in verts:
@@ -309,7 +311,7 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.Graph, dict[str,
                 i += 1
     return subgraph_nx, boundary_mapping
 
-def get_vertex_positions(graph: GraphT, rhs_graph: nx.Graph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
+def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
     pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
     coords = np.array(list(pos_dict.values()))
     center = np.mean(coords, axis=0)
@@ -320,12 +322,14 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.Graph, boundary_vertex_map
     except:
         area = 1.
     k = (area ** 0.5) / len(rhs_graph)
-    ret: dict[NodeView, tuple[float, float]] = nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys())
+    ret: dict[NodeView, tuple[float, float]] = dict(nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys()))
     # if the node type in ret is W_INPUT, move it next to the W_OUTPUT node
     for v in ret:
         if rhs_graph.nodes()[v]['type'] == VertexType.W_INPUT:
-            w_out = next((n for n in rhs_graph.neighbors(v) if rhs_graph.edges()[(v, n)]['type'] == EdgeType.W_IO), None)
-            if w_out and rhs_graph.nodes()[w_out]['type'] == VertexType.W_OUTPUT:
+            w_out = next((n for n in rhs_graph.neighbors(v) if \
+                any(rhs_graph.get_edge_data(v, n, k)['type'] == EdgeType.W_IO for k in rhs_graph[v][n]) \
+                and rhs_graph.nodes()[n]['type'] == VertexType.W_OUTPUT), None)
+            if w_out:
                 ret[v] = (ret[w_out][0] - 0.3, ret[w_out][1])
     return ret
 
@@ -347,8 +351,9 @@ def check_rule(rule: CustomRule) -> None:
         if not (rule.rhs_graph.variable_types.items() <= rule.lhs_graph.variable_types.items()):
             raise ValueError("The right-hand side has more free variables than the left-hand side.")
         for vertex in rule.lhs_graph.vertices():
-            if isinstance(rule.lhs_graph.phase(vertex), Poly):
+            phase = rule.lhs_graph.phase(vertex)
+            if isinstance(phase, Poly):
                 try:
-                    get_linear(rule.lhs_graph.phase(vertex))
+                    get_linear(phase)
                 except ValueError as e:
                     raise ValueError(f"Error in left-hand side phase: {str(e)}")
