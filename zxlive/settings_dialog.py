@@ -256,8 +256,7 @@ class SettingsDialog(QDialog):
         widget = QComboBox()
         for k, v in _data.items():
             widget.addItem(v, userData=k)
-        widget.setCurrentText(_data.get(value, defaults[name]))
-        # Remove auto-apply on change
+        widget.setCurrentText(_data.get(value, str(defaults[name]) if defaults[name] is not None else ""))
         return widget
 
     def add_setting_to_form(self, form: QFormLayout, settings_data: SettingsData) -> None:
