@@ -278,11 +278,7 @@ class SettingsDialog(QDialog):
         self.value_dict[settings_data["id"]] = widget
 
     def okay(self) -> None:
-        self.update_global_settings()
-        self.apply_global_settings()
-        # Update previous values after applying
-        self.prev_color_scheme = self.get_settings_value("color-scheme", str)
-        self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        self.apply()
         self.accept()
 
     def update_global_settings(self) -> None:
