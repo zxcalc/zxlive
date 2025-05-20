@@ -195,6 +195,9 @@ class SettingsDialog(QDialog):
         hlayout.addStretch()
         w.setLayout(hlayout)
         layout.addWidget(w)
+        apply_button = QPushButton("Apply")
+        apply_button.clicked.connect(self.apply)
+        hlayout.addWidget(apply_button)
         okay_button = QPushButton("Okay")
         okay_button.clicked.connect(self.okay)
         hlayout.addWidget(okay_button)
@@ -249,7 +252,7 @@ class SettingsDialog(QDialog):
         widget = QComboBox()
         for k, v in _data.items():
             widget.addItem(v, userData=k)
-        widget.setCurrentText(_data.get(value, defaults[name]))
+        widget.setCurrentText(_data.get(value, str(defaults[name]) if defaults[name] is not None else ""))
         return widget
 
     def add_setting_to_form(self, form: QFormLayout, settings_data: SettingsData) -> None:
@@ -267,9 +270,15 @@ class SettingsDialog(QDialog):
         form.addRow(settings_data["label"], widget)
         self.value_dict[settings_data["id"]] = widget
 
-    def okay(self) -> None:
+    def apply(self) -> None:
         self.update_global_settings()
         self.apply_global_settings()
+        # Update previous values after applying
+        self.prev_color_scheme = self.get_settings_value("color-scheme", str)
+        self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+
+    def okay(self) -> None:
+        self.apply()
         self.accept()
 
     def update_global_settings(self) -> None:
