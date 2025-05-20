@@ -205,13 +205,6 @@ class SettingsDialog(QDialog):
         cancel_button.clicked.connect(self.cancel)
         hlayout.addWidget(cancel_button)
 
-    def apply(self) -> None:
-        self.update_global_settings()
-        self.apply_global_settings()
-        # Update previous values after applying
-        self.prev_color_scheme = self.get_settings_value("color-scheme", str)
-        self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
-
     def make_bool_form_input(self, data: SettingsData) -> QCheckBox:
         widget = QCheckBox()
         widget.setChecked(self.get_settings_from_data(data, bool))
@@ -276,6 +269,13 @@ class SettingsDialog(QDialog):
 
         form.addRow(settings_data["label"], widget)
         self.value_dict[settings_data["id"]] = widget
+
+    def apply(self) -> None:
+        self.update_global_settings()
+        self.apply_global_settings()
+        # Update previous values after applying
+        self.prev_color_scheme = self.get_settings_value("color-scheme", str)
+        self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
 
     def okay(self) -> None:
         self.apply()
