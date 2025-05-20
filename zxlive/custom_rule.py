@@ -268,7 +268,7 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: n
     return params
 
 
-def filter_matchings_if_symbolic_compatible(matchings: list[Dict[VT, VT]], left: nx.MultiGraph, right: nx.MultiGraph) -> list[Dict[VT, VT]]:
+def filter_matchings_if_symbolic_compatible(matchings: list[Dict], left: nx.MultiGraph, right: nx.MultiGraph) -> list[Dict]:
     new_matchings = []
     for matching in matchings:
         if len(matching) != len(left):
