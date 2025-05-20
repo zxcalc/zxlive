@@ -81,6 +81,7 @@ general_settings: list[SettingsData] = [
     {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
+    {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
 ]
 
 
