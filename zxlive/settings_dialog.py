@@ -212,25 +212,21 @@ class SettingsDialog(QDialog):
     def make_bool_form_input(self, data: SettingsData) -> QCheckBox:
         widget = QCheckBox()
         widget.setChecked(self.get_settings_from_data(data, bool))
-        widget.stateChanged.connect(self.apply)
         return widget
 
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
         widget = QLineEdit()
         widget.setText(self.get_settings_from_data(data, str))
-        widget.editingFinished.connect(self.apply)
         return widget
 
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
         widget = QSpinBox()
         widget.setValue(self.get_settings_from_data(data, int))
-        widget.valueChanged.connect(self.apply)
         return widget
 
     def make_float_form_input(self, data: SettingsData) -> QDoubleSpinBox:
         widget = QDoubleSpinBox()
         widget.setValue(self.get_settings_from_data(data, float))
-        widget.valueChanged.connect(self.apply)
         return widget
 
     def make_folder_form_input(self, data: SettingsData) -> QLineEdit:
@@ -261,8 +257,7 @@ class SettingsDialog(QDialog):
         for k, v in _data.items():
             widget.addItem(v, userData=k)
         widget.setCurrentText(_data.get(value, defaults[name]))
-        # Auto-apply on change
-        widget.currentIndexChanged.connect(self.apply)
+        # Remove auto-apply on change
         return widget
 
     def add_setting_to_form(self, form: QFormLayout, settings_data: SettingsData) -> None:
