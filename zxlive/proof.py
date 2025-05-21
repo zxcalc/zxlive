@@ -371,28 +371,28 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
-            if option.state & QStyle.StateFlag.State_Selected:
+            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
                 painter.setBrush(QColor(60, 80, 120))
-            elif option.state & QStyle.StateFlag.State_MouseOver:
+            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
                 painter.setBrush(QColor(50, 60, 80))
             else:
                 painter.setBrush(QColor(35, 39, 46))
         else:
-            if option.state & QStyle.StateFlag.State_Selected:
+            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
                 painter.setBrush(QColor(204, 232, 255))
-            elif option.state & QStyle.StateFlag.State_MouseOver:
+            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
                 painter.setBrush(QColor(229, 243, 255))
             else:
                 painter.setBrush(Qt.GlobalColor.white)
-        painter.drawRect(option.rect)
+        painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
         # Draw line
         is_last = index.row() == index.model().rowCount() - 1
         line_rect = QRect(
             self.line_padding,
-            int(option.rect.y()),
+            int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)
+            int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
         )
         if display_setting.dark_mode:
             painter.setBrush(QColor(180, 180, 180))
@@ -406,24 +406,24 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         else:
             painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
         painter.setBrush(display_setting.effective_colors["z_spider"])
-        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
+        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),
+            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
             circle_radius,
             circle_radius
         )
 
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()
+        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),
-            option.rect.width(),
+            int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
+            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
-        font = option.font
-        if option.state & QStyle.StateFlag.State_Selected:
+        font = option.font  # type: ignore[attr-defined]
+        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
             font.setWeight(QFont.Weight.Bold)
         painter.setFont(font)
         if display_setting.dark_mode:
