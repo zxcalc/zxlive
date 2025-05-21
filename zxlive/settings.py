@@ -237,8 +237,8 @@ class DisplaySettings:
             s: int = color.hslSaturation()
             l: int = color.lightness()
             a: int = color.alpha()            # Make colors slightly darker and less saturated for dark mode
-            l = int(l * 0.8)
-            s = int(s * 0.8)
+            l = int(l * 0.6)
+            s = int(s * 0.4)
             return QColor.fromHsl(h, s, l, a)
         base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
         if self.dark_mode:
