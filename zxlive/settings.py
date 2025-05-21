@@ -240,7 +240,7 @@ class DisplaySettings:
             l = max(30, int(l * 0.8))
             s = max(60, int(s * 0.85))
             return QColor.fromHsl(h, s, l, a)
-        base: dict[str, QColor] = dict(self.colors)
+        base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
         if self.dark_mode:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
