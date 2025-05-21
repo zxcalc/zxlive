@@ -298,8 +298,16 @@ class GraphView(QGraphicsView):
                 self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
     def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
-        # First draw blank white background
-        painter.setBrush(QColor(255, 255, 255, 255))
+        # Use dark or light background based on dark mode
+        if display_setting.dark_mode:
+            bg_color = QColor(30, 30, 30, 255)
+            grid_color = QColor(60, 60, 60)
+            thick_grid_color = QColor(90, 90, 90)
+        else:
+            bg_color = QColor(255, 255, 255, 255)
+            grid_color = QColor(240, 240, 240)
+            thick_grid_color = QColor(240, 240, 240)
+        painter.setBrush(bg_color)
         painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
         if not self.draw_background_lines: return
@@ -320,9 +328,9 @@ class GraphView(QGraphicsView):
                 lines.append(line)
 
         # Draw grid lines
-        painter.setPen(QPen(QColor(240, 240, 240), 1, Qt.PenStyle.SolidLine))
+        painter.setPen(QPen(grid_color, 1, Qt.PenStyle.SolidLine))
         painter.drawLines(lines)
-        painter.setPen(QPen(QColor(240, 240, 240), 2, Qt.PenStyle.SolidLine))
+        painter.setPen(QPen(thick_grid_color, 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
 
     def update_font(self) -> None:
@@ -349,7 +357,10 @@ class ProofGraphView(GraphView):
     def __update_scalar_label(self, scalar: Scalar) -> None:
         self.scalar = scalar
         scalar_string = f" Scalar: {scalar.polar_str()}"
-        if scalar.is_zero:
+        if display_setting.dark_mode:
+            colour = "#eeeeee"
+            text = f"{scalar_string}"
+        elif scalar.is_zero:
             colour = "red"
             text = f"{scalar_string}, The global scalar is zero"
         else:

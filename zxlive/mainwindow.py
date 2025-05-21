@@ -25,7 +25,7 @@ from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget,
-                               QVBoxLayout, QWidget)
+                               QVBoxLayout, QWidget, QApplication)
 
 import pyperclip
 
@@ -636,6 +636,44 @@ class MainWindow(QMainWindow):
         save_rule_dialog(rule, self, name + ".zxr" if name else "")
 
     def update_colors(self) -> None:
+        # Apply dark or light stylesheet to the app and widgets
+        app = QApplication.instance()
+        if isinstance(app, QApplication):
+            if display_setting.dark_mode:
+                dark_stylesheet = """
+                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {
+                        background-color: #232323;
+                        color: #e0e0e0;
+                    }
+                    QLineEdit, QTextEdit, QPlainTextEdit {
+                        background-color: #2d2d2d;
+                        color: #e0e0e0;
+                    }
+                    QTableWidget QHeaderView::section {
+                        background-color: #232323;
+                        color: #e0e0e0;
+                    }
+                    QTabBar::tab:selected {
+                        background: #333333;
+                    }
+                    QTabBar::tab:!selected {
+                        background: #232323;
+                    }
+                    QMenu::item:selected {
+                        background: #444444;
+                    }
+                    QPushButton {
+                        background-color: #333333;
+                        color: #e0e0e0;
+                    }
+                    QSpinBox, QComboBox {
+                        background-color: #2d2d2d;
+                        color: #e0e0e0;
+                    }
+                """
+                app.setStyleSheet(dark_stylesheet)
+            else:
+                app.setStyleSheet("")
         if self.active_panel is not None:
             self.active_panel.update_colors()
 

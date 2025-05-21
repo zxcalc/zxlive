@@ -26,9 +26,10 @@ class ColorScheme(TypedDict):
     w_output: QColor
     w_output_pressed: QColor
     outline: QColor
+    edge: QColor
 
 
-general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
+general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "path/custom-rules": "lemmas/",
     "color-scheme": "modern-red-green",
     "tab-bar-location": QTabWidget.TabPosition.North,
@@ -38,6 +39,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int] = {
     "sparkle-mode": True,
     'sound-effects': False,
     "matrix/precision": 4,
+    "dark-mode": False,  # Add dark mode toggle
 }
 
 font_defaults: dict[str, str | int | None] = {
@@ -111,6 +113,7 @@ modern_red_green: ColorScheme = {
     "w_output": QColor("#000000"),
     "w_output_pressed": QColor("#444444"),
     "outline": QColor("#000000"),
+    "edge": QColor("#000000"),
 }
 
 classic_red_green: ColorScheme = {
@@ -214,6 +217,39 @@ class DisplaySettings:
     @previews_show.setter
     def previews_show(self, value: bool) -> None:
         settings.setValue("previews-show", value)
+
+    @property
+    def dark_mode(self) -> bool:
+        return get_settings_value("dark-mode", bool)
+
+    @dark_mode.setter
+    def dark_mode(self, value: bool) -> None:
+        settings.setValue("dark-mode", value)
+
+    @property
+    def effective_colors(self) -> dict[str, QColor]:
+        # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
+        from PySide6.QtGui import QColor
+        def adjust_for_dark(color: QColor) -> QColor:
+            if not isinstance(color, QColor):
+                raise ValueError(f"Expected QColor, got {type(color)}")
+            h: int = color.hslHue()
+            s: int = color.hslSaturation()
+            l: int = color.lightness()
+            a: int = color.alpha()            # Make colors slightly darker and less saturated for dark mode
+            l = int(l * 0.8)
+            s = int(s * 0.8)
+            return QColor.fromHsl(h, s, l, a)
+        base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
+        if self.dark_mode:
+            for k in base:
+                if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
+                    base[k] = QColor("#dbdbdb") if k != "outline" else QColor("#dbdbdb")
+                else:
+                    base[k] = adjust_for_dark(base[k])
+        # else: do not adjust for light mode
+        return base
+
 
 # Initialise settings
 settings = QSettings("zxlive", "zxlive")

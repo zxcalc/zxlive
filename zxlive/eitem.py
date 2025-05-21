@@ -91,7 +91,8 @@ class EItem(QGraphicsPathItem):
             pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
         else:
-            pen.setColor(QColor("#000000"))
+            from .settings import display_setting
+            pen.setColor(display_setting.effective_colors["edge"])
         self.setPen(QPen(pen))
 
         path = QPainterPath()

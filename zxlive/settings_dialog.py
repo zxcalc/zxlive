@@ -81,6 +81,7 @@ general_settings: list[SettingsData] = [
     {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
+    {"id": "dark-mode", "label": "Dark Mode (UI)", "type": FormInputType.Bool},  # Add dark mode option
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
 ]
 
