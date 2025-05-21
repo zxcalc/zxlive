@@ -149,7 +149,10 @@ class VItem(QGraphicsPathItem):
             brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
-            if self.ty not in pressed_color_map:
+            # Use a light outline in dark mode, otherwise use the pressed color
+            if display_setting.dark_mode:
+                pen.setColor(QColor("#dbdbdb"))
+            else:
                 pen.setColor(display_setting.effective_colors["boundary_pressed"])
         self.prepareGeometryChange()
         self.setBrush(brush)

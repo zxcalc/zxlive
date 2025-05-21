@@ -233,7 +233,20 @@ class ProofStepView(QListView):
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
-        self.setPalette(QColor(255, 255, 255))
+        # Set background color for dark mode (panel background)
+        if display_setting.dark_mode:
+            self.setStyleSheet("background-color: #23272e;")
+        else:
+            self.setStyleSheet("")
+        # Set background color for dark mode
+        pal = self.palette()
+        if display_setting.dark_mode:
+            pal.setColor(self.backgroundRole(), QColor(35, 39, 46))
+            pal.setColor(self.viewport().backgroundRole(), QColor(35, 39, 46))
+        else:
+            pal.setColor(self.backgroundRole(), QColor(255, 255, 255))
+            pal.setColor(self.viewport().backgroundRole(), QColor(255, 255, 255))
+        self.setPalette(pal)
         self.setSpacing(0)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -355,16 +368,22 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
-        assert hasattr(option, "state") and hasattr(option, "rect") and hasattr(option, "font")
-
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
-        if option.state & QStyle.StateFlag.State_Selected:
-            painter.setBrush(QColor(204, 232, 255))
-        elif option.state & QStyle.StateFlag.State_MouseOver:
-            painter.setBrush(QColor(229, 243, 255))
+        if display_setting.dark_mode:
+            if option.state & QStyle.StateFlag.State_Selected:
+                painter.setBrush(QColor(60, 80, 120))
+            elif option.state & QStyle.StateFlag.State_MouseOver:
+                painter.setBrush(QColor(50, 60, 80))
+            else:
+                painter.setBrush(QColor(35, 39, 46))
         else:
-            painter.setBrush(Qt.GlobalColor.white)
+            if option.state & QStyle.StateFlag.State_Selected:
+                painter.setBrush(QColor(204, 232, 255))
+            elif option.state & QStyle.StateFlag.State_MouseOver:
+                painter.setBrush(QColor(229, 243, 255))
+            else:
+                painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)
 
         # Draw line
@@ -375,11 +394,17 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             self.line_width,
             int(option.rect.height() if not is_last else option.rect.height() / 2)
         )
-        painter.setBrush(Qt.GlobalColor.black)
+        if display_setting.dark_mode:
+            painter.setBrush(QColor(180, 180, 180))
+        else:
+            painter.setBrush(Qt.GlobalColor.black)
         painter.drawRect(line_rect)
 
         # Draw circle
-        painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
+        if display_setting.dark_mode:
+            painter.setPen(QPen(QColor(180, 180, 180), self.circle_outline_width))
+        else:
+            painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
         painter.setBrush(display_setting.effective_colors["z_spider"])
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius
         painter.drawEllipse(
@@ -397,11 +422,16 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             option.rect.width(),
             text_height
         )
+        font = option.font
         if option.state & QStyle.StateFlag.State_Selected:
-            option.font.setWeight(QFont.Weight.Bold)
-        painter.setFont(option.font)
-        painter.setPen(Qt.GlobalColor.black)
-        painter.setBrush(Qt.GlobalColor.black)
+            font.setWeight(QFont.Weight.Bold)
+        painter.setFont(font)
+        if display_setting.dark_mode:
+            painter.setPen(QColor(224, 224, 224))
+            painter.setBrush(QColor(224, 224, 224))
+        else:
+            painter.setPen(Qt.GlobalColor.black)
+            painter.setBrush(Qt.GlobalColor.black)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
         painter.restore()
