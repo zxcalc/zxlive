@@ -121,9 +121,9 @@ class ChangeNodeType(BaseCommand):
                 self.g.set_type(v2, self._old_w_info[v].partner_type)
                 self.g.set_row(v2, self._old_w_info[v].partner_pos[0])
                 self.g.set_qubit(v2, self._old_w_info[v].partner_pos[1])
-                self.g.add_edge(self.g.edge(v,v2), edgetype=EdgeType.W_IO)
+                self.g.add_edge((v,v2), edgetype=EdgeType.W_IO)
                 for v3 in self._old_w_info[v].neighbors:
-                    self.g.add_edge(self.g.edge(v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
+                    self.g.add_edge((v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
                     self.g.remove_edge(self.g.edge(v,v3))
             self.g.set_type(v, old_vty)
         if self._new_w_inputs is not None:
@@ -151,14 +151,14 @@ class ChangeNodeType(BaseCommand):
                 w_input = self.g.add_vertex(VertexType.W_INPUT,
                                             self.g.qubit(v) - W_INPUT_OFFSET,
                                             self.g.row(v))
-                self.g.add_edge(self.g.edge(w_input, v), edgetype=EdgeType.W_IO)
+                self.g.add_edge((w_input, v), edgetype=EdgeType.W_IO)
                 self._new_w_inputs.append(w_input)
         for v in self.vs:
             if vertex_is_w(self.g.type(v)):
                 v2 = get_w_partner(self.g, v)
                 v2_neighbors = [vn for vn in self.g.neighbors(v2) if vn != v]
                 for v3 in v2_neighbors:
-                    self.g.add_edge(self.g.edge(v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
+                    self.g.add_edge((v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
                 self._old_w_info[v] = self.WInfo(partner=v2,
                                                  partner_type=self.g.type(v2),
                                                  partner_pos=(self.g.row(v2), self.g.qubit(v2)),
@@ -228,7 +228,7 @@ class AddNodeSnapped(BaseCommand):
         assert self.t is not None
         assert self._et is not None
         self.g.remove_vertex(self.added_vert)
-        self.g.add_edge(self.g.edge(self.s,self.t), self._et)
+        self.g.add_edge((self.s,self.t), self._et)
         self.update_graph_view()
 
     def redo(self) -> None:
@@ -238,11 +238,11 @@ class AddNodeSnapped(BaseCommand):
         s,t = self.g.edge_st(self.e)
         self._et = self.g.edge_type(self.e)
         if self._et == EdgeType.SIMPLE:
-            self.g.add_edge(self.g.edge(s, self.added_vert), EdgeType.SIMPLE)
-            self.g.add_edge(self.g.edge(t, self.added_vert), EdgeType.SIMPLE)
+            self.g.add_edge((s, self.added_vert), EdgeType.SIMPLE)
+            self.g.add_edge((t, self.added_vert), EdgeType.SIMPLE)
         elif self._et == EdgeType.HADAMARD:
-            self.g.add_edge(self.g.edge(s, self.added_vert), EdgeType.HADAMARD)
-            self.g.add_edge(self.g.edge(t, self.added_vert), EdgeType.SIMPLE)
+            self.g.add_edge((s, self.added_vert), EdgeType.HADAMARD)
+            self.g.add_edge((t, self.added_vert), EdgeType.SIMPLE)
         else: 
             raise ValueError("Can't add spider between vertices connected by edge of type", str(self._et))
         self.s = s
