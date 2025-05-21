@@ -19,7 +19,7 @@ import math
 
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
-from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation
+from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
 from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont, QPainterPath
 from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
      QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
@@ -168,31 +168,33 @@ class VItem(QGraphicsPathItem):
         for e_item in self.adj_items:
             e_item.refresh()
 
+    def _make_shape_path(self) -> QPainterPath:
+        """Helper to create the path for both drawing and hit-testing."""
+        path = QPainterPath()
+        if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
+            path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        elif self.ty == VertexType.W_OUTPUT:
+            path.moveTo(0, 0.2 * SCALE)
+            path.lineTo(0.25 * SCALE, -0.15 * SCALE)
+            path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
+            path.closeSubpath()
+        elif self.ty == VertexType.W_INPUT or self.ty == VertexType.BOUNDARY:
+            scale = 0.3 * SCALE
+            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
+        else:
+            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+        return path
+
     def update_shape(self) -> None:
         pen = QPen()
         pen.setWidthF(3)
         pen.setColor(display_setting.effective_colors["outline"])
         self.setPen(pen)
-
-        path = QPainterPath()
-        if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
-            path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        elif self.ty == VertexType.W_OUTPUT:
-            # draw a triangle
-            path.moveTo(0, 0.2 * SCALE)
-            path.lineTo(0.25 * SCALE, -0.15 * SCALE)
-            path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
-            path.lineTo(0, 0.2 * SCALE)
-        elif self.ty == VertexType.W_INPUT:
-            scale = 0.3 * SCALE
-            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
-        elif self.ty == VertexType.BOUNDARY:
-            scale = 0.3 * SCALE
-            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
-        else:
-            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
-        self.setPath(path)
+        self.setPath(self._make_shape_path())
         self.set_vitem_rotation()
+
+    def shape(self) -> QPainterPath:
+        return self._make_shape_path()
 
     def set_vitem_rotation(self) -> None:
         if self.ty == VertexType.W_OUTPUT:
@@ -342,6 +344,13 @@ class VItem(QGraphicsPathItem):
 
     def update_font(self) -> None:
         self.phase_item.setFont(display_setting.font)
+
+    def boundingRect(self) -> 'QRectF':
+        # Ensure the bounding rect includes the outline (pen width) and antialiasing
+        path_rect = self._make_shape_path().boundingRect()
+        pen_width = self.pen().widthF() if self.pen() else 1.0
+        margin = pen_width / 2.0 + 1.0  # +1 for antialiasing
+        return path_rect.adjusted(-margin, -margin, margin, margin)
 
 
 class VItemAnimation(QVariantAnimation):
