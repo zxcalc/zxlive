@@ -211,8 +211,8 @@ class ProofPanel(BasePanel):
 
         new_g = copy.deepcopy(self.graph)
         v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
-        new_g.add_edge(self.graph.edge(s, v), self.graph.edge_type(item.e))
-        new_g.add_edge(self.graph.edge(v, t))
+        new_g.add_edge((s, v), self.graph.edge_type(item.e))
+        new_g.add_edge((v, t))
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
