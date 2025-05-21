@@ -164,10 +164,21 @@ class SettingsDialog(QDialog):
 
         self.add_settings_tab(tab_widget, "General", "General ZXLive settings", general_settings)
         self.add_settings_tab(tab_widget, "Font", "Font settings", font_settings)
-        self.add_settings_tab(tab_widget, "Tikz rule names", "Tikz rule name settings", tikz_rule_name_settings)
-        self.add_settings_tab(tab_widget, "Tikz export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
-        self.add_settings_tab(tab_widget, "Tikz import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
-        self.add_settings_tab(tab_widget, "Tikz layout",  "Tikz layout settings", tikz_layout_settings)
+
+        # --- Begin TikZ nested tab structure ---
+        tikz_tab = QWidget()
+        tikz_tab_layout = QVBoxLayout()
+        tikz_tab.setLayout(tikz_tab_layout)
+        tikz_subtab_widget = QTabWidget()
+        tikz_tab_layout.addWidget(tikz_subtab_widget)
+        tikz_tab_layout.addStretch()
+        tab_widget.addTab(tikz_tab, "TikZ")
+
+        self.add_settings_tab(tikz_subtab_widget, "Rule names", "Tikz rule name settings", tikz_rule_name_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Layout",  "Tikz layout settings", tikz_layout_settings)
+        # --- End TikZ nested tab structure ---
 
         self.init_okay_cancel_buttons(layout)
 
