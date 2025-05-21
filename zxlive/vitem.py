@@ -419,7 +419,11 @@ class PhaseItem(QGraphicsTextItem):
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
 
-        self.setDefaultTextColor(QColor("#006bb3"))
+        # Set phase label color based on dark mode
+        if display_setting.dark_mode:
+            self.setDefaultTextColor(QColor("#00e6e6"))  # bright cyan for dark mode
+        else:
+            self.setDefaultTextColor(QColor("#006bb3"))  # original blue for light mode
         self.v_item = v_item
         self.refresh()
 
