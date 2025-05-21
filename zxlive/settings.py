@@ -232,7 +232,7 @@ class DisplaySettings:
         from PySide6.QtGui import QColor
         def adjust_for_dark(color: QColor) -> QColor:
             if not isinstance(color, QColor):
-                return color
+                raise ValueError(f"Expected QColor, got {type(color)}")
             h: int = color.hslHue()
             s: int = color.hslSaturation()
             l: int = color.lightness()
@@ -245,8 +245,6 @@ class DisplaySettings:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
                     base[k] = QColor("#e0e0e0") if k != "outline" else QColor("#ffffff")
-                elif k in ("id", "label"):
-                    pass  # not a color
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode
