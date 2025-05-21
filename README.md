@@ -40,3 +40,6 @@ The documentation can be built with
 
     cd doc
     make html
+
+# Overview of the files
+![ZXLive File Overview](ZXLive-file-overview.svg)
