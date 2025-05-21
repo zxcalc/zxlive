@@ -327,6 +327,8 @@ class ProofPanel(BasePanel):
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
         for edge in set(self.graph.incident_edges(v)):
+            if self.graph.edge_type(edge) == EdgeType.W_IO:
+                continue
             edge_st = self.graph.edge_st(edge)
             neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
             eitems = self.graph_scene.edge_map[edge]
