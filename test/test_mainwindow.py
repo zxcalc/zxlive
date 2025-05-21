@@ -104,7 +104,7 @@ def test_settings_dialog(app: MainWindow) -> None:
 def test_file_formats_preserved(app: MainWindow) -> None:
     # Disable the pop-up error message dialog for this test.
     import zxlive.dialogs
-    zxlive.dialogs.show_error_msg = lambda *args: None
+    zxlive.dialogs.show_error_msg = lambda *args, **kwargs: None
 
     def check_file_format(filename: str) -> None:
         assert import_diagram_from_file(os.path.join(os.path.dirname(__file__), filename)), \
