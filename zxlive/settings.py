@@ -237,14 +237,14 @@ class DisplaySettings:
             s: int = color.hslSaturation()
             l: int = color.lightness()
             a: int = color.alpha()            # Make colors slightly darker and less saturated for dark mode
-            l = max(30, int(l * 0.8))
-            s = max(60, int(s * 0.85))
+            l = int(l * 0.8)
+            s = int(s * 0.8)
             return QColor.fromHsl(h, s, l, a)
         base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
         if self.dark_mode:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
-                    base[k] = QColor("#e0e0e0") if k != "outline" else QColor("#ffffff")
+                    base[k] = QColor("#dbdbdb") if k != "outline" else QColor("#dbdbdb")
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode
