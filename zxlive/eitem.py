@@ -21,7 +21,7 @@ from enum import Enum
 from PySide6.QtCore import QPointF, QVariantAnimation, QAbstractAnimation
 from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsItem, \
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
-from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath
+from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
 
 from pyzx import EdgeType
 
@@ -171,6 +171,11 @@ class EItem(QGraphicsPathItem):
         if TYPE_CHECKING: assert isinstance(scene, GraphScene)
         scene.edge_double_clicked.emit(self.e)
 
+    def shape(self) -> QPainterPath:
+        path = self.path()
+        stroker = QPainterPathStroker()
+        stroker.setWidth(max(self.thickness, 8))  # 8 px is a reasonable clickable width
+        return stroker.createStroke(path)
 
 
 # TODO: This is essentially a clone of EItem. We should common it up!
