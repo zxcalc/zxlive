@@ -105,9 +105,9 @@ class MainWindow(QMainWindow):
             "Save the diagram by overwriting the previous loaded file.")
         self.save_as = self._new_action("Save &as...", self.handle_save_as_action, QKeySequence.StandardKey.SaveAs,
             "Opens a file-picker dialog to save the diagram in a chosen file format")
-        self.export_tikz_proof = self._new_action("Export to tikz", self.handle_export_tikz_proof_action, None,
+        self.export_tikz_proof = self._new_action("Export proof to tikz", self.handle_export_tikz_proof_action, None,
             "Exports the proof to tikz")
-        self.export_gif_proof = self._new_action("Export to gif", self.handle_export_gif_proof_action, None,
+        self.export_gif_proof = self._new_action("Export proof to gif", self.handle_export_gif_proof_action, None,
             "Exports the proof to gif")
 
         file_menu = menu.addMenu("&File")
@@ -129,11 +129,11 @@ class MainWindow(QMainWindow):
             "Cut the selected part of the diagram")
         self.copy_action = self._new_action("&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        self.copy_clipboard_action = self._new_action("Copy to clipboard", self.copy_graph_to_clipboard, 
+        self.copy_clipboard_action = self._new_action("Copy tikz to clipboard", self.copy_graph_to_clipboard, 
                                                       QKeySequence("Ctrl+Shift+C"), "Copy the selected part of the diagram to the clipboard as tikz")
         self.paste_action = self._new_action("Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
-        self.paste_clipboard_action = self._new_action("Paste from clipboard", self.paste_graph_from_clipboard,
+        self.paste_clipboard_action = self._new_action("Paste tikz from clipboard", self.paste_graph_from_clipboard,
                                                        QKeySequence("Ctrl+Shift+V"), "Paste a tikz diagram in the clipboard to ZXLive")
         self.delete_action = self._new_action("Delete", self.delete_graph,QKeySequence.StandardKey.Delete,
             "Delete the selected part of the diagram", alt_shortcut = QKeySequence("Backspace"))
