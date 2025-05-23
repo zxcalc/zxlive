@@ -23,7 +23,7 @@ from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphics
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
 from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
 
-from pyzx import EdgeType
+from pyzx.utils import EdgeType
 
 from .common import SCALE, ET, GraphT
 from .vitem import VItem, EITEM_Z
