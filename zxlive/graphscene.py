@@ -136,7 +136,7 @@ class GraphScene(QGraphicsScene):
             self.removeItem(e_item)
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)
-            self.update_edge_curves(s, t)
+            # self.update_edge_curves(s, t)
             if len(self.edge_map[e]) == 0:
                 del self.edge_map[e]
 
@@ -164,7 +164,7 @@ class GraphScene(QGraphicsScene):
             curve_distance = self.g._edata.get(e, {}).get(f"curve_{idx}", 0.0)
             e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t], curve_distance, idx)
             self.edge_map[e][idx] = e_item
-            self.update_edge_curves(s, t)
+            # self.update_edge_curves(s, t)
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
 
@@ -179,6 +179,10 @@ class GraphScene(QGraphicsScene):
 
         for v in diff.changed_vdata:
             self.vertex_map[v].refresh()
+
+        for e in diff.changed_edata:
+            for i in self.edge_map[e]:
+                self.edge_map[e][i].refresh()
 
         for v in diff.changed_pos:
             v_item = self.vertex_map[v]
@@ -234,7 +238,7 @@ class GraphScene(QGraphicsScene):
                 self.edge_map[e][i] = ei
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
-            self.update_edge_curves(s, t)
+            # self.update_edge_curves(s, t)
 
     def select_all(self) -> None:
         """Selects all vertices and edges in the scene."""

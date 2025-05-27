@@ -96,6 +96,8 @@ class EItem(QGraphicsPathItem):
             pen.setColor(display_setting.effective_colors["edge"])
         self.setPen(QPen(pen))
 
+        self.curve_distance = self.g._edata.get(self.e, {}).get(f"curve_{self.index}", self.curve_distance)
+
         path = QPainterPath()
         if self.s_item == self.t_item: # self-loop
             cd = self.curve_distance

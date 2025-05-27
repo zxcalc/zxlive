@@ -16,7 +16,7 @@ from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, MoveNodeProofMode
+from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode
 from .common import ET, VT, GraphT, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg
 from .editor_base_panel import string_to_complex
@@ -111,6 +111,9 @@ class ProofPanel(BasePanel):
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         cmd = MoveNodeProofMode(self.graph_view, vs, self.step_view)
         self.undo_stack.push(cmd)
+
+    def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
+        self.undo_stack.push(ChangeEdgeCurveProofMode(self.graph_view, eitem, new_distance, old_distance, self.step_view))
 
     def _selection_clicked(self) -> None:
         self.graph_view.tool = GraphTool.Selection
