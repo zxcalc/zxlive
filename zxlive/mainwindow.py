@@ -490,6 +490,12 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
         panel.play_sound_signal.connect(self.play_sound)
+        panel.undo_stack.indexChanged.connect(self._auto_save_if_needed)
+
+    def _auto_save_if_needed(self) -> None:
+        panel = self.active_panel
+        if panel and getattr(panel, 'file_path', None) and get_settings_value("auto-save", bool, False):
+            self.handle_save_file_action()
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
         _graph = graph or new_graph()

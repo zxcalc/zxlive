@@ -51,22 +51,6 @@ class AnimatedUndoStack(QUndoStack):
         else:
             self._push_now(cmd, anim_after)
 
-        # Auto-save if enabled
-        try:
-            if get_settings_value("auto-save", bool, False):
-                app = QApplication.instance()
-                mw = getattr(app, 'main_window', None) if app else None
-                panel = getattr(mw, 'active_panel', None) if mw else None
-                file_path = getattr(panel, 'file_path', None) if panel else None
-                can_save = (
-                    mw is not None and hasattr(mw, 'handle_save_file_action')
-                    and panel is not None and file_path is not None
-                )
-                if can_save:
-                    mw.handle_save_file_action()  # type: ignore[union-attr]
-        except Exception:
-            pass
-
     def undo(self) -> None:
         # Stop previously running animation
         if self.running_anim:
