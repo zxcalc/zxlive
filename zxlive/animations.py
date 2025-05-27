@@ -7,11 +7,12 @@ from typing import Optional, Callable, TYPE_CHECKING
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
+from PySide6.QtWidgets import QApplication
 from pyzx.utils import vertex_is_w
 
 from .custom_rule import CustomRule
 from .rewrite_data import operations
-from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
+from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION, get_settings_value
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
 from .eitem import EItem, EItemAnimation
@@ -49,6 +50,22 @@ class AnimatedUndoStack(QUndoStack):
             self.running_anim = anim_before
         else:
             self._push_now(cmd, anim_after)
+
+        # Auto-save if enabled
+        try:
+            if get_settings_value("auto-save", bool, False):
+                app = QApplication.instance()
+                mw = getattr(app, 'main_window', None) if app else None
+                panel = getattr(mw, 'active_panel', None) if mw else None
+                file_path = getattr(panel, 'file_path', None) if panel else None
+                can_save = (
+                    mw is not None and hasattr(mw, 'handle_save_file_action')
+                    and panel is not None and file_path is not None
+                )
+                if can_save:
+                    mw.handle_save_file_action()  # type: ignore[union-attr]
+        except Exception:
+            pass
 
     def undo(self) -> None:
         # Stop previously running animation
