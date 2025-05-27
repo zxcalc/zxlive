@@ -161,7 +161,8 @@ class GraphScene(QGraphicsScene):
             if e not in self.edge_map:
                 self.edge_map[e] = {}
             idx = len(self.edge_map[e])
-            e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t], index=idx)
+            curve_distance = self.g._edata.get(e, {}).get(f"curve_{idx}", 0.0)
+            e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t], curve_distance, idx)
             self.edge_map[e][idx] = e_item
             self.update_edge_curves(s, t)
             self.addItem(e_item)
@@ -226,7 +227,8 @@ class GraphScene(QGraphicsScene):
             s, t = self.g.edge_st(e)
             self.edge_map[e] = {}
             for i in range(self.g.graph[s][t].get_edge_count(e[2])):
-                ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t], index=i)
+                curve_distance = self.g._edata.get(e, {}).get(f"curve_{i}", 0.0)
+                ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t], curve_distance, i)
                 self.addItem(ei)
                 self.addItem(ei.selection_node)
                 self.edge_map[e][i] = ei
