@@ -43,7 +43,7 @@ class EItem(QGraphicsPathItem):
         """Properties of an EItem that can be animated."""
         Thickness = 1
 
-    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0) -> None:
+    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -54,6 +54,7 @@ class EItem(QGraphicsPathItem):
         self.s_item = s_item
         self.t_item = t_item
         self.curve_distance = curve_distance
+        self.index = index
         self.active_animations = set()
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
