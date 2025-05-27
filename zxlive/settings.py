@@ -39,7 +39,8 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "sparkle-mode": True,
     'sound-effects': False,
     "matrix/precision": 4,
-    "dark-mode": False,  # Add dark mode toggle
+    "dark-mode": False,
+    "auto-save": False,
 }
 
 font_defaults: dict[str, str | int | None] = {

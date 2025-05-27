@@ -109,6 +109,12 @@ class MainWindow(QMainWindow):
             "Exports the proof to tikz")
         self.export_gif_proof = self._new_action("Export proof to gif", self.handle_export_gif_proof_action, None,
             "Exports the proof to gif")
+        self.auto_save_action = self._new_action(
+            "Auto Save", self.toggle_auto_save, None,
+            "Automatically save the file after every edit"
+        )
+        self.auto_save_action.setCheckable(True)
+        self.auto_save_action.setChecked(get_settings_value("auto-save", bool, False))
 
         file_menu = menu.addMenu("&File")
         file_menu.addAction(new_graph)
@@ -120,6 +126,8 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.save_as)
         file_menu.addAction(self.export_tikz_proof)
         file_menu.addAction(self.export_gif_proof)
+        file_menu.addSeparator()
+        file_menu.addAction(self.auto_save_action)
 
         self.undo_action = self._new_action("Undo", self.undo, QKeySequence.StandardKey.Undo,
             "Undoes the last action", "undo.svg")
@@ -482,6 +490,12 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
         panel.play_sound_signal.connect(self.play_sound)
+        panel.undo_stack.indexChanged.connect(self._auto_save_if_needed)
+
+    def _auto_save_if_needed(self) -> None:
+        panel = self.active_panel
+        if panel and getattr(panel, 'file_path', None) and get_settings_value("auto-save", bool, False):
+            self.handle_save_file_action()
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
         _graph = graph or new_graph()
@@ -634,3 +648,9 @@ class MainWindow(QMainWindow):
         for i in range(self.tab_widget.count()):
             w = cast(BasePanel, self.tab_widget.widget(i))
             w.update_font()
+
+    def toggle_auto_save(self) -> None:
+        """Toggle the auto-save setting from the File menu."""
+        from .common import set_settings_value
+        checked = self.auto_save_action.isChecked()
+        set_settings_value("auto-save", checked, bool)
