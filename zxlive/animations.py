@@ -7,12 +7,11 @@ from typing import Optional, Callable, TYPE_CHECKING
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
-from PySide6.QtWidgets import QApplication
 from pyzx.utils import vertex_is_w
 
 from .custom_rule import CustomRule
 from .rewrite_data import operations
-from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION, get_settings_value
+from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
 from .eitem import EItem, EItemAnimation

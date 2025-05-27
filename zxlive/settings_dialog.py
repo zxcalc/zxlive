@@ -73,8 +73,8 @@ input_circuit_formats = {
 }
 
 general_settings: list[SettingsData] = [
-    {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},  # Add auto-save option
-    {"id": "dark-mode", "label": "Dark Mode (UI)", "type": FormInputType.Bool},  # Add dark mode option
+    {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
+    {"id": "dark-mode", "label": "Dark Mode (UI)", "type": FormInputType.Bool},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
