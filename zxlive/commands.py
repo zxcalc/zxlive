@@ -355,13 +355,17 @@ class ChangeEdgeCurve(BaseCommand):
     new_distance: float
     old_distance: float
 
-    def undo(self) -> None:
-        self.eitem.curve_distance = self.old_distance
+    def _set_distance(self, distance: float) -> None:
+        self.eitem.curve_distance = distance
+        edge, idx = self.eitem.e, self.eitem.index
+        self.g._edata.setdefault(edge, {})[idx] = distance
         self.eitem.refresh()
 
+    def undo(self) -> None:
+        self._set_distance(self.old_distance)
+
     def redo(self) -> None:
-        self.eitem.curve_distance = self.new_distance
-        self.eitem.refresh()
+        self._set_distance(self.new_distance)
 
 
 @dataclass
