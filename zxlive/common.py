@@ -4,7 +4,7 @@ import os
 from enum import IntEnum
 from typing import Final, Optional, TypeVar, Type
 
-from pyzx import EdgeType
+from pyzx.graph import EdgeType
 from pyzx.graph.multigraph import Multigraph
 from typing_extensions import TypeAlias
 
