@@ -7,6 +7,7 @@ from typing_extensions import TypedDict, NotRequired
 
 import pyzx
 from pyzx import simplify, extract_circuit
+from pyzx.graph import VertexType
 
 from .common import ET, GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
@@ -108,16 +109,35 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
 }
 
-const_true = lambda graph, matches: matches
+def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
+    """Returns a list of vertices in the selection or all vertices if no selection is made."""
+    matches_list = [v for v in graph.vertices() if matches(v)]
+    if len(matches_list) == 0:
+        return list(graph.vertices())
+    return matches_list
 
 
-def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[
-    [GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
+def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
     def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
-        simplification(g)
-        return ({}, [], [], True)
-
+        if set(g.vertices()) == set(matches):
+            simplification(g)
+            return ({}, [], [], True)
+        subgraph = create_subgraph_with_boundary(g, matches)
+        simplified = cast(GraphT, subgraph.copy())
+        simplification(simplified)
+        return CustomRule(subgraph, simplified, "", "")(g, matches)
     return rule
+
+def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
+    verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
+    subgraph = cast(GraphT, graph.subgraph_from_vertices(verts))
+    for v in verts:
+        for e in graph.incident_edges(v):
+            s, t = graph.edge_st(e)
+            if s not in verts or t not in verts:
+                boundary_node = subgraph.add_vertex(VertexType.BOUNDARY)
+                subgraph.add_edge((v, boundary_node), graph.edge_type(e))
+    return subgraph
 
 
 def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
@@ -135,7 +155,7 @@ def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[VT,
 ocm_action: RewriteData = {
     "text": "OCM",
     "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
-    "matcher": const_true,
+    "matcher": selection_or_all_matcher,
     "rule": ocm_rule,
     "type": MATCHES_VERTICES,
 }
@@ -144,126 +164,126 @@ simplifications: dict[str, RewriteData] = {
     'bialg_simp': {
         "text": "bialgebra simp",
         "tooltip": "bialg_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.bialg_simp),
         "type": MATCHES_VERTICES,
     },
     'spider_simp': {
         "text": "spider fusion",
         "tooltip": "spider_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.spider_simp),
         "type": MATCHES_VERTICES,
     },
     'id_simp': {
         "text": "id",
         "tooltip": "id_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.id_simp),
         "type": MATCHES_VERTICES,
     },
     'phase_free_simp': {
         "text": "phase free",
         "tooltip": "phase_free_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.phase_free_simp),
         "type": MATCHES_VERTICES,
     },
     'pivot_simp': {
         "text": "pivot",
         "tooltip": "pivot_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.pivot_simp),
         "type": MATCHES_VERTICES,
     },
     'pivot_gadget_simp': {
         "text": "pivot gadget",
         "tooltip": "pivot_gadget_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.pivot_gadget_simp),
         "type": MATCHES_VERTICES,
     },
     'pivot_boundary_simp': {
         "text": "pivot boundary",
         "tooltip": "pivot_boundary_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.pivot_boundary_simp),
         "type": MATCHES_VERTICES,
     },
     'gadget_simp': {
         "text": "gadget",
         "tooltip": "gadget_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.gadget_simp),
         "type": MATCHES_VERTICES,
     },
     'lcomp_simp': {
         "text": "local complementation",
         "tooltip": "lcomp_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.lcomp_simp),
         "type": MATCHES_VERTICES,
     },
     'clifford_simp': {
         "text": "clifford simplification",
         "tooltip": "clifford_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.clifford_simp),
         "type": MATCHES_VERTICES,
     },
     'tcount': {
         "text": "tcount",
         "tooltip": "tcount",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.tcount),
         "type": MATCHES_VERTICES,
     },
     'to_gh': {
         "text": "to green-hadamard form",
         "tooltip": "to_gh",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.to_gh),
         "type": MATCHES_VERTICES,
     },
     'to_rg': {
         "text": "to red-green form",
         "tooltip": "to_rg",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.to_rg),
         "type": MATCHES_VERTICES,
     },
     'full_reduce': {
         "text": "full reduce",
         "tooltip": "full_reduce",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.full_reduce),
         "type": MATCHES_VERTICES,
     },
     'reduce_scalar': {
         "text": "reduce scalar",
         "tooltip": "reduce_scalar",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.reduce_scalar),
         "type": MATCHES_VERTICES,
     },
     'supplementarity_simp': {
         "text": "supplementarity",
         "tooltip": "supplementarity_simp",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.supplementarity_simp),
         "type": MATCHES_VERTICES,
     },
     'to_clifford_normal_form_graph': {
         "text": "to clifford normal form",
         "tooltip": "to_clifford_normal_form_graph",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": apply_simplification(simplify.to_clifford_normal_form_graph),
         "type": MATCHES_VERTICES,
     },
     'extract_circuit': {
         "text": "circuit extraction",
         "tooltip": "extract_circuit",
-        "matcher": const_true,
+        "matcher": selection_or_all_matcher,
         "rule": _extract_circuit,
         "type": MATCHES_VERTICES,
         "returns_new_graph": True,
