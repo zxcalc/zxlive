@@ -17,7 +17,7 @@ from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor,
+from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
@@ -220,6 +220,9 @@ class EditorBasePanel(BasePanel):
 
     def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         self.undo_stack.push(MoveNode(self.graph_view, vs))
+
+    def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
+        self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))
 
     def vert_double_clicked(self, v: VT) -> None:
         graph = self.graph
