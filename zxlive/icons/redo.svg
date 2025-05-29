@@ -1,15 +1,1 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg
-   width="60"
-   height="60"
-   viewBox="0 0 60 60"
-   version="1.1"
-   id="svg4"
-   xmlns="http://www.w3.org/2000/svg">
-  <defs
-     id="defs8" />
-  <path
-     d="m 33,25.5 h -6 c -4.962,0 -9,4.038 -9,9 0,4.962 4.038,9 9,9 h 9 v 6 h -9 c -8.271,0 -15,-6.729 -15,-15 0,-8.271 6.729,-15 15,-15 h 6 l -6,-9 21,12 -21,12 z"
-     id="path2"
-     style="stroke-width:3" />
-</svg>
+<svg fill="#CCCCCC" viewBox="-2.08 -2.08 20.16 20.16" xmlns="http://www.w3.org/2000/svg" stroke="#CCCCCC" stroke-width="0.00016" transform="rotate(0)matrix(-1, 0, 0, 1, 16, 0)"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#4D4D4D" stroke-width="1.6"> <path class="cls-1" d="M6,3.6V0L0,6l6,6V8c6-.27,7.53,3.76,7.88,5.77a.27.27,0,0,0,.53,0C17.08,2.86,6,3.6,6,3.6Z"></path> </g><g id="SVGRepo_iconCarrier"> <path class="cls-1" d="M6,3.6V0L0,6l6,6V8c6-.27,7.53,3.76,7.88,5.77a.27.27,0,0,0,.53,0C17.08,2.86,6,3.6,6,3.6Z"></path> </g></svg>
