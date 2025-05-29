@@ -208,6 +208,8 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+        if e.button() == Qt.MouseButton.RightButton and self.graph_scene.selectedItems():
+            return
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
             e.setModifiers(e.modifiers() | Qt.KeyboardModifier.ControlModifier)
         super().mouseReleaseEvent(e)

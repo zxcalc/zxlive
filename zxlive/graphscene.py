@@ -19,7 +19,7 @@ from typing import Optional, Iterator, Iterable
 
 from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent
 
 from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
@@ -268,6 +268,8 @@ class EditGraphScene(GraphScene):
         self._is_mouse_pressed = False
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        if e.button() == Qt.MouseButton.RightButton and self.selectedItems():
+            return
         # Right-press on a vertex means the start of a drag for edge adding
         super().mousePressEvent(e)
         if (self.curr_tool == ToolType.EDGE) or \
@@ -335,7 +337,7 @@ class EditGraphScene(GraphScene):
                 colliding_verts.append(it)
         self.edge_added.emit(v1.v,v2.v,colliding_verts)
 
-    def contextMenuEvent(self, event: 'QGraphicsSceneContextMenuEvent') -> None:
+    def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent) -> None:
         from PySide6.QtWidgets import QMenu
         selected_items = self.selectedItems() if hasattr(self, 'selectedItems') else []
         if selected_items:
@@ -344,4 +346,7 @@ class EditGraphScene(GraphScene):
             action = menu.exec_(event.screenPos())
             if action == add_pattern_action:
                 self.add_selection_as_pattern_signal.emit()
+            event.accept()
+            return
+        super().contextMenuEvent(event)
 
