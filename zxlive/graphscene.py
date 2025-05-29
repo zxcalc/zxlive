@@ -55,6 +55,7 @@ class GraphScene(QGraphicsScene):
     edge_double_clicked = Signal(object)  # Actual type: ET
 
     selection_changed_custom = Signal()
+    add_selection_as_pattern_signal = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -333,4 +334,14 @@ class EditGraphScene(GraphScene):
             if isinstance(it, VItem) and it not in (v1,v2):
                 colliding_verts.append(it)
         self.edge_added.emit(v1.v,v2.v,colliding_verts)
+
+    def contextMenuEvent(self, event: 'QGraphicsSceneContextMenuEvent') -> None:
+        from PySide6.QtWidgets import QMenu
+        selected_items = self.selectedItems() if hasattr(self, 'selectedItems') else []
+        if selected_items:
+            menu = QMenu()
+            add_pattern_action = menu.addAction("Add selection as pattern")
+            action = menu.exec_(event.screenPos())
+            if action == add_pattern_action:
+                self.add_selection_as_pattern_signal.emit()
 

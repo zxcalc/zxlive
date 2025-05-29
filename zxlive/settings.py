@@ -41,6 +41,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "matrix/precision": 4,
     "dark-mode": False,
     "auto-save": False,
+    "patterns-folder": "patterns/",
 }
 
 font_defaults: dict[str, str | int | None] = {

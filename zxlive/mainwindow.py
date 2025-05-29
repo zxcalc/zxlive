@@ -234,10 +234,14 @@ class MainWindow(QMainWindow):
         if shortcut:
             action.setShortcut(shortcut)
             if alt_shortcut:
-                if not action.shortcuts():
-                    action.setShortcut(alt_shortcut)
-                elif alt_shortcut not in action.shortcuts():
-                    action.setShortcuts([shortcut, alt_shortcut])  # type: ignore
+                # Fix: Only add QKeySequence, not StandardKey
+                shortcuts = []
+                if isinstance(shortcut, QKeySequence):
+                    shortcuts.append(shortcut)
+                if isinstance(alt_shortcut, QKeySequence):
+                    shortcuts.append(alt_shortcut)
+                if shortcuts:
+                    action.setShortcuts(shortcuts)  # type: ignore
         return action
 
     @property
