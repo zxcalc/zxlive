@@ -183,7 +183,7 @@ class ProofPanel(BasePanel):
             # Remove even number of edges
             if num_edges % 2 != 0:
                 num_edges -= 1
-            for _ in range(num_edges):
+            for _ in range(num_edges): # TODO: This doesn't take into account the global scalar factor.
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
