@@ -14,4 +14,5 @@ dist
 .env
 *.zxr
 .ipynb_checkpoints
+*.code-workspace
 doc/_build/*
