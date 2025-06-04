@@ -291,7 +291,7 @@ simplifications: dict[str, RewriteData] = {
     },
 }
 
-rules_basic = ["spider", "rem_id", "copy", "pauli", "hopf",
+rules_basic = ["spider", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
                "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
 operations["spider"]["repeat_rule_application"] = True
 operations["rem_id"]["repeat_rule_application"] = True
