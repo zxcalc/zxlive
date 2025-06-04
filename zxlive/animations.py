@@ -295,8 +295,8 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         print('To do: animate ' + self.name)
     elif self.name == operations['rem_id']['text']:
         anim_before = QParallelAnimationGroup()
-        for m in matches:
-            anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[m[0]]))
+        for v in rem_verts:
+            anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
     elif self.name == operations['copy']['text']:
         anim_before = QParallelAnimationGroup()
         for m in matches:

@@ -33,6 +33,7 @@ class RewriteData(TypedDict):
     custom_rule: NotRequired[bool]
     lhs: NotRequired[GraphT]
     rhs: NotRequired[GraphT]
+    repeat_rule_application: NotRequired[bool]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -292,6 +293,8 @@ simplifications: dict[str, RewriteData] = {
 
 rules_basic = ["spider", "rem_id", "copy", "pauli", "hopf",
                "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
+operations["spider"]["repeat_rule_application"] = True
+operations["rem_id"]["repeat_rule_application"] = True
 operations["pauli"]["picture"] = "push_pauli.png"
 operations["copy"]["picture"] = "copy_pi.png"
 operations["bialgebra"]["picture"] = "bialgebra.png"

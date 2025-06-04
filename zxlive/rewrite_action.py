@@ -44,6 +44,7 @@ class RewriteAction:
     # Whether the rule returns a new graph instead of returning the rewrite changes.
     returns_new_graph: bool = field(default=False)
     enabled: bool = field(default=False)
+    repeat_rule_application: bool = False
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -64,6 +65,7 @@ class RewriteAction:
             rhs_graph = d.get('rhs', None),
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
+            repeat_rule_application=d.get('repeat_rule_application', False),
         )
 
     def do_rewrite(self, panel: ProofPanel) -> None:
@@ -73,18 +75,26 @@ class RewriteAction:
         g = copy.deepcopy(panel.graph_scene.g)
         verts, edges = panel.parse_selection()
 
-        matches = self.matcher(g, lambda v: v in verts) \
-            if self.match_type == MATCHES_VERTICES \
-            else self.matcher(g, lambda e: e in edges)
-
-        try:
-            g, rem_verts = self.apply_rewrite(g, matches)
-        except Exception as ex:
-            show_error_msg('Error while applying rewrite rule', str(ex))
-            return
+        rem_verts_list: list[VT] = []
+        matches_list: list[VT | ET] = []
+        while True:
+            matches = self.matcher(g, lambda v: v in verts) \
+                      if self.match_type == MATCHES_VERTICES \
+                      else self.matcher(g, lambda e: e in edges)
+            matches_list.extend(matches)
+            if not matches:
+                break
+            try:
+                g, rem_verts = self.apply_rewrite(g, matches)
+                rem_verts_list.extend(rem_verts)
+            except Exception as ex:
+                show_error_msg('Error while applying rewrite rule', str(ex))
+                return
+            if not self.repeat_rule_application:
+                break
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
-        anim_before, anim_after = make_animation(self, panel, g, matches, rem_verts)
+        anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Narrow down the type of the first return value.
