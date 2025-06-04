@@ -355,13 +355,36 @@ class ChangeEdgeCurve(BaseCommand):
     new_distance: float
     old_distance: float
 
+    def _set_distance(self, distance: float) -> None:
+        self.eitem.curve_distance = distance
+        edge, idx = self.eitem.e, self.eitem.index
+        self.g.set_edata(edge, f"curve_{idx}", distance)
+        self.update_graph_view()
+
     def undo(self) -> None:
-        self.eitem.curve_distance = self.old_distance
-        self.eitem.refresh()
+        self._set_distance(self.old_distance)
 
     def redo(self) -> None:
-        self.eitem.curve_distance = self.new_distance
-        self.eitem.refresh()
+        self._set_distance(self.new_distance)
+
+@dataclass
+class ChangeEdgeCurveProofMode(ChangeEdgeCurve):
+    step_view: ProofStepView
+
+    def __init__(self, graph_view: GraphView, eitem: EItem, new_distance: float, old_distance: float, step_view: ProofStepView) -> None:
+        super().__init__(graph_view, eitem, new_distance, old_distance)
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
 
 
 @dataclass
