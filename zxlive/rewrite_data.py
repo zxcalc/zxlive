@@ -290,14 +290,14 @@ simplifications: dict[str, RewriteData] = {
     },
 }
 
-rules_basic = {"spider", "to_z", "to_x", "rem_id", "copy", "pauli", "bialgebra", "bialgebra_op", "euler"}
+rules_basic = ["spider", "rem_id", "copy", "pauli", "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
 operations["pauli"]["picture"] = "push_pauli.png"
 operations["copy"]["picture"] = "copy_pi.png"
 operations["bialgebra"]["picture"] = "bialgebra.png"
 
-rules_zxw = {"spider", "fuse_w", "z_to_z_box"}
+rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
 
-rules_zh = {"had2edge", "fuse_hbox", "mult_hbox"}
+rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 action_groups = {
     "Basic rules": {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
