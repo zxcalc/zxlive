@@ -6,6 +6,7 @@ from typing import Callable, TYPE_CHECKING, Any, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 import pyzx
+from pyzx.utils import VertexType
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
@@ -78,9 +79,20 @@ class RewriteAction:
         rem_verts_list: list[VT] = []
         matches_list: list[VT | ET] = []
         while True:
-            matches = self.matcher(g, lambda v: v in verts) \
-                      if self.match_type == MATCHES_VERTICES \
-                      else self.matcher(g, lambda e: e in edges)
+            if self.match_type == MATCHES_VERTICES:
+                matches = self.matcher(
+                    g,
+                    lambda v: v in verts and g.type(v) != VertexType.DUMMY
+                )
+            else:
+                matches = self.matcher(
+                    g,
+                    lambda e: (
+                        e in edges and
+                        g.type(g.edge_s(e)) != VertexType.DUMMY and
+                        g.type(g.edge_t(e)) != VertexType.DUMMY
+                    )
+                )
             matches_list.extend(matches)
             if not matches:
                 break

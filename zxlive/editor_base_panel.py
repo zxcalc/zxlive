@@ -50,6 +50,7 @@ def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
         VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])},
         VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])},
         VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])},
+        VertexType.DUMMY: {"text": "dummy (blank)", "icon": (ShapeType.CIRCLE, QColor("#ff69b4"))},
     }
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
@@ -229,7 +230,17 @@ class EditorBasePanel(BasePanel):
         old_variables = graph.variable_types.copy()
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
-
+        if graph.type(v) == VertexType.DUMMY:
+            # Prompt for text and store in vdata
+            input_, ok = QInputDialog.getText(self, "Set Text", "Enter text for dummy node:")
+            if not ok:
+                return None
+            # Store in vdata under key 'text'
+            new_g = copy.deepcopy(self.graph_scene.g)
+            new_g.set_vdata(v, 'text', input_)
+            cmd = SetGraph(self.graph_view, new_g)
+            self.undo_stack.push(cmd)
+            return
         phase_is_complex = (graph.type(v) == VertexType.Z_BOX)
         if phase_is_complex:
             prompt = "Enter desired phase value (complex value):"
