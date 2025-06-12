@@ -236,7 +236,8 @@ class EditorBasePanel(BasePanel):
             return None
         if graph.type(v) == VertexType.DUMMY:
             # Prompt for text and store in vdata
-            input_, ok = QInputDialog.getText(self, "Set Text", "Enter text for dummy node:")
+            current_text = graph.vdata(v, 'text', '')
+            input_, ok = QInputDialog.getText(self, "Set Text", "Enter text for dummy node:", text=current_text)
             if not ok:
                 return None
             # Store in vdata under key 'text'
