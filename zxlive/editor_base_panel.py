@@ -192,6 +192,10 @@ class EditorBasePanel(BasePanel):
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
             graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
             return None
+        if (graph.type(u) == VertexType.DUMMY and graph.type(v) != VertexType.DUMMY) or \
+              (graph.type(u) != VertexType.DUMMY and graph.type(v) == VertexType.DUMMY):
+            return None
+
         # We will try to connect all the vertices together in order
         # First we filter out the vertices that are not compatible with the edge.
         verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT] # we will be adding two edges, which is not compatible with W_INPUT
