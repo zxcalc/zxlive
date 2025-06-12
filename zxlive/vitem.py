@@ -145,26 +145,23 @@ class VItem(QGraphicsPathItem):
         pen = QPen()
         if not self.isSelected():
             color_key = color_map.get(self.ty, "boundary")
-            if color_key == "dummy":
-                brush = QBrush(QColor("#ff69b4"))  # Pink for dummy
-            else:
-                brush = QBrush(display_setting.effective_colors[color_key])
+            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
             pen.setColor(display_setting.effective_colors["outline"])
+            if self.ty == VertexType.DUMMY:
+                pen.setColor(display_setting.effective_colors["dummy"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            if color_key == "dummy_pressed":
-                brush = QBrush(QColor("#ffb6d5"))  # Lighter pink for pressed dummy
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-            else:
-                brush = QBrush(display_setting.effective_colors[color_key])
-                brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
             # Use a light outline in dark mode, otherwise use the pressed color
             if display_setting.dark_mode:
                 pen.setColor(QColor("#dbdbdb"))
             else:
                 pen.setColor(display_setting.effective_colors["boundary_pressed"])
+            if self.ty == VertexType.DUMMY:
+                pen.setColor(display_setting.effective_colors["dummy_pressed"])
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)
@@ -175,13 +172,11 @@ class VItem(QGraphicsPathItem):
             if self.dummy_text_item is None:
                 self.dummy_text_item = QGraphicsTextItem(self)
                 self.dummy_text_item.setDefaultTextColor(QColor("#222"))
-                font = display_setting.font
-                font.setPointSizeF(font.pointSizeF() * 0.9)
-                self.dummy_text_item.setFont(font)
+                self.dummy_text_item.setFont(display_setting.font)
             self.dummy_text_item.setPlainText(text)
             # Center the text in the node
             rect = self.dummy_text_item.boundingRect()
-            self.dummy_text_item.setPos(-rect.width()/2, -rect.height()/2)
+            self.dummy_text_item.setPos(-rect.width()/2, -rect.height()/2 - 0.25 * SCALE)
             self.dummy_text_item.setVisible(bool(text))
         elif self.dummy_text_item is not None:
             self.dummy_text_item.setVisible(False)
@@ -210,7 +205,8 @@ class VItem(QGraphicsPathItem):
             scale = 0.3 * SCALE
             path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         elif self.ty == VertexType.DUMMY:
-            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+            scale = 0.3 * SCALE
+            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         return path

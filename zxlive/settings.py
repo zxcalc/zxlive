@@ -115,6 +115,8 @@ modern_red_green: ColorScheme = {
     "w_output_pressed": QColor("#444444"),
     "outline": QColor("#000000"),
     "edge": QColor("#000000"),
+    "dummy": QColor("#B6B6B6"),
+    "dummy_pressed": QColor("#808080"),
 }
 
 classic_red_green: ColorScheme = {
