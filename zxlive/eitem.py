@@ -23,7 +23,7 @@ from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphics
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
 from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
 
-from pyzx.utils import EdgeType
+from pyzx.utils import EdgeType, VertexType
 
 from .common import SCALE, ET, GraphT
 from .vitem import VItem, EITEM_Z
@@ -93,7 +93,11 @@ class EItem(QGraphicsPathItem):
             pen.setDashPattern([4.0, 2.0])
         else:
             from .settings import display_setting
-            pen.setColor(display_setting.effective_colors["edge"])
+            if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
+               self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
+                pen.setColor(display_setting.effective_colors["dummy_edge"])
+            else:
+                pen.setColor(display_setting.effective_colors["edge"])
         self.setPen(QPen(pen))
 
         if not self.is_dragging:
