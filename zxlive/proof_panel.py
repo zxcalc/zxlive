@@ -9,14 +9,14 @@ from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
 
 import pyzx
-from pyzx import VertexType, basicrules
+from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
+from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode
+from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode, SetGraph, UpdateGraph
 from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg
 from .editor_base_panel import string_to_complex
@@ -496,3 +496,29 @@ class ProofPanel(BasePanel):
         from .commands import AddEdgeProofMode
         cmd = AddEdgeProofMode(self.graph_view, u, v, EdgeType.SIMPLE, self.step_view)
         self.undo_stack.push(cmd)
+
+    def delete_selection(self) -> None:
+        g = self.graph_scene.g
+        rem_vertices = [v for v in self.graph_scene.selected_vertices if g.type(v) == VertexType.DUMMY]
+        rem_edges = []
+        for e in self.graph_scene.selected_edges:
+            if g.type(g.edge_s(e)) == VertexType.DUMMY and g.type(g.edge_t(e)) == VertexType.DUMMY:
+                rem_edges.append(e)
+        if not rem_vertices and not rem_edges: return
+        new_g = copy.deepcopy(self.graph_scene.g)
+        new_g.remove_edges(rem_edges)
+        new_g.remove_vertices(list(set(rem_vertices)))
+        cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
+            else UpdateGraph(self.graph_view,new_g)
+        self.undo_stack.push(cmd)
+
+    def paste_graph(self, graph: GraphT) -> None:
+        dummy_vertices = [v for v in graph.vertices() if graph.type(v) == VertexType.DUMMY]
+        if not dummy_vertices:
+            return
+        dummy_graph = graph.subgraph_from_vertices(dummy_vertices)
+        new_g = copy.deepcopy(self.graph_scene.g)
+        new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
+        cmd = UpdateGraph(self.graph_view, new_g)
+        self.undo_stack.push(cmd)
+        self.graph_scene.select_vertices(new_verts)
