@@ -208,6 +208,26 @@ class AddNode(BaseCommand):
         self._added_vert = self.g.add_vertex(self.vty, y,x)
         self.update_graph_view()
 
+
+@dataclass
+class AddNodeProofMode(AddNode):
+    step_view: ProofStepView
+
+    def __init__(self, graph_view: GraphView, x: float, y: float, vty: VertexType, step_view: ProofStepView) -> None:
+        super().__init__(graph_view, x, y, vty)
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
 @dataclass
 class AddNodeSnapped(BaseCommand):
     """Adds a new spider positioned on an edge, replacing the original edge"""
@@ -288,6 +308,26 @@ class AddEdge(BaseCommand):
     def redo(self) -> None:
         self.g.add_edge((self.u, self.v), self.ety)
         self.update_graph_view()
+
+
+@dataclass
+class AddEdgeProofMode(AddEdge):
+    step_view: ProofStepView
+
+    def __init__(self, graph_view: GraphView, u: VT, v: VT, ety: EdgeType, step_view: ProofStepView) -> None:
+        super().__init__(graph_view, u, v, ety)
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        super().redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
 
 @dataclass
 class AddEdges(BaseCommand):
