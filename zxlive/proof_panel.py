@@ -17,11 +17,11 @@ from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode
-from .common import ET, VT, GraphT, get_data, pos_from_view, pos_to_view
+from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
-from .graphscene import GraphScene
+from .graphscene import EditGraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeView
@@ -33,13 +33,11 @@ from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 class ProofPanel(BasePanel):
     """Panel for the proof mode of ZXLive."""
 
+    graph_scene: EditGraphScene
+
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
-        self.graph_scene = GraphScene()
-        self.graph_scene.vertices_moved.connect(self._vert_moved)
-        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
-        self.graph_scene.edge_double_clicked.connect(self._edge_double_clicked)
-
+        self.graph_scene = EditGraphScene()
         self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
@@ -51,6 +49,12 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
+        self.graph_scene.vertices_moved.connect(self._vert_moved)
+        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+        self.graph_scene.edge_double_clicked.connect(self._edge_double_clicked)
+
+        self.graph_scene.vertex_added.connect(self._add_dummy_node)
+        self.graph_scene.edge_added.connect(self._add_dummy_edge)
 
         self.step_view = ProofStepView(self)
 
@@ -77,7 +81,23 @@ class ProofPanel(BasePanel):
         self.magic_wand.setShortcut("w")
         self.selection.clicked.connect(self._selection_clicked)
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
-        yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
+        # --- Dummy node/edge addition ---
+        self._dummy_icon = QToolButton(self)
+        self._dummy_icon.setCheckable(True)
+        self._dummy_icon.setIcon(QIcon(get_data("icons/tikzit-tool-node.svg")))
+        self._dummy_icon.setIconSize(QSize(32, 32))
+        self._dummy_icon.setToolTip("Add Dummy Vertex (v)")
+        self._dummy_icon.setShortcut("v")
+        self._dummy_icon.clicked.connect(self._dummy_node_mode_clicked)
+
+        self._dummy_edge_icon = QToolButton(self)
+        self._dummy_edge_icon.setCheckable(True)
+        self._dummy_edge_icon.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
+        self._dummy_edge_icon.setIconSize(QSize(32, 32))
+        self._dummy_edge_icon.setToolTip("Add Dummy Edge (e)")
+        self._dummy_edge_icon.setShortcut("e")
+        self._dummy_edge_icon.clicked.connect(self._dummy_edge_mode_clicked)
+        yield ToolbarSection(self.selection, self._dummy_icon, self._dummy_edge_icon, self.magic_wand, exclusive=True)
 
         self.identity_choice = (
             QToolButton(self),
@@ -116,9 +136,11 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(ChangeEdgeCurveProofMode(self.graph_view, eitem, new_distance, old_distance, self.step_view))
 
     def _selection_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.SELECT
         self.graph_view.tool = GraphTool.Selection
 
     def _magic_wand_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.SELECT
         self.graph_view.tool = GraphTool.MagicWand
 
     def _vertex_dragged(self, state: DragState, v: VT, w: VT) -> None:
@@ -204,6 +226,8 @@ class ProofPanel(BasePanel):
         pos = QPointF(*pos_from_view(pos.x(), pos.y())) * SCALE
         s = self.graph.edge_s(item.e)
         t = self.graph.edge_t(item.e)
+        if self.graph.type(s) == VertexType.DUMMY or self.graph.type(t) == VertexType.DUMMY:
+            return False
 
         if self.identity_choice[0].isChecked():
             vty: VertexType = VertexType.Z
@@ -447,3 +471,28 @@ class ProofPanel(BasePanel):
             pyzx.hrules.had_edge_to_hbox(new_g, e)
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
             self.undo_stack.push(cmd)
+
+    def _dummy_node_mode_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.VERTEX
+        self.graph_view.tool = GraphTool.Selection
+
+    def _dummy_edge_mode_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.EDGE
+        self.graph_view.tool = GraphTool.Selection
+
+    def _add_dummy_node(self, x: float, y: float, edges: list[EItem]) -> None:
+        if self.graph_scene.curr_tool != ToolType.VERTEX:
+            return
+        from .commands import AddNodeProofMode
+        cmd = AddNodeProofMode(self.graph_view, x, y, VertexType.DUMMY, self.step_view)
+        self.undo_stack.push(cmd)
+
+    def _add_dummy_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        if self.graph_scene.curr_tool != ToolType.EDGE:
+            return
+        g = self.graph_scene.g
+        if g.type(u) != VertexType.DUMMY or g.type(v) != VertexType.DUMMY:
+            return
+        from .commands import AddEdgeProofMode
+        cmd = AddEdgeProofMode(self.graph_view, u, v, EdgeType.SIMPLE, self.step_view)
+        self.undo_stack.push(cmd)
