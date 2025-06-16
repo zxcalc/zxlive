@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Iterable, Optional, Set, Union, Callable
+from typing import Any, Callable, Iterable, Optional, Set, Type, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -60,6 +60,28 @@ class UndoableChange(BaseCommand):
     """
     undo: Callable[[], None]
     redo: Callable[[], None]
+
+
+class ProofModeMixin:
+    step_view: 'ProofStepView'
+    proof_step_index: int
+
+    def setup_proof_mode(self, step_view: 'ProofStepView') -> None:
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        base: Type[Any] = type(self).__mro__[1]
+        base.undo(self)
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)  # type: ignore[attr-defined]
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        base: Type[Any] = type(self).__mro__[1]
+        base.redo(self)
+        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)  # type: ignore[attr-defined]
+
 
 @dataclass
 class SetGraph(BaseCommand):
@@ -210,23 +232,11 @@ class AddNode(BaseCommand):
 
 
 @dataclass
-class AddNodeProofMode(AddNode):
+class AddNodeProofMode(AddNode, ProofModeMixin):
     step_view: ProofStepView
-
     def __init__(self, graph_view: GraphView, x: float, y: float, vty: VertexType, step_view: ProofStepView) -> None:
-        super().__init__(graph_view, x, y, vty)
-        self.step_view = step_view
-        self.proof_step_index = int(step_view.currentIndex().row())
-
-    def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
-    def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+        AddNode.__init__(self, graph_view, x, y, vty)
+        self.setup_proof_mode(step_view)
 
 @dataclass
 class AddNodeSnapped(BaseCommand):
@@ -262,11 +272,11 @@ class AddNodeSnapped(BaseCommand):
         elif self._et == EdgeType.HADAMARD:
             self.g.add_edge((s, self.added_vert), EdgeType.HADAMARD)
             self.g.add_edge((t, self.added_vert), EdgeType.SIMPLE)
-        else: 
+        else:
             raise ValueError("Can't add spider between vertices connected by edge of type", str(self._et))
         self.s = s
         self.t = t
-        
+
         self.g.remove_edge(self.e)
         self.update_graph_view()
 
@@ -311,23 +321,11 @@ class AddEdge(BaseCommand):
 
 
 @dataclass
-class AddEdgeProofMode(AddEdge):
+class AddEdgeProofMode(AddEdge, ProofModeMixin):
     step_view: ProofStepView
-
     def __init__(self, graph_view: GraphView, u: VT, v: VT, ety: EdgeType, step_view: ProofStepView) -> None:
-        super().__init__(graph_view, u, v, ety)
-        self.step_view = step_view
-        self.proof_step_index = int(step_view.currentIndex().row())
-
-    def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
-    def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+        AddEdge.__init__(self, graph_view, u, v, ety)
+        self.setup_proof_mode(step_view)
 
 @dataclass
 class AddEdges(BaseCommand):
@@ -369,23 +367,11 @@ class MoveNode(BaseCommand):
         self.update_graph_view()
 
 @dataclass
-class MoveNodeProofMode(MoveNode):
+class MoveNodeProofMode(MoveNode, ProofModeMixin):
     step_view: ProofStepView
-
     def __init__(self, graph_view: GraphView, vs: list[tuple[VT, float, float]], step_view: ProofStepView) -> None:
-        super().__init__(graph_view, vs)
-        self.step_view = step_view
-        self.proof_step_index = int(step_view.currentIndex().row())
-
-    def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
-    def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
+        MoveNode.__init__(self, graph_view, vs)
+        self.setup_proof_mode(step_view)
 
 
 @dataclass
@@ -408,24 +394,11 @@ class ChangeEdgeCurve(BaseCommand):
         self._set_distance(self.new_distance)
 
 @dataclass
-class ChangeEdgeCurveProofMode(ChangeEdgeCurve):
+class ChangeEdgeCurveProofMode(ChangeEdgeCurve, ProofModeMixin):
     step_view: ProofStepView
-
     def __init__(self, graph_view: GraphView, eitem: EItem, new_distance: float, old_distance: float, step_view: ProofStepView) -> None:
-        super().__init__(graph_view, eitem, new_distance, old_distance)
-        self.step_view = step_view
-        self.proof_step_index = int(step_view.currentIndex().row())
-
-    def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
-    def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
+        ChangeEdgeCurve.__init__(self, graph_view, eitem, new_distance, old_distance)
+        self.setup_proof_mode(step_view)
 
 @dataclass
 class ChangePhase(BaseCommand):
