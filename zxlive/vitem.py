@@ -201,10 +201,7 @@ class VItem(QGraphicsPathItem):
             path.lineTo(0.25 * SCALE, -0.15 * SCALE)
             path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
             path.closeSubpath()
-        elif self.ty == VertexType.W_INPUT or self.ty == VertexType.BOUNDARY:
-            scale = 0.3 * SCALE
-            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
-        elif self.ty == VertexType.DUMMY:
+        elif self.ty in {VertexType.W_INPUT, VertexType.BOUNDARY, VertexType.DUMMY}:
             scale = 0.3 * SCALE
             path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
