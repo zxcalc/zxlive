@@ -18,7 +18,7 @@ from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode, SetGraphProofMode, UpdateGraphProofMode
 from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
-from .dialogs import show_error_msg
+from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
 from .graphscene import EditGraphScene
@@ -457,11 +457,17 @@ class ProofPanel(BasePanel):
             return
         if ty == VertexType.H_BOX:
             new_g = copy.deepcopy(self.graph)
-            if not pyzx.hrules.is_hadamard(new_g, v): 
+            if not pyzx.hrules.is_hadamard(new_g, v):
                 return
             pyzx.hrules.replace_hadamard(new_g, v)
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
             self.undo_stack.push(cmd)
+            return
+        if ty == VertexType.DUMMY:
+            new_graph = update_dummy_vertex_text(self, self.graph, v)
+            if new_graph is not None:
+                cmd_dummy = SetGraphProofMode(self.graph_view, new_graph, self.step_view)
+                self.undo_stack.push(cmd_dummy)
             return
 
     def _edge_double_clicked(self, e: ET) -> None:

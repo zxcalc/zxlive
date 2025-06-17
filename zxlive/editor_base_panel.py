@@ -21,7 +21,7 @@ from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, 
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
-from .dialogs import show_error_msg
+from .dialogs import show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
 from .vitem import VItem, BLACK, VItemAnimation
 from .graphscene import EditGraphScene
@@ -234,16 +234,10 @@ class EditorBasePanel(BasePanel):
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
         if graph.type(v) == VertexType.DUMMY:
-            # Prompt for text and store in vdata
-            current_text = graph.vdata(v, 'text', '')
-            input_, ok = QInputDialog.getText(self, "Set Text", "Enter text for dummy node:", text=current_text)
-            if not ok:
-                return None
-            # Store in vdata under key 'text'
-            new_g = copy.deepcopy(self.graph_scene.g)
-            new_g.set_vdata(v, 'text', input_)
-            cmd = SetGraph(self.graph_view, new_g)
-            self.undo_stack.push(cmd)
+            new_g = update_dummy_vertex_text(self, self.graph_scene.g, v)
+            if new_g is not None:
+                cmd = SetGraph(self.graph_view, new_g)
+                self.undo_stack.push(cmd)
             return
         phase_is_complex = (graph.type(v) == VertexType.Z_BOX)
         if phase_is_complex:
