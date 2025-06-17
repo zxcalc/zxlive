@@ -50,7 +50,7 @@ def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
         VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])},
         VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])},
         VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])},
-        VertexType.DUMMY: {"text": "Blank", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["dummy"])},
+        VertexType.DUMMY: {"text": "Dummy", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["dummy"])},
     }
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
