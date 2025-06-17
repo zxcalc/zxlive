@@ -16,7 +16,7 @@ from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode, SetGraph, UpdateGraph
+from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode, SetGraphProofMode, UpdateGraphProofMode
 from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg
 from .editor_base_panel import string_to_complex
@@ -508,8 +508,8 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph_scene.g)
         new_g.remove_edges(rem_edges)
         new_g.remove_vertices(list(set(rem_vertices)))
-        cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
-            else UpdateGraph(self.graph_view,new_g)
+        cmd = SetGraphProofMode(self.graph_view, new_g, self.step_view) if len(set(rem_vertices)) > 128 \
+            else UpdateGraphProofMode(self.graph_view, new_g, self.step_view)
         self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
@@ -519,6 +519,6 @@ class ProofPanel(BasePanel):
         dummy_graph = graph.subgraph_from_vertices(dummy_vertices)
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
-        cmd = UpdateGraph(self.graph_view, new_g)
+        cmd = UpdateGraphProofMode(self.graph_view, new_g, self.step_view)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)

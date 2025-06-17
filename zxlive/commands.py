@@ -97,6 +97,12 @@ class SetGraph(BaseCommand):
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
 
+@dataclass
+class SetGraphProofMode(SetGraph, ProofModeMixin):
+    step_view: ProofStepView
+    def __init__(self, graph_view: GraphView, new_g: GraphT, step_view: ProofStepView) -> None:
+        SetGraph.__init__(self, graph_view, new_g)
+        self.setup_proof_mode(step_view)
 
 @dataclass
 class UpdateGraph(BaseCommand):
@@ -119,6 +125,12 @@ class UpdateGraph(BaseCommand):
         self.g = self.new_g
         self.update_graph_view(True)
 
+@dataclass
+class UpdateGraphProofMode(UpdateGraph, ProofModeMixin):
+    step_view: ProofStepView
+    def __init__(self, graph_view: GraphView, new_g: GraphT, step_view: ProofStepView) -> None:
+        UpdateGraph.__init__(self, graph_view, new_g)
+        self.setup_proof_mode(step_view)
 
 @dataclass
 class ChangeNodeType(BaseCommand):
