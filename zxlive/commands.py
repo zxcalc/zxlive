@@ -62,25 +62,22 @@ class UndoableChange(BaseCommand):
     redo: Callable[[], None]
 
 
-class ProofModeMixin:
-    step_view: 'ProofStepView'
-    proof_step_index: int
-
-    def setup_proof_mode(self, step_view: 'ProofStepView') -> None:
+class ProofModeCommand(QUndoCommand):
+    def __init__(self, command: BaseCommand, step_view: ProofStepView):
+        super().__init__()
+        self.command = command
         self.step_view = step_view
         self.proof_step_index = int(step_view.currentIndex().row())
 
     def undo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
-        base: Type[Any] = type(self).__mro__[1]
-        base.undo(self)
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)  # type: ignore[attr-defined]
+        self.command.undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.command.graph_view.graph_scene.g)
 
     def redo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
-        base: Type[Any] = type(self).__mro__[1]
-        base.redo(self)
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)  # type: ignore[attr-defined]
+        self.command.redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.command.graph_view.graph_scene.g)
 
 
 @dataclass
@@ -96,13 +93,6 @@ class SetGraph(BaseCommand):
     def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
-
-@dataclass
-class SetGraphProofMode(SetGraph, ProofModeMixin):
-    step_view: ProofStepView
-    def __init__(self, graph_view: GraphView, new_g: GraphT, step_view: ProofStepView) -> None:
-        SetGraph.__init__(self, graph_view, new_g)
-        self.setup_proof_mode(step_view)
 
 @dataclass
 class UpdateGraph(BaseCommand):
@@ -124,13 +114,6 @@ class UpdateGraph(BaseCommand):
             self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
         self.g = self.new_g
         self.update_graph_view(True)
-
-@dataclass
-class UpdateGraphProofMode(UpdateGraph, ProofModeMixin):
-    step_view: ProofStepView
-    def __init__(self, graph_view: GraphView, new_g: GraphT, step_view: ProofStepView) -> None:
-        UpdateGraph.__init__(self, graph_view, new_g)
-        self.setup_proof_mode(step_view)
 
 @dataclass
 class ChangeNodeType(BaseCommand):
@@ -244,13 +227,6 @@ class AddNode(BaseCommand):
 
 
 @dataclass
-class AddNodeProofMode(AddNode, ProofModeMixin):
-    step_view: ProofStepView
-    def __init__(self, graph_view: GraphView, x: float, y: float, vty: VertexType, step_view: ProofStepView) -> None:
-        AddNode.__init__(self, graph_view, x, y, vty)
-        self.setup_proof_mode(step_view)
-
-@dataclass
 class AddNodeSnapped(BaseCommand):
     """Adds a new spider positioned on an edge, replacing the original edge"""
     x: float
@@ -333,13 +309,6 @@ class AddEdge(BaseCommand):
 
 
 @dataclass
-class AddEdgeProofMode(AddEdge, ProofModeMixin):
-    step_view: ProofStepView
-    def __init__(self, graph_view: GraphView, u: VT, v: VT, ety: EdgeType, step_view: ProofStepView) -> None:
-        AddEdge.__init__(self, graph_view, u, v, ety)
-        self.setup_proof_mode(step_view)
-
-@dataclass
 class AddEdges(BaseCommand):
     """Adds multiple edges of the same type to a graph."""
     pairs: list[tuple[VT,VT]]
@@ -379,14 +348,6 @@ class MoveNode(BaseCommand):
         self.update_graph_view()
 
 @dataclass
-class MoveNodeProofMode(MoveNode, ProofModeMixin):
-    step_view: ProofStepView
-    def __init__(self, graph_view: GraphView, vs: list[tuple[VT, float, float]], step_view: ProofStepView) -> None:
-        MoveNode.__init__(self, graph_view, vs)
-        self.setup_proof_mode(step_view)
-
-
-@dataclass
 class ChangeEdgeCurve(BaseCommand):
     """Changes the curve of an edge."""
     eitem: EItem
@@ -404,13 +365,6 @@ class ChangeEdgeCurve(BaseCommand):
 
     def redo(self) -> None:
         self._set_distance(self.new_distance)
-
-@dataclass
-class ChangeEdgeCurveProofMode(ChangeEdgeCurve, ProofModeMixin):
-    step_view: ProofStepView
-    def __init__(self, graph_view: GraphView, eitem: EItem, new_distance: float, old_distance: float, step_view: ProofStepView) -> None:
-        ChangeEdgeCurve.__init__(self, graph_view, eitem, new_distance, old_distance)
-        self.setup_proof_mode(step_view)
 
 @dataclass
 class ChangePhase(BaseCommand):

@@ -16,7 +16,7 @@ from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode, SetGraphProofMode, UpdateGraphProofMode
+from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
 from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
@@ -129,11 +129,12 @@ class ProofPanel(BasePanel):
         return selection, list(edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNodeProofMode(self.graph_view, vs, self.step_view)
+        cmd = ProofModeCommand(MoveNode(self.graph_view, vs), self.step_view)
         self.undo_stack.push(cmd)
 
     def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
-        self.undo_stack.push(ChangeEdgeCurveProofMode(self.graph_view, eitem, new_distance, old_distance, self.step_view))
+        cmd = ProofModeCommand(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance), self.step_view)
+        self.undo_stack.push(cmd)
 
     def _selection_clicked(self) -> None:
         self.graph_scene.curr_tool = ToolType.SELECT
@@ -466,7 +467,7 @@ class ProofPanel(BasePanel):
         if ty == VertexType.DUMMY:
             new_graph = update_dummy_vertex_text(self, self.graph, v)
             if new_graph is not None:
-                cmd_dummy = SetGraphProofMode(self.graph_view, new_graph, self.step_view)
+                cmd_dummy = ProofModeCommand(SetGraph(self.graph_view, new_graph), self.step_view)
                 self.undo_stack.push(cmd_dummy)
             return
 
@@ -489,8 +490,7 @@ class ProofPanel(BasePanel):
     def _add_dummy_node(self, x: float, y: float, edges: list[EItem]) -> None:
         if self.graph_scene.curr_tool != ToolType.VERTEX:
             return
-        from .commands import AddNodeProofMode
-        cmd = AddNodeProofMode(self.graph_view, x, y, VertexType.DUMMY, self.step_view)
+        cmd = ProofModeCommand(AddNode(self.graph_view, x, y, VertexType.DUMMY), self.step_view)
         self.undo_stack.push(cmd)
 
     def _add_dummy_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
@@ -499,8 +499,7 @@ class ProofPanel(BasePanel):
         g = self.graph_scene.g
         if g.type(u) != VertexType.DUMMY or g.type(v) != VertexType.DUMMY:
             return
-        from .commands import AddEdgeProofMode
-        cmd = AddEdgeProofMode(self.graph_view, u, v, EdgeType.SIMPLE, self.step_view)
+        cmd = ProofModeCommand(AddEdge(self.graph_view, u, v, EdgeType.SIMPLE), self.step_view)
         self.undo_stack.push(cmd)
 
     def delete_selection(self) -> None:
@@ -514,8 +513,10 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph_scene.g)
         new_g.remove_edges(rem_edges)
         new_g.remove_vertices(list(set(rem_vertices)))
-        cmd = SetGraphProofMode(self.graph_view, new_g, self.step_view) if len(set(rem_vertices)) > 128 \
-            else UpdateGraphProofMode(self.graph_view, new_g, self.step_view)
+        if len(set(rem_vertices)) > 128:
+            cmd = ProofModeCommand(SetGraph(self.graph_view, new_g), self.step_view)
+        else:
+            cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
         self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
@@ -525,6 +526,6 @@ class ProofPanel(BasePanel):
         dummy_graph = graph.subgraph_from_vertices(dummy_vertices)
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
-        cmd = UpdateGraphProofMode(self.graph_view, new_g, self.step_view)
+        cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
