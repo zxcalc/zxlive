@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Any, Callable, Iterable, Optional, Set, Type, Union
+from typing import Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -72,12 +72,12 @@ class ProofModeCommand(QUndoCommand):
     def undo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
         self.command.undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.command.graph_view.graph_scene.g)
+        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
 
     def redo(self) -> None:
         self.step_view.move_to_step(self.proof_step_index)
         self.command.redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.command.graph_view.graph_scene.g)
+        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
 
 
 @dataclass
