@@ -444,10 +444,9 @@ class MainWindow(QMainWindow):
 
     def cut_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
-            self.copied_graph = self.active_panel.copy_selection()
-            self.paste_action.setEnabled(True)
-            self.active_panel.delete_selection()
+        self.copied_graph = self.active_panel.copy_selection()
+        self.paste_action.setEnabled(True)
+        self.active_panel.delete_selection()
 
     def copy_graph(self) -> None:
         assert self.active_panel is not None
@@ -463,22 +462,19 @@ class MainWindow(QMainWindow):
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
-        if (isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel)) \
-            and self.copied_graph is not None:
+        if self.copied_graph is not None:
             self.active_panel.paste_graph(self.copied_graph)
 
     def paste_graph_from_clipboard(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel): 
-            tikz = pyperclip.paste()
-            copied_graph = from_tikz(tikz)
-            if copied_graph is not None:
-                self.active_panel.paste_graph(copied_graph)
+        tikz = pyperclip.paste()
+        copied_graph = from_tikz(tikz)
+        if copied_graph is not None:
+            self.active_panel.paste_graph(copied_graph)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
-        if isinstance(self.active_panel, GraphEditPanel) or isinstance(self.active_panel, RulePanel):
-            self.active_panel.delete_selection()
+        self.active_panel.delete_selection()
 
     def _new_panel(self, panel: BasePanel, name: str) -> None:
         self.tab_widget.addTab(panel, name)
