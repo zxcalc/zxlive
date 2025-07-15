@@ -26,7 +26,10 @@ class ColorScheme(TypedDict):
     w_output: QColor
     w_output_pressed: QColor
     outline: QColor
+    dummy: QColor
+    dummy_pressed: QColor
     edge: QColor
+    dummy_edge: QColor
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {

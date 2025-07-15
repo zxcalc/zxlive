@@ -236,8 +236,7 @@ class EditorBasePanel(BasePanel):
         if graph.type(v) == VertexType.DUMMY:
             new_g = update_dummy_vertex_text(self, self.graph_scene.g, v)
             if new_g is not None:
-                cmd = SetGraph(self.graph_view, new_g)
-                self.undo_stack.push(cmd)
+                self.undo_stack.push(SetGraph(self.graph_view, new_g))
             return
         phase_is_complex = (graph.type(v) == VertexType.Z_BOX)
         if phase_is_complex:
@@ -258,8 +257,7 @@ class EditorBasePanel(BasePanel):
         except ValueError:
             show_error_msg("Invalid Input", error_msg, parent=self)
             return None
-        cmd = ChangePhase(self.graph_view, v, new_phase)
-        self.undo_stack.push(cmd)
+        self.undo_stack.push(ChangePhase(self.graph_view, v, new_phase))
         # For some reason it is important we first push to the stack before we do the following.
         if len(graph.variable_types) != len(old_variables):
             new_vars = graph.variable_types.keys() - old_variables.keys()

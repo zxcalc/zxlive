@@ -123,6 +123,9 @@ class BasePanel(QWidget):
     def paste_selection(self, graph: GraphT) -> None:
         pass
 
+    def paste_graph(self, graph: GraphT) -> None:
+        pass
+
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
 
