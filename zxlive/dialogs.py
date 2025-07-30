@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
@@ -9,8 +10,9 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
+from pyzx.utils import VertexType
 
-from .common import GraphT
+from .common import GraphT, VT
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
 
@@ -334,3 +336,18 @@ def create_new_rewrite(parent: MainWindow) -> None:
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
     if not dialog.exec(): return
+
+def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[GraphT]:
+    """Prompt the user for text and return a new graph with the text stored in the vertex's vdata under key 'text'.
+    If the user cancels, return None. Otherwise, return the new graph with the updated vdata.
+    """
+    if graph.type(v) != VertexType.DUMMY:
+        show_error_msg("Invalid Vertex Type", "This function can only be used on dummy vertices.", parent=parent)
+        return None
+    current_text = graph.vdata(v, 'text', '')
+    input_, ok = QInputDialog.getText(parent, "Set Text", "Enter text for dummy node:", text=current_text)
+    if not ok:
+        return None
+    new_g = copy.deepcopy(graph)
+    new_g.set_vdata(v, 'text', input_)
+    return new_g

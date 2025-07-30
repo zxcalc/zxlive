@@ -9,19 +9,19 @@ from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
 
 import pyzx
-from pyzx import VertexType, basicrules
+from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import (EdgeType, FractionLike, get_w_partner, get_z_box_label,
+from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddRewriteStep, ChangeEdgeCurveProofMode, MoveNodeProofMode
-from .common import ET, VT, GraphT, get_data, pos_from_view, pos_to_view
-from .dialogs import show_error_msg
+from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
+from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
+from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
-from .graphscene import GraphScene
+from .graphscene import EditGraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeView
@@ -33,13 +33,11 @@ from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 class ProofPanel(BasePanel):
     """Panel for the proof mode of ZXLive."""
 
+    graph_scene: EditGraphScene
+
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
-        self.graph_scene = GraphScene()
-        self.graph_scene.vertices_moved.connect(self._vert_moved)
-        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
-        self.graph_scene.edge_double_clicked.connect(self._edge_double_clicked)
-
+        self.graph_scene = EditGraphScene()
         self.graph_view = ProofGraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
@@ -51,6 +49,12 @@ class ProofPanel(BasePanel):
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
+        self.graph_scene.vertices_moved.connect(self._vert_moved)
+        self.graph_scene.vertex_double_clicked.connect(self._vert_double_clicked)
+        self.graph_scene.edge_double_clicked.connect(self._edge_double_clicked)
+
+        self.graph_scene.vertex_added.connect(self._add_dummy_node)
+        self.graph_scene.edge_added.connect(self._add_dummy_edge)
 
         self.step_view = ProofStepView(self)
 
@@ -77,7 +81,23 @@ class ProofPanel(BasePanel):
         self.magic_wand.setShortcut("w")
         self.selection.clicked.connect(self._selection_clicked)
         self.magic_wand.clicked.connect(self._magic_wand_clicked)
-        yield ToolbarSection(self.selection, self.magic_wand, exclusive=True)
+        # --- Dummy node/edge addition ---
+        self._dummy_icon = QToolButton(self)
+        self._dummy_icon.setCheckable(True)
+        self._dummy_icon.setIcon(QIcon(get_data("icons/tikzit-tool-node.svg")))
+        self._dummy_icon.setIconSize(QSize(32, 32))
+        self._dummy_icon.setToolTip("Add Dummy Vertex (v)")
+        self._dummy_icon.setShortcut("v")
+        self._dummy_icon.clicked.connect(self._dummy_node_mode_clicked)
+
+        self._dummy_edge_icon = QToolButton(self)
+        self._dummy_edge_icon.setCheckable(True)
+        self._dummy_edge_icon.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
+        self._dummy_edge_icon.setIconSize(QSize(32, 32))
+        self._dummy_edge_icon.setToolTip("Add Dummy Edge (e)")
+        self._dummy_edge_icon.setShortcut("e")
+        self._dummy_edge_icon.clicked.connect(self._dummy_edge_mode_clicked)
+        yield ToolbarSection(self.selection, self._dummy_icon, self._dummy_edge_icon, self.magic_wand, exclusive=True)
 
         self.identity_choice = (
             QToolButton(self),
@@ -109,16 +129,19 @@ class ProofPanel(BasePanel):
         return selection, list(edges)
 
     def _vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
-        cmd = MoveNodeProofMode(self.graph_view, vs, self.step_view)
+        cmd = ProofModeCommand(MoveNode(self.graph_view, vs), self.step_view)
         self.undo_stack.push(cmd)
 
     def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
-        self.undo_stack.push(ChangeEdgeCurveProofMode(self.graph_view, eitem, new_distance, old_distance, self.step_view))
+        cmd = ProofModeCommand(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance), self.step_view)
+        self.undo_stack.push(cmd)
 
     def _selection_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.SELECT
         self.graph_view.tool = GraphTool.Selection
 
     def _magic_wand_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.SELECT
         self.graph_view.tool = GraphTool.MagicWand
 
     def _vertex_dragged(self, state: DragState, v: VT, w: VT) -> None:
@@ -204,6 +227,8 @@ class ProofPanel(BasePanel):
         pos = QPointF(*pos_from_view(pos.x(), pos.y())) * SCALE
         s = self.graph.edge_s(item.e)
         t = self.graph.edge_t(item.e)
+        if self.graph.type(s) == VertexType.DUMMY or self.graph.type(t) == VertexType.DUMMY:
+            return False
 
         if self.identity_choice[0].isChecked():
             vty: VertexType = VertexType.Z
@@ -433,11 +458,17 @@ class ProofPanel(BasePanel):
             return
         if ty == VertexType.H_BOX:
             new_g = copy.deepcopy(self.graph)
-            if not pyzx.hrules.is_hadamard(new_g, v): 
+            if not pyzx.hrules.is_hadamard(new_g, v):
                 return
             pyzx.hrules.replace_hadamard(new_g, v)
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
             self.undo_stack.push(cmd)
+            return
+        if ty == VertexType.DUMMY:
+            new_graph = update_dummy_vertex_text(self, self.graph, v)
+            if new_graph is not None:
+                cmd_dummy = ProofModeCommand(SetGraph(self.graph_view, new_graph), self.step_view)
+                self.undo_stack.push(cmd_dummy)
             return
 
     def _edge_double_clicked(self, e: ET) -> None:
@@ -447,3 +478,54 @@ class ProofPanel(BasePanel):
             pyzx.hrules.had_edge_to_hbox(new_g, e)
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
             self.undo_stack.push(cmd)
+
+    def _dummy_node_mode_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.VERTEX
+        self.graph_view.tool = GraphTool.Selection
+
+    def _dummy_edge_mode_clicked(self) -> None:
+        self.graph_scene.curr_tool = ToolType.EDGE
+        self.graph_view.tool = GraphTool.Selection
+
+    def _add_dummy_node(self, x: float, y: float, edges: list[EItem]) -> None:
+        if self.graph_scene.curr_tool != ToolType.VERTEX:
+            return
+        cmd = ProofModeCommand(AddNode(self.graph_view, x, y, VertexType.DUMMY), self.step_view)
+        self.undo_stack.push(cmd)
+
+    def _add_dummy_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        if self.graph_scene.curr_tool != ToolType.EDGE:
+            return
+        g = self.graph_scene.g
+        if g.type(u) != VertexType.DUMMY or g.type(v) != VertexType.DUMMY:
+            return
+        cmd = ProofModeCommand(AddEdge(self.graph_view, u, v, EdgeType.SIMPLE), self.step_view)
+        self.undo_stack.push(cmd)
+
+    def delete_selection(self) -> None:
+        g = self.graph_scene.g
+        rem_vertices = [v for v in self.graph_scene.selected_vertices if g.type(v) == VertexType.DUMMY]
+        rem_edges = []
+        for e in self.graph_scene.selected_edges:
+            if g.type(g.edge_s(e)) == VertexType.DUMMY and g.type(g.edge_t(e)) == VertexType.DUMMY:
+                rem_edges.append(e)
+        if not rem_vertices and not rem_edges: return
+        new_g = copy.deepcopy(self.graph_scene.g)
+        new_g.remove_edges(rem_edges)
+        new_g.remove_vertices(list(set(rem_vertices)))
+        if len(set(rem_vertices)) > 128:
+            cmd = ProofModeCommand(SetGraph(self.graph_view, new_g), self.step_view)
+        else:
+            cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
+        self.undo_stack.push(cmd)
+
+    def paste_graph(self, graph: GraphT) -> None:
+        dummy_vertices = [v for v in graph.vertices() if graph.type(v) == VertexType.DUMMY]
+        if not dummy_vertices:
+            return
+        dummy_graph = graph.subgraph_from_vertices(dummy_vertices)
+        new_g = copy.deepcopy(self.graph_scene.g)
+        new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
+        cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
+        self.undo_stack.push(cmd)
+        self.graph_scene.select_vertices(new_verts)
