@@ -11,26 +11,8 @@ from pyzx.graph import VertexType
 
 from .common import ET, GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
+from .unfusion_rewrite import match_unfuse_single_vertex, apply_unfuse_rule
 
-
-def _get_unfusion_functions():
-    """Lazy import of unfusion functions to avoid circular import."""
-    from .unfusion_rewrite import match_unfuse_single_vertex, apply_unfuse_rule
-    return match_unfuse_single_vertex, apply_unfuse_rule
-
-
-def _init_unfusion_rule():
-    """Initialize the unfusion rule when safe to do so."""
-    if "unfuse" not in operations:
-        match_unfuse_single_vertex, apply_unfuse_rule = _get_unfusion_functions()
-        operations["unfuse"] = {
-            "text": "unfuse",
-            "tooltip": "Split a node into two nodes with configurable edge distribution",
-            "matcher": match_unfuse_single_vertex,
-            "rule": apply_unfuse_rule,
-            "type": MATCHES_VERTICES,
-            "copy_first": False,
-        }
 
 operations = copy.deepcopy(editor_actions.operations)
 
@@ -72,10 +54,14 @@ def read_custom_rules() -> list[RewriteData]:
                     custom_rules.append(rule)
     return custom_rules
 
-# We want additional actions that are not part of the original PyZX editor
-# So we add them to operations
-
-# Note: unfuse rule is added dynamically to avoid circular imports
+operations["unfuse"] = {
+    "text": "unfuse",
+    "tooltip": "Unfuse a spider",
+    "matcher": match_unfuse_single_vertex,
+    "rule": apply_unfuse_rule,
+    "type": MATCHES_VERTICES,
+    "copy_first": False,
+}
 
 rewrites_graph_theoretic: dict[str, RewriteData] = {
     "lcomp": {
@@ -313,10 +299,9 @@ simplifications: dict[str, RewriteData] = {
     },
 }
 
-rules_basic = ["spider", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
+rules_basic = ["spider", "unfuse", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
                "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
 
-# Note: unfuse is added dynamically later to avoid circular imports
 operations["spider"]["repeat_rule_application"] = True
 operations["rem_id"]["repeat_rule_application"] = True
 operations["pauli"]["picture"] = "push_pauli.png"
@@ -337,21 +322,8 @@ action_groups = {
 }
 
 
-def get_action_groups():
-    """Get action groups with unfuse rule added dynamically."""
-    # Initialize unfusion rule when first requested
-    _init_unfusion_rule()
-    
-    # Add unfuse to basic rules if not already there
-    if "unfuse" in operations and "unfuse" not in action_groups["Basic rules"]:
-        action_groups["Basic rules"]["unfuse"] = operations["unfuse"]
-    
-    return action_groups
-
-
 def refresh_custom_rules() -> None:
-    # Get the current action groups and update custom rules
-    current_groups = get_action_groups()
-    current_groups["Custom rules"] = {rule["text"]: rule for rule in read_custom_rules()}
+    action_groups["Custom rules"] = {rule["text"]: rule for rule in read_custom_rules()}
 
-# Note: refresh_custom_rules() is called later when the system is ready, not at module import time
+
+refresh_custom_rules()

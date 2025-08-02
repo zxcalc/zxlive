@@ -17,7 +17,7 @@ from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
-from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES, refresh_custom_rules, get_action_groups
+from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES, refresh_custom_rules, action_groups
 from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -364,7 +364,7 @@ class RewriteActionTreeView(QTreeView):
 
     def refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
-        model = RewriteActionTreeModel.from_dict(get_action_groups(), self.proof_panel)
+        model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
         self.setModel(model)
         self.expand(model.index(0,0))
         self.clicked.connect(model.do_rewrite)

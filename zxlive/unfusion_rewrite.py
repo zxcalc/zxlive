@@ -4,7 +4,7 @@ import copy
 from typing import TYPE_CHECKING
 
 import pyzx
-from pyzx.utils import EdgeType, VertexType
+from pyzx.utils import VertexType
 
 from .common import VT, ET, GraphT
 from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
@@ -17,16 +17,9 @@ if TYPE_CHECKING:
 def match_unfuse_single_vertex(graph: GraphT, matches) -> list[VT]:
     """Matcher for unfusion - matches single selected vertices that can be unfused."""
     vertices = [v for v in graph.vertices() if matches(v)]
-    valid_vertices = []
-
-    for v in vertices:
-        # Only allow unfusion for vertices that are not boundary vertices
-        # and have at least 2 incident edges
-        if (graph.type(v) != VertexType.BOUNDARY and
-            len(list(graph.incident_edges(v))) >= 2):
-            valid_vertices.append(v)
-
-    return valid_vertices
+    if len(vertices) == 1 and (graph.type(vertices[0]) not in (VertexType.BOUNDARY, VertexType.DUMMY)):
+        return vertices
+    return []
 
 
 def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[VT, ET]:
@@ -77,7 +70,7 @@ class UnfusionRewriteAction:
         graph = self.proof_panel.graph_scene.g
         original_phase = graph.phase(vertex) if graph.type(vertex) in (VertexType.Z, VertexType.X) else 0
 
-        self.dialog = UnfusionDialog(original_phase, self.proof_panel)
+        self.dialog = UnfusionDialog(original_phase, self.proof_panel.graph_scene.g, self.proof_panel)
         self.dialog.confirmed.connect(self._on_confirmed)
         self.dialog.cancelled.connect(self._on_cancelled)
         self.dialog.show()

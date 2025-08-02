@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING, Dict, Set
-from fractions import Fraction
 
-from PySide6.QtCore import Qt, Signal, QRect
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QSpinBox, QPushButton, QFrame,
                                QWidget)
 from PySide6.QtGui import QKeyEvent, QPen, QColor
+from pyzx.graph.jsonparser import string_to_phase
 
-from .common import VT, ET
-from .editor_base_panel import string_to_complex
+from .common import VT, ET, GraphT
+
 
 if TYPE_CHECKING:
     from .graphscene import GraphScene
@@ -21,8 +21,9 @@ class UnfusionDialog(QDialog):
     confirmed = Signal(int, complex, complex)  # num_edges, phase1, phase2
     cancelled = Signal()
 
-    def __init__(self, original_phase: complex, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, original_phase: complex, graph: Optional[GraphT] = None, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
+        self.graph = graph
         self.original_phase = original_phase
         self.setWindowTitle("Unfuse Node Configuration")
         self.setModal(False)  # Allow interaction with the graph behind the dialog
@@ -42,8 +43,13 @@ class UnfusionDialog(QDialog):
         # Instructions
         instructions = QLabel("Double-click edges to assign them to Node 1 (orange) or Node 2 (grey)")
         instructions.setWordWrap(True)
-        instructions.setStyleSheet("color: blue; font-weight: bold; padding: 5px;")
+        instructions.setStyleSheet("font-weight: bold; padding: 5px;")
         layout.addWidget(instructions)
+
+        # Separator
+        separator = QFrame()
+        separator.setFrameStyle(QFrame.Shape.HLine | QFrame.Shadow.Sunken)
+        layout.addWidget(separator)
 
         # Edges between new nodes
         edges_layout = QHBoxLayout()
@@ -104,7 +110,7 @@ class UnfusionDialog(QDialog):
             return
         self._updating_phases = True
         try:
-            phase1 = string_to_complex(self.phase1_edit.text())
+            phase1 = string_to_phase(self.phase1_edit.text(), self.graph)
             phase2 = self.original_phase - phase1
             self.phase2_edit.setText(str(phase2))
         except (ValueError, TypeError):
@@ -118,7 +124,7 @@ class UnfusionDialog(QDialog):
             return
         self._updating_phases = True
         try:
-            phase2 = string_to_complex(self.phase2_edit.text())
+            phase2 = string_to_phase(self.phase2_edit.text(), self.graph)
             phase1 = self.original_phase - phase2
             self.phase1_edit.setText(str(phase1))
         except (ValueError, TypeError):
@@ -130,8 +136,8 @@ class UnfusionDialog(QDialog):
     def _confirm(self) -> None:
         try:
             num_edges = self.edges_spinbox.value()
-            phase1 = string_to_complex(self.phase1_edit.text())
-            phase2 = string_to_complex(self.phase2_edit.text())
+            phase1 = string_to_phase(self.phase1_edit.text(), self.graph)
+            phase2 = string_to_phase(self.phase2_edit.text(), self.graph)
             self.confirmed.emit(num_edges, phase1, phase2)
             self.accept()
         except (ValueError, TypeError) as e:
