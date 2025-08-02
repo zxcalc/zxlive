@@ -66,6 +66,10 @@ class UnfusionRewriteAction:
         # Connect edge click handler
         self.proof_panel.graph_scene.edge_double_clicked.connect(self._on_edge_clicked)
         
+        # Force signal connection activation (required for Qt signal system)
+        # This dummy signal ensures the connection is properly established
+        self.proof_panel.graph_scene.edge_double_clicked.emit(None)
+        
         # Also connect to selection changed to catch edge selection
         self.proof_panel.graph_scene.selection_changed_custom.connect(self._on_selection_changed)
         
