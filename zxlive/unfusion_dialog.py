@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Dict, Set
+from typing import Optional, TYPE_CHECKING, Dict, Set, Union
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QSpinBox, QPushButton, QFrame,
                                QWidget)
 from PySide6.QtGui import QKeyEvent, QPen, QColor
+from fractions import Fraction
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.symbolic import Poly
 
 from .common import VT, ET, GraphT
 
@@ -18,10 +20,10 @@ if TYPE_CHECKING:
 class UnfusionDialog(QDialog):
     """Dialog for configuring the unfusion operation."""
 
-    confirmed = Signal(int, complex, complex)  # num_edges, phase1, phase2
+    confirmed = Signal(int, object, object)  # num_edges, phase1, phase2
     cancelled = Signal()
 
-    def __init__(self, original_phase: complex, graph: Optional[GraphT] = None, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, original_phase: Union[Fraction, Poly, complex], graph: GraphT, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.graph = graph
         self.original_phase = original_phase
@@ -73,7 +75,7 @@ class UnfusionDialog(QDialog):
         phase1_layout.addWidget(QLabel("Phase for Node 1:"))
         self.phase1_edit = QLineEdit()
         self.phase1_edit.setText(str(self.original_phase))
-        self.phase1_edit.textChanged.connect(self._on_phase1_changed)
+        self.phase1_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase1_edit, self.phase2_edit))
         phase1_layout.addWidget(self.phase1_edit)
         layout.addLayout(phase1_layout)
 
@@ -82,7 +84,7 @@ class UnfusionDialog(QDialog):
         phase2_layout.addWidget(QLabel("Phase for Node 2:"))
         self.phase2_edit = QLineEdit()
         self.phase2_edit.setText("0")
-        self.phase2_edit.textChanged.connect(self._on_phase2_changed)
+        self.phase2_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase2_edit, self.phase1_edit))
         phase2_layout.addWidget(self.phase2_edit)
         layout.addLayout(phase2_layout)
 
@@ -105,30 +107,17 @@ class UnfusionDialog(QDialog):
         # Make confirm button default
         self.confirm_button.setDefault(True)
 
-    def _on_phase1_changed(self) -> None:
+    def _on_phase_changed(self, source_edit: QLineEdit, target_edit: QLineEdit) -> None:
+        """Update the target phase field when the source phase field changes."""
         if self._updating_phases:
             return
         self._updating_phases = True
         try:
-            phase1 = string_to_phase(self.phase1_edit.text(), self.graph)
-            phase2 = self.original_phase - phase1
-            self.phase2_edit.setText(str(phase2))
+            source_phase = string_to_phase(source_edit.text(), self.graph) #TODO: deal with the complex case
+            target_phase = self.original_phase - source_phase
+            target_edit.setText(str(target_phase))
         except (ValueError, TypeError):
-            # Invalid input, don't update phase2
-            pass
-        finally:
-            self._updating_phases = False
-
-    def _on_phase2_changed(self) -> None:
-        if self._updating_phases:
-            return
-        self._updating_phases = True
-        try:
-            phase2 = string_to_phase(self.phase2_edit.text(), self.graph)
-            phase1 = self.original_phase - phase2
-            self.phase1_edit.setText(str(phase1))
-        except (ValueError, TypeError):
-            # Invalid input, don't update phase1
+            # Invalid input, don't update target phase
             pass
         finally:
             self._updating_phases = False
