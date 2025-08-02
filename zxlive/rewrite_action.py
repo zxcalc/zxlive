@@ -72,6 +72,15 @@ class RewriteAction:
         if not self.enabled:
             return
 
+        # Special handling for unfusion rule
+        if self.name == "unfuse":
+            from .unfusion_rewrite import UnfusionRewriteAction
+            verts, _ = panel.parse_selection()
+            if len(verts) == 1:
+                unfusion_action = UnfusionRewriteAction(panel)
+                unfusion_action.start_unfusion(verts[0])
+            return
+
         g = copy.deepcopy(panel.graph_scene.g)
         verts, edges = panel.parse_selection()
 
