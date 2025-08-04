@@ -59,9 +59,9 @@ class UnfusionRewriteAction:
         # Connect edge click handler
         self.proof_panel.graph_scene.edge_double_clicked.connect(self._on_edge_clicked)
 
-        # Force signal connection activation (required for Qt signal system)
+        # Force signal connection activation (required for some reason)
         # This dummy signal ensures the connection is properly established
-        self.proof_panel.graph_scene.edge_double_clicked.emit(None)
+        self.proof_panel.graph_scene.edge_double_clicked.emit(None) # TODO: Fix this
 
         # Also connect to selection changed to catch edge selection
         self.proof_panel.graph_scene.selection_changed_custom.connect(self._on_selection_changed)
@@ -89,7 +89,7 @@ class UnfusionRewriteAction:
                 s, t = graph.edge_st(edge)
                 if s == self.unfusion_manager.target_vertex or t == self.unfusion_manager.target_vertex:
                     self.unfusion_manager.toggle_edge_selection(edge)
-            except Exception as e:
+            except Exception:
                 pass  # Ignore errors for robustness
 
     def _on_selection_changed(self) -> None:
@@ -206,10 +206,10 @@ class UnfusionRewriteAction:
         # Disconnect edge click handlers
         try:
             self.proof_panel.graph_scene.edge_double_clicked.disconnect(self._on_edge_clicked)
-        except:
+        except RuntimeError:
             pass  # Connection might not exist
 
         try:
             self.proof_panel.graph_scene.selection_changed_custom.disconnect(self._on_selection_changed)
-        except:
+        except RuntimeError:
             pass  # Connection might not exist

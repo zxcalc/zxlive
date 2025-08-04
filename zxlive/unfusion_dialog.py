@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Dict, Set, Union
+from typing import Optional, TYPE_CHECKING, Set, Union
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
@@ -29,14 +29,10 @@ class UnfusionDialog(QDialog):
         self.original_phase = original_phase
         self.setWindowTitle("Unfuse Node Configuration")
         self.setModal(False)  # Allow interaction with the graph behind the dialog
-        self.setFixedSize(350, 250)  # Slightly larger to accommodate instructions
-
+        self.setFixedSize(350, 250)
         # Keep dialog on top but allow interaction with parent
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-
-        # Store original values for validation
         self._updating_phases = False
-
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -129,7 +125,7 @@ class UnfusionDialog(QDialog):
             phase2 = string_to_phase(self.phase2_edit.text(), self.graph)
             self.confirmed.emit(num_edges, phase1, phase2)
             self.accept()
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError):
             # Could show error message here
             pass
 
@@ -151,19 +147,15 @@ class UnfusionModeManager:
         self.graph_scene = graph_scene
         self.target_vertex = target_vertex
         self.selected_edges: Set[ET] = set()
-        self.original_edge_colors: Dict[ET, str] = {}
         self.active = False
 
     def enter_mode(self) -> None:
         """Enter the Direct Edge Selection Mode."""
         self.active = True
-
-        # Store original edge colors and set them to grey (unassigned)
+        # Set incident edges to grey (unassigned)
         for edge in self.graph_scene.g.incident_edges(self.target_vertex):
             if edge in self.graph_scene.edge_map:
                 for eitem in self.graph_scene.edge_map[edge].values():
-                    # Store original pen
-                    self.original_edge_colors[edge] = eitem.pen().color().name()
                     # Set to grey (unassigned)
                     pen = QPen(eitem.pen())
                     pen.setColor(QColor("#808080"))
@@ -173,23 +165,18 @@ class UnfusionModeManager:
         """Exit the Direct Edge Selection Mode and restore original colors."""
         if not self.active:
             return
-
         self.active = False
-
         # Restore original edge colors by calling refresh on each edge item
         for edge in self.graph_scene.g.incident_edges(self.target_vertex):
             if edge in self.graph_scene.edge_map:
                 for eitem in self.graph_scene.edge_map[edge].values():
                     eitem.refresh()  # This will restore the default colors
-
         self.selected_edges.clear()
-        self.original_edge_colors.clear()
 
     def toggle_edge_selection(self, edge: ET) -> None:
         """Toggle the selection state of an edge."""
         if not self.active or edge not in self.graph_scene.edge_map:
             return
-
         if edge in self.selected_edges:
             # Deselect - change to grey (unassigned)
             self.selected_edges.remove(edge)
