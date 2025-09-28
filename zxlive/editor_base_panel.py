@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
                                QListWidgetItem, QScrollArea, QSizePolicy,
                                QSpacerItem, QSplitter, QToolButton, QWidget)
-from pyzx import EdgeType, VertexType
+from pyzx import VertexType
+from .common import EdgeType
 from pyzx.utils import get_w_partner, vertex_is_w
 from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
@@ -28,6 +29,9 @@ from .graphscene import EditGraphScene
 from .settings import display_setting
 
 from . import animations
+
+# Color constants
+FAULT_EDGE_RED = "#8B0000"
 
 
 class ShapeType(Enum):
@@ -57,6 +61,7 @@ def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
     return {
         EdgeType.SIMPLE: {"text": "Simple", "icon": (ShapeType.LINE, QColor(BLACK))},
         EdgeType.HADAMARD: {"text": "Hadamard", "icon": (ShapeType.DASHED_LINE, QColor(HAD_EDGE_BLUE))},
+        EdgeType.FAULT_EDGE: {"text": "Fault Edge", "icon": (ShapeType.LINE, QColor(FAULT_EDGE_RED))},
     }
 
 
@@ -159,7 +164,7 @@ class EditorBasePanel(BasePanel):
             for it in edges:
                 e = it.e
                 g = self.graph_scene.g
-                if self.graph_scene.g.edge_type(e) not in (EdgeType.SIMPLE, EdgeType.HADAMARD):
+                if self.graph_scene.g.edge_type(e) not in (EdgeType.SIMPLE, EdgeType.HADAMARD, EdgeType.FAULT_EDGE):
                     continue
                 cmd = AddNodeSnapped(self.graph_view, x, y, self._curr_vty, e)
                 self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
@@ -434,7 +439,7 @@ def create_icon(shape: ShapeType, color: QColor) -> QIcon:
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setPen(QPen(QColor(BLACK), 6))
+    painter.setPen(QPen(QColor(color), 6))
     painter.setBrush(color)
     if shape == ShapeType.CIRCLE:
         painter.drawEllipse(4, 4, 56, 56)

@@ -5,7 +5,8 @@ from typing import Iterator
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
-from pyzx import EdgeType, VertexType
+from pyzx import VertexType
+from .common import EdgeType
 from pyzx.symbolic import Poly
 
 

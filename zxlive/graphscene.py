@@ -21,7 +21,7 @@ from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
 
-from pyzx.utils import EdgeType
+from .common import EdgeType
 from pyzx.graph.diff import GraphDiff
 
 
@@ -134,7 +134,8 @@ class GraphScene(QGraphicsScene):
             for anim_e in e_item.active_animations.copy():
                 anim_e.stop()
             e_item.s_item.adj_items.remove(e_item)
-            e_item.t_item.adj_items.remove(e_item)
+            if e_item.s_item != e_item.t_item:
+                e_item.t_item.adj_items.remove(e_item)
             self.removeItem(e_item)
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)

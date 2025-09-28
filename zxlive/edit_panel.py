@@ -6,7 +6,8 @@ from typing import Iterator
 from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
-from pyzx import EdgeType, VertexType, sqasm
+from pyzx import VertexType, sqasm
+from .common import EdgeType
 from pyzx.circuit.qasmparser import QASMParser
 from pyzx.symbolic import Poly
 

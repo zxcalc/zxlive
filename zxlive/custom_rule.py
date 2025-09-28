@@ -9,7 +9,8 @@ import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
 from networkx.classes.reportviews import NodeView
-from pyzx.utils import EdgeType, VertexType, get_w_io
+from pyzx.utils import VertexType, get_w_io
+from .common import EdgeType
 from shapely import Polygon
 
 from pyzx.symbolic import Poly, Var

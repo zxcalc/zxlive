@@ -23,7 +23,8 @@ from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphics
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
 from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
 
-from pyzx.utils import EdgeType, VertexType
+from pyzx.utils import VertexType
+from .common import EdgeType
 
 from .common import SCALE, ET, GraphT
 from .vitem import VItem, EITEM_Z
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from .graphscene import GraphScene
 
 HAD_EDGE_BLUE = "#0077ff"
+FAULT_EDGE_RED = "#8B0000"
 
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
@@ -91,6 +93,8 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
+        elif self.g.edge_type(self.e) == EdgeType.FAULT_EDGE:
+            pen.setColor(QColor(FAULT_EDGE_RED))
         else:
             from .settings import display_setting
             if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
@@ -208,6 +212,8 @@ class EDragItem(QGraphicsPathItem):
         if self.ety == EdgeType.HADAMARD:
             pen.setColor(QColor("#0077ff"))
             pen.setDashPattern([4.0, 2.0])
+        elif self.ety == EdgeType.FAULT_EDGE:
+            pen.setColor(QColor(FAULT_EDGE_RED))
         else:
             pen.setColor(QColor("#000000"))
         self.setPen(QPen(pen))
