@@ -349,10 +349,18 @@ class VariableViewer(QScrollArea):
             self.updateGeometry()
 
     def _text_changed(self, name: str, text: str) -> None:
+        from .rule_panel import RulePanel
         if text == "Parametric":
-            self.parent_panel.graph.var_registry.set_type(name, False)
+            new_type = False
         elif text == "Boolean":
-            self.parent_panel.graph.var_registry.set_type(name, True)
+            new_type = True
+        else:
+            raise ValueError("Unknown variable type")
+        if isinstance(self.parent_panel, RulePanel):
+            self.parent_panel.graph_scene_left.g.var_registry.set_type(name, new_type)
+            self.parent_panel.graph_scene_right.g.var_registry.set_type(name, new_type)
+        else:
+            self.parent_panel.graph_scene.g.var_registry.set_type(name, new_type)
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
