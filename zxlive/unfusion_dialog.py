@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                QLineEdit, QSpinBox, QPushButton, QFrame,
                                QWidget)
-from PySide6.QtGui import QKeyEvent, QPen, QColor
+from PySide6.QtGui import QKeyEvent, QColor
 from fractions import Fraction
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.symbolic import Poly
@@ -31,7 +31,7 @@ class UnfusionDialog(QDialog):
         self.original_phase = original_phase
         self.setWindowTitle("Unfuse Node Configuration")
         self.setModal(False)  # Allow interaction with the graph behind the dialog
-        self.setFixedSize(350, 250)
+        self.setFixedSize(250, 250)
         # Keep dialog on top but allow interaction with parent
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self._updating_phases = False

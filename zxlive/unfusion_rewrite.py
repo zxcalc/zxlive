@@ -4,7 +4,7 @@ import copy
 from typing import TYPE_CHECKING
 
 import pyzx
-from pyzx.utils import VertexType
+from pyzx.utils import VertexType, FractionLike
 
 from .common import VT, ET, GraphT
 from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
@@ -52,18 +52,9 @@ class UnfusionRewriteAction:
         if not self.can_unfuse(vertex):
             return False
 
-        # Enter Direct Edge Selection Mode
         self.unfusion_manager = UnfusionModeManager(self.proof_panel.graph_scene, vertex)
         self.unfusion_manager.enter_mode()
 
-        # Connect edge click handler
-        self.proof_panel.graph_scene.edge_double_clicked.connect(self._on_selection_changed)
-
-        # Force signal connection activation (required for some reason)
-        # This dummy signal ensures the connection is properly established
-        self.proof_panel.graph_scene.edge_double_clicked.emit(None) # TODO: Fix this
-
-        # Also connect to selection changed to catch edge selection
         self.proof_panel.graph_scene.selection_changed_custom.connect(self._on_selection_changed)
 
         # Show the configuration dialog
@@ -78,7 +69,7 @@ class UnfusionRewriteAction:
         return True
 
     def _on_selection_changed(self) -> None:
-        """Handle selection changes to potentially catch edge selections."""
+        """Handle selection changes to catch edge selections."""
         if self.unfusion_manager and self.unfusion_manager.active:
             # Check if any edges are selected and toggle them
             scene = self.proof_panel.graph_scene
@@ -90,7 +81,7 @@ class UnfusionRewriteAction:
                     if s == self.unfusion_manager.target_vertex or t == self.unfusion_manager.target_vertex:
                         self.unfusion_manager.toggle_edge_selection(item)
 
-    def _on_confirmed(self, num_connecting_edges: int, phase1: complex, phase2: complex) -> None:
+    def _on_confirmed(self, num_connecting_edges: int, phase1: FractionLike, phase2: FractionLike) -> None:
         """Handle confirmation of the unfusion parameters."""
         if not self.unfusion_manager:
             return
@@ -105,7 +96,7 @@ class UnfusionRewriteAction:
 
     def _apply_unfusion(self, original_vertex: VT, node1_edges: set[ET],
                        node2_edges: set[ET], num_connecting_edges: int,
-                       phase1: complex, phase2: complex) -> None:
+                       phase1: FractionLike, phase2: FractionLike) -> None:
         """Apply the actual unfusion transformation."""
         from .commands import AddRewriteStep
         from . import animations as anims
