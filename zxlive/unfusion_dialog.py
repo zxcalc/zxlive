@@ -12,6 +12,7 @@ from pyzx.graph.jsonparser import string_to_phase
 from pyzx.symbolic import Poly
 
 from .common import VT, ET, GraphT
+from .dialogs import show_error_msg
 from .eitem import EItem
 
 
@@ -40,7 +41,7 @@ class UnfusionDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Instructions
-        instructions = QLabel("Double-click edges to assign them to Node 1 (orange) or Node 2 (grey)")
+        instructions = QLabel("Click edges to assign to Node 1 (orange) or Node 2 (grey)")
         instructions.setWordWrap(True)
         instructions.setStyleSheet("font-weight: bold; padding: 5px;")
         layout.addWidget(instructions)
@@ -126,10 +127,8 @@ class UnfusionDialog(QDialog):
             phase2 = string_to_phase(self.phase2_edit.text(), self.graph)
             self.confirmed.emit(num_edges, phase1, phase2)
             self.accept()
-        except (ValueError, TypeError):
-            # Could show error message here
-            pass
-
+        except (ValueError, TypeError) as e:
+            show_error_msg("Invalid phase input", str(e), parent=self)
     def _cancel(self) -> None:
         self.cancelled.emit()
         self.reject()
