@@ -66,10 +66,6 @@ class GraphEditPanel(EditorBasePanel):
             show_error_msg("Graph is not well-formed", parent=self)
             return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
-        for vert in new_g.vertices():
-            phase = new_g.phase(vert)
-            if isinstance(phase, Poly):
-                phase.freeze()
         self.start_derivation_signal.emit(new_g)
 
     def _input_circuit(self) -> None:

@@ -253,6 +253,8 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: n
         var_value = (right_phase[match[v]] - const) / coeff
         if var in params and params[var] != var_value:
             raise ValueError("Symbolic parameters do not match")
+        if var.is_bool and var_value not in (0, 1):
+            raise ValueError("Boolean variable assigned non-boolean value")
         params[var] = var_value
 
     for v in left.nodes():
@@ -340,7 +342,7 @@ def check_rule(rule: CustomRule) -> None:
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
         len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
         raise ValueError("The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
-    if not rule.lhs_graph.variable_types and not rule.rhs_graph.variable_types:
+    if len(rule.lhs_graph.var_registry.vars()) == 0 and len(rule.rhs_graph.var_registry.vars()) == 0:
         left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
         if not np.allclose(left_matrix, right_matrix):
             if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
@@ -348,8 +350,11 @@ def check_rule(rule: CustomRule) -> None:
             else:
                 raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
     else:
-        if not (rule.rhs_graph.variable_types.items() <= rule.lhs_graph.variable_types.items()):
-            raise ValueError("The right-hand side has more free variables than the left-hand side.")
+        lhs_vars = set(rule.lhs_graph.var_registry.vars())
+        rhs_vars = set(rule.rhs_graph.var_registry.vars())
+        if not rhs_vars.issubset(lhs_vars):
+            missing = rhs_vars - lhs_vars
+            raise ValueError(f"The right-hand side uses variables not present on the left-hand side: {', '.join(sorted(str(v) for v in missing))}")
         for vertex in rule.lhs_graph.vertices():
             phase = rule.lhs_graph.phase(vertex)
             if isinstance(phase, Poly):

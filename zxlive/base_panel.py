@@ -117,6 +117,15 @@ class BasePanel(QWidget):
         assert isinstance(copied_graph, GraphT)  # type: ignore
         return copied_graph
 
+    def delete_selection(self) -> None:
+        pass
+
+    def paste_selection(self, graph: GraphT) -> None:
+        pass
+
+    def paste_graph(self, graph: GraphT) -> None:
+        pass
+
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
 

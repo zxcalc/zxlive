@@ -21,7 +21,7 @@ from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, 
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data
-from .dialogs import show_error_msg
+from .dialogs import show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
 from .vitem import VItem, BLACK, VItemAnimation
 from .graphscene import EditGraphScene
@@ -50,6 +50,7 @@ def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
         VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])},
         VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])},
         VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])},
+        VertexType.DUMMY: {"text": "Dummy", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["dummy"])},
     }
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
@@ -127,7 +128,6 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
-        if graph is None: return
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
         cmd = UpdateGraph(self.graph_view,new_g)
@@ -191,6 +191,10 @@ class EditorBasePanel(BasePanel):
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
             graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
             return None
+        if (graph.type(u) == VertexType.DUMMY and graph.type(v) != VertexType.DUMMY) or \
+              (graph.type(u) != VertexType.DUMMY and graph.type(v) == VertexType.DUMMY):
+            return None
+
         # We will try to connect all the vertices together in order
         # First we filter out the vertices that are not compatible with the edge.
         verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT] # we will be adding two edges, which is not compatible with W_INPUT
@@ -226,10 +230,14 @@ class EditorBasePanel(BasePanel):
 
     def vert_double_clicked(self, v: VT) -> None:
         graph = self.graph
-        old_variables = graph.variable_types.copy()
+        old_variables = graph.var_registry.vars()
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
-
+        if graph.type(v) == VertexType.DUMMY:
+            new_g = update_dummy_vertex_text(self, self.graph_scene.g, v)
+            if new_g is not None:
+                self.undo_stack.push(SetGraph(self.graph_view, new_g))
+            return
         phase_is_complex = (graph.type(v) == VertexType.Z_BOX)
         if phase_is_complex:
             prompt = "Enter desired phase value (complex value):"
@@ -249,12 +257,10 @@ class EditorBasePanel(BasePanel):
         except ValueError:
             show_error_msg("Invalid Input", error_msg, parent=self)
             return None
-        cmd = ChangePhase(self.graph_view, v, new_phase)
-        self.undo_stack.push(cmd)
+        self.undo_stack.push(ChangePhase(self.graph_view, v, new_phase))
         # For some reason it is important we first push to the stack before we do the following.
-        if len(graph.variable_types) != len(old_variables):
-            new_vars = graph.variable_types.keys() - old_variables.keys()
-            #self.graph.variable_types.update(graph.variable_types)
+        if len(graph.var_registry.vars()) != len(old_variables):
+            new_vars = graph.var_registry.vars() - old_variables
             for nv in new_vars:
                 self.variable_viewer.add_item(nv)
 
@@ -303,7 +309,7 @@ class VariableViewer(QScrollArea):
 
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
 
-        for name in self.parent_panel.graph.variable_types.keys():
+        for name in self.parent_panel.graph.var_registry.vars():
             self.add_item(name)
 
         self.setWidget(self._widget)
@@ -324,10 +330,8 @@ class VariableViewer(QScrollArea):
     def add_item(self, name: str) -> None:
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
-        if self.parent_panel.graph.variable_types[name]:
-            combobox.setCurrentIndex(1)
-        else:
-            combobox.setCurrentIndex(0)
+        is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
+        combobox.setCurrentIndex(1 if is_bool else 0)
         combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
         item = self._layout.itemAtPosition(2 + self._items, 2)
         assert item is not None # For mypy
@@ -345,10 +349,18 @@ class VariableViewer(QScrollArea):
             self.updateGeometry()
 
     def _text_changed(self, name: str, text: str) -> None:
+        from .rule_panel import RulePanel
         if text == "Parametric":
-            self.parent_panel.graph.variable_types[name] = False
+            new_type = False
         elif text == "Boolean":
-            self.parent_panel.graph.variable_types[name] = True
+            new_type = True
+        else:
+            raise ValueError("Unknown variable type")
+        if isinstance(self.parent_panel, RulePanel):
+            self.parent_panel.graph_scene_left.g.var_registry.set_type(name, new_type)
+            self.parent_panel.graph_scene_right.g.var_registry.set_type(name, new_type)
+        else:
+            self.parent_panel.graph_scene.g.var_registry.set_type(name, new_type)
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
