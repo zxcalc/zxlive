@@ -26,7 +26,10 @@ class ColorScheme(TypedDict):
     w_output: QColor
     w_output_pressed: QColor
     outline: QColor
+    dummy: QColor
+    dummy_pressed: QColor
     edge: QColor
+    dummy_edge: QColor
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
@@ -58,6 +61,7 @@ tikz_export_defaults: dict[str, str] = {
     "tikz/Hadamard-export": pyzx.settings.tikz_classes['H'],
     "tikz/w-output-export": pyzx.settings.tikz_classes['W'],
     "tikz/w-input-export": pyzx.settings.tikz_classes['W input'],
+    "tikz/dummy-export": pyzx.settings.tikz_classes['dummy'],
     "tikz/edge-export": pyzx.settings.tikz_classes['edge'],
     "tikz/edge-H-export": pyzx.settings.tikz_classes['H-edge'],
     "tikz/edge-W-export": pyzx.settings.tikz_classes['W-io-edge'],
@@ -71,6 +75,7 @@ tikz_import_defaults: dict[str, str] = {
     "tikz/w-input-import": ", ".join(pyzx.tikz.synonyms_w_input),
     "tikz/w-output-import": ", ".join(pyzx.tikz.synonyms_w_output),
     "tikz/z-box-import": ", ".join(pyzx.tikz.synonyms_z_box),
+    "tikz/dummy-import": ", ".join(pyzx.tikz.synonyms_dummy),
     "tikz/edge-import": ", ".join(pyzx.tikz.synonyms_edge),
     "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
@@ -114,7 +119,10 @@ modern_red_green: ColorScheme = {
     "w_output": QColor("#000000"),
     "w_output_pressed": QColor("#444444"),
     "outline": QColor("#000000"),
+    "dummy": QColor("#B6B6B6"),
+    "dummy_pressed": QColor("#808080"),
     "edge": QColor("#000000"),
+    "dummy_edge": QColor("#808080"),
 }
 
 classic_red_green: ColorScheme = {
@@ -167,6 +175,7 @@ def load_tikz_classes() -> dict[str, str]:
         'H': str(settings.value('tikz/Hadamard-export', pyzx.settings.tikz_classes['H'])),
         'W': str(settings.value('tikz/W-output-export', pyzx.settings.tikz_classes['W'])),
         'W input': str(settings.value('tikz/W-input-export', pyzx.settings.tikz_classes['W input'])),
+        'dummy': str(settings.value('tikz/dummy-export', pyzx.settings.tikz_classes['dummy'])),
         'edge': str(settings.value('tikz/edge-export', pyzx.settings.tikz_classes['edge'])),
         'H-edge': str(settings.value('tikz/edge-H-export', pyzx.settings.tikz_classes['H-edge'])),
         'W-io-edge': str(settings.value('tikz/edge-W-export', pyzx.settings.tikz_classes['W-io-edge'])),
@@ -188,6 +197,7 @@ def refresh_pyzx_tikz_settings() -> None:
     pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/W-input-import', pyzx.tikz.synonyms_w_input)
     pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/W-output-import', pyzx.tikz.synonyms_w_output)
     pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/Z-box-import', pyzx.tikz.synonyms_z_box)
+    pyzx.tikz.synonyms_dummy = _get_synonyms('tikz/dummy-import', pyzx.tikz.synonyms_dummy)
     pyzx.tikz.synonyms_edge = _get_synonyms('tikz/edge-import', pyzx.tikz.synonyms_edge)
     pyzx.tikz.synonyms_hedge = _get_synonyms('tikz/edge-H-import', pyzx.tikz.synonyms_hedge)
     pyzx.tikz.synonyms_wedge = _get_synonyms('tikz/edge-W-import', pyzx.tikz.synonyms_wedge)
