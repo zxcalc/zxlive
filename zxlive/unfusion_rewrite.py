@@ -22,7 +22,7 @@ def match_unfuse_single_vertex(graph: GraphT, matches) -> list[VT]:
     return []
 
 
-def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[VT, ET]:
+def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rewrite_rules.rules.RewriteOutputType[VT, ET]:
     """Apply the unfusion rule to a single vertex."""
     if len(vertices) != 1:
         return ({}, [], [], True)
@@ -57,7 +57,7 @@ class UnfusionRewriteAction:
         self.unfusion_manager.enter_mode()
 
         # Connect edge click handler
-        self.proof_panel.graph_scene.edge_double_clicked.connect(self._on_edge_clicked)
+        self.proof_panel.graph_scene.edge_double_clicked.connect(self._on_selection_changed)
 
         # Force signal connection activation (required for some reason)
         # This dummy signal ensures the connection is properly established
@@ -77,21 +77,6 @@ class UnfusionRewriteAction:
 
         return True
 
-    def _on_edge_clicked(self, edge: ET) -> None:
-        """Handle edge click during selection mode."""
-        if edge is None:
-            return
-
-        if self.unfusion_manager and self.unfusion_manager.active:
-            # Check if this edge is connected to the target vertex
-            graph = self.proof_panel.graph_scene.g
-            try:
-                s, t = graph.edge_st(edge)
-                if s == self.unfusion_manager.target_vertex or t == self.unfusion_manager.target_vertex:
-                    self.unfusion_manager.toggle_edge_selection(edge)
-            except Exception:
-                pass  # Ignore errors for robustness
-
     def _on_selection_changed(self) -> None:
         """Handle selection changes to potentially catch edge selections."""
         if self.unfusion_manager and self.unfusion_manager.active:
@@ -109,16 +94,9 @@ class UnfusionRewriteAction:
         """Handle confirmation of the unfusion parameters."""
         if not self.unfusion_manager:
             return
-
-        # Get edge assignments
         node1_edges, node2_edges = self.unfusion_manager.get_edge_assignments()
-        target_vertex = self.unfusion_manager.target_vertex
-
-        # Apply the unfusion
-        self._apply_unfusion(target_vertex, node1_edges, node2_edges,
-                           num_connecting_edges, phase1, phase2)
-
-        # Clean up
+        self._apply_unfusion(self.unfusion_manager.target_vertex, node1_edges, node2_edges,
+                             num_connecting_edges, phase1, phase2)
         self._cleanup()
 
     def _on_cancelled(self) -> None:
@@ -177,20 +155,17 @@ class UnfusionRewriteAction:
                 new_g.remove_edge(edge)
 
         # Add connecting edges between the two new vertices
+        if num_connecting_edges < 1:
+            raise ValueError("Number of connecting edges must be at least 1.")
         for _ in range(num_connecting_edges):
             new_g.add_edge((node1, node2))
 
         # Remove the original vertex
         new_g.remove_vertex(original_vertex)
 
-        # Create the rewrite step
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
                            self.proof_panel.step_view, "unfuse")
-
-        # Create animation
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
-
-        # Apply the change
         self.proof_panel.undo_stack.push(cmd, anim_after=anim)
 
     def _cleanup(self) -> None:
@@ -202,12 +177,6 @@ class UnfusionRewriteAction:
         if self.dialog:
             self.dialog.close()
             self.dialog = None
-
-        # Disconnect edge click handlers
-        try:
-            self.proof_panel.graph_scene.edge_double_clicked.disconnect(self._on_edge_clicked)
-        except RuntimeError:
-            pass  # Connection might not exist
 
         try:
             self.proof_panel.graph_scene.selection_changed_custom.disconnect(self._on_selection_changed)

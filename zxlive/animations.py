@@ -275,7 +275,7 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     return anim
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
-    """Animation that is played when a spider is unfused using the magic wand."""
+    """Animation that is played when a spider is unfused."""
     return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
                        duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 
