@@ -230,7 +230,7 @@ class EditorBasePanel(BasePanel):
 
     def vert_double_clicked(self, v: VT) -> None:
         graph = self.graph
-        old_variables = graph.variable_types.copy()
+        old_variables = graph.var_registry.vars()
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
         if graph.type(v) == VertexType.DUMMY:
@@ -259,9 +259,8 @@ class EditorBasePanel(BasePanel):
             return None
         self.undo_stack.push(ChangePhase(self.graph_view, v, new_phase))
         # For some reason it is important we first push to the stack before we do the following.
-        if len(graph.variable_types) != len(old_variables):
-            new_vars = graph.variable_types.keys() - old_variables.keys()
-            #self.graph.variable_types.update(graph.variable_types)
+        if len(graph.var_registry.vars()) != len(old_variables):
+            new_vars = graph.var_registry.vars() - old_variables
             for nv in new_vars:
                 self.variable_viewer.add_item(nv)
 
@@ -310,7 +309,7 @@ class VariableViewer(QScrollArea):
 
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
 
-        for name in self.parent_panel.graph.variable_types.keys():
+        for name in self.parent_panel.graph.var_registry.vars():
             self.add_item(name)
 
         self.setWidget(self._widget)
@@ -331,10 +330,8 @@ class VariableViewer(QScrollArea):
     def add_item(self, name: str) -> None:
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
-        if self.parent_panel.graph.variable_types[name]:
-            combobox.setCurrentIndex(1)
-        else:
-            combobox.setCurrentIndex(0)
+        is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
+        combobox.setCurrentIndex(1 if is_bool else 0)
         combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
         item = self._layout.itemAtPosition(2 + self._items, 2)
         assert item is not None # For mypy
@@ -352,10 +349,18 @@ class VariableViewer(QScrollArea):
             self.updateGeometry()
 
     def _text_changed(self, name: str, text: str) -> None:
+        from .rule_panel import RulePanel
         if text == "Parametric":
-            self.parent_panel.graph.variable_types[name] = False
+            new_type = False
         elif text == "Boolean":
-            self.parent_panel.graph.variable_types[name] = True
+            new_type = True
+        else:
+            raise ValueError("Unknown variable type")
+        if isinstance(self.parent_panel, RulePanel):
+            self.parent_panel.graph_scene_left.g.var_registry.set_type(name, new_type)
+            self.parent_panel.graph_scene_right.g.var_registry.set_type(name, new_type)
+        else:
+            self.parent_panel.graph_scene.g.var_registry.set_type(name, new_type)
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
