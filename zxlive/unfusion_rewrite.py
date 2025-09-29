@@ -88,7 +88,7 @@ class UnfusionRewriteAction:
                     graph = scene.g
                     s, t = graph.edge_st(item.e)
                     if s == self.unfusion_manager.target_vertex or t == self.unfusion_manager.target_vertex:
-                        self.unfusion_manager.toggle_edge_selection(item.e)
+                        self.unfusion_manager.toggle_edge_selection(item)
 
     def _on_confirmed(self, num_connecting_edges: int, phase1: complex, phase2: complex) -> None:
         """Handle confirmation of the unfusion parameters."""

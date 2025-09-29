@@ -12,6 +12,7 @@ from pyzx.graph.jsonparser import string_to_phase
 from pyzx.symbolic import Poly
 
 from .common import VT, ET, GraphT
+from .eitem import EItem
 
 
 if TYPE_CHECKING:
@@ -146,7 +147,7 @@ class UnfusionModeManager:
     def __init__(self, graph_scene: GraphScene, target_vertex: VT) -> None:
         self.graph_scene = graph_scene
         self.target_vertex = target_vertex
-        self.selected_edges: Set[ET] = set()
+        self.selected_edges: Set[EItem] = set()
         self.active = False
 
     def enter_mode(self) -> None:
@@ -156,45 +157,40 @@ class UnfusionModeManager:
         for edge in self.graph_scene.g.incident_edges(self.target_vertex):
             if edge in self.graph_scene.edge_map:
                 for eitem in self.graph_scene.edge_map[edge].values():
-                    # Set to grey (unassigned)
-                    pen = QPen(eitem.pen())
-                    pen.setColor(QColor("#808080"))
-                    eitem.setPen(pen)
+                    eitem.color = QColor("#808080")
+                    eitem.refresh()
 
     def exit_mode(self) -> None:
         """Exit the Direct Edge Selection Mode and restore original colors."""
         if not self.active:
             return
         self.active = False
-        # Restore original edge colors by calling refresh on each edge item
-        for edge in self.graph_scene.g.incident_edges(self.target_vertex):
-            if edge in self.graph_scene.edge_map:
-                for eitem in self.graph_scene.edge_map[edge].values():
-                    eitem.refresh()  # This will restore the default colors
+        # Restore original edge colors by calling reset_color on each edge item
+        if self.target_vertex in self.graph_scene.g.vertices():
+            for edge in self.graph_scene.g.incident_edges(self.target_vertex):
+                if edge in self.graph_scene.edge_map:
+                    for eitem in self.graph_scene.edge_map[edge].values():
+                        eitem.reset_color()
+                        eitem.refresh()
         self.selected_edges.clear()
 
-    def toggle_edge_selection(self, edge: ET) -> None:
+    def toggle_edge_selection(self, edge: EItem) -> None:
         """Toggle the selection state of an edge."""
-        if not self.active or edge not in self.graph_scene.edge_map:
+        if not self.active:
             return
         if edge in self.selected_edges:
             # Deselect - change to grey (unassigned)
             self.selected_edges.remove(edge)
-            for eitem in self.graph_scene.edge_map[edge].values():
-                pen = QPen(eitem.pen())
-                pen.setColor(QColor("#808080"))  # Grey for unassigned
-                eitem.setPen(pen)
+            edge.color = QColor("#808080")
         else:
             # Select - change to orange (selected for Node 1)
             self.selected_edges.add(edge)
-            for eitem in self.graph_scene.edge_map[edge].values():
-                pen = QPen(eitem.pen())
-                pen.setColor(QColor("#FFA500"))  # Orange for selected
-                eitem.setPen(pen)
+            edge.color = QColor("#FFA500")
+        edge.refresh()
 
     def get_edge_assignments(self) -> tuple[Set[ET], Set[ET]]:
         """Get the edge assignments for Node 1 and Node 2."""
         all_edges = set(self.graph_scene.g.incident_edges(self.target_vertex))
-        node1_edges = self.selected_edges.copy()
+        node1_edges = set(eitem.e for eitem in self.selected_edges)
         node2_edges = all_edges - node1_edges
         return node1_edges, node2_edges

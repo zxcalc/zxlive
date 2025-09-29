@@ -195,6 +195,7 @@ class GraphScene(QGraphicsScene):
 
         for e in diff.changed_edge_types:
             for i in self.edge_map[e]:
+                self.edge_map[e][i].reset_color()
                 self.edge_map[e][i].refresh()
 
         self.select_vertices(selected_vertices)
@@ -217,6 +218,7 @@ class GraphScene(QGraphicsScene):
             v.refresh()
         for e in self.edge_map.values():
             for ei in e.values():
+                ei.reset_color()
                 ei.refresh()
 
     def add_items(self) -> None:
