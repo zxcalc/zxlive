@@ -330,7 +330,7 @@ class VariableViewer(QScrollArea):
     def add_item(self, name: str) -> None:
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
-        is_bool = self.parent_panel.graph.var_registry.get_type(name, False)
+        is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
         combobox.setCurrentIndex(1 if is_bool else 0)
         combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
         item = self._layout.itemAtPosition(2 + self._items, 2)
