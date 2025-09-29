@@ -253,6 +253,8 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: n
         var_value = (right_phase[match[v]] - const) / coeff
         if var in params and params[var] != var_value:
             raise ValueError("Symbolic parameters do not match")
+        if var.is_bool and var_value not in (0, 1):
+            raise ValueError("Boolean variable assigned non-boolean value")
         params[var] = var_value
 
     for v in left.nodes():
