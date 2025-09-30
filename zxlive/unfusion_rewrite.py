@@ -17,7 +17,11 @@ if TYPE_CHECKING:
 def match_unfuse_single_vertex(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
     """Matcher for unfusion - matches single selected vertices that can be unfused."""
     vertices = [v for v in graph.vertices() if matches(v)]
-    if len(vertices) == 1 and (graph.type(vertices[0]) not in (VertexType.BOUNDARY, VertexType.DUMMY)):
+    if len(vertices) == 1 and (graph.type(vertices[0]) not in (VertexType.BOUNDARY,
+                                                               VertexType.DUMMY,
+                                                               VertexType.H_BOX,
+                                                               VertexType.W_INPUT,
+                                                               VertexType.W_OUTPUT)): #TODO: Support H_BOX and W node unfusions
         return vertices
     return []
 
