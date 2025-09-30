@@ -69,6 +69,8 @@ class EItem(QGraphicsPathItem):
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
         self.thickness: float = 3
+        self.color: QColor = QColor()
+        self.reset_color()
 
         self.refresh()
 
@@ -80,6 +82,18 @@ class EItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
+    def reset_color(self) -> None:
+        """Reset the color of the edge to the default color."""
+        if self.g.edge_type(self.e) == EdgeType.HADAMARD:
+            self.color = QColor(HAD_EDGE_BLUE)
+        else:
+            from .settings import display_setting
+            if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
+               self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
+                self.color = display_setting.effective_colors["dummy_edge"]
+            else:
+                self.color = display_setting.effective_colors["edge"]
+
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
 
@@ -89,15 +103,8 @@ class EItem(QGraphicsPathItem):
         pen = QPen()
         pen.setWidthF(self.thickness)
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
-            pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
-        else:
-            from .settings import display_setting
-            if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
-               self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
-                pen.setColor(display_setting.effective_colors["dummy_edge"])
-            else:
-                pen.setColor(display_setting.effective_colors["edge"])
+        pen.setColor(self.color)
         self.setPen(QPen(pen))
 
         if not self.is_dragging:

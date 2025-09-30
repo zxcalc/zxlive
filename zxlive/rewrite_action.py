@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING, Any, cast, Union, Optional
+from typing import Callable, TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 import pyzx
@@ -71,6 +71,15 @@ class RewriteAction:
 
     def do_rewrite(self, panel: ProofPanel) -> None:
         if not self.enabled:
+            return
+
+        # Special handling for unfusion rule
+        if self.name == "unfuse":
+            from .unfusion_rewrite import UnfusionRewriteAction
+            verts, _ = panel.parse_selection()
+            if len(verts) == 1:
+                self.unfusion_action = UnfusionRewriteAction(panel)
+                self.unfusion_action.start_unfusion(verts[0])
             return
 
         g = copy.deepcopy(panel.graph_scene.g)

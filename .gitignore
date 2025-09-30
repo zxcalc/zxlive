@@ -5,6 +5,7 @@ dist
 .vs
 *.tikz
 .venv
+.venv-mac
 .vscode
 .idea
 *.zxg
