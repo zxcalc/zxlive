@@ -129,6 +129,8 @@ class UnfusionRewriteAction:
             if edge in new_g.edges():
                 s, t = graph.edge_st(edge)
                 other_vertex = s if t == original_vertex else t
+                if other_vertex == original_vertex:
+                    other_vertex = node1  # Self-loop case
                 edge_type = graph.edge_type(edge)
                 new_g.add_edge((other_vertex, node1), edge_type)
                 new_g.remove_edge(edge)
@@ -136,6 +138,8 @@ class UnfusionRewriteAction:
             if edge in new_g.edges():
                 s, t = graph.edge_st(edge)
                 other_vertex = s if t == original_vertex else t
+                if other_vertex == original_vertex:
+                    other_vertex = node2  # Self-loop case
                 edge_type = graph.edge_type(edge)
                 new_g.add_edge((other_vertex, node2), edge_type)
                 new_g.remove_edge(edge)
