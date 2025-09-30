@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING, Union
+from collections import Counter
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
@@ -189,9 +190,15 @@ class UnfusionModeManager:
             edge.color = QColor("#FFA500")
         edge.refresh()
 
-    def get_edge_assignments(self) -> tuple[set[ET], set[ET]]:
+    def get_edge_assignments(self) -> tuple[list[ET], list[ET]]:
         """Get the edge assignments for Node 1 and Node 2."""
-        all_edges = set(self.graph_scene.g.incident_edges(self.target_vertex))
-        node1_edges = set(eitem.e for eitem in self.selected_edges)
-        node2_edges = all_edges - node1_edges
+        all_edges = list(self.graph_scene.g.incident_edges(self.target_vertex))
+        node1_edges = [eitem.e for eitem in self.selected_edges]
+
+        # Use Counter to handle multiplicities properly
+        node2_edges_counter = Counter(all_edges) - Counter(node1_edges)
+        node2_edges = []
+        for edge, count in node2_edges_counter.items():
+            node2_edges.extend([edge] * count)
+
         return node1_edges, node2_edges

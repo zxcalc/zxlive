@@ -91,8 +91,8 @@ class UnfusionRewriteAction:
         """Handle cancellation of the unfusion."""
         self._cleanup()
 
-    def _apply_unfusion(self, original_vertex: VT, node1_edges: set[ET],
-                       node2_edges: set[ET], num_connecting_edges: int,
+    def _apply_unfusion(self, original_vertex: VT, node1_edges: list[ET],
+                       node2_edges: list[ET], num_connecting_edges: int,
                        phase1: FractionLike, phase2: FractionLike) -> None:
         """Apply the actual unfusion transformation."""
         from .commands import AddRewriteStep
