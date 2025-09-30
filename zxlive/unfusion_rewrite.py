@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import pyzx
 from pyzx.utils import VertexType, FractionLike
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 
-def match_unfuse_single_vertex(graph: GraphT, matches) -> list[VT]:
+def match_unfuse_single_vertex(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
     """Matcher for unfusion - matches single selected vertices that can be unfused."""
     vertices = [v for v in graph.vertices() if matches(v)]
     if len(vertices) == 1 and (graph.type(vertices[0]) not in (VertexType.BOUNDARY, VertexType.DUMMY)):

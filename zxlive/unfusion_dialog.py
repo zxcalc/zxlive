@@ -73,7 +73,6 @@ class UnfusionDialog(QDialog):
         phase1_layout.addWidget(QLabel("Phase for Node 1:"))
         self.phase1_edit = QLineEdit()
         self.phase1_edit.setText(str(self.original_phase))
-        self.phase1_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase1_edit, self.phase2_edit))
         phase1_layout.addWidget(self.phase1_edit)
         layout.addLayout(phase1_layout)
 
@@ -82,9 +81,11 @@ class UnfusionDialog(QDialog):
         phase2_layout.addWidget(QLabel("Phase for Node 2:"))
         self.phase2_edit = QLineEdit()
         self.phase2_edit.setText("0")
-        self.phase2_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase2_edit, self.phase1_edit))
         phase2_layout.addWidget(self.phase2_edit)
         layout.addLayout(phase2_layout)
+
+        self.phase1_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase1_edit, self.phase2_edit))
+        self.phase2_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase2_edit, self.phase1_edit))
 
         # Info label
         self.info_label = QLabel("Original phase: " + str(self.original_phase))
