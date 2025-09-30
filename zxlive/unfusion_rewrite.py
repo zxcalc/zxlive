@@ -124,25 +124,20 @@ class UnfusionRewriteAction:
             set_z_box_label(new_g, node1, phase1)
             set_z_box_label(new_g, node2, phase2)
 
-        # Reassign edges
-        for edge in node1_edges:
-            if edge in new_g.edges():
-                s, t = graph.edge_st(edge)
+        def reassign_edges(edges: list[ET], node: VT) -> None:
+            for edge in edges:
+                if edge not in new_g.edges():
+                    continue
+                s, t = new_g.edge_st(edge)
                 other_vertex = s if t == original_vertex else t
                 if other_vertex == original_vertex:
-                    other_vertex = node1  # Self-loop case
-                edge_type = graph.edge_type(edge)
-                new_g.add_edge((other_vertex, node1), edge_type)
+                    other_vertex = node  # Self-loop case
+                edge_type = new_g.edge_type(edge)
+                new_g.add_edge((other_vertex, node), edge_type)
                 new_g.remove_edge(edge)
-        for edge in node2_edges:
-            if edge in new_g.edges():
-                s, t = graph.edge_st(edge)
-                other_vertex = s if t == original_vertex else t
-                if other_vertex == original_vertex:
-                    other_vertex = node2  # Self-loop case
-                edge_type = graph.edge_type(edge)
-                new_g.add_edge((other_vertex, node2), edge_type)
-                new_g.remove_edge(edge)
+
+        reassign_edges(node1_edges, node1)
+        reassign_edges(node2_edges, node2)
 
         # Add connecting edges between the two new vertices
         if num_connecting_edges < 1:
