@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Set, Union
+from typing import Optional, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
@@ -148,7 +148,7 @@ class UnfusionModeManager:
     def __init__(self, graph_scene: GraphScene, target_vertex: VT) -> None:
         self.graph_scene = graph_scene
         self.target_vertex = target_vertex
-        self.selected_edges: Set[EItem] = set()
+        self.selected_edges: set[EItem] = set()
         self.active = False
 
     def enter_mode(self) -> None:
@@ -189,7 +189,7 @@ class UnfusionModeManager:
             edge.color = QColor("#FFA500")
         edge.refresh()
 
-    def get_edge_assignments(self) -> tuple[Set[ET], Set[ET]]:
+    def get_edge_assignments(self) -> tuple[set[ET], set[ET]]:
         """Get the edge assignments for Node 1 and Node 2."""
         all_edges = set(self.graph_scene.g.incident_edges(self.target_vertex))
         node1_edges = set(eitem.e for eitem in self.selected_edges)
