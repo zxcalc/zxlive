@@ -6,7 +6,8 @@ from typing import Callable, Literal, cast, Optional
 from typing_extensions import TypedDict, NotRequired
 
 import pyzx
-from pyzx import simplify, extract_circuit, editor_actions
+from pyzx import simplify, extract_circuit
+from pyzx.rewrite_rules import editor_actions
 from pyzx.graph import VertexType
 
 from .common import ET, GraphT, VT, get_custom_rules_path

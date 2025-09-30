@@ -24,9 +24,6 @@ def match_unfuse_single_vertex(graph: GraphT, matches: Callable[[VT], bool]) -> 
 
 def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rewrite_rules.rules.RewriteOutputType[VT, ET]:
     """Apply the unfusion rule to a single vertex."""
-    if len(vertices) != 1:
-        return ({}, [], [], True)
-
     # This function should not be called directly for the interactive unfusion
     # It's here for compatibility with the rewrite system structure
     # The actual unfusion logic is handled by the UnfusionRewriteAction
@@ -104,7 +101,6 @@ class UnfusionRewriteAction:
         graph = self.proof_panel.graph_scene.g
         new_g = copy.deepcopy(graph)
 
-        # Get original vertex properties
         original_type = graph.type(original_vertex)
         original_row = graph.row(original_vertex)
         original_qubit = graph.qubit(original_vertex)
@@ -136,7 +132,6 @@ class UnfusionRewriteAction:
                 edge_type = graph.edge_type(edge)
                 new_g.add_edge((other_vertex, node1), edge_type)
                 new_g.remove_edge(edge)
-
         for edge in node2_edges:
             if edge in new_g.edges():
                 s, t = graph.edge_st(edge)
@@ -164,11 +159,9 @@ class UnfusionRewriteAction:
         if self.unfusion_manager:
             self.unfusion_manager.exit_mode()
             self.unfusion_manager = None
-
         if self.dialog:
             self.dialog.close()
             self.dialog = None
-
         try:
             self.proof_panel.graph_scene.selection_changed_custom.disconnect(self._on_selection_changed)
         except RuntimeError:

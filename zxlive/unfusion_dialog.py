@@ -130,6 +130,7 @@ class UnfusionDialog(QDialog):
             self.accept()
         except (ValueError, TypeError) as e:
             show_error_msg("Invalid phase input", str(e), parent=self)
+
     def _cancel(self) -> None:
         self.cancelled.emit()
         self.reject()
