@@ -112,7 +112,7 @@ class UnfusionDialog(QDialog):
             return
         self._updating_phases = True
         try:
-            source_phase = string_to_phase(source_edit.text(), self.graph) #TODO: deal with the complex case
+            source_phase = string_to_phase(source_edit.text(), self.graph)
             target_phase = self.original_phase - source_phase
             target_edit.setText(str(target_phase))
         except (ValueError, TypeError):

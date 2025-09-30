@@ -69,7 +69,7 @@ class EItem(QGraphicsPathItem):
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
         self.thickness: float = 3
-        self.color: QColor
+        self.color: QColor = QColor()
         self.reset_color()
 
         self.refresh()
