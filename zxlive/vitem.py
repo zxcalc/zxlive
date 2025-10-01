@@ -266,6 +266,11 @@ class VItem(QGraphicsPathItem):
             # should be refreshed or not
             if not self.is_animated:
                 self.refresh()
+            
+            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                scene = self.scene()
+                if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+                scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
 
