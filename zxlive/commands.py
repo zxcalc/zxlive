@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
+import pyzx.basicrules
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .settings import display_setting
@@ -365,6 +366,49 @@ class ChangeEdgeCurve(BaseCommand):
 
     def redo(self) -> None:
         self._set_distance(self.new_distance)
+
+@dataclass
+class MergeNodes(BaseCommand):
+    """Merges selected vertices that are at the same position."""
+    vertices: list[VT]
+    
+    _old_g: Optional[GraphT] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._old_g is not None
+        self.g = self._old_g
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._old_g = copy.deepcopy(self.g)
+        # Group vertices by position
+        position_groups: dict[tuple[float, float], list[VT]] = {}
+        for v in self.vertices:
+            if v not in self.g.vertices():
+                continue
+            pos = (self.g.row(v), self.g.qubit(v))
+            if pos not in position_groups:
+                position_groups[pos] = []
+            position_groups[pos].append(v)
+        
+        # Merge vertices at each position
+        for pos, verts in position_groups.items():
+            if len(verts) < 2:
+                continue
+            # Sort vertices to have a consistent merge order
+            verts = sorted(verts)
+            # Keep the first vertex and merge others into it
+            target = verts[0]
+            for v in verts[1:]:
+                if v not in self.g.vertices():
+                    continue
+                # Add a temporary edge to allow fusing
+                self.g.add_edge((target, v))
+                # Fuse vertices
+                pyzx.basicrules.fuse(self.g, target, v)
+        
+        self.update_graph_view()
+
 
 @dataclass
 class ChangePhase(BaseCommand):

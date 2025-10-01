@@ -73,6 +73,7 @@ class GraphView(QGraphicsView):
     """
 
     wand_trace_finished = Signal(object)
+    merge_triggered = Signal()
     draw_background_lines = True
 
     def __init__(self, graph_scene: GraphScene) -> None:
@@ -169,6 +170,10 @@ class GraphView(QGraphicsView):
                     g.set_position(v, y, x - distance)
                 elif e.key() == Qt.Key.Key_Right:
                     g.set_position(v, y, x + distance)
+                elif e.key() == Qt.Key.Key_M:
+                    # Merge vertices at the same position
+                    self.merge_triggered.emit()
+                    return
                 vitem.set_pos_from_graph()
         else:
             super().keyPressEvent(e)
