@@ -267,8 +267,6 @@ class VItem(QGraphicsPathItem):
             if not self.is_animated:
                 self.refresh()
             
-            # Emit the selection changed signal when a vertex selection changes
-            # This ensures that rewrite rules are updated when vertices are selected by direct clicking
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
                 scene = self.scene()
                 if TYPE_CHECKING: assert isinstance(scene, GraphScene)

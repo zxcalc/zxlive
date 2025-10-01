@@ -138,8 +138,6 @@ class EItem(QGraphicsPathItem):
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             self.refresh()
             
-            # Emit the selection changed signal when an edge selection changes
-            # This ensures that rewrite rules are updated when edges are selected by direct clicking
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
                 self.graph_scene.selection_changed_custom.emit()
 
