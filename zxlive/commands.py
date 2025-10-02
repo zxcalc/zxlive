@@ -12,7 +12,6 @@ from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
-import pyzx.basicrules
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .settings import display_setting
@@ -369,8 +368,8 @@ class ChangeEdgeCurve(BaseCommand):
 
 @dataclass
 class MergeNodes(BaseCommand):
-    """Merges selected vertices that are at the same position."""
-    vertices: list[VT]
+    """Merges groups of vertices that are at the same position."""
+    vertex_groups: list[list[VT]]  # Each inner list contains vertices at the same position
     
     _old_g: Optional[GraphT] = field(default=None, init=False)
 
@@ -381,31 +380,44 @@ class MergeNodes(BaseCommand):
 
     def redo(self) -> None:
         self._old_g = copy.deepcopy(self.g)
-        # Group vertices by position
-        position_groups: dict[tuple[float, float], list[VT]] = {}
-        for v in self.vertices:
-            if v not in self.g.vertices():
-                continue
-            pos = (self.g.row(v), self.g.qubit(v))
-            if pos not in position_groups:
-                position_groups[pos] = []
-            position_groups[pos].append(v)
         
-        # Merge vertices at each position
-        for pos, verts in position_groups.items():
+        # Merge vertices in each group
+        for verts in self.vertex_groups:
             if len(verts) < 2:
                 continue
+            
             # Sort vertices to have a consistent merge order
             verts = sorted(verts)
             # Keep the first vertex and merge others into it
             target = verts[0]
+            
             for v in verts[1:]:
                 if v not in self.g.vertices():
                     continue
-                # Add a temporary edge to allow fusing
-                self.g.add_edge((target, v))
-                # Fuse vertices
-                pyzx.basicrules.fuse(self.g, target, v)
+                
+                # Manually merge v into target:
+                # 1. Transfer all edges from v to target
+                neighbors = list(self.g.neighbors(v))
+                for n in neighbors:
+                    if n == target:
+                        continue  # Skip self-loops
+                    
+                    # Get all edges between v and n
+                    edges = list(self.g.edges(v, n))
+                    for e in edges:
+                        etype = self.g.edge_type(e)
+                        self.g.add_edge((target, n), etype)
+                
+                # 2. If vertices are same type and both have phases, add them
+                if self.g.type(v) == self.g.type(target):
+                    if self.g.type(v) in (VertexType.Z, VertexType.X):
+                        # Add phases for Z and X spiders
+                        target_phase = self.g.phase(target)
+                        v_phase = self.g.phase(v)
+                        self.g.set_phase(target, target_phase + v_phase)
+                
+                # 3. Remove the merged vertex
+                self.g.remove_vertex(v)
         
         self.update_graph_view()
 

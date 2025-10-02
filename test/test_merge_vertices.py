@@ -2,7 +2,34 @@
 """Unit test for merge functionality."""
 import pytest
 import pyzx
-from pyzx import VertexType
+from pyzx import VertexType, EdgeType
+
+
+def manual_merge_vertices(g, verts):
+    """Manually merge vertices following the new merge logic."""
+    verts = sorted(verts)
+    target = verts[0]
+    
+    for v in verts[1:]:
+        if v not in g.vertices():
+            continue
+        
+        neighbors = list(g.neighbors(v))
+        for n in neighbors:
+            if n == target:
+                continue
+            edges = list(g.edges(v, n))
+            for e in edges:
+                etype = g.edge_type(e)
+                g.add_edge((target, n), etype)
+        
+        if g.type(v) == g.type(target):
+            if g.type(v) in (VertexType.Z, VertexType.X):
+                target_phase = g.phase(target)
+                v_phase = g.phase(v)
+                g.set_phase(target, target_phase + v_phase)
+        
+        g.remove_vertex(v)
 
 
 def test_merge_vertices_same_position():
@@ -20,8 +47,7 @@ def test_merge_vertices_same_position():
     assert v2 in g.vertices()
     
     # Simulate merge
-    g.add_edge((v1, v2))
-    pyzx.basicrules.fuse(g, v1, v2)
+    manual_merge_vertices(g, [v1, v2])
     
     # Check result
     assert len(list(g.vertices())) == 2
@@ -64,15 +90,8 @@ def test_merge_three_vertices():
     # Initial state
     assert len(list(g.vertices())) == 4
     
-    # Simulate merge (v1 merges with v2, then with v3)
-    vertices = [v1, v2, v3]
-    verts = sorted(vertices)
-    target = verts[0]
-    
-    for v in verts[1:]:
-        if v in g.vertices():
-            g.add_edge((target, v))
-            pyzx.basicrules.fuse(g, target, v)
+    # Simulate merge
+    manual_merge_vertices(g, [v1, v2, v3])
     
     # Check result
     assert len(list(g.vertices())) == 2
@@ -80,6 +99,29 @@ def test_merge_three_vertices():
     assert v2 not in g.vertices()
     assert v3 not in g.vertices()
     assert abs(g.phase(v1) - 1.75) < 0.001  # 1 + 0.5 + 0.25
+
+
+def test_merge_different_types():
+    """Test merging vertices of different types."""
+    g = pyzx.Graph()
+    v1 = g.add_vertex(VertexType.Z, 1, 2, phase=1)
+    v2 = g.add_vertex(VertexType.X, 1, 2, phase=0.5)
+    v3 = g.add_vertex(VertexType.Z, 3, 4)
+    g.add_edge((v1, v3))
+    g.add_edge((v2, v3))
+    
+    # Initial state
+    assert len(list(g.vertices())) == 3
+    
+    # Simulate merge - should work now!
+    manual_merge_vertices(g, [v1, v2])
+    
+    # Check result
+    assert len(list(g.vertices())) == 2
+    assert v1 in g.vertices()
+    assert v2 not in g.vertices()
+    # Phase should not change since types are different
+    assert abs(g.phase(v1) - 1.0) < 0.001
 
 
 if __name__ == "__main__":
@@ -91,5 +133,8 @@ if __name__ == "__main__":
     
     test_merge_three_vertices()
     print("✓ test_merge_three_vertices passed")
+    
+    test_merge_different_types()
+    print("✓ test_merge_different_types passed")
     
     print("\n✓ All tests passed!")

@@ -163,12 +163,12 @@ class EditorBasePanel(BasePanel):
                 position_groups[pos] = []
             position_groups[pos].append(v)
         
-        # Check if any vertices are at the same position
-        has_overlapping = any(len(verts) >= 2 for verts in position_groups.values())
-        if not has_overlapping:
+        # Filter groups to only include those with 2+ vertices
+        vertex_groups = [verts for verts in position_groups.values() if len(verts) >= 2]
+        if not vertex_groups:
             return
         
-        cmd = MergeNodes(self.graph_view, selected)
+        cmd = MergeNodes(self.graph_view, vertex_groups)
         self.undo_stack.push(cmd)
 
     def add_vert(self, x: float, y: float, edges: list[EItem]) -> None:
