@@ -367,6 +367,62 @@ class ChangeEdgeCurve(BaseCommand):
         self._set_distance(self.new_distance)
 
 @dataclass
+class MergeNodes(BaseCommand):
+    """Merges groups of vertices that are at the same position."""
+    vertex_groups: list[list[VT]]  # Each inner list contains vertices at the same position
+    
+    _old_g: Optional[GraphT] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._old_g is not None
+        self.g = self._old_g
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._old_g = copy.deepcopy(self.g)
+        
+        # Merge vertices in each group
+        for verts in self.vertex_groups:
+            if len(verts) < 2:
+                continue
+            
+            # Sort vertices to have a consistent merge order
+            verts = sorted(verts)
+            # Keep the first vertex and merge others into it
+            target = verts[0]
+            
+            for v in verts[1:]:
+                if v not in self.g.vertices():
+                    continue
+                
+                # Manually merge v into target:
+                # 1. Transfer all edges from v to target
+                neighbors = list(self.g.neighbors(v))
+                for n in neighbors:
+                    if n == target:
+                        continue  # Skip self-loops
+                    
+                    # Get all edges between v and n
+                    edges = list(self.g.edges(v, n))
+                    for e in edges:
+                        etype = self.g.edge_type(e)
+                        self.g.add_edge((target, n), etype)
+                
+                # 2. If vertices are same type and both have phases, add them
+                if self.g.type(v) == self.g.type(target):
+                    if self.g.type(v) in (VertexType.Z, VertexType.X):
+                        # Add phases for Z and X spiders
+                        target_phase = self.g.phase(target)
+                        v_phase = self.g.phase(v)
+                        self.g.set_phase(target, target_phase + v_phase)
+                
+                # 3. Remove the merged vertex
+                self.g.remove_vertex(v)
+        
+        self.update_graph_view()
+
+
+@dataclass
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
