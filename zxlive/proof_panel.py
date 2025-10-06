@@ -182,8 +182,8 @@ class ProofPanel(BasePanel):
         else:
             view_pos = self.graph_scene.vertex_map[v].pos()
             pos = pos_from_view(view_pos.x(), view_pos.y())
-            cmd = ProofModeCommand(MoveNode(self.graph_view, [(v, pos[0], pos[1])]), self.step_view)
-            self.undo_stack.push(cmd)
+            move_cmd = ProofModeCommand(MoveNode(self.graph_view, [(v, pos[0], pos[1])]), self.step_view)
+            self.undo_stack.push(move_cmd)
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
