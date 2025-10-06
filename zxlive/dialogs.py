@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
-from .common import GraphT, VT
+from .common import GraphT, VT, from_tikz
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
 
@@ -218,13 +218,12 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
             g.set_auto_simplify(False)
             return ImportGraphOutput(selected_format, file_path, ) # type: ignore
         elif selected_format == FileFormat.TikZ:
-            try:
-                g = GraphT.from_tikz(data) # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                if TYPE_CHECKING: assert isinstance(g, GraphT)
-                g.set_auto_simplify(False)
-                return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
-            except ValueError:
-                raise ValueError("Probable reason: attempted to import a proof from TikZ, which is not supported.")
+            g = from_tikz(data, parent=parent)  # type: ignore[assignment]
+            if g is None:
+                return None
+            if TYPE_CHECKING: assert isinstance(g, GraphT)
+            g.set_auto_simplify(False)
+            return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
         else:
             assert selected_format == FileFormat.All
             try:
@@ -239,15 +238,14 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
                     g.set_auto_simplify(False)
                     return ImportGraphOutput(FileFormat.QGraph, file_path, g)  # type: ignore
                 except Exception:
-                    try:
-                        g = GraphT.from_tikz(data) # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                        if TYPE_CHECKING: assert isinstance(g, GraphT)
-                        g.set_auto_simplify(False)
-                        return ImportGraphOutput(FileFormat.TikZ, file_path, g)  # type: ignore
-                    except:
+                    g = from_tikz(data, parent=parent)  # type: ignore[assignment]
+                    if g is None:
                         show_error_msg(f"Failed to import {selected_format.name} file",
                                        f"Couldn't determine filetype: {file_path}.", parent=parent)
                         return None
+                    if TYPE_CHECKING: assert isinstance(g, GraphT)
+                    g.set_auto_simplify(False)
+                    return ImportGraphOutput(FileFormat.TikZ, file_path, g)  # type: ignore
 
     except Exception as e:
         show_error_msg(f"Failed to import {selected_format.name} file: {file_path}", str(e), parent=parent)
