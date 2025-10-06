@@ -369,7 +369,7 @@ class ChangeEdgeCurve(BaseCommand):
 @dataclass
 class MergeNodes(BaseCommand):
     """Merges groups of vertices that are at the same position."""
-    vertex_groups: list[list[VT]]  # Each inner list contains vertices at the same position
+    vertices_to_merge: list[VT]
     
     _old_g: Optional[GraphT] = field(default=None, init=False)
 
@@ -380,19 +380,24 @@ class MergeNodes(BaseCommand):
 
     def redo(self) -> None:
         self._old_g = copy.deepcopy(self.g)
-        for verts in self.vertex_groups:
-            if len(verts) < 2:
+        if len(self.vertices_to_merge) < 2:
+            return
+        target = self.vertices_to_merge[0]
+        for v in self.vertices_to_merge[1:]:
+            if v not in self.g.vertices():
                 continue
-            target = verts[0]
-            for v in verts[1:]:
-                if v not in self.g.vertices():
+            for e in self.g.incident_edges(v):
+                s,t = self.g.edge_st(e)
+                if s == target or t == target:
                     continue
-                for n in self.g.neighbors(v):
-                    if n == target:
-                        continue
-                    for e in self.g.edges(v, n):
-                        self.g.add_edge((target, n), self.g.edge_type(e))
-                self.g.remove_vertex(v)
+                ety = self.g.edge_type(e)
+                if s == v and t == v:
+                    self.g.add_edge((target, target), ety)
+                elif s == v:
+                    self.g.add_edge((target, t), ety)
+                else:
+                    self.g.add_edge((s, target), ety)
+            self.g.remove_vertex(v)
         self.update_graph_view()
 
 

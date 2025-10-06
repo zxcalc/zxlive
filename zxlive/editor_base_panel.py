@@ -150,25 +150,11 @@ class EditorBasePanel(BasePanel):
         self.undo_stack.push(cmd)
 
     def merge_vertices(self) -> None:
-        """Merge selected vertices that are at exactly the same position."""
+        """Merge selected vertices"""
         selected = list(self.graph_scene.selected_vertices)
         if len(selected) < 2:
             return
-        
-        # Group vertices by position
-        position_groups: dict[tuple[float, float], list[VT]] = {}
-        for v in selected:
-            pos = (self.graph_scene.g.row(v), self.graph_scene.g.qubit(v))
-            if pos not in position_groups:
-                position_groups[pos] = []
-            position_groups[pos].append(v)
-        
-        # Filter groups to only include those with 2+ vertices
-        vertex_groups = [verts for verts in position_groups.values() if len(verts) >= 2]
-        if not vertex_groups:
-            return
-        
-        cmd = MergeNodes(self.graph_view, vertex_groups)
+        cmd = MergeNodes(self.graph_view, selected)
         self.undo_stack.push(cmd)
 
     def add_vert(self, x: float, y: float, edges: list[EItem]) -> None:
