@@ -170,9 +170,10 @@ class ProofPanel(BasePanel):
             etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, match)
             g.add_edge_table(etab)
             g.remove_edges(rem_edges)
-            g.remove_vertices(rem_verts) 
+            g.remove_vertices(rem_verts)
+            anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
-            self.undo_stack.push(cmd)
+            self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
