@@ -35,6 +35,7 @@ class GraphEditPanel(EditorBasePanel):
         self.graph_scene.vertices_moved.connect(self.vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene.vertex_added.connect(self.add_vert)
+        self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_added.connect(self.add_edge)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
