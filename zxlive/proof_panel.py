@@ -176,7 +176,10 @@ class ProofPanel(BasePanel):
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
+            # Check if this is a "copy 0/pi spider" operation (when one vertex has degree 1)
+            # versus a full bialgebra operation
+            rewrite_name = "copy 0/pi spider" if (self.graph.vertex_degree(v) == 1 or self.graph.vertex_degree(w) == 1) else "bialgebra"
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, rewrite_name)
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
         else:
