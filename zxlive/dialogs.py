@@ -94,8 +94,28 @@ def show_error_msg(title: str, description: Optional[str] = None, parent: Option
 def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] = None) -> Optional[dict[str, bool]]:
     """Shows a TikZ import error and offers retry options.
     
-    Returns a dictionary of options to use for retrying, or None if user cancels.
-    Options returned: ignore_nonzx, fuse_overlap, ignore_overlap_warning
+    This function displays an error dialog when TikZ import fails, and gives the user
+    the option to retry with different error handling settings. The following options
+    are available:
+    
+    - ignore_nonzx: Ignores nodes/edges with unknown styles or invalid definitions.
+                    When enabled, vertices with invalid styles are treated as boundary nodes,
+                    and invalid phase labels are silently ignored.
+    
+    - fuse_overlap: Merges vertices that have the exact same position coordinates.
+                    This is useful when the TikZ diagram has duplicate vertices at the
+                    same location that should be treated as a single vertex.
+    
+    - ignore_overlap_warning: Suppresses warnings about overlapping vertices.
+                              Only relevant when fuse_overlap is False.
+    
+    Args:
+        error_message: The error message from the failed import attempt
+        parent: Parent widget for the dialog
+    
+    Returns:
+        A dictionary with keys 'ignore_nonzx', 'fuse_overlap', and 'ignore_overlap_warning',
+        or None if the user cancels.
     """
     msg = QMessageBox(parent)
     msg.setWindowTitle("TikZ Import Error")
@@ -121,22 +141,35 @@ def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] =
     # Create checkboxes for different error handling options
     from PySide6.QtWidgets import QCheckBox, QVBoxLayout, QLabel
     
-    info_label = QLabel("Select options to ignore certain errors during import:")
+    info_label = QLabel(
+        "Select options to handle errors during TikZ import:\n\n"
+        "These options allow you to work around common issues with TikZ diagrams."
+    )
     layout.addRow(info_label)
     
     ignore_nonzx_cb = QCheckBox()
     ignore_nonzx_cb.setChecked(True)
-    ignore_nonzx_cb.setToolTip("Ignore nodes/edges with unknown styles or invalid definitions")
+    ignore_nonzx_cb.setToolTip(
+        "Ignore nodes/edges with unknown styles or invalid phase labels.\n"
+        "Unknown node styles will be treated as boundary nodes.\n"
+        "Invalid phase labels will be ignored (phase set to 0)."
+    )
     layout.addRow("Ignore invalid styles:", ignore_nonzx_cb)
     
     fuse_overlap_cb = QCheckBox()
     fuse_overlap_cb.setChecked(True)
-    fuse_overlap_cb.setToolTip("Merge vertices that have the same position")
+    fuse_overlap_cb.setToolTip(
+        "Automatically merge vertices that have the exact same position.\n"
+        "Useful for diagrams where multiple vertices are at the same coordinates."
+    )
     layout.addRow("Merge overlapping vertices:", fuse_overlap_cb)
     
     ignore_warning_cb = QCheckBox()
     ignore_warning_cb.setChecked(True)
-    ignore_warning_cb.setToolTip("Don't raise warnings about overlapping vertices")
+    ignore_warning_cb.setToolTip(
+        "Suppress warnings about overlapping vertices.\n"
+        "Only relevant when 'Merge overlapping vertices' is disabled."
+    )
     layout.addRow("Ignore overlap warnings:", ignore_warning_cb)
     
     # Add buttons
