@@ -380,35 +380,19 @@ class MergeNodes(BaseCommand):
 
     def redo(self) -> None:
         self._old_g = copy.deepcopy(self.g)
-        
-        # Merge vertices in each group
         for verts in self.vertex_groups:
             if len(verts) < 2:
                 continue
-            
-            # Keep the first vertex and merge others into it
             target = verts[0]
-            
             for v in verts[1:]:
                 if v not in self.g.vertices():
                     continue
-                
-                # Manually merge v into target:
-                # 1. Transfer all edges from v to target
-                neighbors = list(self.g.neighbors(v))
-                for n in neighbors:
+                for n in self.g.neighbors(v):
                     if n == target:
-                        continue  # Skip self-loops
-                    
-                    # Get all edges between v and n
-                    edges = list(self.g.edges(v, n))
-                    for e in edges:
-                        etype = self.g.edge_type(e)
-                        self.g.add_edge((target, n), etype)
-                
-                # 2. Remove the merged vertex
+                        continue
+                    for e in self.g.edges(v, n):
+                        self.g.add_edge((target, n), self.g.edge_type(e))
                 self.g.remove_vertex(v)
-        
         self.update_graph_view()
 
 
