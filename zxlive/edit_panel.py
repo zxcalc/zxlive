@@ -45,6 +45,7 @@ class GraphEditPanel(EditorBasePanel):
         self.graph_view = GraphView(self.graph_scene)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
+        self.graph_view.merge_triggered.connect(self.merge_vertices)
 
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)

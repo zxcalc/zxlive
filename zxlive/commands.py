@@ -367,6 +367,41 @@ class ChangeEdgeCurve(BaseCommand):
         self._set_distance(self.new_distance)
 
 @dataclass
+class MergeNodes(BaseCommand):
+    """Merges groups of vertices that are at the same position."""
+    vertices_to_merge: list[VT]
+    
+    _old_g: Optional[GraphT] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._old_g is not None
+        self.g = self._old_g
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._old_g = copy.deepcopy(self.g)
+        if len(self.vertices_to_merge) < 2:
+            return
+        target = self.vertices_to_merge[0]
+        for v in self.vertices_to_merge[1:]:
+            if v not in self.g.vertices():
+                continue
+            for e in self.g.incident_edges(v):
+                s,t = self.g.edge_st(e)
+                if s == target or t == target:
+                    continue
+                ety = self.g.edge_type(e)
+                if s == v and t == v:
+                    self.g.add_edge((target, target), ety)
+                elif s == v:
+                    self.g.add_edge((target, t), ety)
+                else:
+                    self.g.add_edge((s, target), ety)
+            self.g.remove_vertex(v)
+        self.update_graph_view()
+
+
+@dataclass
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT

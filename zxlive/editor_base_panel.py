@@ -18,7 +18,7 @@ from zxlive.sfx import SFXEnum
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
-                       ChangeNodeType, ChangePhase, MoveNode, SetGraph,
+                       ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data, pos_from_view
 from .dialogs import show_error_msg, update_dummy_vertex_text
@@ -147,6 +147,14 @@ class EditorBasePanel(BasePanel):
         new_g.remove_vertices(list(set(rem_vertices)))
         cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
             else UpdateGraph(self.graph_view,new_g)
+        self.undo_stack.push(cmd)
+
+    def merge_vertices(self) -> None:
+        """Merge selected vertices"""
+        selected = list(self.graph_scene.selected_vertices)
+        if len(selected) < 2:
+            return
+        cmd = MergeNodes(self.graph_view, selected)
         self.undo_stack.push(cmd)
 
     def add_vert(self, x: float, y: float, edges: list[EItem]) -> None:
