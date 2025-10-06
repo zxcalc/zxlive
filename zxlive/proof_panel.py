@@ -179,7 +179,11 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
-
+        else:
+            view_pos = self.graph_scene.vertex_map[v].pos()
+            pos = pos_from_view(view_pos.x(), view_pos.y())
+            cmd = ProofModeCommand(MoveNode(self.graph_view, [(v, pos[0], pos[1])]), self.step_view)
+            self.undo_stack.push(cmd)
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
