@@ -93,26 +93,26 @@ def show_error_msg(title: str, description: Optional[str] = None, parent: Option
 
 def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] = None) -> Optional[dict[str, bool]]:
     """Shows a TikZ import error and offers retry options.
-    
+
     This function displays an error dialog when TikZ import fails, and gives the user
     the option to retry with different error handling settings. The following options
     are available:
-    
+
     - ignore_nonzx: Ignores nodes/edges with unknown styles or invalid definitions.
                     When enabled, vertices with invalid styles are treated as boundary nodes,
                     and invalid phase labels are silently ignored.
-    
+
     - fuse_overlap: Merges vertices that have the exact same position coordinates.
                     This is useful when the TikZ diagram has duplicate vertices at the
                     same location that should be treated as a single vertex.
-    
+
     - ignore_overlap_warning: Suppresses warnings about overlapping vertices.
                               Only relevant when fuse_overlap is False.
-    
+
     Args:
         error_message: The error message from the failed import attempt
         parent: Parent widget for the dialog
-    
+
     Returns:
         A dictionary with keys 'ignore_nonzx', 'fuse_overlap', and 'ignore_overlap_warning',
         or None if the user cancels.
@@ -122,31 +122,29 @@ def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] =
     msg.setText("Failed to import TikZ diagram")
     msg.setInformativeText(f"Error: {error_message}\n\nWould you like to try again with error handling options?")
     msg.setIcon(QMessageBox.Icon.Warning)
-    
+
     # Add custom buttons
     retry_button = msg.addButton("Retry with options...", QMessageBox.ButtonRole.AcceptRole)
     cancel_button = msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
     msg.setDefaultButton(retry_button)
-    
+
     msg.exec()
-    
+
     if msg.clickedButton() == cancel_button:
         return None
-    
+
     # Show dialog with options
     dialog = QDialog(parent)
     dialog.setWindowTitle("TikZ Import Options")
     layout = QFormLayout()
-    
+
     # Create checkboxes for different error handling options
-    from PySide6.QtWidgets import QCheckBox, QVBoxLayout, QLabel
-    
     info_label = QLabel(
         "Select options to handle errors during TikZ import:\n\n"
         "These options allow you to work around common issues with TikZ diagrams."
     )
     layout.addRow(info_label)
-    
+
     ignore_nonzx_cb = QCheckBox()
     ignore_nonzx_cb.setChecked(True)
     ignore_nonzx_cb.setToolTip(
@@ -155,7 +153,7 @@ def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] =
         "Invalid phase labels will be ignored (phase set to 0)."
     )
     layout.addRow("Ignore invalid styles:", ignore_nonzx_cb)
-    
+
     fuse_overlap_cb = QCheckBox()
     fuse_overlap_cb.setChecked(True)
     fuse_overlap_cb.setToolTip(
@@ -163,7 +161,7 @@ def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] =
         "Useful for diagrams where multiple vertices are at the same coordinates."
     )
     layout.addRow("Merge overlapping vertices:", fuse_overlap_cb)
-    
+
     ignore_warning_cb = QCheckBox()
     ignore_warning_cb.setChecked(True)
     ignore_warning_cb.setToolTip(
@@ -171,22 +169,22 @@ def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] =
         "Only relevant when 'Merge overlapping vertices' is disabled."
     )
     layout.addRow("Ignore overlap warnings:", ignore_warning_cb)
-    
+
     # Add buttons
     button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     button_box.accepted.connect(dialog.accept)
     button_box.rejected.connect(dialog.reject)
     layout.addRow(button_box)
-    
+
     dialog.setLayout(layout)
-    
+
     if dialog.exec() == QDialog.DialogCode.Accepted:
         return {
             'ignore_nonzx': ignore_nonzx_cb.isChecked(),
             'fuse_overlap': fuse_overlap_cb.isChecked(),
             'ignore_overlap_warning': ignore_warning_cb.isChecked()
         }
-    
+
     return None
 
 

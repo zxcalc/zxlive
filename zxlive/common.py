@@ -95,11 +95,11 @@ def view_to_length(width:float,height:float)-> tuple[float, float]:
 def to_tikz(g: GraphT) -> str:
     return pyzx.tikz.to_tikz(g)  # type: ignore
 
-def from_tikz(s: str, ignore_nonzx: bool = False, fuse_overlap: bool = True, 
-              warn_overlap: bool = False, show_error_dialog: bool = True, 
+def from_tikz(s: str, ignore_nonzx: bool = False, fuse_overlap: bool = True,
+              warn_overlap: bool = False, show_error_dialog: bool = True,
               parent: Optional['QWidget'] = None) -> Optional[GraphT]:
     """Import a graph from TikZ string.
-    
+
     Args:
         s: TikZ string to import
         ignore_nonzx: If True, ignore unknown vertex/edge types and invalid labels
@@ -107,12 +107,12 @@ def from_tikz(s: str, ignore_nonzx: bool = False, fuse_overlap: bool = True,
         warn_overlap: If True, warn about overlapping vertices (only has effect if fuse_overlap is False)
         show_error_dialog: If True, show error dialog with retry options on failure
         parent: Parent widget for dialogs
-    
+
     Returns:
         The imported graph or None if import failed
     """
     try:
-        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph', 
+        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph',
                                      ignore_nonzx=ignore_nonzx,
                                      fuse_overlap=fuse_overlap,
                                      warn_overlap=warn_overlap)
@@ -125,12 +125,14 @@ def from_tikz(s: str, ignore_nonzx: bool = False, fuse_overlap: bool = True,
             options = dialogs.show_tikz_error_with_options(str(e), parent=parent)
             if options is not None:
                 # Retry with user-selected options
-                return from_tikz(s, 
-                               ignore_nonzx=options['ignore_nonzx'],
-                               fuse_overlap=options['fuse_overlap'],
-                               warn_overlap=not options['ignore_overlap_warning'],
-                               show_error_dialog=False,  # Don't show dialog again on retry
-                               parent=parent)
+                return from_tikz(
+                    s,
+                    ignore_nonzx=options['ignore_nonzx'],
+                    fuse_overlap=options['fuse_overlap'],
+                    warn_overlap=not options['ignore_overlap_warning'],
+                    show_error_dialog=False,  # Don't show dialog again on retry
+                    parent=parent
+                )
             return None
         else:
             # If not showing dialog, just raise the error or return None
