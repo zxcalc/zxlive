@@ -151,13 +151,17 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def keyPressEvent(self, e: QKeyEvent) -> None:
-        """Logic for moving selected vertices with arrow keys"""
+        """Logic for moving selected vertices with arrow keys and merging selected vertices with Ctrl+M"""
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
             g = self.graph_scene.g
             if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
                 distance = 1 / get_settings_value("snap-granularity", int)
             else:
                 distance = 0.5
+            if e.key() == Qt.Key.Key_M:
+                # Merge vertices at the same position
+                self.merge_triggered.emit()
+                return
             for v in self.graph_scene.selected_vertices:
                 vitem = self.graph_scene.vertex_map[v]
                 x = g.row(v)
@@ -170,10 +174,6 @@ class GraphView(QGraphicsView):
                     g.set_position(v, y, x - distance)
                 elif e.key() == Qt.Key.Key_Right:
                     g.set_position(v, y, x + distance)
-                elif e.key() == Qt.Key.Key_M:
-                    # Merge vertices at the same position
-                    self.merge_triggered.emit()
-                    return
                 vitem.set_pos_from_graph()
         else:
             super().keyPressEvent(e)
