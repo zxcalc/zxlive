@@ -26,6 +26,7 @@ from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStro
 from pyzx.utils import EdgeType, VertexType
 
 from .common import SCALE, ET, GraphT
+from .settings import display_setting
 from .vitem import VItem, EITEM_Z
 
 if TYPE_CHECKING:
@@ -87,7 +88,6 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             self.color = QColor(HAD_EDGE_BLUE)
         else:
-            from .settings import display_setting
             if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
                self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
                 self.color = display_setting.effective_colors["dummy_edge"]
@@ -196,7 +196,6 @@ class EItem(QGraphicsPathItem):
         return stroker.createStroke(path)
 
 
-# TODO: This is essentially a clone of EItem. We should common it up!
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
@@ -216,10 +215,12 @@ class EDragItem(QGraphicsPathItem):
         pen = QPen()
         pen.setWidthF(3)
         if self.ety == EdgeType.HADAMARD:
-            pen.setColor(QColor("#0077ff"))
+            pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
+        elif self.start.ty == VertexType.DUMMY:
+            pen.setColor(display_setting.effective_colors["dummy_edge"])
         else:
-            pen.setColor(QColor("#000000"))
+            pen.setColor(display_setting.effective_colors["edge"])
         self.setPen(QPen(pen))
 
         # set path as a straight line from source to target
