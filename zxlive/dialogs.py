@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Optional
 from PySide6.QtCore import QFile, QIODevice, QTextStream
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget, QInputDialog)
+                               QPushButton, QTextEdit, QWidget, QInputDialog,
+                               QCheckBox, QVBoxLayout, QLabel)
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
@@ -88,6 +89,72 @@ def show_error_msg(title: str, description: Optional[str] = None, parent: Option
     if description is not None:
         msg.setInformativeText(description)
     msg.exec()
+
+
+def show_tikz_error_with_options(error_message: str, parent: Optional[QWidget] = None) -> Optional[dict[str, bool]]:
+    """Shows a TikZ import error and offers retry options.
+    
+    Returns a dictionary of options to use for retrying, or None if user cancels.
+    Options returned: ignore_nonzx, fuse_overlap, ignore_overlap_warning
+    """
+    msg = QMessageBox(parent)
+    msg.setWindowTitle("TikZ Import Error")
+    msg.setText("Failed to import TikZ diagram")
+    msg.setInformativeText(f"Error: {error_message}\n\nWould you like to try again with error handling options?")
+    msg.setIcon(QMessageBox.Icon.Warning)
+    
+    # Add custom buttons
+    retry_button = msg.addButton("Retry with options...", QMessageBox.ButtonRole.AcceptRole)
+    cancel_button = msg.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+    msg.setDefaultButton(retry_button)
+    
+    msg.exec()
+    
+    if msg.clickedButton() == cancel_button:
+        return None
+    
+    # Show dialog with options
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("TikZ Import Options")
+    layout = QFormLayout()
+    
+    # Create checkboxes for different error handling options
+    from PySide6.QtWidgets import QCheckBox, QVBoxLayout, QLabel
+    
+    info_label = QLabel("Select options to ignore certain errors during import:")
+    layout.addRow(info_label)
+    
+    ignore_nonzx_cb = QCheckBox()
+    ignore_nonzx_cb.setChecked(True)
+    ignore_nonzx_cb.setToolTip("Ignore nodes/edges with unknown styles or invalid definitions")
+    layout.addRow("Ignore invalid styles:", ignore_nonzx_cb)
+    
+    fuse_overlap_cb = QCheckBox()
+    fuse_overlap_cb.setChecked(True)
+    fuse_overlap_cb.setToolTip("Merge vertices that have the same position")
+    layout.addRow("Merge overlapping vertices:", fuse_overlap_cb)
+    
+    ignore_warning_cb = QCheckBox()
+    ignore_warning_cb.setChecked(True)
+    ignore_warning_cb.setToolTip("Don't raise warnings about overlapping vertices")
+    layout.addRow("Ignore overlap warnings:", ignore_warning_cb)
+    
+    # Add buttons
+    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    button_box.accepted.connect(dialog.accept)
+    button_box.rejected.connect(dialog.reject)
+    layout.addRow(button_box)
+    
+    dialog.setLayout(layout)
+    
+    if dialog.exec() == QDialog.DialogCode.Accepted:
+        return {
+            'ignore_nonzx': ignore_nonzx_cb.isChecked(),
+            'fuse_overlap': fuse_overlap_cb.isChecked(),
+            'ignore_overlap_warning': ignore_warning_cb.isChecked()
+        }
+    
+    return None
 
 
 def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
