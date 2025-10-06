@@ -20,7 +20,7 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data
+from .common import VT, GraphT, ToolType, get_data, pos_from_view
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
 from .vitem import VItem, BLACK, VItemAnimation
@@ -224,6 +224,11 @@ class EditorBasePanel(BasePanel):
 
     def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         self.undo_stack.push(MoveNode(self.graph_view, vs))
+
+    def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
+        view_pos = self.graph_scene.vertex_map[v].pos()
+        pos = pos_from_view(view_pos.x(), view_pos.y())
+        self.vert_moved([(v, pos[0], pos[1])])
 
     def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
         self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))
