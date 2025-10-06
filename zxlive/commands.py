@@ -386,8 +386,6 @@ class MergeNodes(BaseCommand):
             if len(verts) < 2:
                 continue
             
-            # Sort vertices to have a consistent merge order
-            verts = sorted(verts)
             # Keep the first vertex and merge others into it
             target = verts[0]
             
@@ -408,15 +406,7 @@ class MergeNodes(BaseCommand):
                         etype = self.g.edge_type(e)
                         self.g.add_edge((target, n), etype)
                 
-                # 2. If vertices are same type and both have phases, add them
-                if self.g.type(v) == self.g.type(target):
-                    if self.g.type(v) in (VertexType.Z, VertexType.X):
-                        # Add phases for Z and X spiders
-                        target_phase = self.g.phase(target)
-                        v_phase = self.g.phase(v)
-                        self.g.set_phase(target, target_phase + v_phase)
-                
-                # 3. Remove the merged vertex
+                # 2. Remove the merged vertex
                 self.g.remove_vertex(v)
         
         self.update_graph_view()
