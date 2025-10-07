@@ -362,12 +362,12 @@ class ProofGraphView(GraphView):
     def __update_scalar_label(self, scalar: Scalar) -> None:
         self.scalar = scalar
         scalar_string = f" Scalar: {scalar.polar_str()}"
-        if display_setting.dark_mode:
-            colour = "#eeeeee"
-            text = f"{scalar_string}"
-        elif scalar.is_zero:
+        if scalar.is_zero:
             colour = "red"
             text = f"{scalar_string}, The global scalar is zero"
+        elif display_setting.dark_mode:
+            colour = "#eeeeee"
+            text = f"{scalar_string}"
         else:
             colour = "black"
             text = f"{scalar_string}"
