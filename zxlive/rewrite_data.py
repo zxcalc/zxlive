@@ -88,7 +88,7 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
         "matcher": pyzx.rules.match_pivot_boundary,
         "rule": pyzx.rules.pivot,
-        "type": MATCHES_EDGES,
+        "type": MATCHES_VERTICES,
         "copy_first": True
     },
     "pivot_gadget": {
