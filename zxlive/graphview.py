@@ -361,7 +361,11 @@ class ProofGraphView(GraphView):
 
     def __update_scalar_label(self, scalar: Scalar) -> None:
         self.scalar = scalar
-        scalar_string = f" Scalar: {scalar.polar_str()}"
+        try:
+            scalar_string = f" Scalar: {scalar.polar_str()}"
+        except:
+            scalar_string = f" Scalar: {scalar}"
+
         if scalar.is_zero:
             colour = "red"
             text = f"{scalar_string}, The global scalar is zero"
