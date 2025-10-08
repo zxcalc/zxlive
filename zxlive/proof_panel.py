@@ -414,10 +414,8 @@ class ProofPanel(BasePanel):
             return avg_vector
 
         pos = QPointF(self.graph.row(v), self.graph.qubit(v))
-
         avg_left = compute_avg_vector(pos, left_edge_items)
         snap_vector(avg_left)
-
         avg_right = compute_avg_vector(pos, right_edge_items)
         snap_vector(avg_right)
 
@@ -444,20 +442,15 @@ class ProofPanel(BasePanel):
         # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
         self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items)
 
-        if phase_left:
-            if self.graph.type(v) == VertexType.Z_BOX:
-                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v) / phase)
-                set_z_box_label(new_g, v, phase)
-            else:
-                new_g.set_phase(left_vert, new_g.phase(v) - phase)
-                new_g.set_phase(v, phase)
+        first, second = (left_vert, v) if phase_left else (v, left_vert)
+        if self.graph.type(v) == VertexType.Z_BOX:
+            old_label = get_z_box_label(new_g, v)
+            set_z_box_label(new_g, first, old_label / phase)
+            set_z_box_label(new_g, second, phase)
         else:
-            if self.graph.type(v) == VertexType.Z_BOX:
-                set_z_box_label(new_g, left_vert, phase)
-                set_z_box_label(new_g, v, get_z_box_label(new_g, v) / phase)
-            else:
-                new_g.set_phase(left_vert, phase)
-                new_g.set_phase(v, new_g.phase(v) - phase)
+            old_phase = new_g.phase(v)
+            new_g.set_phase(first, old_phase - phase)
+            new_g.set_phase(second, phase)
 
         self._finalize_unfuse(v, new_g)
 
