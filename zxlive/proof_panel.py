@@ -330,10 +330,10 @@ class ProofPanel(BasePanel):
         ])
         self.play_sound_signal.emit(s)
 
-    def _reassign_edges_to_left_vertex(self, v: VT, new_g: GraphT, left_vert: VT, 
+    def _reassign_edges_to_left_vertex(self, v: VT, new_g: GraphT, left_vert: VT,
                                        left_edge_items: list[EItem], skip_edge_type: Optional[EdgeType] = None) -> None:
         """Helper method to reassign edges from the original vertex to the new left vertex.
-        
+
         Args:
             v: Original vertex
             new_g: New graph to modify
@@ -355,10 +355,6 @@ class ProofPanel(BasePanel):
 
     def _finalize_unfuse(self, v: VT, new_g: GraphT) -> None:
         """Helper method to apply animation and push the unfuse command to the undo stack.
-        
-        Args:
-            v: Original vertex
-            new_g: New graph after unfusion
         """
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
@@ -393,7 +389,7 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
-        
+
         # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
         self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items, skip_edge_type=EdgeType.W_IO)
         self._finalize_unfuse(v, new_g)
