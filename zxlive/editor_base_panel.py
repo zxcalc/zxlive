@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QListWidgetItem, QScrollArea, QSizePolicy,
                                QSpacerItem, QSplitter, QToolButton, QWidget)
 from pyzx import EdgeType, VertexType
-from pyzx.utils import get_w_partner, vertex_is_w
+from pyzx.utils import get_w_partner, vertex_is_w, phase_to_s, get_z_box_label
 from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum
 
@@ -255,13 +255,14 @@ class EditorBasePanel(BasePanel):
         if phase_is_complex:
             prompt = "Enter desired phase value (complex value):"
             error_msg = "Please enter a valid input (e.g., -1+2j)."
-
+            current_phase = str(get_z_box_label(graph, v))
         else:
             prompt = "Enter desired phase value (non-variables are multiples of pi):"
             error_msg = "Please enter a valid input. (e.g. pi/2, 1/2, 0.25, a+b)."
+            current_phase = phase_to_s(graph.phase(v), graph.type(v))
 
         input_, ok = QInputDialog.getText(
-            self, "Change Phase", prompt
+            self, "Change Phase", prompt, text=current_phase
         )
         if not ok:
             return None
