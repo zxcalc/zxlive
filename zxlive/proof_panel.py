@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import random
-from typing import Iterator, Union, cast
+from typing import Iterator, Optional, Union, cast
 
 from PySide6.QtCore import QPointF, QSize
 from PySide6.QtGui import QAction, QIcon, QVector2D
@@ -330,6 +330,36 @@ class ProofPanel(BasePanel):
         ])
         self.play_sound_signal.emit(s)
 
+    def _reassign_edges_to_left_vertex(self, v: VT, new_g: GraphT, left_vert: VT,
+                                       left_edge_items: list[EItem], skip_edge_type: Optional[EdgeType] = None) -> None:
+        """Helper method to reassign edges from the original vertex to the new left vertex.
+
+        Args:
+            v: Original vertex
+            new_g: New graph to modify
+            left_vert: New left vertex to reassign edges to
+            left_edge_items: Edge items that should be reassigned
+            skip_edge_type: Optional edge type to skip during reassignment
+        """
+        for edge in set(self.graph.incident_edges(v)):
+            if skip_edge_type is not None and self.graph.edge_type(edge) == skip_edge_type:
+                continue
+            edge_st = self.graph.edge_st(edge)
+            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                if eitem not in left_edge_items:
+                    continue
+                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge))
+                new_g.remove_edge(edge)
+
+    def _finalize_unfuse(self, v: VT, new_g: GraphT) -> None:
+        """Helper method to apply animation and push the unfuse command to the undo stack.
+        """
+        anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
+        self.undo_stack.push(cmd, anim_after=anim)
+
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
         new_g = copy.deepcopy(self.graph)
 
@@ -359,21 +389,10 @@ class ProofPanel(BasePanel):
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
         new_g.set_qubit(v, self.graph.qubit(v))
-        for edge in set(self.graph.incident_edges(v)):
-            if self.graph.edge_type(edge) == EdgeType.W_IO:
-                continue
-            edge_st = self.graph.edge_st(edge)
-            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
-            eitems = self.graph_scene.edge_map[edge]
-            for eitem in eitems.values():
-                if eitem not in left_edge_items:
-                    continue
-                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
-                new_g.remove_edge(edge)
 
-        anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
-        self.undo_stack.push(cmd, anim_after=anim)
+        # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+        self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items, skip_edge_type=EdgeType.W_IO)
+        self._finalize_unfuse(v, new_g)
 
     def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
         def snap_vector(v: QVector2D) -> None:
@@ -395,10 +414,8 @@ class ProofPanel(BasePanel):
             return avg_vector
 
         pos = QPointF(self.graph.row(v), self.graph.qubit(v))
-
         avg_left = compute_avg_vector(pos, left_edge_items)
         snap_vector(avg_left)
-
         avg_right = compute_avg_vector(pos, right_edge_items)
         snap_vector(avg_right)
 
@@ -422,34 +439,20 @@ class ProofPanel(BasePanel):
         new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
         new_g.add_edge((v, left_vert))
 
-        for edge in set(self.graph.incident_edges(v)):
-            edge_st = self.graph.edge_st(edge)
-            neighbor = edge_st[0] if edge_st[1] == v else edge_st[1]
-            eitems = self.graph_scene.edge_map[edge]
-            for eitem in eitems.values():
-                if eitem not in left_edge_items:
-                    continue
-                new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge)) # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
-                new_g.remove_edge(edge)
+        # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
+        self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items)
 
-        if phase_left:
-            if self.graph.type(v) == VertexType.Z_BOX:
-                set_z_box_label(new_g, left_vert, get_z_box_label(new_g, v) / phase)
-                set_z_box_label(new_g, v, phase)
-            else:
-                new_g.set_phase(left_vert, new_g.phase(v) - phase)
-                new_g.set_phase(v, phase)
+        first, second = (left_vert, v) if phase_left else (v, left_vert)
+        if self.graph.type(v) == VertexType.Z_BOX:
+            old_label = get_z_box_label(new_g, v)
+            set_z_box_label(new_g, first, old_label / phase)
+            set_z_box_label(new_g, second, phase)
         else:
-            if self.graph.type(v) == VertexType.Z_BOX:
-                set_z_box_label(new_g, left_vert, phase)
-                set_z_box_label(new_g, v, get_z_box_label(new_g, v) / phase)
-            else:
-                new_g.set_phase(left_vert, phase)
-                new_g.set_phase(v, new_g.phase(v) - phase)
+            old_phase = new_g.phase(v)
+            new_g.set_phase(first, old_phase - phase)
+            new_g.set_phase(second, phase)
 
-        anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
-        self.undo_stack.push(cmd, anim_after=anim)
+        self._finalize_unfuse(v, new_g)
 
     def _vert_double_clicked(self, v: VT) -> None:
         ty = self.graph.type(v)
