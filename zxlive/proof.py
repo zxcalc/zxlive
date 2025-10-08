@@ -613,7 +613,13 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
         value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-        editor.setText(str(value))
+        text = str(value)
+        
+        # Strip the expand/collapse indicator if present
+        if text.startswith("▶ ") or text.startswith("▼ "):
+            text = text[2:]
+        
+        editor.setText(text)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
