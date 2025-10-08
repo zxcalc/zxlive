@@ -127,8 +127,14 @@ class ProofModel(QAbstractItemModel):
         return None
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
-        if index.row() == 0:
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        
+        # START row is not editable
+        if not index.parent().isValid() and index.row() == 0:
             return super().flags(index)
+        
+        # All other items (including children) are editable
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
 
     def headerData(self, section: int, orientation: Qt.Orientation,
@@ -416,16 +422,23 @@ class ProofStepView(QTreeView):
         selected_indexes = self.selectedIndexes()
         if not selected_indexes:
             return
+        
+        # Filter out child items from selection for grouping purposes
+        # Only work with top-level items
+        top_level_indexes = [idx for idx in selected_indexes if not idx.parent().isValid()]
+        if not top_level_indexes:
+            return
+        
         context_menu = QMenu(self)
         action_function_map = {}
 
-        index = selected_indexes[0].row()
-        if len(selected_indexes) > 1:
+        index = top_level_indexes[0].row()
+        if len(top_level_indexes) > 1:
             group_action = context_menu.addAction("Group Steps")
             action_function_map[group_action] = self.group_selected_steps
         elif index != 0:
             rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+            action_function_map[rename_action] = lambda: self.edit(top_level_indexes[0])
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
@@ -453,10 +466,14 @@ class ProofStepView(QTreeView):
         from .commands import GroupRewriteSteps
         from .dialogs import show_error_msg
         selected_indexes = self.selectedIndexes()
-        if not selected_indexes or len(selected_indexes) < 2:
+        
+        # Filter to only top-level items
+        top_level_indexes = [idx for idx in selected_indexes if not idx.parent().isValid()]
+        
+        if not top_level_indexes or len(top_level_indexes) < 2:
             raise ValueError("Can only group two or more steps")
 
-        indices = sorted(index.row() for index in selected_indexes)
+        indices = sorted(index.row() for index in top_level_indexes)
         if indices[-1] - indices[0] != len(indices) - 1:
             show_error_msg("Can only group contiguous steps")
             raise ValueError("Can only group contiguous steps")
@@ -471,10 +488,14 @@ class ProofStepView(QTreeView):
     def ungroup_selected_step(self) -> None:
         from .commands import UngroupRewriteSteps
         selected_indexes = self.selectedIndexes()
-        if not selected_indexes or len(selected_indexes) != 1:
+        
+        # Filter to only top-level items
+        top_level_indexes = [idx for idx in selected_indexes if not idx.parent().isValid()]
+        
+        if not top_level_indexes or len(top_level_indexes) != 1:
             raise ValueError("Can only ungroup one step")
 
-        index = selected_indexes[0].row()
+        index = top_level_indexes[0].row()
         if index == 0 or self.model().steps[index - 1].grouped_rewrites is None:
             raise ValueError("Step is not grouped")
 
@@ -598,4 +619,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
         assert isinstance(editor, QLineEdit)
-        step_view.rename_proof_step(editor.text(), index.row() - 1)
+        
+        # Only allow renaming top-level items (not child items)
+        if not index.parent().isValid():
+            step_view.rename_proof_step(editor.text(), index.row() - 1)
