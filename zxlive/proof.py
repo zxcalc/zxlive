@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
+from PySide6.QtCore import (QAbstractItemModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
+from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QMenu, QTreeView,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
@@ -56,20 +56,23 @@ class Rewrite(NamedTuple):
             grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
         )
 
-class ProofModel(QAbstractListModel):
-    """List model capturing the individual steps in a proof.
+class ProofModel(QAbstractItemModel):
+    """Tree model capturing the individual steps in a proof.
 
     There is a row for each graph in the proof sequence. Furthermore, we store the
     rewrite that was used to go from one graph to next.
+    Grouped steps can be expanded/collapsed in a tree-like fashion.
     """
 
     initial_graph: GraphT
     steps: list[Rewrite]
+    expanded_groups: set[int]  # Track which grouped steps are expanded
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
         self.initial_graph = start_graph
         self.steps = []
+        self.expanded_groups = set()
 
     def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
@@ -85,20 +88,53 @@ class ProofModel(QAbstractListModel):
     def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int=Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
 
-        if index.row() >= len(self.steps)+1 or index.column() >= 1:
+        if not index.isValid():
             return None
 
-        if role == Qt.ItemDataRole.DisplayRole:
-            if index.row() == 0:
-                return "START"
-            else:
-                return self.steps[index.row()-1].display_name
-        elif role == Qt.ItemDataRole.FontRole:
-            return QFont("monospace", 12)
+        # Get the step, considering parent-child relationships
+        if not index.parent().isValid():
+            # Top-level item (including START)
+            row = index.row()
+            if row >= len(self.steps)+1 or index.column() >= 1:
+                return None
+            
+            if role == Qt.ItemDataRole.DisplayRole:
+                if row == 0:
+                    return "START"
+                else:
+                    step = self.steps[row-1]
+                    # For grouped steps, add expand/collapse indicator
+                    if step.grouped_rewrites is not None:
+                        indicator = "▼ " if (row - 1) in self.expanded_groups else "▶ "
+                        return indicator + step.display_name
+                    return step.display_name
+            elif role == Qt.ItemDataRole.FontRole:
+                return QFont("monospace", 12)
+        else:
+            # Child item (sub-step of a grouped rewrite)
+            parent_row = index.parent().row()
+            if parent_row == 0 or parent_row >= len(self.steps) + 1:
+                return None
+            parent_step = self.steps[parent_row - 1]
+            if parent_step.grouped_rewrites is None or index.row() >= len(parent_step.grouped_rewrites):
+                return None
+            
+            if role == Qt.ItemDataRole.DisplayRole:
+                return parent_step.grouped_rewrites[index.row()].display_name
+            elif role == Qt.ItemDataRole.FontRole:
+                return QFont("monospace", 12)
+        
+        return None
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
-        if index.row() == 0:
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        
+        # START row is not editable
+        if not index.parent().isValid() and index.row() == 0:
             return super().flags(index)
+        
+        # All other items (including children) are editable
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
 
     def headerData(self, section: int, orientation: Qt.Orientation,
@@ -113,15 +149,56 @@ class ProofModel(QAbstractListModel):
         """The number of columns"""
         return 1
 
-    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def rowCount(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of rows"""
-        # This is a quirk of Qt list models: Since they are based on tree models, the
-        # user has to specify the index of the parent. In a list, we always expect the
-        # parent to be `None` or the empty `QModelIndex()`
-        if not index or not index.isValid():
-            return len(self.steps)+1
-        else:
+        if not parent.isValid():
+            # Top-level: START + all steps
+            return len(self.steps) + 1
+        
+        # Check if parent is a grouped step that is expanded
+        parent_row = parent.row()
+        if parent_row == 0:  # START has no children
             return 0
+        
+        parent_step_index = parent_row - 1
+        if parent_step_index < 0 or parent_step_index >= len(self.steps):
+            return 0
+        
+        parent_step = self.steps[parent_step_index]
+        # Only show children if the group is expanded
+        if parent_step.grouped_rewrites is not None and parent_step_index in self.expanded_groups:
+            return len(parent_step.grouped_rewrites)
+        
+        return 0
+
+    def index(self, row: int, column: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> QModelIndex:
+        """Create index for the given row and column"""
+        if not self.hasIndex(row, column, parent):
+            return QModelIndex()
+        
+        if not parent.isValid():
+            # Top-level item
+            return self.createIndex(row, column, None)
+        else:
+            # Child item - store parent row in internal pointer
+            parent_row = parent.row()
+            if parent_row == 0:
+                return QModelIndex()
+            # Use parent_row as internal pointer to identify this is a child
+            return self.createIndex(row, column, parent_row)
+
+    def parent(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> QModelIndex:
+        """Return parent index"""
+        if not index.isValid():
+            return QModelIndex()
+        
+        # If internal pointer is None, it's a top-level item (no parent)
+        parent_row = index.internalPointer()
+        if parent_row is None:
+            return QModelIndex()
+        
+        # Return the parent index
+        return self.createIndex(parent_row, 0, None)
 
     def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
@@ -162,8 +239,37 @@ class ProofModel(QAbstractListModel):
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
-        modelIndex = self.createIndex(index, 0)
+        modelIndex = self.createIndex(index + 1, 0, None)
         self.dataChanged.emit(modelIndex, modelIndex, [])
+
+    def toggle_expansion(self, index: int) -> None:
+        """Toggle the expansion state of a grouped step"""
+        if index < 0 or index >= len(self.steps):
+            return
+        
+        step = self.steps[index]
+        if step.grouped_rewrites is None:
+            return
+        
+        model_index = self.createIndex(index + 1, 0, None)
+        
+        if index in self.expanded_groups:
+            # Collapse: remove children
+            self.expanded_groups.remove(index)
+            child_count = len(step.grouped_rewrites)
+            if child_count > 0:
+                self.beginRemoveRows(model_index, 0, child_count - 1)
+                self.endRemoveRows()
+        else:
+            # Expand: add children
+            self.expanded_groups.add(index)
+            child_count = len(step.grouped_rewrites)
+            if child_count > 0:
+                self.beginInsertRows(model_index, 0, child_count - 1)
+                self.endInsertRows()
+        
+        # Update the parent row to change the indicator
+        self.dataChanged.emit(model_index, model_index, [])
 
     def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
@@ -176,7 +282,14 @@ class ProofModel(QAbstractListModel):
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
         self.add_rewrite(new_rewrite, start_index)
-        modelIndex = self.createIndex(start_index, 0)
+        # Automatically expand the new group
+        self.expanded_groups.add(start_index)
+        # Trigger expansion to show children
+        modelIndex = self.createIndex(start_index + 1, 0, None)
+        child_count = len(new_rewrite.grouped_rewrites) if new_rewrite.grouped_rewrites else 0
+        if child_count > 0:
+            self.beginInsertRows(modelIndex, 0, child_count - 1)
+            self.endInsertRows()
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def ungroup_steps(self, index: int) -> None:
@@ -184,11 +297,15 @@ class ProofModel(QAbstractListModel):
         individual_steps = self.steps[index].grouped_rewrites
         if individual_steps is None:
             raise ValueError("Step is not grouped")
+        
+        # Remove from expanded groups if present
+        self.expanded_groups.discard(index)
+        
         self.pop_rewrite(index)
         for i, step in enumerate(individual_steps):
             self.add_rewrite(step, index + i)
-        self.dataChanged.emit(self.createIndex(index, 0),
-                              self.createIndex(index + len(individual_steps), 0),
+        self.dataChanged.emit(self.createIndex(index + 1, 0, None),
+                              self.createIndex(index + len(individual_steps), 0, None),
                               [])
 
     def to_dict(self) -> Dict[str,Any]:
@@ -222,7 +339,7 @@ class ProofModel(QAbstractListModel):
             model.add_rewrite(rewrite)
         return model
 
-class ProofStepView(QListView):
+class ProofStepView(QTreeView):
     """A view for displaying the steps in a proof."""
 
     def __init__(self, parent: 'ProofPanel'):
@@ -233,6 +350,11 @@ class ProofStepView(QListView):
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        
+        # Hide the tree view's default expand/collapse controls
+        self.setRootIsDecorated(False)
+        self.setIndentation(0)
+        
         # Set background color for dark mode (panel background)
         if display_setting.dark_mode:
             self.setStyleSheet("background-color: #23272e;")
@@ -247,17 +369,16 @@ class ProofStepView(QListView):
             pal.setColor(self.backgroundRole(), QColor(255, 255, 255))
             pal.setColor(self.viewport().backgroundRole(), QColor(255, 255, 255))
         self.setPalette(pal)
-        self.setSpacing(0)
+        self.setUniformRowHeights(True)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
+        self.clicked.connect(self.handle_click)
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -270,6 +391,22 @@ class ProofStepView(QListView):
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)  
         self.setCurrentIndex(model.index(len(model.steps), 0))
+
+    def handle_click(self, index: QModelIndex) -> None:
+        """Handle clicks on proof steps, toggle expansion for grouped steps"""
+        if not index.isValid() or index.parent().isValid():
+            # Don't toggle for child items
+            return
+        
+        row = index.row()
+        if row == 0:  # START row
+            return
+        
+        step_index = row - 1
+        if step_index >= 0 and step_index < len(self.model().steps):
+            step = self.model().steps[step_index]
+            if step.grouped_rewrites is not None:
+                self.model().toggle_expansion(step_index)
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -285,16 +422,23 @@ class ProofStepView(QListView):
         selected_indexes = self.selectedIndexes()
         if not selected_indexes:
             return
+        
+        # Filter out child items from selection for grouping purposes
+        # Only work with top-level items
+        top_level_indexes = [idx for idx in selected_indexes if not idx.parent().isValid()]
+        if not top_level_indexes:
+            return
+        
         context_menu = QMenu(self)
         action_function_map = {}
 
-        index = selected_indexes[0].row()
-        if len(selected_indexes) > 1:
+        index = top_level_indexes[0].row()
+        if len(top_level_indexes) > 1:
             group_action = context_menu.addAction("Group Steps")
             action_function_map[group_action] = self.group_selected_steps
         elif index != 0:
             rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+            action_function_map[rename_action] = lambda: self.edit(top_level_indexes[0])
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
@@ -322,10 +466,14 @@ class ProofStepView(QListView):
         from .commands import GroupRewriteSteps
         from .dialogs import show_error_msg
         selected_indexes = self.selectedIndexes()
-        if not selected_indexes or len(selected_indexes) < 2:
+        
+        # Filter to only top-level items
+        top_level_indexes = [idx for idx in selected_indexes if not idx.parent().isValid()]
+        
+        if not top_level_indexes or len(top_level_indexes) < 2:
             raise ValueError("Can only group two or more steps")
 
-        indices = sorted(index.row() for index in selected_indexes)
+        indices = sorted(index.row() for index in top_level_indexes)
         if indices[-1] - indices[0] != len(indices) - 1:
             show_error_msg("Can only group contiguous steps")
             raise ValueError("Can only group contiguous steps")
@@ -340,10 +488,14 @@ class ProofStepView(QListView):
     def ungroup_selected_step(self) -> None:
         from .commands import UngroupRewriteSteps
         selected_indexes = self.selectedIndexes()
-        if not selected_indexes or len(selected_indexes) != 1:
+        
+        # Filter to only top-level items
+        top_level_indexes = [idx for idx in selected_indexes if not idx.parent().isValid()]
+        
+        if not top_level_indexes or len(top_level_indexes) != 1:
             raise ValueError("Can only ungroup one step")
 
-        index = selected_indexes[0].row()
+        index = top_level_indexes[0].row()
         if index == 0 or self.model().steps[index - 1].grouped_rewrites is None:
             raise ValueError("Step is not grouped")
 
@@ -361,6 +513,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     line_width = 3
     line_padding = 13
     vert_padding = 10
+    child_indent = 30  # Additional indent for child steps
 
     circle_radius = 4
     circle_radius_selected = 6
@@ -368,6 +521,11 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
+        
+        # Check if this is a child item
+        is_child = index.parent().isValid()
+        indent_offset = self.child_indent if is_child else 0
+        
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
@@ -386,10 +544,19 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
+        # Determine if this is the last item at this level
+        is_last = False
+        if not is_child:
+            # Top-level item
+            is_last = index.row() == index.model().rowCount() - 1
+        else:
+            # Child item
+            parent_index = index.parent()
+            is_last = index.row() == index.model().rowCount(parent_index) - 1
+
         # Draw line
-        is_last = index.row() == index.model().rowCount() - 1
         line_rect = QRect(
-            self.line_padding,
+            self.line_padding + indent_offset,
             int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
             int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
@@ -408,7 +575,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setBrush(display_setting.effective_colors["z_spider"])
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
+            QPointF(self.line_padding + self.line_width / 2 + indent_offset, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
             circle_radius,
             circle_radius
         )
@@ -417,7 +584,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
+            int(option.rect.x() + self.line_width + 2 * self.line_padding + indent_offset),  # type: ignore[attr-defined]
             int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
@@ -446,10 +613,19 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
         value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-        editor.setText(str(value))
+        text = str(value)
+        
+        # Strip the expand/collapse indicator if present
+        if text.startswith("▶ ") or text.startswith("▼ "):
+            text = text[2:]
+        
+        editor.setText(text)
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
         assert isinstance(editor, QLineEdit)
-        step_view.rename_proof_step(editor.text(), index.row() - 1)
+        
+        # Only allow renaming top-level items (not child items)
+        if not index.parent().isValid():
+            step_view.rename_proof_step(editor.text(), index.row() - 1)
