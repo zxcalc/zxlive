@@ -252,20 +252,19 @@ class ProofModel(QAbstractItemModel):
             return
         
         model_index = self.createIndex(index + 1, 0, None)
+        child_count = len(step.grouped_rewrites)
         
         if index in self.expanded_groups:
             # Collapse: remove children
-            self.expanded_groups.remove(index)
-            child_count = len(step.grouped_rewrites)
             if child_count > 0:
                 self.beginRemoveRows(model_index, 0, child_count - 1)
+                self.expanded_groups.remove(index)
                 self.endRemoveRows()
         else:
             # Expand: add children
-            self.expanded_groups.add(index)
-            child_count = len(step.grouped_rewrites)
             if child_count > 0:
                 self.beginInsertRows(model_index, 0, child_count - 1)
+                self.expanded_groups.add(index)
                 self.endInsertRows()
         
         # Update the parent row to change the indicator
@@ -282,14 +281,15 @@ class ProofModel(QAbstractItemModel):
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
         self.add_rewrite(new_rewrite, start_index)
+        
         # Automatically expand the new group
-        self.expanded_groups.add(start_index)
-        # Trigger expansion to show children
         modelIndex = self.createIndex(start_index + 1, 0, None)
         child_count = len(new_rewrite.grouped_rewrites) if new_rewrite.grouped_rewrites else 0
         if child_count > 0:
             self.beginInsertRows(modelIndex, 0, child_count - 1)
+            self.expanded_groups.add(start_index)
             self.endInsertRows()
+        
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def ungroup_steps(self, index: int) -> None:
