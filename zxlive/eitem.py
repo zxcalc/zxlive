@@ -23,9 +23,10 @@ from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphics
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
 from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
 
-from pyzx.utils import EdgeType
+from pyzx.utils import EdgeType, VertexType
 
 from .common import SCALE, ET, GraphT
+from .settings import display_setting
 from .vitem import VItem, EITEM_Z
 
 if TYPE_CHECKING:
@@ -43,7 +44,7 @@ class EItem(QGraphicsPathItem):
         """Properties of an EItem that can be animated."""
         Thickness = 1
 
-    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0) -> None:
+    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -54,6 +55,7 @@ class EItem(QGraphicsPathItem):
         self.s_item = s_item
         self.t_item = t_item
         self.curve_distance = curve_distance
+        self.index = index
         self.active_animations = set()
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
@@ -68,6 +70,8 @@ class EItem(QGraphicsPathItem):
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
         self.thickness: float = 3
+        self.color: QColor = QColor()
+        self.reset_color()
 
         self.refresh()
 
@@ -79,6 +83,17 @@ class EItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
+    def reset_color(self) -> None:
+        """Reset the color of the edge to the default color."""
+        if self.g.edge_type(self.e) == EdgeType.HADAMARD:
+            self.color = QColor(HAD_EDGE_BLUE)
+        else:
+            if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
+               self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
+                self.color = display_setting.effective_colors["dummy_edge"]
+            else:
+                self.color = display_setting.effective_colors["edge"]
+
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
 
@@ -88,12 +103,12 @@ class EItem(QGraphicsPathItem):
         pen = QPen()
         pen.setWidthF(self.thickness)
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
-            pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
-        else:
-            from .settings import display_setting
-            pen.setColor(display_setting.effective_colors["edge"])
+        pen.setColor(self.color)
         self.setPen(QPen(pen))
+
+        if not self.is_dragging:
+            self.curve_distance = self.g.edata(self.e, f"curve_{self.index}", self.curve_distance)
 
         path = QPainterPath()
         if self.s_item == self.t_item: # self-loop
@@ -129,6 +144,9 @@ class EItem(QGraphicsPathItem):
         # this event fires.
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             self.refresh()
+            
+            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                self.graph_scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
 
@@ -178,7 +196,6 @@ class EItem(QGraphicsPathItem):
         return stroker.createStroke(path)
 
 
-# TODO: This is essentially a clone of EItem. We should common it up!
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
@@ -198,10 +215,12 @@ class EDragItem(QGraphicsPathItem):
         pen = QPen()
         pen.setWidthF(3)
         if self.ety == EdgeType.HADAMARD:
-            pen.setColor(QColor("#0077ff"))
+            pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
+        elif self.start.ty == VertexType.DUMMY:
+            pen.setColor(display_setting.effective_colors["dummy_edge"])
         else:
-            pen.setColor(QColor("#000000"))
+            pen.setColor(display_setting.effective_colors["edge"])
         self.setPen(QPen(pen))
 
         # set path as a straight line from source to target

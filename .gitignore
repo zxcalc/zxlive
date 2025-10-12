@@ -5,6 +5,7 @@ dist
 .vs
 *.tikz
 .venv
+.venv-mac
 .vscode
 .idea
 *.zxg
@@ -14,4 +15,5 @@ dist
 .env
 *.zxr
 .ipynb_checkpoints
+*.code-workspace
 doc/_build/*

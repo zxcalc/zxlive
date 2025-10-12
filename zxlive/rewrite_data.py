@@ -7,12 +7,15 @@ from typing_extensions import TypedDict, NotRequired
 
 import pyzx
 from pyzx import simplify, extract_circuit
+from pyzx.rewrite_rules import editor_actions
 from pyzx.graph import VertexType
 
 from .common import ET, GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
+from .unfusion_rewrite import match_unfuse_single_vertex, apply_unfuse_rule
 
-operations = copy.deepcopy(pyzx.editor.operations)
+
+operations = copy.deepcopy(editor_actions.operations)
 
 MatchType = Literal[1, 2]
 
@@ -33,6 +36,7 @@ class RewriteData(TypedDict):
     custom_rule: NotRequired[bool]
     lhs: NotRequired[GraphT]
     rhs: NotRequired[GraphT]
+    repeat_rule_application: NotRequired[bool]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -51,8 +55,14 @@ def read_custom_rules() -> list[RewriteData]:
                     custom_rules.append(rule)
     return custom_rules
 
-# We want additional actions that are not part of the original PyZX editor
-# So we add them to operations
+operations["unfuse"] = {
+    "text": "unfuse",
+    "tooltip": "Unfuse a spider",
+    "matcher": match_unfuse_single_vertex,
+    "rule": apply_unfuse_rule,
+    "type": MATCHES_VERTICES,
+    "copy_first": False,
+}
 
 rewrites_graph_theoretic: dict[str, RewriteData] = {
     "lcomp": {
@@ -78,7 +88,7 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
         "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
         "matcher": pyzx.rules.match_pivot_boundary,
         "rule": pyzx.rules.pivot,
-        "type": MATCHES_EDGES,
+        "type": MATCHES_VERTICES,
         "copy_first": True
     },
     "pivot_gadget": {
@@ -290,14 +300,18 @@ simplifications: dict[str, RewriteData] = {
     },
 }
 
-rules_basic = {"spider", "to_z", "to_x", "rem_id", "copy", "pauli", "bialgebra", "bialgebra_op", "euler"}
+rules_basic = ["spider", "unfuse", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
+               "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
+
+operations["spider"]["repeat_rule_application"] = True
+operations["rem_id"]["repeat_rule_application"] = True
 operations["pauli"]["picture"] = "push_pauli.png"
 operations["copy"]["picture"] = "copy_pi.png"
 operations["bialgebra"]["picture"] = "bialgebra.png"
 
-rules_zxw = {"spider", "fuse_w", "z_to_z_box"}
+rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
 
-rules_zh = {"had2edge", "fuse_hbox", "mult_hbox"}
+rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 action_groups = {
     "Basic rules": {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},

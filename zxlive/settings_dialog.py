@@ -110,6 +110,7 @@ tikz_export_settings: list[SettingsData] = [
     {"id": "tikz/w-input-export", "label": "W input", "type": FormInputType.Str},
     {"id": "tikz/w-output-export", "label": "W output", "type": FormInputType.Str},
     {"id": "tikz/z-box-export", "label": "Z box", "type": FormInputType.Str},
+    {"id": "tikz/dummy-export", "label": "Dummy node", "type": FormInputType.Str},
     {"id": "tikz/edge-W-export", "label": "W io edge", "type": FormInputType.Str},
 ]
 
@@ -120,6 +121,7 @@ tikz_import_settings: list[SettingsData] = [
     {"id": "tikz/w-input-import", "label": "W input", "type": FormInputType.Str},
     {"id": "tikz/w-output-import", "label": "W output", "type": FormInputType.Str},
     {"id": "tikz/z-box-import", "label": "Z box", "type": FormInputType.Str},
+    {"id": "tikz/dummy-import", "label": "Dummy node", "type": FormInputType.Str},
     {"id": "tikz/edge-import", "label": "regular edge", "type": FormInputType.Str},
     {"id": "tikz/edge-H-import", "label": "H edge", "type": FormInputType.Str},
     {"id": "tikz/edge-W-import", "label": "W io edge", "type": FormInputType.Str},

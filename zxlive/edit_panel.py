@@ -38,6 +38,7 @@ class GraphEditPanel(EditorBasePanel):
         self.graph_scene.vertices_moved.connect(self.vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene.vertex_added.connect(self.add_vert)
+        self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_added.connect(self.add_edge)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
@@ -49,6 +50,7 @@ class GraphEditPanel(EditorBasePanel):
         self.splitter.addWidget(self.patterns_sidebar)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
+        self.graph_view.merge_triggered.connect(self.merge_vertices)
 
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
@@ -82,10 +84,6 @@ class GraphEditPanel(EditorBasePanel):
             show_error_msg("Graph is not well-formed", parent=self)
             return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
-        for vert in new_g.vertices():
-            phase = new_g.phase(vert)
-            if isinstance(phase, Poly):
-                phase.freeze()
         self.start_derivation_signal.emit(new_g)
 
     def _input_circuit(self) -> None:

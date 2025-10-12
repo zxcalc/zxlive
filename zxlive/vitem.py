@@ -60,6 +60,7 @@ class VItem(QGraphicsPathItem):
     phase_item: PhaseItem
     adj_items: Set[EItem]  # Connected edges
     graph_scene: GraphScene
+    dummy_text_item: Optional[QGraphicsTextItem] = None  # For dummy node text
 
     halftone = "1000100010001000" #QPixmap("images/halftone.png")
 
@@ -90,6 +91,7 @@ class VItem(QGraphicsPathItem):
         self.adj_items: Set[EItem] = set()
         self.phase_item = PhaseItem(self)
         self.active_animations = set()
+        self.dummy_text_item = None
 
         self._old_pos = None
         self._dragged_on = None
@@ -129,6 +131,7 @@ class VItem(QGraphicsPathItem):
             VertexType.H_BOX: "hadamard",
             VertexType.W_INPUT: "w_input",
             VertexType.W_OUTPUT: "w_output",
+            VertexType.DUMMY: "dummy",
         }
         pressed_color_map = {
             VertexType.Z: "z_spider_pressed",
@@ -137,6 +140,7 @@ class VItem(QGraphicsPathItem):
             VertexType.H_BOX: "hadamard_pressed",
             VertexType.W_INPUT: "w_input_pressed",
             VertexType.W_OUTPUT: "w_output_pressed",
+            VertexType.DUMMY: "dummy_pressed",
         }
         pen = QPen()
         if not self.isSelected():
@@ -144,6 +148,8 @@ class VItem(QGraphicsPathItem):
             brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
             pen.setColor(display_setting.effective_colors["outline"])
+            if self.ty == VertexType.DUMMY:
+                pen.setColor(display_setting.effective_colors["dummy"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
             brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
@@ -154,9 +160,26 @@ class VItem(QGraphicsPathItem):
                 pen.setColor(QColor("#dbdbdb"))
             else:
                 pen.setColor(display_setting.effective_colors["boundary_pressed"])
+            if self.ty == VertexType.DUMMY:
+                pen.setColor(display_setting.effective_colors["dummy_pressed"])
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)
+
+        # Render dummy node text if applicable
+        if self.ty == VertexType.DUMMY:
+            text = self.g.vdata(self.v, 'text', '')
+            if self.dummy_text_item is None:
+                self.dummy_text_item = QGraphicsTextItem(self)
+                self.dummy_text_item.setDefaultTextColor(QColor("#222"))
+                self.dummy_text_item.setFont(display_setting.font)
+            self.dummy_text_item.setPlainText(text)
+            # Center the text in the node
+            rect = self.dummy_text_item.boundingRect()
+            self.dummy_text_item.setPos(-rect.width()/2, -rect.height()/2 - 0.25 * SCALE)
+            self.dummy_text_item.setVisible(bool(text))
+        elif self.dummy_text_item is not None:
+            self.dummy_text_item.setVisible(False)
 
         if self.phase_item:
             self.phase_item.refresh()
@@ -178,7 +201,7 @@ class VItem(QGraphicsPathItem):
             path.lineTo(0.25 * SCALE, -0.15 * SCALE)
             path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
             path.closeSubpath()
-        elif self.ty == VertexType.W_INPUT or self.ty == VertexType.BOUNDARY:
+        elif self.ty in {VertexType.W_INPUT, VertexType.BOUNDARY, VertexType.DUMMY}:
             scale = 0.3 * SCALE
             path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
@@ -243,6 +266,11 @@ class VItem(QGraphicsPathItem):
             # should be refreshed or not
             if not self.is_animated:
                 self.refresh()
+            
+            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                scene = self.scene()
+                if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+                scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
 

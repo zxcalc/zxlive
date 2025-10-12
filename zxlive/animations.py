@@ -275,7 +275,7 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     return anim
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
-    """Animation that is played when a spider is unfused using the magic wand."""
+    """Animation that is played when a spider is unfused."""
     return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
                        duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 
@@ -295,8 +295,8 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         print('To do: animate ' + self.name)
     elif self.name == operations['rem_id']['text']:
         anim_before = QParallelAnimationGroup()
-        for m in matches:
-            anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[m[0]]))
+        for v in rem_verts:
+            anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
     elif self.name == operations['copy']['text']:
         anim_before = QParallelAnimationGroup()
         for m in matches:

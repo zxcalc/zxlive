@@ -134,6 +134,9 @@ class GraphScene(QGraphicsScene):
                 self.removeItem(e_item.selection_node)
             for anim_e in e_item.active_animations.copy():
                 anim_e.stop()
+            e_item.s_item.adj_items.remove(e_item)
+            if e_item.s_item != e_item.t_item:
+                e_item.t_item.adj_items.remove(e_item)
             self.removeItem(e_item)
             self.edge_map[e].pop(edge_idx)
             s, t = self.g.edge_st(e)
@@ -162,7 +165,8 @@ class GraphScene(QGraphicsScene):
             if e not in self.edge_map:
                 self.edge_map[e] = {}
             idx = len(self.edge_map[e])
-            e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
+            curve_distance = self.g.edata(e, f"curve_{idx}", 0.0)
+            e_item = EItem(self, e, self.vertex_map[s], self.vertex_map[t], curve_distance, idx)
             self.edge_map[e][idx] = e_item
             self.update_edge_curves(s, t)
             self.addItem(e_item)
@@ -180,6 +184,10 @@ class GraphScene(QGraphicsScene):
         for v in diff.changed_vdata:
             self.vertex_map[v].refresh()
 
+        for e in diff.changed_edata:
+            for i in self.edge_map[e]:
+                self.edge_map[e][i].refresh()
+
         for v in diff.changed_pos:
             v_item = self.vertex_map[v]
             for anim in v_item.active_animations.copy():
@@ -189,6 +197,7 @@ class GraphScene(QGraphicsScene):
 
         for e in diff.changed_edge_types:
             for i in self.edge_map[e]:
+                self.edge_map[e][i].reset_color()
                 self.edge_map[e][i].refresh()
 
         self.select_vertices(selected_vertices)
@@ -211,6 +220,7 @@ class GraphScene(QGraphicsScene):
             v.refresh()
         for e in self.edge_map.values():
             for ei in e.values():
+                ei.reset_color()
                 ei.refresh()
 
     def add_items(self) -> None:
@@ -227,7 +237,8 @@ class GraphScene(QGraphicsScene):
             s, t = self.g.edge_st(e)
             self.edge_map[e] = {}
             for i in range(self.g.graph[s][t].get_edge_count(e[2])):
-                ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t])
+                curve_distance = self.g.edata(e, f"curve_{i}", 0.0)
+                ei = EItem(self, e, self.vertex_map[s], self.vertex_map[t], curve_distance, i)
                 self.addItem(ei)
                 self.addItem(ei.selection_node)
                 self.edge_map[e][i] = ei

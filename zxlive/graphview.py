@@ -73,6 +73,7 @@ class GraphView(QGraphicsView):
     """
 
     wand_trace_finished = Signal(object)
+    merge_triggered = Signal()
     draw_background_lines = True
 
     def __init__(self, graph_scene: GraphScene) -> None:
@@ -150,13 +151,17 @@ class GraphView(QGraphicsView):
             e.ignore()
 
     def keyPressEvent(self, e: QKeyEvent) -> None:
-        """Logic for moving selected vertices with arrow keys"""
+        """Logic for moving selected vertices with arrow keys and merging selected vertices with Ctrl+M"""
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
             g = self.graph_scene.g
             if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
                 distance = 1 / get_settings_value("snap-granularity", int)
             else:
                 distance = 0.5
+            if e.key() == Qt.Key.Key_M:
+                # Merge vertices at the same position
+                self.merge_triggered.emit()
+                return
             for v in self.graph_scene.selected_vertices:
                 vitem = self.graph_scene.vertex_map[v]
                 x = g.row(v)
@@ -358,13 +363,17 @@ class ProofGraphView(GraphView):
 
     def __update_scalar_label(self, scalar: Scalar) -> None:
         self.scalar = scalar
-        scalar_string = f" Scalar: {scalar.polar_str()}"
-        if display_setting.dark_mode:
-            colour = "#eeeeee"
-            text = f"{scalar_string}"
-        elif scalar.is_zero:
+        try:
+            scalar_string = f" Scalar: {scalar.polar_str()}"
+        except:
+            scalar_string = f" Scalar: {scalar}"
+
+        if scalar.is_zero:
             colour = "red"
             text = f"{scalar_string}, The global scalar is zero"
+        elif display_setting.dark_mode:
+            colour = "#eeeeee"
+            text = f"{scalar_string}"
         else:
             colour = "black"
             text = f"{scalar_string}"

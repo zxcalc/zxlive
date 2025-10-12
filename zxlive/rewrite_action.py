@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING, Any, cast, Union, Optional
+from typing import Callable, TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 import pyzx
+from pyzx.utils import VertexType
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
@@ -44,6 +45,7 @@ class RewriteAction:
     # Whether the rule returns a new graph instead of returning the rewrite changes.
     returns_new_graph: bool = field(default=False)
     enabled: bool = field(default=False)
+    repeat_rule_application: bool = False
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -64,27 +66,56 @@ class RewriteAction:
             rhs_graph = d.get('rhs', None),
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
+            repeat_rule_application=d.get('repeat_rule_application', False),
         )
 
     def do_rewrite(self, panel: ProofPanel) -> None:
         if not self.enabled:
             return
 
+        # Special handling for unfusion rule
+        if self.name == "unfuse":
+            from .unfusion_rewrite import UnfusionRewriteAction
+            verts, _ = panel.parse_selection()
+            if len(verts) == 1:
+                self.unfusion_action = UnfusionRewriteAction(panel)
+                self.unfusion_action.start_unfusion(verts[0])
+            return
+
         g = copy.deepcopy(panel.graph_scene.g)
         verts, edges = panel.parse_selection()
 
-        matches = self.matcher(g, lambda v: v in verts) \
-            if self.match_type == MATCHES_VERTICES \
-            else self.matcher(g, lambda e: e in edges)
-
-        try:
-            g, rem_verts = self.apply_rewrite(g, matches)
-        except Exception as ex:
-            show_error_msg('Error while applying rewrite rule', str(ex))
-            return
+        rem_verts_list: list[VT] = []
+        matches_list: list[VT | ET] = []
+        while True:
+            if self.match_type == MATCHES_VERTICES:
+                matches = self.matcher(
+                    g,
+                    lambda v: v in verts and g.type(v) != VertexType.DUMMY
+                )
+            else:
+                matches = self.matcher(
+                    g,
+                    lambda e: (
+                        e in edges and
+                        g.type(g.edge_s(e)) != VertexType.DUMMY and
+                        g.type(g.edge_t(e)) != VertexType.DUMMY
+                    )
+                )
+            matches_list.extend(matches)
+            if not matches:
+                break
+            try:
+                g, rem_verts = self.apply_rewrite(g, matches)
+                rem_verts_list.extend(rem_verts)
+            except Exception as ex:
+                show_error_msg('Error while applying rewrite rule', str(ex))
+                return
+            if not self.repeat_rule_application:
+                break
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
-        anim_before, anim_after = make_animation(self, panel, g, matches, rem_verts)
+        anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Narrow down the type of the first return value.

@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Iterable, Optional, Set, Union, Callable
+from typing import Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -61,6 +61,25 @@ class UndoableChange(BaseCommand):
     undo: Callable[[], None]
     redo: Callable[[], None]
 
+
+class ProofModeCommand(QUndoCommand):
+    def __init__(self, command: BaseCommand, step_view: ProofStepView):
+        super().__init__()
+        self.command = command
+        self.step_view = step_view
+        self.proof_step_index = int(step_view.currentIndex().row())
+
+    def undo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        self.command.undo()
+        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
+
+    def redo(self) -> None:
+        self.step_view.move_to_step(self.proof_step_index)
+        self.command.redo()
+        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
+
+
 @dataclass
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
@@ -74,7 +93,6 @@ class SetGraph(BaseCommand):
     def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
-
 
 @dataclass
 class UpdateGraph(BaseCommand):
@@ -96,7 +114,6 @@ class UpdateGraph(BaseCommand):
             self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
         self.g = self.new_g
         self.update_graph_view(True)
-
 
 @dataclass
 class ChangeNodeType(BaseCommand):
@@ -208,6 +225,7 @@ class AddNode(BaseCommand):
         self._added_vert = self.g.add_vertex(self.vty, y,x)
         self.update_graph_view()
 
+
 @dataclass
 class AddNodeSnapped(BaseCommand):
     """Adds a new spider positioned on an edge, replacing the original edge"""
@@ -242,11 +260,11 @@ class AddNodeSnapped(BaseCommand):
         elif self._et == EdgeType.HADAMARD:
             self.g.add_edge((s, self.added_vert), EdgeType.HADAMARD)
             self.g.add_edge((t, self.added_vert), EdgeType.SIMPLE)
-        else: 
+        else:
             raise ValueError("Can't add spider between vertices connected by edge of type", str(self._et))
         self.s = s
         self.t = t
-        
+
         self.g.remove_edge(self.e)
         self.update_graph_view()
 
@@ -289,6 +307,7 @@ class AddEdge(BaseCommand):
         self.g.add_edge((self.u, self.v), self.ety)
         self.update_graph_view()
 
+
 @dataclass
 class AddEdges(BaseCommand):
     """Adds multiple edges of the same type to a graph."""
@@ -329,39 +348,57 @@ class MoveNode(BaseCommand):
         self.update_graph_view()
 
 @dataclass
-class MoveNodeProofMode(MoveNode):
-    step_view: ProofStepView
-
-    def __init__(self, graph_view: GraphView, vs: list[tuple[VT, float, float]], step_view: ProofStepView) -> None:
-        super().__init__(graph_view, vs)
-        self.step_view = step_view
-        self.proof_step_index = int(step_view.currentIndex().row())
-
-    def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
-    def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
-        super().redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.graph_view.graph_scene.g)
-
-
-@dataclass
 class ChangeEdgeCurve(BaseCommand):
     """Changes the curve of an edge."""
     eitem: EItem
     new_distance: float
     old_distance: float
 
+    def _set_distance(self, distance: float) -> None:
+        self.eitem.curve_distance = distance
+        edge, idx = self.eitem.e, self.eitem.index
+        self.g.set_edata(edge, f"curve_{idx}", distance)
+        self.update_graph_view()
+
     def undo(self) -> None:
-        self.eitem.curve_distance = self.old_distance
-        self.eitem.refresh()
+        self._set_distance(self.old_distance)
 
     def redo(self) -> None:
-        self.eitem.curve_distance = self.new_distance
-        self.eitem.refresh()
+        self._set_distance(self.new_distance)
+
+@dataclass
+class MergeNodes(BaseCommand):
+    """Merges groups of vertices that are at the same position."""
+    vertices_to_merge: list[VT]
+    
+    _old_g: Optional[GraphT] = field(default=None, init=False)
+
+    def undo(self) -> None:
+        assert self._old_g is not None
+        self.g = self._old_g
+        self.update_graph_view()
+
+    def redo(self) -> None:
+        self._old_g = copy.deepcopy(self.g)
+        if len(self.vertices_to_merge) < 2:
+            return
+        target = self.vertices_to_merge[0]
+        for v in self.vertices_to_merge[1:]:
+            if v not in self.g.vertices():
+                continue
+            for e in self.g.incident_edges(v):
+                s,t = self.g.edge_st(e)
+                if s == target or t == target:
+                    continue
+                ety = self.g.edge_type(e)
+                if s == v and t == v:
+                    self.g.add_edge((target, target), ety)
+                elif s == v:
+                    self.g.add_edge((target, t), ety)
+                else:
+                    self.g.add_edge((s, target), ety)
+            self.g.remove_vertex(v)
+        self.update_graph_view()
 
 
 @dataclass

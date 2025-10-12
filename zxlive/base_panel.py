@@ -117,6 +117,15 @@ class BasePanel(QWidget):
         assert isinstance(copied_graph, GraphT)  # type: ignore
         return copied_graph
 
+    def delete_selection(self) -> None:
+        pass
+
+    def paste_selection(self, graph: GraphT) -> None:
+        pass
+
+    def paste_graph(self, graph: GraphT) -> None:
+        pass
+
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
 
@@ -127,8 +136,6 @@ class BasePanel(QWidget):
         if self.__class__ in self.splitter_sizes:
             self.splitter.setSizes(self.splitter_sizes[self.__class__])
 
-    def change_edge_curves(self, eitem: EItem, new_distance: float, old_distance: float) -> None:
-        self.undo_stack.push(ChangeEdgeCurve(self.graph_view, eitem, new_distance, old_distance))
 
     def update_font(self) -> None:
         self.graph_view.update_font()
