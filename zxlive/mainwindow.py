@@ -185,6 +185,10 @@ class MainWindow(QMainWindow):
         rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
+        check_for_updates = self._new_action("Check for &Updates...", self.check_for_updates, None, "Check for new versions of ZXLive")
+        help_menu = menu.addMenu("&Help")
+        help_menu.addAction(check_for_updates)
+
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
@@ -650,3 +654,45 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
+
+    def check_for_updates(self) -> None:
+        """Manually check for updates."""
+        from .update_checker import UpdateChecker
+        from .dialogs import show_update_available_dialog
+        
+        # Show a simple message that we're checking
+        from PySide6.QtWidgets import QMessageBox
+        checking_msg = QMessageBox(self)
+        checking_msg.setWindowTitle("Checking for Updates")
+        checking_msg.setText("Checking for updates...")
+        checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
+        checking_msg.setModal(False)
+        checking_msg.show()
+        QApplication.processEvents()  # Force UI update
+        
+        # Create a temporary update checker for manual checks
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        version = app.applicationVersion() if app else "0.3.1"
+        
+        checker = UpdateChecker(version, self.settings)
+        update_found = [False]  # Use list to allow modification in nested function
+        
+        def on_update_available(latest_version: str, url: str) -> None:
+            update_found[0] = True
+            checking_msg.close()
+            show_update_available_dialog(version, latest_version, url, self)
+        
+        def on_check_complete() -> None:
+            checking_msg.close()
+            if not update_found[0]:
+                msg = QMessageBox(self)
+                msg.setWindowTitle("No Updates")
+                msg.setText("You are using the latest version of ZXLive!")
+                msg.setIcon(QMessageBox.Icon.Information)
+                msg.exec()
+        
+        checker.update_available.connect(on_update_available)
+        checker.check_complete.connect(on_check_complete)
+        checker.check_for_updates_async()
+

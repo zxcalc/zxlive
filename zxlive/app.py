@@ -25,6 +25,8 @@ sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
 from .mainwindow import MainWindow
 from .common import get_data, GraphT
 from .settings import display_setting
+from .update_checker import UpdateChecker
+from .dialogs import show_update_available_dialog
 from typing import Optional, cast
 
 # The following hack is needed on windows in order to show the icon in the taskbar
@@ -55,6 +57,14 @@ class ZXLive(QApplication):
 
         self.lastWindowClosed.connect(self.quit)
 
+        # Initialize update checker
+        self.update_checker = UpdateChecker(self.applicationVersion(), self.main_window.settings)
+        self.update_checker.update_available.connect(self._on_update_available)
+        
+        # Check for updates in background if needed
+        if self.update_checker.should_check_for_updates():
+            self.update_checker.check_for_updates_async()
+
         parser = QCommandLineParser()
         parser.setApplicationDescription("ZXLive - An interactive tool for the ZX-calculus")
         parser.addHelpOption()
@@ -66,6 +76,11 @@ class ZXLive(QApplication):
         else:
             for f in parser.positionalArguments():
                 self.main_window.open_file_from_path(f)
+    
+    def _on_update_available(self, version: str, url: str) -> None:
+        """Handle update available notification."""
+        if self.main_window:
+            show_update_available_dialog(self.applicationVersion(), version, url, self.main_window)
 
     def edit_graph(self, g: GraphT, name: str) -> None:
         """Opens a ZXLive window from within a notebook to edit a graph."""

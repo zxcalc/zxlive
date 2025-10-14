@@ -351,3 +351,29 @@ def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[
     new_g = copy.deepcopy(graph)
     new_g.set_vdata(v, 'text', input_)
     return new_g
+
+
+def show_update_available_dialog(current_version: str, latest_version: str, release_url: str, parent: Optional[QWidget] = None) -> None:
+    """Shows a dialog informing the user about a new version."""
+    msg = QMessageBox(parent)
+    msg.setWindowTitle("Update Available")
+    msg.setText(f"A new version of ZXLive is available!")
+    msg.setInformativeText(
+        f"Current version: {current_version}\n"
+        f"Latest version: {latest_version}\n\n"
+        f"Visit the releases page to download the latest version."
+    )
+    msg.setIcon(QMessageBox.Icon.Information)
+    
+    # Add a button to open the release page
+    view_release_button = msg.addButton("View Release", QMessageBox.ButtonRole.AcceptRole)
+    msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+    msg.setDefaultButton(view_release_button)
+    
+    msg.exec()
+    
+    # Open URL if user clicked "View Release"
+    if msg.clickedButton() == view_release_button:
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        QDesktopServices.openUrl(QUrl(release_url))
