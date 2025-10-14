@@ -153,6 +153,8 @@ class ProofPanel(BasePanel):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
             elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
+            elif editor_actions.operations['pauli']['matcher'](self.graph, lambda x: x in (v, w)):
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
