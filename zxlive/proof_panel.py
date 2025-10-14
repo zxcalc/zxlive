@@ -152,6 +152,8 @@ class ProofPanel(BasePanel):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
             elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
+            elif self._check_h_bialgebra(v, w):
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
@@ -180,11 +182,127 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
+        elif self._apply_h_color_change(g, v, w):
+            anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "H-box color change")
+            self.undo_stack.push(cmd, anim_after=anim)
+        elif self._apply_h_bialgebra(g, v, w):
+            anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "H-bialgebra")
+            self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
+            self.undo_stack.push(cmd, anim_after=anim)
         else:
             view_pos = self.graph_scene.vertex_map[v].pos()
             pos = pos_from_view(view_pos.x(), view_pos.y())
             move_cmd = ProofModeCommand(MoveNode(self.graph_view, [(v, pos[0], pos[1])]), self.step_view)
             self.undo_stack.push(move_cmd)
+
+    def _check_h_bialgebra(self, v: VT, w: VT) -> bool:
+        """Check if we can apply H-bialgebra or H-box color change."""
+        v_type = self.graph.type(v)
+        w_type = self.graph.type(w)
+        
+        # Check if one is an H-box and the other is a Z or X spider
+        if v_type == VertexType.H_BOX and w_type in (VertexType.Z, VertexType.X):
+            return True
+        if w_type == VertexType.H_BOX and v_type in (VertexType.Z, VertexType.X):
+            return True
+        return False
+
+    def _apply_h_color_change(self, g: GraphT, v: VT, w: VT) -> bool:
+        """Apply color change when a 2-ary H-box is dropped on a Z/X spider.
+        
+        This implements the ZH rewrite where dropping a Hadamard (2-ary H-box) on a spider
+        causes a color change and connects the H-box neighbors to the spider with appropriate edges.
+        """
+        v_type = g.type(v)
+        w_type = g.type(w)
+        
+        # Determine which is the H-box and which is the spider
+        if v_type == VertexType.H_BOX and w_type in (VertexType.Z, VertexType.X):
+            h_box, spider = v, w
+        elif w_type == VertexType.H_BOX and v_type in (VertexType.Z, VertexType.X):
+            h_box, spider = w, v
+        else:
+            return False
+        
+        # Check if H-box is a Hadamard (arity 2)
+        if not pyzx.hrules.is_hadamard(g, h_box):
+            return False
+        
+        # Get the neighbors of the H-box
+        h_neighbors = list(g.neighbors(h_box))
+        if len(h_neighbors) != 2:
+            return False
+        
+        # Apply the transformation:
+        # The H-box acts as a Hadamard gate between its two neighbors
+        # When dropped on a spider, we:
+        # 1. Connect both H-box neighbors to the spider
+        # 2. Color change the spider (which flips the spider type and toggles all edge types)
+        # 3. Remove the H-box
+        n1, n2 = h_neighbors
+        
+        # Connect both neighbors to the spider with simple edges
+        g.add_edge((n1, spider), EdgeType.SIMPLE)
+        g.add_edge((n2, spider), EdgeType.SIMPLE)
+        
+        # Color change the spider (this flips spider type and all adjacent edge types)
+        basicrules.color_change(g, spider)
+        
+        # Remove the H-box
+        g.remove_vertex(h_box)
+        
+        return True
+
+    def _apply_h_bialgebra(self, g: GraphT, v: VT, w: VT) -> bool:
+        """Apply H-bialgebra when an H-box is dropped on a Z/X spider.
+        
+        This implements the ZH bialgebra rewrite where dropping an H-box on a spider
+        connects all H-box neighbors to all spider neighbors, similar to regular bialgebra
+        but with colors flipped.
+        """
+        v_type = g.type(v)
+        w_type = g.type(w)
+        
+        # Determine which is the H-box and which is the spider
+        if v_type == VertexType.H_BOX and w_type in (VertexType.Z, VertexType.X):
+            h_box, spider = v, w
+        elif w_type == VertexType.H_BOX and v_type in (VertexType.Z, VertexType.X):
+            h_box, spider = w, v
+        else:
+            return False
+        
+        # Skip if this is a 2-ary H-box (handled by color change)
+        if pyzx.hrules.is_hadamard(g, h_box):
+            return False
+        
+        # Get neighbors
+        h_neighbors = list(g.neighbors(h_box))
+        spider_neighbors = list(g.neighbors(spider))
+        
+        # Check arity conditions (similar to strong_comp)
+        if len(h_neighbors) <= 1 or len(spider_neighbors) <= 1:
+            return False
+        
+        # Apply the H-bialgebra transformation:
+        # 1. Connect all H-box neighbors to all spider neighbors
+        # 2. Color change the spider
+        # 3. Remove the H-box and spider
+        
+        for hn in h_neighbors:
+            for sn in spider_neighbors:
+                if hn != sn:  # Avoid self-loops
+                    g.add_edge((hn, sn), EdgeType.SIMPLE)
+        
+        # Color change the spider before removing
+        basicrules.color_change(g, spider)
+        
+        # Remove the H-box and spider
+        g.remove_vertex(h_box)
+        g.remove_vertex(spider)
+        
+        return True
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
         if self._magic_slice(trace):
