@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 import pyzx
 from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.rewrite_rules import editor_actions
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
@@ -173,6 +174,19 @@ class ProofPanel(BasePanel):
             g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            self.undo_stack.push(cmd, anim_after=anim)
+        elif editor_actions.operations['pauli']['matcher'](g, lambda x: x in (v, w)):
+            # Check if we can push a Pauli spider through the other vertex
+            match = editor_actions.operations['pauli']['matcher'](g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.operations['pauli']['rule'](g, match)
+            g.add_edge_table(etab)
+            g.remove_edges(rem_edges)
+            g.remove_vertices(rem_verts)
+            # Determine which vertex is the target (the one being pushed through)
+            # The match is (pauli_vertex, target_vertex)
+            target = match[0][1] if match else w
+            anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "push Pauli")
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
