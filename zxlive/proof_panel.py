@@ -243,9 +243,11 @@ class ProofPanel(BasePanel):
         # 3. Remove the H-box
         n1, n2 = h_neighbors
         
-        # Connect both neighbors to the spider with simple edges
-        g.add_edge((n1, spider), EdgeType.SIMPLE)
-        g.add_edge((n2, spider), EdgeType.SIMPLE)
+        # Connect both neighbors to the spider with simple edges (if not already connected)
+        if not g.connected(n1, spider):
+            g.add_edge((n1, spider), EdgeType.SIMPLE)
+        if not g.connected(n2, spider):
+            g.add_edge((n2, spider), EdgeType.SIMPLE)
         
         # Color change the spider (this flips spider type and all adjacent edge types)
         basicrules.color_change(g, spider)
@@ -292,7 +294,7 @@ class ProofPanel(BasePanel):
         
         for hn in h_neighbors:
             for sn in spider_neighbors:
-                if hn != sn:  # Avoid self-loops
+                if hn != sn and not g.connected(hn, sn):  # Avoid self-loops and duplicate edges
                     g.add_edge((hn, sn), EdgeType.SIMPLE)
         
         # Color change the spider before removing
