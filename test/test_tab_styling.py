@@ -1,4 +1,10 @@
-"""Test tab styling improvements."""
+"""Test tab styling improvements.
+
+This module tests the custom tab styling features added to ZXLive:
+- CustomTabBar class implementation
+- Close button visibility behavior (hidden by default, shown on hover)
+- Mouse tracking functionality for hover detection
+"""
 
 import pytest
 from PySide6.QtWidgets import QTabBar
