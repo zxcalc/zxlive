@@ -54,6 +54,8 @@ from pyzx.drawing import graphs_to_gif
 class CustomTabBar(QTabBar):
     """Custom tab bar that shows close buttons only on hover."""
     
+    hovered_tab: int
+    
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.hovered_tab = -1
