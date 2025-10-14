@@ -169,8 +169,8 @@ class ProofPanel(BasePanel):
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.hrules.match_copy(g, lambda x: x in (v, w)):
-            match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, match)
+            copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
             g.add_edge_table(etab)
             g.remove_edges(rem_edges)
             g.remove_vertices(rem_verts)
@@ -179,14 +179,14 @@ class ProofPanel(BasePanel):
             self.undo_stack.push(cmd, anim_after=anim)
         elif editor_actions.pauli_matcher(g, lambda x: x in (v, w)):
             # Check if we can push a Pauli spider through the other vertex
-            match = editor_actions.pauli_matcher(g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.pauli_push(g, match)
+            pauli_match = editor_actions.pauli_matcher(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.pauli_push(g, pauli_match)
             g.add_edge_table(etab)
             g.remove_edges(rem_edges)
             g.remove_vertices(rem_verts)
             # Determine which vertex is the target (the one being pushed through)
             # The match is (pauli_vertex, target_vertex)
-            target = match[0][1] if match else w
+            target = pauli_match[0][1] if pauli_match else w
             anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "push Pauli")
             self.undo_stack.push(cmd, anim_after=anim)
