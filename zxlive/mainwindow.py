@@ -20,12 +20,12 @@ import random
 from typing import Callable, Optional, cast
 
 from PySide6.QtCore import (QByteArray, QDir, QEvent, QFile, QFileInfo,
-                            QIODevice, QSettings, QTextStream, Qt, QUrl, QObject)
+                            QIODevice, QSettings, QTextStream, Qt, QUrl)
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut, QMouseEvent
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
                                QTableWidget, QTableWidgetItem, QTabWidget, QTabBar,
-                               QVBoxLayout, QWidget, QApplication, QStylePainter, QStyleOptionTab, QStyle)
+                               QVBoxLayout, QWidget, QApplication)
 
 import pyperclip
 
@@ -58,12 +58,6 @@ class CustomTabBar(QTabBar):
         super().__init__(parent)
         self.hovered_tab = -1
         self.setMouseTracking(True)
-    
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        """Filter events to track mouse hover."""
-        if event.type() == QEvent.Type.Enter:
-            self.setMouseTracking(True)
-        return super().eventFilter(obj, event)
     
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Track which tab is being hovered."""
