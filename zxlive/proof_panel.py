@@ -249,7 +249,7 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "add identity")
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
@@ -321,7 +321,7 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph)
         basicrules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
