@@ -153,7 +153,7 @@ class ProofPanel(BasePanel):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
             elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif editor_actions.operations['pauli']['matcher'](self.graph, lambda x: x in (v, w)):
+            elif editor_actions.pauli_matcher(self.graph, lambda x: x in (v, w)):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
@@ -177,10 +177,10 @@ class ProofPanel(BasePanel):
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
             self.undo_stack.push(cmd, anim_after=anim)
-        elif editor_actions.operations['pauli']['matcher'](g, lambda x: x in (v, w)):
+        elif editor_actions.pauli_matcher(g, lambda x: x in (v, w)):
             # Check if we can push a Pauli spider through the other vertex
-            match = editor_actions.operations['pauli']['matcher'](g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.operations['pauli']['rule'](g, match)
+            match = editor_actions.pauli_matcher(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.pauli_push(g, match)
             g.add_edge_table(etab)
             g.remove_edges(rem_edges)
             g.remove_vertices(rem_verts)
