@@ -62,9 +62,6 @@ packages = [
     "zxlive"
 ]
 
-[project.scripts]
-zxlive = "zxlive.app:main"
-
 [project.gui-scripts]
 zxlive = "zxlive.app:main"
 
