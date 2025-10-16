@@ -661,14 +661,12 @@ class MainWindow(QMainWindow):
         from .dialogs import show_update_available_dialog
 
         # Show a simple message that we're checking
-        from PySide6.QtWidgets import QMessageBox
         checking_msg = QMessageBox(self)
         checking_msg.setWindowTitle("Checking for Updates")
         checking_msg.setText("Checking for updates...")
         checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
         checking_msg.setModal(False)
         checking_msg.show()
-        from PySide6.QtWidgets import QApplication
         QApplication.processEvents()  # Force UI update
 
         # Create a temporary update checker for manual checks
@@ -680,11 +678,15 @@ class MainWindow(QMainWindow):
 
         def on_update_available(latest_version: str, url: str) -> None:
             update_found[0] = True
-            checking_msg.close()
+            if checking_msg and checking_msg.isVisible():
+                checking_msg.accept()  # Use accept() instead of close()
+                checking_msg.deleteLater()  # Ensure proper cleanup
             show_update_available_dialog(version, latest_version, url, self)
 
         def on_check_complete() -> None:
-            checking_msg.close()
+            if checking_msg and checking_msg.isVisible():
+                checking_msg.accept()  # Use accept() instead of close()
+                checking_msg.deleteLater()  # Ensure proper cleanup
             if not update_found[0]:
                 msg = QMessageBox(self)
                 msg.setWindowTitle("No Updates")
