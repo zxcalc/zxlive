@@ -659,7 +659,7 @@ class MainWindow(QMainWindow):
         """Manually check for updates."""
         from .update_checker import UpdateChecker
         from .dialogs import show_update_available_dialog
-        
+
         # Show a simple message that we're checking
         from PySide6.QtWidgets import QMessageBox
         checking_msg = QMessageBox(self)
@@ -668,21 +668,21 @@ class MainWindow(QMainWindow):
         checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
         checking_msg.setModal(False)
         checking_msg.show()
-        QApplication.processEvents()  # Force UI update
-        
-        # Create a temporary update checker for manual checks
         from PySide6.QtWidgets import QApplication
+        QApplication.processEvents()  # Force UI update
+
+        # Create a temporary update checker for manual checks
         app = QApplication.instance()
         version = app.applicationVersion() if app else "0.3.1"
-        
-        checker = UpdateChecker(version, self.settings)
+
+        self.checker = UpdateChecker(version, self.settings)
         update_found = [False]  # Use list to allow modification in nested function
-        
+
         def on_update_available(latest_version: str, url: str) -> None:
             update_found[0] = True
             checking_msg.close()
             show_update_available_dialog(version, latest_version, url, self)
-        
+
         def on_check_complete() -> None:
             checking_msg.close()
             if not update_found[0]:
@@ -691,8 +691,8 @@ class MainWindow(QMainWindow):
                 msg.setText("You are using the latest version of ZXLive!")
                 msg.setIcon(QMessageBox.Icon.Information)
                 msg.exec()
-        
-        checker.update_available.connect(on_update_available)
-        checker.check_complete.connect(on_check_complete)
-        checker.check_for_updates_async()
+
+        self.checker.check_for_updates_async()
+        self.checker.update_available.connect(on_update_available)
+        self.checker.check_complete.connect(on_check_complete)
 
