@@ -61,6 +61,7 @@ This creates a rule where:
 
 ![Proof to rewrite rule](./_static/cnot_cancellation_proof_rewrite.gif)
 
+---
 
 ## Parametric rules
 
@@ -69,6 +70,8 @@ Instead of hard-coding specific phase values in your rewrite rules, you can use 
 For example, the following phase gadget fusion rule uses parameters `a` and `b` that will transform to `a + b` when fused. This will apply to any phases, for instance when `a = π/2` and `b = π/4`, the result will be a phase of `3π/4`.
 
 ![Phase gadget fusion rule](./_static/phase_gadget_fusion_rule.png)
+
+---
 
 ## Tips
 
