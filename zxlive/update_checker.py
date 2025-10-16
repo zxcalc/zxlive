@@ -16,14 +16,15 @@
 from __future__ import annotations
 
 import json
-import urllib.request
 import urllib.error
-from typing import Optional
-from packaging import version as pkg_version
+import urllib.request
 from datetime import datetime, timedelta
+from typing import Optional
 
-from PySide6.QtCore import QObject, Signal, QThread, Slot
+from packaging import version as pkg_version
+from PySide6.QtCore import QObject, QSettings, QThread, Signal, Slot
 
+from .common import get_settings_value, set_settings_value
 
 GITHUB_API_URL = "https://api.github.com/repos/zxcalc/zxlive/releases/latest"
 CHECK_INTERVAL_DAYS = 1  # Check for updates once per day
@@ -89,9 +90,6 @@ class UpdateChecker(QObject):
         if self.settings is None:
             return True
 
-        from .common import get_settings_value
-        from PySide6.QtCore import QSettings
-
         settings = self.settings if isinstance(self.settings, QSettings) else QSettings("zxlive", "zxlive")
         last_check_str = get_settings_value("last-update-check", str, "", settings)
 
@@ -130,18 +128,12 @@ class UpdateChecker(QObject):
 
     def _on_update_available(self, version: str, url: str) -> None:
         """Handle update available signal."""
-        print(f"[MAIN THREAD] Update available: {version} at {url}")
-        # Breakpoint here will work since we're in the main thread
         self.update_available.emit(version, url)
 
     def _on_check_complete(self) -> None:
         """Handle check complete signal."""
-        print("[MAIN THREAD] Update check completed")
-        # Breakpoint here will work since we're in the main thread
         # Update the last check time
         if self.settings is not None:
-            from .common import set_settings_value
-            from PySide6.QtCore import QSettings
 
             settings = self.settings if isinstance(self.settings, QSettings) else QSettings("zxlive", "zxlive")
             set_settings_value("last-update-check", datetime.now().isoformat(), str, settings)
@@ -158,7 +150,5 @@ class UpdateChecker(QObject):
 
     def _on_error(self, error_message: str) -> None:
         """Handle error signal."""
-        print(f"[MAIN THREAD] Update check error: {error_message}")
-        # Breakpoint here will work since we're in the main thread
         # Silently ignore errors - we don't want to bother the user if the check fails
         pass
