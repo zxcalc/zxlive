@@ -11,14 +11,17 @@ Rewrites in ZXLive are transformations that can be applied to parts of a ZX-diag
 2. **Import from existing diagram files.** - Select ZX graph files for LHS and RHS of the rule.
 3. **Save a finished proof as a rule.** - Convert a completed proof into a reusable rule.
 
-> [!IMPORTANT] Where ZXLive looks for rules
-> ZXLive loads `.zxr` files from your **Custom rules path** (configure in `Edit > Preferences`).
->
-> <img src="./_static/custom_rules_path.png" alt="Custom rules path setting" width="350"/>
+:::{important}
+**Where ZXLive looks for rules**\
+ZXLive loads `.zxr` files from your **Custom rules path** (configure in `Edit > Preferences`).
 
-> [!TIP] Refresh without restarting
-> In proof mode, right‑click the **Rewrites** panel and choose **Refresh rules** to re‑scan your rules folder.
+<img src="./_static/custom_rules_path.png" alt="Custom rules path setting" width="350"/>
+:::
 
+:::{tip}
+**Refresh without restarting**\
+In proof mode, right‑click the **Rewrites** panel and choose **Refresh rules** to re‑scan your rules folder.
+:::
 
 ## Creating Custom Rules
 
