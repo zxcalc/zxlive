@@ -21,10 +21,10 @@ from typing import Callable, Optional, cast
 
 from PySide6.QtCore import (QByteArray, QDir, QEvent, QFile, QFileInfo,
                             QIODevice, QSettings, QTextStream, Qt, QUrl)
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut, QMouseEvent
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
-                               QTableWidget, QTableWidgetItem, QTabWidget,
+                               QTableWidget, QTableWidgetItem, QTabWidget, QTabBar,
                                QVBoxLayout, QWidget, QApplication)
 
 import pyperclip
@@ -49,6 +49,41 @@ from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
 from pyzx.graph.base import BaseGraph
 from pyzx.drawing import graphs_to_gif
+
+
+class CustomTabBar(QTabBar):
+    """Custom tab bar that shows close buttons only on hover."""
+    
+    hovered_tab: int
+    
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.hovered_tab = -1
+        self.setMouseTracking(True)
+    
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Track which tab is being hovered."""
+        super().mouseMoveEvent(event)
+        # Get the tab index at the mouse position
+        pos = event.pos()
+        tab_index = self.tabAt(pos)
+        if tab_index != self.hovered_tab:
+            self.hovered_tab = tab_index
+            self._update_close_buttons()
+    
+    def leaveEvent(self, event: QEvent) -> None:
+        """Clear hover state when mouse leaves."""
+        super().leaveEvent(event)
+        self.hovered_tab = -1
+        self._update_close_buttons()
+    
+    def _update_close_buttons(self) -> None:
+        """Update visibility of close buttons based on hover state."""
+        for i in range(self.count()):
+            button = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if button:
+                # Show button only for hovered tab
+                button.setVisible(i == self.hovered_tab)
 
 
 class MainWindow(QMainWindow):
@@ -76,6 +111,7 @@ class MainWindow(QMainWindow):
         self.show()
 
         tab_widget = QTabWidget(self)
+        tab_widget.setTabBar(CustomTabBar(tab_widget))
         wlayout.addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
@@ -85,6 +121,9 @@ class MainWindow(QMainWindow):
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
+        
+        # Apply custom tab styling
+        self.update_colors()
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
         # We could do this by using pyperclip.
@@ -585,41 +624,108 @@ class MainWindow(QMainWindow):
         # Apply dark or light stylesheet to the app and widgets
         app = QApplication.instance()
         if isinstance(app, QApplication):
+            # Get the path to the close icon
+            close_icon_path = get_data("icons/tab-close.svg").replace("\\", "/")
+            
             if display_setting.dark_mode:
-                dark_stylesheet = """
-                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {
+                dark_stylesheet = f"""
+                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {{
                         background-color: #232323;
                         color: #e0e0e0;
-                    }
-                    QLineEdit, QTextEdit, QPlainTextEdit {
+                    }}
+                    QLineEdit, QTextEdit, QPlainTextEdit {{
                         background-color: #2d2d2d;
                         color: #e0e0e0;
-                    }
-                    QTableWidget QHeaderView::section {
+                    }}
+                    QTableWidget QHeaderView::section {{
                         background-color: #232323;
                         color: #e0e0e0;
-                    }
-                    QTabBar::tab:selected {
-                        background: #333333;
-                    }
-                    QTabBar::tab:!selected {
+                    }}
+                    QTabBar::tab {{
+                        background: #2d2d2d;
+                        color: #b0b0b0;
+                        border: 1px solid #1a1a1a;
+                        border-bottom: none;
+                        padding: 10px 24px;
+                        margin-right: 2px;
+                        min-width: 100px;
+                        max-width: 200px;
+                    }}
+                    QTabBar::tab:selected {{
+                        background: #3d3d3d;
+                        color: #e0e0e0;
+                        border-color: #4a4a4a;
+                    }}
+                    QTabBar::tab:!selected {{
                         background: #232323;
-                    }
-                    QMenu::item:selected {
+                        margin-top: 2px;
+                    }}
+                    QTabBar::tab:hover {{
+                        background: #3a3a3a;
+                    }}
+                    QTabBar::close-button {{
+                        subcontrol-position: right;
+                        image: url({close_icon_path});
+                        background: #555555;
+                        border-radius: 3px;
+                        width: 16px;
+                        height: 16px;
+                        margin: 4px;
+                    }}
+                    QTabBar::close-button:hover {{
+                        background: #888888;
+                    }}
+                    QMenu::item:selected {{
                         background: #444444;
-                    }
-                    QPushButton {
+                    }}
+                    QPushButton {{
                         background-color: #333333;
                         color: #e0e0e0;
-                    }
-                    QSpinBox, QComboBox {
+                    }}
+                    QSpinBox, QComboBox {{
                         background-color: #2d2d2d;
                         color: #e0e0e0;
-                    }
+                    }}
                 """
                 app.setStyleSheet(dark_stylesheet)
             else:
-                app.setStyleSheet("")
+                light_stylesheet = f"""
+                    QTabBar::tab {{
+                        background: #e8e8e8;
+                        color: #505050;
+                        border: 1px solid #c0c0c0;
+                        border-bottom: none;
+                        padding: 10px 24px;
+                        margin-right: 2px;
+                        min-width: 100px;
+                        max-width: 200px;
+                    }}
+                    QTabBar::tab:selected {{
+                        background: #ffffff;
+                        color: #000000;
+                        border-color: #a0a0a0;
+                    }}
+                    QTabBar::tab:!selected {{
+                        background: #f5f5f5;
+                        margin-top: 2px;
+                    }}
+                    QTabBar::tab:hover {{
+                        background: #f0f0f0;
+                    }}
+                    QTabBar::close-button {{
+                        subcontrol-position: right;
+                        image: url({close_icon_path});
+                        background: #c0c0c0;
+                        border-radius: 3px;
+                        width: 16px;
+                        height: 16px;
+                        margin: 4px;
+                    }}
+                    QTabBar::close-button:hover {{
+                        background: #999999;
+                    }}
+                """
+                app.setStyleSheet(light_stylesheet)
         if self.active_panel is not None:
             self.active_panel.update_colors()
 
