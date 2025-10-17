@@ -5,8 +5,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from packaging import version as pkg_version
-from PySide6.QtCore import QObject, QSettings, Signal
-from PySide6.QtNetwork import QNetworkAccessManager, QNetworkRequest, QNetworkReply
+from PySide6.QtCore import QObject, QSettings, QUrl, Signal
+from PySide6.QtNetwork import (QNetworkAccessManager, QNetworkReply,
+                               QNetworkRequest)
 
 from .common import get_settings_value, set_settings_value
 
@@ -40,7 +41,7 @@ class UpdateChecker(QObject):
     def check_for_updates_async(self) -> None:
         """Check for updates asynchronously using network manager."""
         request = QNetworkRequest()
-        request.setUrl(GITHUB_API_URL)
+        request.setUrl(QUrl(GITHUB_API_URL))
         request.setRawHeader(b"Accept", b"application/vnd.github.v3+json")
 
         reply = self.network.get(request)
