@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream
+from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget, QInputDialog)
@@ -351,3 +352,22 @@ def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[
     new_g = copy.deepcopy(graph)
     new_g.set_vdata(v, 'text', input_)
     return new_g
+
+
+def show_update_available_dialog(current_version: str, latest_version: str, release_url: str, parent: Optional[QWidget] = None) -> None:
+    """Shows a dialog informing the user about a new version."""
+    msg = QMessageBox(parent)
+    msg.setWindowTitle("Update Available")
+    msg.setText("A new version of ZXLive is available!")
+    msg.setInformativeText(
+        f"Current version: {current_version}\n"
+        f"Latest version: {latest_version}\n\n"
+        f"Visit the releases page to download the latest version."
+    )
+    msg.setIcon(QMessageBox.Icon.Information)
+    view_release_button = msg.addButton("View Release", QMessageBox.ButtonRole.AcceptRole)
+    msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+    msg.setDefaultButton(view_release_button)
+    msg.exec()
+    if msg.clickedButton() == view_release_button:
+        QDesktopServices.openUrl(QUrl(release_url))

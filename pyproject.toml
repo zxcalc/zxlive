@@ -34,7 +34,8 @@ dependencies = [
     "numpy",
     "shapely",
     "pyperclip",
-    "imageio"
+    "imageio",
+    "packaging"
 ]
 
 [project.optional-dependencies]

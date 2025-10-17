@@ -185,6 +185,10 @@ class MainWindow(QMainWindow):
         rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
+        check_for_updates = self._new_action("Check for &Updates...", self.check_for_updates, None, "Check for new versions of ZXLive")
+        help_menu = menu.addMenu("&Help")
+        help_menu.addAction(check_for_updates)
+
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
@@ -650,3 +654,45 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
+
+    def check_for_updates(self) -> None:
+        """Manually check for updates."""
+        from .dialogs import show_update_available_dialog
+        from .app import ZXLive
+
+        app = QApplication.instance()
+        if not app or not hasattr(app, 'update_checker'):
+            return
+        zx_app = cast(ZXLive, app)
+
+        checking_msg = QMessageBox(self)
+        checking_msg.setWindowTitle("Checking for Updates")
+        checking_msg.setText("Checking for updates...")
+        checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
+        checking_msg.setModal(False)
+        checking_msg.show()
+        QApplication.processEvents()
+
+        # Temporarily disconnect app-level handler to prevent double dialogs
+        # We assume it's connected (it should be from app startup)
+        zx_app.update_checker.update_available.disconnect(zx_app.on_update_available)
+        update_found = False
+
+        def on_update_available(latest_version: str, url: str) -> None:
+            nonlocal update_found
+            update_found = True
+            checking_msg.accept()
+            show_update_available_dialog(zx_app.applicationVersion(), latest_version, url, self)
+
+        def on_check_complete() -> None:
+            checking_msg.accept()
+            # Disconnect our temporary connections and reconnect the app-level one
+            zx_app.update_checker.update_available.disconnect(on_update_available)
+            zx_app.update_checker.check_complete.disconnect(on_check_complete)
+            zx_app.update_checker.update_available.connect(zx_app.on_update_available)
+            if not update_found:
+                QMessageBox.information(self, "No Updates", "You are using the latest version of ZXLive!")
+
+        zx_app.update_checker.update_available.connect(on_update_available)
+        zx_app.update_checker.check_complete.connect(on_check_complete)
+        zx_app.update_checker.check_for_updates_async()
