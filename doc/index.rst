@@ -11,6 +11,7 @@ Welcome to zxlive's documentation!
    :caption: Contents:
 
    gettingstarted
+   adding-rewrites
 
 
 
