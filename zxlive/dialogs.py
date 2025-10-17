@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream
+from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget, QInputDialog)
@@ -357,23 +358,16 @@ def show_update_available_dialog(current_version: str, latest_version: str, rele
     """Shows a dialog informing the user about a new version."""
     msg = QMessageBox(parent)
     msg.setWindowTitle("Update Available")
-    msg.setText(f"A new version of ZXLive is available!")
+    msg.setText("A new version of ZXLive is available!")
     msg.setInformativeText(
         f"Current version: {current_version}\n"
         f"Latest version: {latest_version}\n\n"
         f"Visit the releases page to download the latest version."
     )
     msg.setIcon(QMessageBox.Icon.Information)
-    
-    # Add a button to open the release page
     view_release_button = msg.addButton("View Release", QMessageBox.ButtonRole.AcceptRole)
     msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
     msg.setDefaultButton(view_release_button)
-    
     msg.exec()
-    
-    # Open URL if user clicked "View Release"
     if msg.clickedButton() == view_release_button:
-        from PySide6.QtGui import QDesktopServices
-        from PySide6.QtCore import QUrl
         QDesktopServices.openUrl(QUrl(release_url))

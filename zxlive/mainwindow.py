@@ -657,44 +657,43 @@ class MainWindow(QMainWindow):
 
     def check_for_updates(self) -> None:
         """Manually check for updates."""
-        from .update_checker import UpdateChecker
         from .dialogs import show_update_available_dialog
+        from .app import ZXLive
 
-        # Show a simple message that we're checking
+        app = QApplication.instance()
+        if not app or not hasattr(app, 'update_checker'):
+            return
+        zx_app = cast(ZXLive, app)
+
         checking_msg = QMessageBox(self)
         checking_msg.setWindowTitle("Checking for Updates")
         checking_msg.setText("Checking for updates...")
         checking_msg.setStandardButtons(QMessageBox.StandardButton.NoButton)
         checking_msg.setModal(False)
         checking_msg.show()
-        QApplication.processEvents()  # Force UI update
+        QApplication.processEvents()
 
-        # Create a temporary update checker for manual checks
-        app = QApplication.instance()
-        version = app.applicationVersion() if app else "0.3.1"
-
-        self.checker = UpdateChecker(version, self.settings)
-        update_found = [False]  # Use list to allow modification in nested function
+        # Temporarily disconnect app-level handler to prevent double dialogs
+        app_handler_connected = zx_app.update_checker.update_available.disconnect(zx_app.on_update_available)
+        update_found = False
 
         def on_update_available(latest_version: str, url: str) -> None:
-            update_found[0] = True
-            if checking_msg and checking_msg.isVisible():
-                checking_msg.accept()  # Use accept() instead of close()
-                checking_msg.deleteLater()  # Ensure proper cleanup
-            show_update_available_dialog(version, latest_version, url, self)
+            nonlocal update_found
+            update_found = True
+            checking_msg.accept()
+            show_update_available_dialog(zx_app.applicationVersion(), latest_version, url, self)
 
         def on_check_complete() -> None:
-            if checking_msg and checking_msg.isVisible():
-                checking_msg.accept()  # Use accept() instead of close()
-                checking_msg.deleteLater()  # Ensure proper cleanup
-            if not update_found[0]:
-                msg = QMessageBox(self)
-                msg.setWindowTitle("No Updates")
-                msg.setText("You are using the latest version of ZXLive!")
-                msg.setIcon(QMessageBox.Icon.Information)
-                msg.exec()
+            # Disconnect our temporary connections first
+            zx_app.update_checker.update_available.disconnect(on_update_available)
+            zx_app.update_checker.check_complete.disconnect(on_check_complete)
+            # Reconnect the app-level handler if it was connected
+            if app_handler_connected:
+                zx_app.update_checker.update_available.connect(zx_app.on_update_available)
+            checking_msg.accept()
+            if not update_found:
+                QMessageBox.information(self, "No Updates", "You are using the latest version of ZXLive!")
 
-        self.checker.check_for_updates_async()
-        self.checker.update_available.connect(on_update_available)
-        self.checker.check_complete.connect(on_check_complete)
-
+        zx_app.update_checker.update_available.connect(on_update_available)
+        zx_app.update_checker.check_complete.connect(on_check_complete)
+        zx_app.update_checker.check_for_updates_async()

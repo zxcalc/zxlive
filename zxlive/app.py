@@ -59,8 +59,8 @@ class ZXLive(QApplication):
 
         # Initialize update checker
         self.update_checker = UpdateChecker(self.applicationVersion(), self.main_window.settings)
-        self.update_checker.update_available.connect(self._on_update_available)
-        
+        self.update_checker.update_available.connect(self.on_update_available)
+
         # Check for updates in background if needed
         if self.update_checker.should_check_for_updates():
             self.update_checker.check_for_updates_async()
@@ -76,8 +76,8 @@ class ZXLive(QApplication):
         else:
             for f in parser.positionalArguments():
                 self.main_window.open_file_from_path(f)
-    
-    def _on_update_available(self, version: str, url: str) -> None:
+
+    def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""
         if self.main_window:
             show_update_available_dialog(self.applicationVersion(), version, url, self.main_window)
