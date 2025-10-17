@@ -620,21 +620,24 @@ class MainWindow(QMainWindow):
         # Apply dark or light stylesheet to the app and widgets
         app = QApplication.instance()
         if isinstance(app, QApplication):
+            # Get the path to the close icon
+            close_icon_path = get_data("icons/tab-close.svg").replace("\\", "/")
+            
             if display_setting.dark_mode:
-                dark_stylesheet = """
-                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {
+                dark_stylesheet = f"""
+                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {{
                         background-color: #232323;
                         color: #e0e0e0;
-                    }
-                    QLineEdit, QTextEdit, QPlainTextEdit {
+                    }}
+                    QLineEdit, QTextEdit, QPlainTextEdit {{
                         background-color: #2d2d2d;
                         color: #e0e0e0;
-                    }
-                    QTableWidget QHeaderView::section {
+                    }}
+                    QTableWidget QHeaderView::section {{
                         background-color: #232323;
                         color: #e0e0e0;
-                    }
-                    QTabBar::tab {
+                    }}
+                    QTabBar::tab {{
                         background: #2d2d2d;
                         color: #b0b0b0;
                         border: 1px solid #1a1a1a;
@@ -643,46 +646,47 @@ class MainWindow(QMainWindow):
                         margin-right: 2px;
                         min-width: 100px;
                         max-width: 200px;
-                    }
-                    QTabBar::tab:selected {
+                    }}
+                    QTabBar::tab:selected {{
                         background: #3d3d3d;
                         color: #e0e0e0;
                         border-color: #4a4a4a;
-                    }
-                    QTabBar::tab:!selected {
+                    }}
+                    QTabBar::tab:!selected {{
                         background: #232323;
                         margin-top: 2px;
-                    }
-                    QTabBar::tab:hover {
+                    }}
+                    QTabBar::tab:hover {{
                         background: #3a3a3a;
-                    }
-                    QTabBar::close-button {
+                    }}
+                    QTabBar::close-button {{
                         subcontrol-position: right;
+                        image: url({close_icon_path});
                         background: #555555;
                         border-radius: 3px;
-                        width: 14px;
-                        height: 14px;
+                        width: 16px;
+                        height: 16px;
                         margin: 4px;
-                    }
-                    QTabBar::close-button:hover {
+                    }}
+                    QTabBar::close-button:hover {{
                         background: #888888;
-                    }
-                    QMenu::item:selected {
+                    }}
+                    QMenu::item:selected {{
                         background: #444444;
-                    }
-                    QPushButton {
+                    }}
+                    QPushButton {{
                         background-color: #333333;
                         color: #e0e0e0;
-                    }
-                    QSpinBox, QComboBox {
+                    }}
+                    QSpinBox, QComboBox {{
                         background-color: #2d2d2d;
                         color: #e0e0e0;
-                    }
+                    }}
                 """
                 app.setStyleSheet(dark_stylesheet)
             else:
-                light_stylesheet = """
-                    QTabBar::tab {
+                light_stylesheet = f"""
+                    QTabBar::tab {{
                         background: #e8e8e8;
                         color: #505050;
                         border: 1px solid #c0c0c0;
@@ -691,30 +695,31 @@ class MainWindow(QMainWindow):
                         margin-right: 2px;
                         min-width: 100px;
                         max-width: 200px;
-                    }
-                    QTabBar::tab:selected {
+                    }}
+                    QTabBar::tab:selected {{
                         background: #ffffff;
                         color: #000000;
                         border-color: #a0a0a0;
-                    }
-                    QTabBar::tab:!selected {
+                    }}
+                    QTabBar::tab:!selected {{
                         background: #f5f5f5;
                         margin-top: 2px;
-                    }
-                    QTabBar::tab:hover {
+                    }}
+                    QTabBar::tab:hover {{
                         background: #f0f0f0;
-                    }
-                    QTabBar::close-button {
+                    }}
+                    QTabBar::close-button {{
                         subcontrol-position: right;
+                        image: url({close_icon_path});
                         background: #c0c0c0;
                         border-radius: 3px;
-                        width: 14px;
-                        height: 14px;
+                        width: 16px;
+                        height: 16px;
                         margin: 4px;
-                    }
-                    QTabBar::close-button:hover {
+                    }}
+                    QTabBar::close-button:hover {{
                         background: #999999;
-                    }
+                    }}
                 """
                 app.setStyleSheet(light_stylesheet)
         if self.active_panel is not None:
