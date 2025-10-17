@@ -33,7 +33,7 @@ class ColorScheme(TypedDict):
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
-    "path/custom-rules": "lemmas/",
+    "path/custom-rules": "rules/",
     "color-scheme": "modern-red-green",
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',

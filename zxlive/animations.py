@@ -297,7 +297,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         anim_before = QParallelAnimationGroup()
         for v in rem_verts:
             anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
-    elif self.name == operations['copy']['text']:
+    elif self.name == operations['copy']['text'] or self.name == operations['pauli']['text']:
         anim_before = QParallelAnimationGroup()
         for m in matches:
             anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
@@ -305,8 +305,6 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         anim_after = QParallelAnimationGroup()
         for m in matches:
             anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
-    elif self.name == operations['pauli']['text']:
-        print('To do: animate ' + self.name)
     elif self.name == operations['bialgebra']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:

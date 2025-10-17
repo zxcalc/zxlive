@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 import pyzx
 from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.rewrite_rules import editor_actions
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
@@ -152,6 +153,8 @@ class ProofPanel(BasePanel):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
             elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
+            elif editor_actions.pauli_matcher(self.graph, lambda x: x in (v, w)):
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
@@ -166,13 +169,26 @@ class ProofPanel(BasePanel):
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.hrules.match_copy(g, lambda x: x in (v, w)):
-            match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, match)
+            copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
             g.add_edge_table(etab)
             g.remove_edges(rem_edges)
             g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            self.undo_stack.push(cmd, anim_after=anim)
+        elif editor_actions.pauli_matcher(g, lambda x: x in (v, w)):
+            # Check if we can push a Pauli spider through the other vertex
+            pauli_match = editor_actions.pauli_matcher(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.pauli_push(g, pauli_match)
+            g.add_edge_table(etab)
+            g.remove_edges(rem_edges)
+            g.remove_vertices(rem_verts)
+            # Determine which vertex is the target (the one being pushed through)
+            # The match is (pauli_vertex, target_vertex)
+            target = pauli_match[0][1] if pauli_match else w
+            anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "push Pauli")
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
