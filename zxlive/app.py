@@ -49,7 +49,7 @@ class ZXLive(QApplication):
         self.setFont(display_setting.font)
         self.setApplicationName('ZXLive')
         self.setDesktopFileName('ZXLive')
-        self.setApplicationVersion('0.3.1')  # TODO: read this from pyproject.toml if possible
+        self.setApplicationVersion(get_version())
         self.main_window = MainWindow()
         self.main_window.setWindowIcon(QIcon(get_data('icons/logo.png')))
         self.setWindowIcon(self.main_window.windowIcon())
@@ -99,6 +99,30 @@ def get_embedded_app() -> ZXLive:
     app = QApplication.instance() or ZXLive()
     app.__class__ = ZXLive
     return cast(ZXLive, app)
+
+
+def get_version() -> str:
+    """Get the application version from installed package metadata or pyproject.toml."""
+    # First, try to get version from installed package metadata (for shipped apps)
+    try:
+        from importlib.metadata import version
+        return version('zxlive')
+    except Exception:
+        pass
+
+    # Fallback: try to read from pyproject.toml (for development)
+    try:
+        # Try using tomllib (Python 3.11+) for proper TOML parsing
+        import tomllib
+        current_dir = os.path.dirname(__file__)
+        project_root = os.path.dirname(current_dir)
+        pyproject_path = os.path.join(project_root, 'pyproject.toml')
+        with open(pyproject_path, 'rb') as f:
+            data = tomllib.load(f)
+            return str(data['project']['version'])
+    except (FileNotFoundError, IOError, ImportError, KeyError):
+        # Final fallback to hardcoded version
+        return '0.3.1' # TODO: Update this for new releases
 
 
 def main() -> None:
