@@ -15,23 +15,22 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QApplication
+import os
+import sys
+from typing import Optional, cast
+
 from PySide6.QtCore import QCommandLineParser
 from PySide6.QtGui import QIcon
-
-import sys
-sys.path.insert(0, '../pyzx')  # So that it can find a local copy of pyzx
+from PySide6.QtWidgets import QApplication
 
 from .mainwindow import MainWindow
 from .common import get_data, GraphT
 from .settings import display_setting
 from .update_checker import UpdateChecker
 from .dialogs import show_update_available_dialog
-from typing import Optional, cast
 
 # The following hack is needed on windows in order to show the icon in the taskbar
 # See https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
-import os
 if os.name == 'nt':
     import ctypes
     myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
