@@ -674,7 +674,8 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()
 
         # Temporarily disconnect app-level handler to prevent double dialogs
-        app_handler_connected = zx_app.update_checker.update_available.disconnect(zx_app.on_update_available)
+        # We assume it's connected (it should be from app startup)
+        zx_app.update_checker.update_available.disconnect(zx_app.on_update_available)
         update_found = False
 
         def on_update_available(latest_version: str, url: str) -> None:
@@ -684,13 +685,11 @@ class MainWindow(QMainWindow):
             show_update_available_dialog(zx_app.applicationVersion(), latest_version, url, self)
 
         def on_check_complete() -> None:
-            # Disconnect our temporary connections first
+            checking_msg.accept()
+            # Disconnect our temporary connections and reconnect the app-level one
             zx_app.update_checker.update_available.disconnect(on_update_available)
             zx_app.update_checker.check_complete.disconnect(on_check_complete)
-            # Reconnect the app-level handler if it was connected
-            if app_handler_connected:
-                zx_app.update_checker.update_available.connect(zx_app.on_update_available)
-            checking_msg.accept()
+            zx_app.update_checker.update_available.connect(zx_app.on_update_available)
             if not update_found:
                 QMessageBox.information(self, "No Updates", "You are using the latest version of ZXLive!")
 
