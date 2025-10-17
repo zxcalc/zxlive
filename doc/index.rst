@@ -12,7 +12,7 @@ Welcome to zxlive's documentation!
 
    gettingstarted
    adding-rewrites
-
+   tikz_export
 
 
 Indices and tables
