@@ -663,10 +663,11 @@ class MainWindow(QMainWindow):
                         subcontrol-position: right;
                         image: url({close_icon_path});
                         background: #555555;
-                        border-radius: 3px;
-                        width: 16px;
-                        height: 16px;
-                        margin: 4px;
+                        border-radius: 5px;
+                        width: 28px;
+                        height: 28px;
+                        margin: 2px;
+                        padding: 2px;
                     }}
                     QTabBar::close-button:hover {{
                         background: #888888;
@@ -712,10 +713,11 @@ class MainWindow(QMainWindow):
                         subcontrol-position: right;
                         image: url({close_icon_path});
                         background: #c0c0c0;
-                        border-radius: 3px;
-                        width: 16px;
-                        height: 16px;
-                        margin: 4px;
+                        border-radius: 5px;
+                        width: 28px;
+                        height: 28px;
+                        margin: 2px;
+                        padding: 2px;
                     }}
                     QTabBar::close-button:hover {{
                         background: #999999;

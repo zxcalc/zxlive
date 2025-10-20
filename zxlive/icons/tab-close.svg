@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
   <!-- X icon for tab close button -->
-  <line x1="4" y1="4" x2="12" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
-  <line x1="12" y1="4" x2="4" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <line x1="7" y1="7" x2="21" y2="21" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="21" y1="7" x2="7" y2="21" stroke="white" stroke-width="3" stroke-linecap="round"/>
 </svg>
