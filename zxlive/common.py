@@ -14,6 +14,7 @@ import pyzx
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 
+
 T = TypeVar('T')
 
 def get_data(path: str) -> str:

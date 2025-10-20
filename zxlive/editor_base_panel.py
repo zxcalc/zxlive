@@ -11,8 +11,7 @@ from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
                                QListWidgetItem, QScrollArea, QSizePolicy,
                                QSpacerItem, QSplitter, QToolButton, QWidget)
-from pyzx import VertexType
-from .common import EdgeType
+from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w
 from pyzx.graph.jsonparser import string_to_phase
 from zxlive.sfx import SFXEnum

@@ -21,7 +21,7 @@ from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
 
-from .common import EdgeType
+from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
 
 

@@ -11,8 +11,7 @@ from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
-from pyzx.utils import VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
-from .common import EdgeType
+from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .settings import display_setting

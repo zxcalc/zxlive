@@ -1,5 +1,4 @@
-from pyzx.utils import VertexType
-from .common import EdgeType
+from pyzx.utils import EdgeType, VertexType
 
 from .common import GraphT, new_graph
 

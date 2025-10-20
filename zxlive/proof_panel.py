@@ -11,9 +11,8 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 import pyzx
 from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import (VertexType, FractionLike, get_w_partner, get_z_box_label,
+from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
-from .common import EdgeType
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
