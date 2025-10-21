@@ -53,14 +53,14 @@ from pyzx.drawing import graphs_to_gif
 
 class CustomTabBar(QTabBar):
     """Custom tab bar that shows close buttons only on hover."""
-    
+
     hovered_tab: int
-    
+
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.hovered_tab = -1
         self.setMouseTracking(True)
-    
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Track which tab is being hovered."""
         super().mouseMoveEvent(event)
@@ -70,13 +70,13 @@ class CustomTabBar(QTabBar):
         if tab_index != self.hovered_tab:
             self.hovered_tab = tab_index
             self._update_close_buttons()
-    
+
     def leaveEvent(self, event: QEvent) -> None:
         """Clear hover state when mouse leaves."""
         super().leaveEvent(event)
         self.hovered_tab = -1
         self._update_close_buttons()
-    
+
     def _update_close_buttons(self) -> None:
         """Update visibility of close buttons based on hover state."""
         for i in range(self.count()):
@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
-        
+
         # Apply custom tab styling
         self.update_colors()
 
@@ -176,7 +176,7 @@ class MainWindow(QMainWindow):
             "Cut the selected part of the diagram")
         self.copy_action = self._new_action("&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        self.copy_clipboard_action = self._new_action("Copy tikz to clipboard", self.copy_graph_to_clipboard, 
+        self.copy_clipboard_action = self._new_action("Copy tikz to clipboard", self.copy_graph_to_clipboard,
                                                       QKeySequence("Ctrl+Shift+C"), "Copy the selected part of the diagram to the clipboard as tikz")
         self.paste_action = self._new_action("Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
@@ -617,113 +617,63 @@ class MainWindow(QMainWindow):
         save_rule_dialog(rule, self, name + ".zxr" if name else "")
 
     def update_colors(self) -> None:
-        # Apply dark or light stylesheet to the app and widgets
+        """Update app theme using reliable Qt native methods (no hardcoded colors)."""
+
         app = QApplication.instance()
-        if isinstance(app, QApplication):
-            # Get the path to the close icon
-            close_icon_path = get_data("icons/tab-close.svg").replace("\\", "/")
-            
-            if display_setting.dark_mode:
-                dark_stylesheet = f"""
-                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {{
-                        background-color: #232323;
-                        color: #e0e0e0;
-                    }}
-                    QLineEdit, QTextEdit, QPlainTextEdit {{
-                        background-color: #2d2d2d;
-                        color: #e0e0e0;
-                    }}
-                    QTableWidget QHeaderView::section {{
-                        background-color: #232323;
-                        color: #e0e0e0;
-                    }}
-                    QTabBar::tab {{
-                        background: #2d2d2d;
-                        color: #b0b0b0;
-                        border: 1px solid #1a1a1a;
-                        border-bottom: none;
-                        padding: 10px 24px;
-                        margin-right: 2px;
-                        min-width: 100px;
-                        max-width: 200px;
-                    }}
-                    QTabBar::tab:selected {{
-                        background: #3d3d3d;
-                        color: #e0e0e0;
-                        border-color: #4a4a4a;
-                    }}
-                    QTabBar::tab:!selected {{
-                        background: #232323;
-                        margin-top: 2px;
-                    }}
-                    QTabBar::tab:hover {{
-                        background: #3a3a3a;
-                    }}
-                    QTabBar::close-button {{
-                        subcontrol-position: right;
-                        image: url({close_icon_path});
-                        background: #555555;
-                        border-radius: 5px;
-                        width: 28px;
-                        height: 28px;
-                        margin: 2px;
-                        padding: 2px;
-                    }}
-                    QTabBar::close-button:hover {{
-                        background: #888888;
-                    }}
-                    QMenu::item:selected {{
-                        background: #444444;
-                    }}
-                    QPushButton {{
-                        background-color: #333333;
-                        color: #e0e0e0;
-                    }}
-                    QSpinBox, QComboBox {{
-                        background-color: #2d2d2d;
-                        color: #e0e0e0;
-                    }}
-                """
-                app.setStyleSheet(dark_stylesheet)
-            else:
-                light_stylesheet = f"""
-                    QTabBar::tab {{
-                        background: #e8e8e8;
-                        color: #505050;
-                        border: 1px solid #c0c0c0;
-                        border-bottom: none;
-                        padding: 10px 24px;
-                        margin-right: 2px;
-                        min-width: 100px;
-                        max-width: 200px;
-                    }}
-                    QTabBar::tab:selected {{
-                        background: #ffffff;
-                        color: #000000;
-                        border-color: #a0a0a0;
-                    }}
-                    QTabBar::tab:!selected {{
-                        background: #f5f5f5;
-                        margin-top: 2px;
-                    }}
-                    QTabBar::tab:hover {{
-                        background: #f0f0f0;
-                    }}
-                    QTabBar::close-button {{
-                        subcontrol-position: right;
-                        image: url({close_icon_path});
-                        background: #c0c0c0;
-                        border-radius: 5px;
-                        width: 28px;
-                        height: 28px;
-                        margin: 2px;
-                        padding: 2px;
-                    }}
-                    QTabBar::close-button:hover {{
-                        background: #999999;
-                    }}
-                """
-                app.setStyleSheet(light_stylesheet)
+        if not isinstance(app, QApplication):
+            return
+
+        # Get the path to the close icon
+        close_icon_path = get_data("icons/tab-close.svg").replace("\\", "/")
+
+        # Use system color keywords instead of hardcoded colors
+        # These automatically adapt to light/dark themes
+        stylesheet = f"""
+            /* Use palette() colors - Qt provides correct ones automatically */
+            CustomTabBar::tab {{
+                color: palette(text);
+                background: palette(button);
+                border: 1px solid palette(mid);
+                border-bottom: none;
+                padding: 10px 24px;
+                margin-right: 2px;
+                min-width: 100px;
+                max-width: 200px;
+            }}
+
+            CustomTabBar::tab:selected {{
+                color: palette(ButtonText);
+                background: palette(light);
+                border-color: palette(midlight);
+            }}
+
+            CustomTabBar::tab:!selected {{
+                background: palette(mid);
+                margin-top: 2px;
+            }}
+
+            CustomTabBar::tab:hover {{
+                background: palette(midlight);
+            }}
+
+            CustomTabBar::close-button {{
+                subcontrol-position: right;
+                image: url({close_icon_path});
+                background: palette(mid);
+                border-radius: 5px;
+                width: 28px;
+                height: 28px;
+                padding: 2px;
+            }}
+
+            CustomTabBar::close-button:hover {{
+                background: palette(dark);
+            }}
+
+            /* Let Qt handle all other widget colors automatically */
+        """
+
+        app.setStyleSheet(stylesheet)
         if self.active_panel is not None:
             self.active_panel.update_colors()
 
