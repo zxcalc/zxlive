@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Any, TypedDict
+from typing import TypedDict
 
 import pyzx
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QTabWidget
+from PySide6.QtWidgets import QApplication, QTabWidget
 
 from .common import get_settings_value, SCALE
 
@@ -42,7 +42,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "sparkle-mode": True,
     'sound-effects': False,
     "matrix/precision": 4,
-    "dark-mode": False,
+    "dark-mode": "system",
     "auto-save": False,
 }
 
@@ -231,10 +231,28 @@ class DisplaySettings:
 
     @property
     def dark_mode(self) -> bool:
-        return get_settings_value("dark-mode", bool)
+        dark_mode_setting = str(settings.value("dark-mode", "system"))
+        if dark_mode_setting == "system":
+            # Check if we can detect system theme
+            app = QApplication.instance()
+            if isinstance(app, QApplication):
+                try:
+                    # Try Qt 6.5+ ColorScheme API
+                    color_scheme = app.styleHints().colorScheme()
+                    return color_scheme == Qt.ColorScheme.Dark
+                except AttributeError:
+                    # Fallback for older Qt versions
+                    pass
+            return False  # Default to light mode if can't detect
+        elif dark_mode_setting == "dark":
+            return True
+        else:  # "light"
+            return False
 
     @dark_mode.setter
-    def dark_mode(self, value: bool) -> None:
+    def dark_mode(self, value: str | bool) -> None:
+        if isinstance(value, bool):
+            value = "dark" if value else "light"
         settings.setValue("dark-mode", value)
 
     @property

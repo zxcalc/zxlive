@@ -19,12 +19,12 @@ import os
 import sys
 from typing import Optional, cast
 
-from PySide6.QtCore import QCommandLineParser
+from PySide6.QtCore import QCommandLineParser, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .mainwindow import MainWindow
-from .common import get_data, GraphT
+from .common import get_data, GraphT, get_settings_value
 from .settings import display_setting
 from .update_checker import UpdateChecker
 from .dialogs import show_update_available_dialog
@@ -35,6 +35,7 @@ if os.name == 'nt':
     import ctypes
     myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
+
 
 class ZXLive(QApplication):
     """The main ZXLive application
@@ -127,5 +128,20 @@ def get_version() -> str:
 
 def main() -> None:
     """Main entry point for ZXLive as a standalone app."""
+    # Configure Windows theme based on settings before creating QApplication
+    dark_mode_setting = get_settings_value("dark-mode", str, "system")
+    if os.name == 'nt': # 'nt' is Windows
+        if dark_mode_setting == "dark":
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
+        elif dark_mode_setting == "light":
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=1"
+        # For "system", don't set the environment variable to let Qt auto-detect
+
     zxl = ZXLive()
+    if sys.platform == "darwin": # 'darwin' is macOS
+        if dark_mode_setting == "dark":
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+        elif dark_mode_setting == "light":
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)
+        # For "system", don't set the color scheme to let Qt auto-detect
     zxl.exec_()
