@@ -49,41 +49,6 @@ from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
 
 
-class CustomTabBar(QTabBar):
-    """Custom tab bar that shows close buttons only on hover."""
-
-    hovered_tab: int
-
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
-        self.hovered_tab = -1
-        self.setMouseTracking(True)
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        """Track which tab is being hovered."""
-        super().mouseMoveEvent(event)
-        # Get the tab index at the mouse position
-        pos = event.pos()
-        tab_index = self.tabAt(pos)
-        if tab_index != self.hovered_tab:
-            self.hovered_tab = tab_index
-            self._update_close_buttons()
-
-    def leaveEvent(self, event: QEvent) -> None:
-        """Clear hover state when mouse leaves."""
-        super().leaveEvent(event)
-        self.hovered_tab = -1
-        self._update_close_buttons()
-
-    def _update_close_buttons(self) -> None:
-        """Update visibility of close buttons based on hover state."""
-        for i in range(self.count()):
-            button = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
-            if button:
-                # Show button only for hovered tab
-                button.setVisible(i == self.hovered_tab)
-
-
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
 
@@ -706,3 +671,38 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
+
+
+class CustomTabBar(QTabBar):
+    """Custom tab bar that shows close buttons only on hover."""
+
+    hovered_tab: int
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.hovered_tab = -1
+        self.setMouseTracking(True)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Track which tab is being hovered."""
+        super().mouseMoveEvent(event)
+        # Get the tab index at the mouse position
+        pos = event.pos()
+        tab_index = self.tabAt(pos)
+        if tab_index != self.hovered_tab:
+            self.hovered_tab = tab_index
+            self._update_close_buttons()
+
+    def leaveEvent(self, event: QEvent) -> None:
+        """Clear hover state when mouse leaves."""
+        super().leaveEvent(event)
+        self.hovered_tab = -1
+        self._update_close_buttons()
+
+    def _update_close_buttons(self) -> None:
+        """Update visibility of close buttons based on hover state."""
+        for i in range(self.count()):
+            button = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if button:
+                # Show button only for hovered tab
+                button.setVisible(i == self.hovered_tab)
