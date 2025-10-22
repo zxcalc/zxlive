@@ -19,36 +19,34 @@ import copy
 import random
 from typing import Callable, Optional, cast
 
-from PySide6.QtCore import (QByteArray, QDir, QEvent, QFile, QFileInfo,
-                            QIODevice, QSettings, QTextStream, Qt, QUrl)
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence, QShortcut
-from PySide6.QtMultimedia import QSoundEffect
-from PySide6.QtWidgets import (QDialog, QMainWindow, QMessageBox,
-                               QTableWidget, QTableWidgetItem, QTabWidget,
-                               QVBoxLayout, QWidget, QApplication)
-
 import pyperclip
+from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
+                            QSettings, QTextStream)
+from PySide6.QtGui import (QAction, QCloseEvent, QIcon, QKeySequence,
+                           QMouseEvent, QShortcut)
+from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
+                               QTabWidget, QVBoxLayout, QWidget)
+from pyzx.drawing import graphs_to_gif
+from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
-from .common import GraphT, get_data, new_graph, to_tikz, from_tikz, get_settings_value, set_settings_value
+from .common import (GraphT, from_tikz, get_data, get_settings_value,
+                     new_graph, set_settings_value, to_tikz)
 from .construct import *
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
-                      ImportRuleOutput, create_new_rewrite,
-                      save_diagram_dialog, save_proof_dialog,
-                      save_rule_dialog, get_lemma_name_and_description,
-                      import_diagram_dialog, import_diagram_from_file, show_error_msg,
-                      export_proof_dialog, export_gif_dialog)
-from .settings import display_setting
-from .settings_dialog import open_settings_dialog
-
+                      ImportRuleOutput, create_new_rewrite, export_gif_dialog,
+                      export_proof_dialog, get_lemma_name_and_description,
+                      import_diagram_dialog, import_diagram_from_file,
+                      save_diagram_dialog, save_proof_dialog, save_rule_dialog,
+                      show_error_msg)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
+from .settings import display_setting
+from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
-from pyzx.graph.base import BaseGraph
-from pyzx.drawing import graphs_to_gif
 
 
 class MainWindow(QMainWindow):
@@ -76,6 +74,7 @@ class MainWindow(QMainWindow):
         self.show()
 
         tab_widget = QTabWidget(self)
+        tab_widget.setTabBar(CustomTabBar(tab_widget))
         wlayout.addWidget(tab_widget)
         tab_widget.setTabsClosable(True)
         tab_widget.currentChanged.connect(self.tab_changed)
@@ -85,6 +84,9 @@ class MainWindow(QMainWindow):
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
+
+        # Apply custom tab styling
+        self.update_colors()
 
         # Currently the copied part is stored internally, and is not made available to the clipboard.
         # We could do this by using pyperclip.
@@ -137,7 +139,7 @@ class MainWindow(QMainWindow):
             "Cut the selected part of the diagram")
         self.copy_action = self._new_action("&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
             "Copy the selected part of the diagram")
-        self.copy_clipboard_action = self._new_action("Copy tikz to clipboard", self.copy_graph_to_clipboard, 
+        self.copy_clipboard_action = self._new_action("Copy tikz to clipboard", self.copy_graph_to_clipboard,
                                                       QKeySequence("Ctrl+Shift+C"), "Copy the selected part of the diagram to the clipboard as tikz")
         self.paste_action = self._new_action("Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
             "Paste the copied part of the diagram")
@@ -582,44 +584,63 @@ class MainWindow(QMainWindow):
         save_rule_dialog(rule, self, name + ".zxr" if name else "")
 
     def update_colors(self) -> None:
-        # Apply dark or light stylesheet to the app and widgets
+        """Update app theme using reliable Qt native methods (no hardcoded colors)."""
+
         app = QApplication.instance()
-        if isinstance(app, QApplication):
-            if display_setting.dark_mode:
-                dark_stylesheet = """
-                    QMainWindow, QWidget, QDialog, QMenuBar, QMenu, QTabWidget, QTableWidget, QSpinBox, QPushButton {
-                        background-color: #232323;
-                        color: #e0e0e0;
-                    }
-                    QLineEdit, QTextEdit, QPlainTextEdit {
-                        background-color: #2d2d2d;
-                        color: #e0e0e0;
-                    }
-                    QTableWidget QHeaderView::section {
-                        background-color: #232323;
-                        color: #e0e0e0;
-                    }
-                    QTabBar::tab:selected {
-                        background: #333333;
-                    }
-                    QTabBar::tab:!selected {
-                        background: #232323;
-                    }
-                    QMenu::item:selected {
-                        background: #444444;
-                    }
-                    QPushButton {
-                        background-color: #333333;
-                        color: #e0e0e0;
-                    }
-                    QSpinBox, QComboBox {
-                        background-color: #2d2d2d;
-                        color: #e0e0e0;
-                    }
-                """
-                app.setStyleSheet(dark_stylesheet)
-            else:
-                app.setStyleSheet("")
+        if not isinstance(app, QApplication):
+            return
+
+        # Get the path to the close icon
+        close_icon_path = get_data("icons/tab-close.svg").replace("\\", "/")
+
+        # Use system color keywords instead of hardcoded colors
+        # These automatically adapt to light/dark themes
+        stylesheet = f"""
+            /* Use palette() colors - Qt provides correct ones automatically */
+            CustomTabBar::tab {{
+                color: palette(text);
+                background: palette(button);
+                border: 1px solid palette(mid);
+                border-bottom: none;
+                padding: 10px 24px;
+                margin-right: 2px;
+                min-width: 100px;
+                max-width: 200px;
+            }}
+
+            CustomTabBar::tab:selected {{
+                color: palette(ButtonText);
+                background: palette(light);
+                border-color: palette(midlight);
+            }}
+
+            CustomTabBar::tab:!selected {{
+                background: palette(mid);
+                margin-top: 2px;
+            }}
+
+            CustomTabBar::tab:hover {{
+                background: palette(midlight);
+            }}
+
+            CustomTabBar::close-button {{
+                subcontrol-position: right;
+                image: url({close_icon_path});
+                background: palette(mid);
+                border-radius: 5px;
+                width: 28px;
+                height: 28px;
+                padding: 2px;
+            }}
+
+            CustomTabBar::close-button:hover {{
+                background: palette(dark);
+            }}
+
+            /* Let Qt handle all other widget colors automatically */
+        """
+
+        app.setStyleSheet(stylesheet)
         if self.active_panel is not None:
             self.active_panel.update_colors()
 
@@ -696,3 +717,36 @@ class MainWindow(QMainWindow):
         zx_app.update_checker.update_available.connect(on_update_available)
         zx_app.update_checker.check_complete.connect(on_check_complete)
         zx_app.update_checker.check_for_updates_async()
+
+
+class CustomTabBar(QTabBar):
+    """Custom tab bar that shows close buttons only on hover."""
+
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.hovered_tab: int = -1
+        self.setMouseTracking(True)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Track which tab is being hovered."""
+        super().mouseMoveEvent(event)
+        # Get the tab index at the mouse position
+        pos = event.pos()
+        tab_index = self.tabAt(pos)
+        if tab_index != self.hovered_tab:
+            self.hovered_tab = tab_index
+            self._update_close_buttons()
+
+    def leaveEvent(self, event: QEvent) -> None:
+        """Clear hover state when mouse leaves."""
+        super().leaveEvent(event)
+        self.hovered_tab = -1
+        self._update_close_buttons()
+
+    def _update_close_buttons(self) -> None:
+        """Update visibility of close buttons based on hover state."""
+        for i in range(self.count()):
+            button = self.tabButton(i, QTabBar.ButtonPosition.RightSide)
+            if button:
+                # Show button only for hovered tab
+                button.setVisible(i == self.hovered_tab)
