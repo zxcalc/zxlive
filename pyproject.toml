@@ -34,7 +34,8 @@ dependencies = [
     "numpy",
     "shapely",
     "pyperclip",
-    "imageio"
+    "imageio",
+    "packaging"
 ]
 
 [project.optional-dependencies]
@@ -61,9 +62,6 @@ Issue-Tracker = "https://github.com/zxcalc/zxlive/issues"
 packages = [
     "zxlive"
 ]
-
-[project.scripts]
-zxlive = "zxlive.app:main"
 
 [project.gui-scripts]
 zxlive = "zxlive.app:main"
