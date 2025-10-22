@@ -36,17 +36,6 @@ if os.name == 'nt':
     myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
 
-# --- This is your app's setting ---
-# In a real app, you would read this from a config file (e.g., QSettings)
-# Options: "system", "light", "dark"
-THEME_SETTING = "light"
-
-if os.name == 'nt': # only on Windows
-    if THEME_SETTING == "light":
-        os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=1"
-    elif THEME_SETTING == "dark":
-        os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
-
 
 class ZXLive(QApplication):
     """The main ZXLive application
@@ -148,10 +137,17 @@ def get_version() -> str:
 
 def main() -> None:
     """Main entry point for ZXLive as a standalone app."""
+    # Configure Windows theme based on settings before creating QApplication
+    if os.name == 'nt': # only on Windows
+        if display_setting.dark_mode:
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
+        else:
+            os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=1"
+
     zxl = ZXLive()
     if sys.platform == "darwin": # 'darwin' is the name for macOS
-        if THEME_SETTING == "light":
-            zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)
-        elif THEME_SETTING == "dark":
+        if display_setting.dark_mode:
             zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+        else:
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)
     zxl.exec_()
