@@ -675,7 +675,7 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
-    
+
     def check_for_updates(self) -> None:
         """Manually check for updates."""
         from .dialogs import show_update_available_dialog
@@ -718,16 +718,13 @@ class MainWindow(QMainWindow):
         zx_app.update_checker.check_complete.connect(on_check_complete)
         zx_app.update_checker.check_for_updates_async()
 
-        
 
 class CustomTabBar(QTabBar):
     """Custom tab bar that shows close buttons only on hover."""
 
-    hovered_tab: int
-
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self.hovered_tab = -1
+        self.hovered_tab: int = -1
         self.setMouseTracking(True)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
