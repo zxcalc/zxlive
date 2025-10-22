@@ -72,9 +72,15 @@ input_circuit_formats = {
     'sqasm-no-simplification': "Spider QASM (no simplification)",
 }
 
+dark_mode_options = {
+    'system': "Same as system",
+    'light': "Light",
+    'dark': "Dark"
+}
+
 general_settings: list[SettingsData] = [
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
-    {"id": "dark-mode", "label": "Dark Mode (UI)", "type": FormInputType.Bool},
+    {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
@@ -155,7 +161,7 @@ class SettingsDialog(QDialog):
         self.value_dict: Dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
-        self.prev_dark_mode = self.get_settings_value("dark-mode", bool)
+        self.prev_dark_mode = self.get_settings_value("dark-mode", str)
         load_font_families()
 
         layout = QVBoxLayout()
@@ -293,7 +299,7 @@ class SettingsDialog(QDialog):
         # Update previous values after applying
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
-        self.prev_dark_mode = self.get_settings_value("dark-mode", bool)
+        self.prev_dark_mode = self.get_settings_value("dark-mode", str)
 
     def okay(self) -> None:
         self.apply()
@@ -316,7 +322,7 @@ class SettingsDialog(QDialog):
 
     def apply_global_settings(self) -> None:
         refresh_pyzx_tikz_settings()
-        current_dark_mode = self.get_settings_value("dark-mode", bool)
+        current_dark_mode = self.get_settings_value("dark-mode", str)
         if current_dark_mode != self.prev_dark_mode:
             QMessageBox.information(
                 self,

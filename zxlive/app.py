@@ -24,7 +24,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .mainwindow import MainWindow
-from .common import get_data, GraphT
+from .common import get_data, GraphT, get_settings_value
 from .settings import display_setting
 from .update_checker import UpdateChecker
 from .dialogs import show_update_available_dialog
@@ -82,15 +82,6 @@ class ZXLive(QApplication):
         if self.main_window:
             show_update_available_dialog(self.applicationVersion(), version, url, self.main_window)
 
-    def is_system_dark_mode(self) -> bool:
-        """Detect if system is using dark mode (Qt 6.5+ ColorScheme API)."""
-        try:
-            color_scheme = self.styleHints().colorScheme()
-            return color_scheme == Qt.ColorScheme.Dark
-        except AttributeError:
-            # Fallback: Qt 6.5+ API not available - use default
-            return False
-
     def edit_graph(self, g: GraphT, name: str) -> None:
         """Opens a ZXLive window from within a notebook to edit a graph."""
         if not self.main_window:
@@ -138,16 +129,19 @@ def get_version() -> str:
 def main() -> None:
     """Main entry point for ZXLive as a standalone app."""
     # Configure Windows theme based on settings before creating QApplication
+    dark_mode_setting = get_settings_value("dark-mode", str, "system")
     if os.name == 'nt': # only on Windows
-        if display_setting.dark_mode:
+        if dark_mode_setting == "dark":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
-        else:
+        elif dark_mode_setting == "light":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=1"
+        # For "system", don't set the environment variable to let Qt auto-detect
 
     zxl = ZXLive()
     if sys.platform == "darwin": # 'darwin' is the name for macOS
-        if display_setting.dark_mode:
+        if dark_mode_setting == "dark":
             zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
-        else:
+        elif dark_mode_setting == "light":
             zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)
+        # For "system", don't set the color scheme to let Qt auto-detect
     zxl.exec_()
