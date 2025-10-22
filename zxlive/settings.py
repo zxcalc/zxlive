@@ -232,7 +232,6 @@ class DisplaySettings:
     @property
     def dark_mode(self) -> bool:
         dark_mode_setting = str(settings.value("dark-mode", "system"))
-
         if dark_mode_setting == "system":
             # Check if we can detect system theme
             app = QApplication.instance()
@@ -251,7 +250,9 @@ class DisplaySettings:
             return False
 
     @dark_mode.setter
-    def dark_mode(self, value: str) -> None:
+    def dark_mode(self, value: str | bool) -> None:
+        if isinstance(value, bool):
+            value = "dark" if value else "light"
         settings.setValue("dark-mode", value)
 
     @property

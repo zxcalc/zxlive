@@ -130,7 +130,7 @@ def main() -> None:
     """Main entry point for ZXLive as a standalone app."""
     # Configure Windows theme based on settings before creating QApplication
     dark_mode_setting = get_settings_value("dark-mode", str, "system")
-    if os.name == 'nt': # only on Windows
+    if os.name == 'nt': # 'nt' is Windows
         if dark_mode_setting == "dark":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
         elif dark_mode_setting == "light":
@@ -138,7 +138,7 @@ def main() -> None:
         # For "system", don't set the environment variable to let Qt auto-detect
 
     zxl = ZXLive()
-    if sys.platform == "darwin": # 'darwin' is the name for macOS
+    if sys.platform == "darwin": # 'darwin' is macOS
         if dark_mode_setting == "dark":
             zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
         elif dark_mode_setting == "light":
