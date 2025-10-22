@@ -19,7 +19,7 @@ import os
 import sys
 from typing import Optional, cast
 
-from PySide6.QtCore import QCommandLineParser
+from PySide6.QtCore import QCommandLineParser, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -35,6 +35,18 @@ if os.name == 'nt':
     import ctypes
     myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
+
+# --- This is your app's setting ---
+# In a real app, you would read this from a config file (e.g., QSettings)
+# Options: "system", "light", "dark"
+THEME_SETTING = "light"
+
+if os.name == 'nt': # only on Windows
+    if THEME_SETTING == "light":
+        os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=1"
+    elif THEME_SETTING == "dark":
+        os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
+
 
 class ZXLive(QApplication):
     """The main ZXLive application
@@ -80,6 +92,15 @@ class ZXLive(QApplication):
         """Handle update available notification."""
         if self.main_window:
             show_update_available_dialog(self.applicationVersion(), version, url, self.main_window)
+
+    def is_system_dark_mode(self) -> bool:
+        """Detect if system is using dark mode (Qt 6.5+ ColorScheme API)."""
+        try:
+            color_scheme = self.styleHints().colorScheme()
+            return color_scheme == Qt.ColorScheme.Dark
+        except AttributeError:
+            # Fallback: Qt 6.5+ API not available - use default
+            return False
 
     def edit_graph(self, g: GraphT, name: str) -> None:
         """Opens a ZXLive window from within a notebook to edit a graph."""
@@ -128,4 +149,9 @@ def get_version() -> str:
 def main() -> None:
     """Main entry point for ZXLive as a standalone app."""
     zxl = ZXLive()
+    if sys.platform == "darwin": # 'darwin' is the name for macOS
+        if THEME_SETTING == "light":
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)
+        elif THEME_SETTING == "dark":
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
     zxl.exec_()
