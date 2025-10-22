@@ -25,7 +25,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
-    QComboBox, QApplication, QCheckBox
+    QComboBox, QApplication, QCheckBox, QMessageBox
 )
 
 from .common import get_settings_value, T, get_data
@@ -155,6 +155,7 @@ class SettingsDialog(QDialog):
         self.value_dict: Dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        self.prev_dark_mode = self.get_settings_value("dark-mode", bool)
         load_font_families()
 
         layout = QVBoxLayout()
@@ -292,6 +293,7 @@ class SettingsDialog(QDialog):
         # Update previous values after applying
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        self.prev_dark_mode = self.get_settings_value("dark-mode", bool)
 
     def okay(self) -> None:
         self.apply()
@@ -308,12 +310,19 @@ class SettingsDialog(QDialog):
             elif isinstance(widget, QComboBox):
                 self.settings.setValue(name, widget.currentData())
             elif isinstance(widget, QCheckBox):
-               self.settings.setValue(name, widget.isChecked())
+                self.settings.setValue(name, widget.isChecked())
         self.settings.sync()
         display_setting.update()
 
     def apply_global_settings(self) -> None:
         refresh_pyzx_tikz_settings()
+        current_dark_mode = self.get_settings_value("dark-mode", bool)
+        if current_dark_mode != self.prev_dark_mode:
+            QMessageBox.information(
+                self,
+                "Theme Change",
+                "You may need to restart the application for the theme change to take full effect."
+            )
         theme = self.get_settings_value("color-scheme", str)
         if theme != self.prev_color_scheme:
             display_setting.set_color_scheme(theme)
