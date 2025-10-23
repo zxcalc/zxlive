@@ -21,9 +21,9 @@ from typing import Callable, Optional, cast
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream)
-from PySide6.QtGui import (QAction, QCloseEvent, QIcon, QKeySequence,
-                           QMouseEvent, QShortcut)
+                            QSettings, QTextStream, QUrl)
+from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
+                           QKeySequence, QMouseEvent, QShortcut)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
                                QTabWidget, QVBoxLayout, QWidget)
 from pyzx.drawing import graphs_to_gif
@@ -187,8 +187,10 @@ class MainWindow(QMainWindow):
         rewrite_menu.addAction(new_rewrite_from_file)
         rewrite_menu.addAction(self.proof_as_rewrite_action)
 
+        user_guide = self._new_action("&User Guide", lambda: QDesktopServices.openUrl(QUrl("https://zxlive.readthedocs.io/")), None, "Open ZXLive user guide")
         check_for_updates = self._new_action("Check for &Updates...", self.check_for_updates, None, "Check for new versions of ZXLive")
         help_menu = menu.addMenu("&Help")
+        help_menu.addAction(user_guide)
         help_menu.addAction(check_for_updates)
 
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
