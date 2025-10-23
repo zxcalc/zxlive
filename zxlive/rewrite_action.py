@@ -261,7 +261,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.proof_panel = proof_panel
         self.root_item = data
         self.emitter = SignalEmitter()
-        self.emitter.finished.connect(lambda: self.dataChanged.emit(QModelIndex(), QModelIndex(), []))
+        self.emitter.finished.connect(self.layoutChanged.emit)
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     @classmethod
