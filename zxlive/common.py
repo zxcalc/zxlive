@@ -17,16 +17,24 @@ _ROOT = os.path.abspath(os.path.dirname(__file__))
 
 T = TypeVar('T')
 
+
 def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
 
-def set_settings_value(arg: str, val: T, _type: Type[T], settings: QSettings | None = None) -> None:
+
+def set_settings_value(
+        arg: str, val: T, _type: Type[T],
+        settings: QSettings | None = None) -> None:
     _settings = settings or QSettings("zxlive", "zxlive")
     if not isinstance(val, _type):
-        raise ValueError(f"Unexpected type for {arg}: expected {_type}, got {type(val)}")
+        raise ValueError(
+            f"Unexpected type for {arg}: expected {_type}, got {type(val)}")
     _settings.setValue(arg, val)
 
-def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
+
+def get_settings_value(
+        arg: str, _type: Type[T], default: T | None = None,
+        settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
     val = _settings.value(arg, default)
     if _type == bool:
@@ -38,8 +46,11 @@ def get_settings_value(arg: str, _type: Type[T], default: T | None = None, setti
     if not isinstance(val, _type):
         if default is not None:
             return default
-        raise ValueError(f"Unexpected type for {arg} ({val}): expected {_type}, got {type(val)}")
+        raise ValueError(
+            f"Unexpected type for {arg} ({val}): expected {_type}, "
+            f"got {type(val)}")
     return val
+
 
 def get_custom_rules_path() -> str:
     settings = QSettings("zxlive", "zxlive")
@@ -50,15 +61,18 @@ VT: TypeAlias = int
 ET: TypeAlias = tuple[int, int, EdgeType]
 GraphT: TypeAlias = Multigraph
 
+
 def new_graph() -> GraphT:
     g = GraphT()
     g.set_auto_simplify(False)
     return g
 
+
 class ToolType(IntEnum):
     SELECT = 0
     VERTEX = 1
     EDGE = 2
+
 
 SCALE: Final = 64.0
 
@@ -74,30 +88,37 @@ MIN_ZOOM = 0.05
 MAX_ZOOM = 10.0
 
 
-def pos_to_view(x:float,y: float) -> tuple[float, float]:
+def pos_to_view(x: float, y: float) -> tuple[float, float]:
     return (x * SCALE + OFFSET_X, y * SCALE + OFFSET_Y)
 
-def pos_from_view(x:float,y: float) -> tuple[float, float]:
+
+def pos_from_view(x: float, y: float) -> tuple[float, float]:
     return ((x-OFFSET_X) / SCALE, (y-OFFSET_Y) / SCALE)
 
-def pos_to_view_int(x:float,y: float) -> tuple[int, int]:
+
+def pos_to_view_int(x: float, y: float) -> tuple[int, int]:
     return (int(x * SCALE + OFFSET_X), int(y * SCALE + OFFSET_Y))
 
-def pos_from_view_int(x:float,y: float) -> tuple[int, int]:
+
+def pos_from_view_int(x: float, y: float) -> tuple[int, int]:
     return (int((x - OFFSET_X) / SCALE), int((y - OFFSET_Y) / SCALE))
 
-def view_to_length(width:float,height:float)-> tuple[float, float]:
-    return (width / SCALE, height / SCALE)
+
+def view_to_length(x: float, y: float) -> tuple[float, float]:
+    return (x / SCALE, y / SCALE)
+
 
 def to_tikz(g: GraphT) -> str:
     return pyzx.tikz.to_tikz(g)  # type: ignore
 
+
 def from_tikz(s: str) -> Optional[GraphT]:
     try:
-        g = pyzx.tikz.tikz_to_graph(s, backend = 'multigraph')
+        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph')
         assert isinstance(g, GraphT)
         return g
     except Exception as e:
         from . import dialogs
-        dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
+        dialogs.show_error_msg(
+            "Tikz import error", f"Error while importing tikz: {e}")
         return None
