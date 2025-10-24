@@ -48,7 +48,8 @@ def construct_circuit() -> GraphT:
     # Adding the edges between inputs nodes and output nodes to internal nodes
     for i in range(qubits):
         nelist.append((i, i+qubits, EdgeType.SIMPLE))
-        nelist.append((nvertices - qubits + i, nvertices - (2*qubits) + i, EdgeType.SIMPLE))
+        nelist.append((nvertices - qubits + i,
+                       nvertices - (2*qubits) + i, EdgeType.SIMPLE))
 
     cur_row = [1] * qubits
 
