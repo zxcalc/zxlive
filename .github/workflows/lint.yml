@@ -26,7 +26,6 @@ jobs:
       run:
         pip install ".[test]"
     - name: Flake8
-      continue-on-error: true
       run:
         pflake8 zxlive
     - name: Pylint
