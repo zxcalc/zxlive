@@ -308,8 +308,8 @@ class MainWindow(QMainWindow):
                 if not action.shortcuts():
                     action.setShortcut(alt_shortcut)
                 elif alt_shortcut not in action.shortcuts():
-                    # type: ignore
-                    action.setShortcuts([shortcut, alt_shortcut])
+                    shortcuts = [shortcut, alt_shortcut]
+                    action.setShortcuts(shortcuts)  # type: ignore
         return action
 
     @property
