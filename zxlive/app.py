@@ -33,9 +33,9 @@ from .dialogs import show_update_available_dialog
 # in the taskbar. See https://stackoverflow.com/questions/1551605/
 if os.name == 'nt':
     import ctypes
-    myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-        myappid)  # type: ignore
+    MYAPPID = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
+    shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
+    shell32.SetCurrentProcessExplicitAppUserModelID(MYAPPID)
 
 
 class ZXLive(QApplication):
