@@ -25,6 +25,9 @@ jobs:
     - name: Install dependecies
       run:
         pip install ".[test]"
+    - name: mypy
+      run:
+        mypy zxlive
     - name: Flake8
       continue-on-error: true
       run:
@@ -33,6 +36,3 @@ jobs:
       continue-on-error: true
       run:
         pylint zxlive
-    - name: mypy
-      run:
-        mypy zxlive
