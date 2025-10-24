@@ -8,7 +8,6 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
-from pyzx.symbolic import Poly
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
@@ -33,9 +32,11 @@ class GraphEditPanel(EditorBasePanel):
         super().__init__(*actions)
         self.graph_scene = EditGraphScene()
         self.graph_scene.vertices_moved.connect(self.vert_moved)
-        self.graph_scene.vertex_double_clicked.connect(self.vert_double_clicked)
+        self.graph_scene.vertex_double_clicked.connect(
+            self.vert_double_clicked)
         self.graph_scene.vertex_added.connect(self.add_vert)
-        self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
+        self.graph_scene.vertex_dropped_onto.connect(
+            self._vertex_dropped_onto)
         self.graph_scene.edge_added.connect(self.add_edge)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
@@ -76,14 +77,24 @@ class GraphEditPanel(EditorBasePanel):
         explanations = {
             'openqasm': "Write a circuit in QASM format.",
             'sqasm': "Write a circuit in Spider QASM format.",
-            'sqasm-no-simplification': "Write a circuit in Spider QASM format. No simplification will be performed.",
+            'sqasm-no-simplification': (
+                "Write a circuit in Spider QASM format. "
+                "No simplification will be performed."),
         }
         examples = {
-            'openqasm': "qreg q[3];\ncx q[0], q[1];\nh q[2];\nccx q[0], q[1], q[2];",
-            'sqasm': "qreg q[1];\nqreg A[2];\n;s A[1];\n;cx q[0], A[0];\n;cx q[0], A[1];",
-            'sqasm-no-simplification': "qreg q[1];\nqreg Z[2];\ncx q[0], Z[0];\ncx q[0], Z[1];\ns Z[1];",
+            'openqasm': (
+                "qreg q[3];\ncx q[0], q[1];\nh q[2];\n"
+                "ccx q[0], q[1], q[2];"),
+            'sqasm': (
+                "qreg q[1];\nqreg A[2];\n;s A[1];\n"
+                ";cx q[0], A[0];\n;cx q[0], A[1];"),
+            'sqasm-no-simplification': (
+                "qreg q[1];\nqreg Z[2];\ncx q[0], Z[0];\n"
+                "cx q[0], Z[1];\ns Z[1];"),
         }
-        qasm = create_circuit_dialog(explanations[circuit_format], examples[circuit_format], self)
+        qasm = create_circuit_dialog(
+            explanations[circuit_format],
+            examples[circuit_format], self)
         if qasm is not None:
             new_g = copy.deepcopy(self.graph_scene.g)
             try:
@@ -97,11 +108,14 @@ class GraphEditPanel(EditorBasePanel):
                 show_error_msg("Invalid circuit", str(err), parent=self)
                 return
             except Exception:
-                show_error_msg("Invalid circuit",
-                               f"Couldn't parse code as {input_circuit_formats[circuit_format]}.", parent=self)
+                show_error_msg(
+                    "Invalid circuit",
+                    f"Couldn't parse code as "
+                    f"{input_circuit_formats[circuit_format]}.",
+                    parent=self)
                 return
 
-            new_verts, new_edges = new_g.merge(circ)
+            new_verts, _ = new_g.merge(circ)
             cmd = UpdateGraph(self.graph_view, new_g)
             self.undo_stack.push(cmd)
             self.graph_scene.select_vertices(new_verts)
