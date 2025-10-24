@@ -8,9 +8,8 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QVBoxLayout, QWidget)
 
-from .eitem import EItem
 from .animations import AnimatedUndoStack
-from .commands import ChangeEdgeCurve, SetGraph
+from .commands import SetGraph
 from .common import GraphT, new_graph
 from .dialogs import FileFormat
 from .graphscene import GraphScene
@@ -27,7 +26,8 @@ class ToolbarSection:
     buttons: Sequence[QWidget | QAction]
     exclusive: bool = False
 
-    def __init__(self, *args: QWidget | QAction, exclusive: bool = False) -> None:
+    def __init__(self, *args: QWidget | QAction,
+                 exclusive: bool = False) -> None:
         self.buttons = args
         self.exclusive = exclusive
 
@@ -55,7 +55,7 @@ class BasePanel(QWidget):
         # Use box layout that fills the entire tab
         self.setLayout(QVBoxLayout())
         layout = self.layout()
-        assert layout is not None # for mypy
+        assert layout is not None  # for mypy
         layout.setSpacing(0)
         self.toolbar = QToolBar()
         layout.addWidget(self.toolbar)
@@ -136,18 +136,20 @@ class BasePanel(QWidget):
         if self.__class__ in self.splitter_sizes:
             self.splitter.setSizes(self.splitter_sizes[self.__class__])
 
-
     def update_font(self) -> None:
         self.graph_view.update_font()
 
     def show_matrix(self) -> None:
         """Show the matrix of the current graph in a dialog."""
         from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QSpinBox, QPushButton, QHBoxLayout, QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem
+        from PySide6.QtWidgets import (QSpinBox, QPushButton, QHBoxLayout,
+                                       QDialog, QTableWidget,
+                                       QTableWidgetItem)
         import pyperclip
         from .common import get_settings_value
         from .dialogs import show_error_msg
         precision: int = get_settings_value("matrix/precision", int, 4)
+
         def format_str(c: complex, p: int) -> str:
             tol = 1e-8
             if abs(c.real) < tol and abs(c.imag) < tol:
@@ -162,8 +164,10 @@ class BasePanel(QWidget):
             self.graph.auto_detect_io()
             matrix = self.graph.to_matrix()
         except AttributeError:
-            show_error_msg("Can't show matrix",
-                           "Showing matrices for parametrized diagrams is not supported yet.", parent=self)
+            show_error_msg(
+                "Can't show matrix",
+                "Showing matrices for parametrized diagrams is not "
+                "supported yet.", parent=self)
             return
         except Exception as e:
             show_error_msg("Can't show matrix", str(e), parent=self)
@@ -190,6 +194,7 @@ class BasePanel(QWidget):
         controls_layout.addWidget(copy_btn)
         layout.addLayout(controls_layout)
         dialog.setLayout(layout)
+
         def update_precision() -> None:
             p = precision_spin.value()
             for i in range(matrix.shape[0]):
@@ -197,13 +202,17 @@ class BasePanel(QWidget):
                     item = table.item(i, j)
                     if item is not None:
                         item.setText(format_str(matrix[i, j], p))
+
         precision_spin.valueChanged.connect(update_precision)
+
         def copy_matrix() -> None:
             p = precision_spin.value()
             rows = [
-                "\t".join(format_str(matrix[i, j], p) for j in range(matrix.shape[1]))
+                "\t".join(format_str(matrix[i, j], p)
+                          for j in range(matrix.shape[1]))
                 for i in range(matrix.shape[0])
             ]
             pyperclip.copy("\n".join(rows))
+
         copy_btn.clicked.connect(copy_matrix)
         dialog.exec()
