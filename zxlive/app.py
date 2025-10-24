@@ -29,12 +29,13 @@ from .settings import display_setting
 from .update_checker import UpdateChecker
 from .dialogs import show_update_available_dialog
 
-# The following hack is needed on windows in order to show the icon in the taskbar
-# See https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
+# The following hack is needed on windows in order to show the icon
+# in the taskbar. See https://stackoverflow.com/questions/1551605/
 if os.name == 'nt':
     import ctypes
     myappid = 'zxcalc.zxlive.zxlive.1.0.0'  # arbitrary string
-    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)  # type: ignore
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+        myappid)  # type: ignore
 
 
 class ZXLive(QApplication):
@@ -58,7 +59,8 @@ class ZXLive(QApplication):
         self.lastWindowClosed.connect(self.quit)
 
         # Initialize update checker
-        self.update_checker = UpdateChecker(self.applicationVersion(), self.main_window.settings)
+        self.update_checker = UpdateChecker(
+            self.applicationVersion(), self.main_window.settings)
         self.update_checker.update_available.connect(self.on_update_available)
 
         # Check for updates in background if needed
@@ -66,7 +68,8 @@ class ZXLive(QApplication):
             self.update_checker.check_for_updates_async()
 
         parser = QCommandLineParser()
-        parser.setApplicationDescription("ZXLive - An interactive tool for the ZX-calculus")
+        parser.setApplicationDescription(
+            "ZXLive - An interactive tool for the ZX-calculus")
         parser.addHelpOption()
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
@@ -80,7 +83,8 @@ class ZXLive(QApplication):
     def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""
         if self.main_window:
-            show_update_available_dialog(self.applicationVersion(), version, url, self.main_window)
+            show_update_available_dialog(
+                self.applicationVersion(), version, url, self.main_window)
 
     def edit_graph(self, g: GraphT, name: str) -> None:
         """Opens a ZXLive window from within a notebook to edit a graph."""
@@ -96,15 +100,18 @@ class ZXLive(QApplication):
 
 
 def get_embedded_app() -> ZXLive:
-    """Main entry point for ZXLive as an embedded app inside a jupyter notebook."""
+    """Main entry point for ZXLive as an embedded app inside a
+    jupyter notebook."""
     app = QApplication.instance() or ZXLive()
     app.__class__ = ZXLive
     return cast(ZXLive, app)
 
 
 def get_version() -> str:
-    """Get the application version from installed package metadata or pyproject.toml."""
-    # First, try to get version from installed package metadata (for shipped apps)
+    """Get the application version from installed package metadata
+    or pyproject.toml."""
+    # First, try to get version from installed package metadata
+    # (for shipped apps)
     try:
         from importlib.metadata import version
         return version('zxlive')
@@ -123,22 +130,23 @@ def get_version() -> str:
             return str(data['project']['version'])
     except (FileNotFoundError, IOError, ImportError, KeyError):
         # Final fallback to hardcoded version
-        return '0.3.1' # TODO: Update this for new releases
+        return '0.3.1'  # TODO: Update this for new releases
 
 
 def main() -> None:
     """Main entry point for ZXLive as a standalone app."""
     # Configure Windows theme based on settings before creating QApplication
     dark_mode_setting = get_settings_value("dark-mode", str, "system")
-    if os.name == 'nt': # 'nt' is Windows
+    if os.name == 'nt':  # 'nt' is Windows
         if dark_mode_setting == "dark":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=2"
         elif dark_mode_setting == "light":
             os.environ["QT_QPA_PLATFORM"] = "windows:darkmode=1"
-        # For "system", don't set the environment variable to let Qt auto-detect
+        # For "system", don't set the environment variable to let Qt
+        # auto-detect
 
     zxl = ZXLive()
-    if sys.platform == "darwin": # 'darwin' is macOS
+    if sys.platform == "darwin":  # 'darwin' is macOS
         if dark_mode_setting == "dark":
             zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
         elif dark_mode_setting == "light":
