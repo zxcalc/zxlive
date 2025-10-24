@@ -11,7 +11,8 @@ from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
+from pyzx.utils import (EdgeType, VertexType, get_w_partner, vertex_is_w,
+                        get_w_io, get_z_box_label, set_z_box_label)
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .settings import display_setting
@@ -47,6 +48,7 @@ class BaseCommand(QUndoCommand):
         #  of the graph have changed and only update those. For example
         #  we could store "dirty flags" for each node/edge.
         self.graph_view.update_graph(self.g, select_new)
+
 
 @dataclass
 class UndoableChange(BaseCommand):
@@ -94,6 +96,7 @@ class SetGraph(BaseCommand):
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
 
+
 @dataclass
 class UpdateGraph(BaseCommand):
     """Updates the current graph with a modified one.
@@ -111,9 +114,11 @@ class UpdateGraph(BaseCommand):
     def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
         if not self.old_selected:
-            self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
+            self.old_selected = set(
+                self.graph_view.graph_scene.selected_vertices)
         self.g = self.new_g
         self.update_graph_view(True)
+
 
 @dataclass
 class ChangeNodeType(BaseCommand):
@@ -121,7 +126,8 @@ class ChangeNodeType(BaseCommand):
     vs: list[VT] | set[VT]
     vty: VertexType
 
-    WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
+    WInfo = namedtuple(
+        'WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
     _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
     _old_w_info: Optional[dict[VT, WInfo]] = field(default=None, init=False)
@@ -129,7 +135,8 @@ class ChangeNodeType(BaseCommand):
 
     def undo(self) -> None:
         assert self._old_vtys is not None
-        for v, old_vty in zip(self.vs, self._old_vtys):  # TODO: strict=True in Python 3.10
+        # TODO: strict=True in Python 3.10
+        for v, old_vty in zip(self.vs, self._old_vtys):
             if vertex_is_w(old_vty):
                 assert self._old_w_info is not None
                 v2 = self._old_w_info[v].partner
@@ -137,10 +144,12 @@ class ChangeNodeType(BaseCommand):
                 self.g.set_type(v2, self._old_w_info[v].partner_type)
                 self.g.set_row(v2, self._old_w_info[v].partner_pos[0])
                 self.g.set_qubit(v2, self._old_w_info[v].partner_pos[1])
-                self.g.add_edge((v,v2), edgetype=EdgeType.W_IO)
+                self.g.add_edge((v, v2), edgetype=EdgeType.W_IO)
                 for v3 in self._old_w_info[v].neighbors:
-                    self.g.add_edge((v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
-                    self.g.remove_edge(self.g.edge(v,v3))
+                    self.g.add_edge(
+                        (v2, v3),
+                        edgetype=self.g.edge_type(self.g.edge(v, v3)))
+                    self.g.remove_edge(self.g.edge(v, v3))
             self.g.set_type(v, old_vty)
         if self._new_w_inputs is not None:
             for w_in in self._new_w_inputs.copy():
@@ -174,11 +183,14 @@ class ChangeNodeType(BaseCommand):
                 v2 = get_w_partner(self.g, v)
                 v2_neighbors = [vn for vn in self.g.neighbors(v2) if vn != v]
                 for v3 in v2_neighbors:
-                    self.g.add_edge((v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
-                self._old_w_info[v] = self.WInfo(partner=v2,
-                                                 partner_type=self.g.type(v2),
-                                                 partner_pos=(self.g.row(v2), self.g.qubit(v2)),
-                                                 neighbors=v2_neighbors)
+                    self.g.add_edge(
+                        (v, v3),
+                        edgetype=self.g.edge_type(self.g.edge(v2, v3)))
+                self._old_w_info[v] = self.WInfo(
+                    partner=v2,
+                    partner_type=self.g.type(v2),
+                    partner_pos=(self.g.row(v2), self.g.qubit(v2)),
+                    neighbors=v2_neighbors)
                 self.g.remove_vertex(v2)
             self.g.set_type(v, self.vty)
         self.update_graph_view()
@@ -194,7 +206,8 @@ class ChangeEdgeColor(BaseCommand):
 
     def undo(self) -> None:
         assert self._old_etys is not None
-        for e, old_ety in zip(self.es, self._old_etys):  # TODO: strict=True in Python 3.10
+        # TODO: strict=True in Python 3.10
+        for e, old_ety in zip(self.es, self._old_etys):
             self.g.set_edge_type(e, old_ety)
         self.update_graph_view()
 
@@ -220,9 +233,11 @@ class AddNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        self._added_vert = self.g.add_vertex(self.vty, y,x)
+        y = (round(self.y * display_setting.SNAP_DIVISION) /
+             display_setting.SNAP_DIVISION)
+        x = (round(self.x * display_setting.SNAP_DIVISION) /
+             display_setting.SNAP_DIVISION)
+        self._added_vert = self.g.add_vertex(self.vty, y, x)
         self.update_graph_view()
 
 
@@ -245,14 +260,16 @@ class AddNodeSnapped(BaseCommand):
         assert self.t is not None
         assert self._et is not None
         self.g.remove_vertex(self.added_vert)
-        self.g.add_edge((self.s,self.t), self._et)
+        self.g.add_edge((self.s, self.t), self._et)
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        self.added_vert = self.g.add_vertex(self.vty, y,x) 
-        s,t = self.g.edge_st(self.e)
+        y = (round(self.y * display_setting.SNAP_DIVISION) /
+             display_setting.SNAP_DIVISION)
+        x = (round(self.x * display_setting.SNAP_DIVISION) /
+             display_setting.SNAP_DIVISION)
+        self.added_vert = self.g.add_vertex(self.vty, y, x)
+        s, t = self.g.edge_st(self.e)
         self._et = self.g.edge_type(self.e)
         if self._et == EdgeType.SIMPLE:
             self.g.add_edge((s, self.added_vert), EdgeType.SIMPLE)
@@ -261,12 +278,15 @@ class AddNodeSnapped(BaseCommand):
             self.g.add_edge((s, self.added_vert), EdgeType.HADAMARD)
             self.g.add_edge((t, self.added_vert), EdgeType.SIMPLE)
         else:
-            raise ValueError("Can't add spider between vertices connected by edge of type", str(self._et))
+            raise ValueError(
+                "Can't add spider between vertices connected by edge "
+                "of type", str(self._et))
         self.s = s
         self.t = t
 
         self.g.remove_edge(self.e)
         self.update_graph_view()
+
 
 @dataclass
 class AddWNode(BaseCommand):
@@ -285,12 +305,19 @@ class AddWNode(BaseCommand):
         self.update_graph_view()
 
     def redo(self) -> None:
-        y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        self._added_input_vert = self.g.add_vertex(VertexType.W_INPUT, y - W_INPUT_OFFSET, self.x)
-        self._added_output_vert = self.g.add_vertex(VertexType.W_OUTPUT, y, x)
-        self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
+        y = (round(self.y * display_setting.SNAP_DIVISION) /
+             display_setting.SNAP_DIVISION)
+        x = (round(self.x * display_setting.SNAP_DIVISION) /
+             display_setting.SNAP_DIVISION)
+        self._added_input_vert = self.g.add_vertex(
+            VertexType.W_INPUT, y - W_INPUT_OFFSET, self.x)
+        self._added_output_vert = self.g.add_vertex(
+            VertexType.W_OUTPUT, y, x)
+        self.g.add_edge(
+            (self._added_input_vert, self._added_output_vert),
+            EdgeType.W_IO)
         self.update_graph_view()
+
 
 @dataclass
 class AddEdge(BaseCommand):
@@ -311,7 +338,7 @@ class AddEdge(BaseCommand):
 @dataclass
 class AddEdges(BaseCommand):
     """Adds multiple edges of the same type to a graph."""
-    pairs: list[tuple[VT,VT]]
+    pairs: list[tuple[VT, VT]]
     ety: EdgeType
 
     def undo(self) -> None:
@@ -330,7 +357,8 @@ class MoveNode(BaseCommand):
     """Updates the location of a collection of nodes."""
     vs: list[tuple[VT, float, float]]
 
-    _old_positions: Optional[list[tuple[float, float]]] = field(default=None, init=False)
+    _old_positions: Optional[list[tuple[float, float]]] = field(
+        default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_positions is not None
@@ -346,6 +374,7 @@ class MoveNode(BaseCommand):
             self.g.set_row(v, x)
             self.g.set_qubit(v, y)
         self.update_graph_view()
+
 
 @dataclass
 class ChangeEdgeCurve(BaseCommand):
@@ -366,11 +395,12 @@ class ChangeEdgeCurve(BaseCommand):
     def redo(self) -> None:
         self._set_distance(self.new_distance)
 
+
 @dataclass
 class MergeNodes(BaseCommand):
     """Merges groups of vertices that are at the same position."""
     vertices_to_merge: list[VT]
-    
+
     _old_g: Optional[GraphT] = field(default=None, init=False)
 
     def undo(self) -> None:
@@ -387,7 +417,7 @@ class MergeNodes(BaseCommand):
             if v not in self.g.vertices():
                 continue
             for e in self.g.incident_edges(v):
-                s,t = self.g.edge_st(e)
+                s, t = self.g.edge_st(e)
                 if s == target or t == target:
                     continue
                 ety = self.g.edge_type(e)
@@ -407,7 +437,8 @@ class ChangePhase(BaseCommand):
     v: VT
     new_phase: Union[Fraction, Poly, complex]
 
-    _old_phase: Optional[Union[Fraction, Poly, complex]] = field(default=None, init=False)
+    _old_phase: Optional[Union[Fraction, Poly, complex]] = field(
+        default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_phase is not None
@@ -431,15 +462,17 @@ class ChangePhase(BaseCommand):
 class AddRewriteStep(UpdateGraph):
     """Adds a new rewrite to the proof.
 
-    The rewrite is inserted after the currently selected step. In particular, it
-    replaces all rewrites that were previously after the current selection.
+    The rewrite is inserted after the currently selected step. In
+    particular, it replaces all rewrites that were previously after the
+    current selection.
     """
     step_view: QListView
     name: str
     diff: Optional[GraphDiff] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
-    _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
+    _old_steps: list[tuple[Rewrite, GraphT]] = field(
+        default_factory=list, init=False)
 
     @property
     def proof_model(self) -> ProofModel:
@@ -448,16 +481,20 @@ class AddRewriteStep(UpdateGraph):
         return model
 
     def redo(self) -> None:
-        # Remove steps from the proof model until we're at the currently selected step
+        # Remove steps from the proof model until we're at the currently
+        # selected step
         self._old_selected = int(self.step_view.currentIndex().row())
         self._old_steps = []
-        for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
+        for _ in range(
+                self.proof_model.rowCount() - self._old_selected - 1):
             self._old_steps.append(self.proof_model.pop_rewrite())
 
-        self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
+        self.proof_model.add_rewrite(
+            Rewrite(self.name, self.name, self.new_g))
 
         # Select the added step
-        idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
+        idx = self.step_view.model().index(
+            self.proof_model.rowCount() - 1, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
@@ -470,12 +507,13 @@ class AddRewriteStep(UpdateGraph):
         self.step_view.selectionModel().blockSignals(False)
 
         # Add back steps that were previously removed
-        for rewrite, graph in reversed(self._old_steps):
+        for rewrite, _ in reversed(self._old_steps):
             self.proof_model.add_rewrite(rewrite)
 
         # Select the previously selected step
         assert self._old_selected is not None
-        idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
+        idx = self.step_view.model().index(
+            self._old_selected, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
@@ -496,6 +534,7 @@ class GroupRewriteSteps(BaseCommand):
         self.step_view.model().ungroup_steps(self.start_index)
         self.step_view.move_to_step(self.end_index + 1)
 
+
 @dataclass
 class UngroupRewriteSteps(BaseCommand):
     step_view: ProofStepView
@@ -506,5 +545,6 @@ class UngroupRewriteSteps(BaseCommand):
         self.step_view.move_to_step(self.group_index + 1)
 
     def undo(self) -> None:
-        self.step_view.model().group_steps(self.group_index, self.group_index + 1)
+        self.step_view.model().group_steps(
+            self.group_index, self.group_index + 1)
         self.step_view.move_to_step(self.group_index + 1)
