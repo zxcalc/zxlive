@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from enum import Enum
+from fractions import Fraction
 from typing import Callable, Iterator, TypedDict
 
 from PySide6.QtCore import (QPoint, QSize, Qt, Signal, QEasingCurve,
@@ -16,7 +17,7 @@ from pyzx import EdgeType, VertexType
 from pyzx.utils import (get_w_partner, vertex_is_w, phase_to_s,
                         get_z_box_label)
 from pyzx.graph.jsonparser import string_to_phase
-from zxlive.sfx import SFXEnum
+from pyzx.symbolic import Poly
 
 from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode,
@@ -29,6 +30,7 @@ from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene
 from .settings import display_setting
+from .sfx import SFXEnum
 
 from . import animations
 
@@ -334,6 +336,7 @@ class EditorBasePanel(BasePanel):
         if not ok:
             return None
         try:
+            new_phase: complex | Fraction | Poly
             if phase_is_complex:
                 new_phase = string_to_complex(input_)
             else:
