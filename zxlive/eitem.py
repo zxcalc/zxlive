@@ -19,9 +19,11 @@ from typing import Optional, Any, TYPE_CHECKING, Union
 from enum import Enum
 
 from PySide6.QtCore import QPointF, QVariantAnimation, QAbstractAnimation
-from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsItem, \
-    QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
-from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
+from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsPathItem,
+                               QGraphicsItem, QGraphicsSceneMouseEvent,
+                               QStyleOptionGraphicsItem, QWidget, QStyle)
+from PySide6.QtGui import (QPen, QPainter, QColor, QPainterPath,
+                           QPainterPathStroker)
 
 from pyzx.utils import EdgeType, VertexType
 
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 
 HAD_EDGE_BLUE = "#0077ff"
 
+
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
@@ -44,11 +47,16 @@ class EItem(QGraphicsPathItem):
         """Properties of an EItem that can be animated."""
         Thickness = 1
 
-    def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
+    def __init__(
+            self, graph_scene: GraphScene, e: ET, s_item: VItem,
+            t_item: VItem, curve_distance: float = 0,
+            index: int = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+        self.setFlag(
+            QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(
+            QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
         self.graph_scene = graph_scene
         self.e = e
@@ -59,7 +67,8 @@ class EItem(QGraphicsPathItem):
         self.active_animations = set()
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
-        self.selection_node = QGraphicsEllipseItem(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
+        self.selection_node = QGraphicsEllipseItem(
+            -0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
         pen = QPen()
         pen.setWidthF(4)
         pen.setColor(QColor('#0022FF'))
@@ -85,20 +94,23 @@ class EItem(QGraphicsPathItem):
 
     def reset_color(self) -> None:
         """Reset the color of the edge to the default color."""
+        colors = display_setting.effective_colors
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             self.color = QColor(HAD_EDGE_BLUE)
         else:
-            if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
-               self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
-                self.color = display_setting.effective_colors["dummy_edge"]
+            s_type = self.g.type(self.g.edge_s(self.e))
+            t_type = self.g.type(self.g.edge_t(self.e))
+            if s_type == VertexType.DUMMY or t_type == VertexType.DUMMY:
+                self.color = colors["dummy_edge"]
             else:
-                self.color = display_setting.effective_colors["edge"]
+                self.color = colors["edge"]
 
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
 
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable,
-                     self.g.edge_type(self.e) != EdgeType.W_IO)
+        self.setFlag(
+            QGraphicsItem.GraphicsItemFlag.ItemIsSelectable,
+            self.g.edge_type(self.e) != EdgeType.W_IO)
         # set color/style according to edge type
         pen = QPen()
         pen.setWidthF(self.thickness)
@@ -108,10 +120,12 @@ class EItem(QGraphicsPathItem):
         self.setPen(QPen(pen))
 
         if not self.is_dragging:
-            self.curve_distance = self.g.edata(self.e, f"curve_{self.index}", self.curve_distance)
+            curve_key = f"curve_{self.index}"
+            self.curve_distance = self.g.edata(
+                self.e, curve_key, self.curve_distance)
 
         path = QPainterPath()
-        if self.s_item == self.t_item: # self-loop
+        if self.s_item == self.t_item:  # self-loop
             cd = self.curve_distance
             cd = cd + 0.5 if cd >= 0 else cd - 0.5
             s_pos = self.s_item.pos()
@@ -121,16 +135,21 @@ class EItem(QGraphicsPathItem):
                          s_pos)
             curve_midpoint = s_pos + QPointF(0, -0.75) * cd * SCALE
         else:
-            control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
+            control_point = calculate_control_point(
+                self.s_item.pos(), self.t_item.pos(), self.curve_distance)
             path.moveTo(self.s_item.pos())
             path.quadTo(control_point, self.t_item.pos())
-            curve_midpoint = self.s_item.pos() * 0.25 + control_point * 0.5 + self.t_item.pos() * 0.25
+            s_pos = self.s_item.pos()
+            t_pos = self.t_item.pos()
+            curve_midpoint = (
+                s_pos * 0.25 + control_point * 0.5 + t_pos * 0.25)
         self.setPath(path)
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
-
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
+    def paint(
+            self, painter: QPainter, option: QStyleOptionGraphicsItem,
+            widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
@@ -138,18 +157,21 @@ class EItem(QGraphicsPathItem):
         option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
 
-    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
-        # Intercept selection- and position-has-changed events to call `refresh`.
-        # Note that the position and selected values are already updated when
-        # this event fires.
-        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
+    def itemChange(
+            self, change: QGraphicsItem.GraphicsItemChange,
+            value: Any) -> Any:
+        # Intercept selection- and position-has-changed events to call
+        # `refresh`. Note that the position and selected values are
+        #  already updated when this event fires.
+        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged,
+                      QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             self.refresh()
-            
-            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+
+            if (change ==
+                    QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged):
                 self.graph_scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
-
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
@@ -161,12 +183,16 @@ class EItem(QGraphicsPathItem):
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
-        if self.is_mouse_pressed and len(scene.selectedItems()) == 1 and self._old_pos is not None:
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
+        if (self.is_mouse_pressed and len(scene.selectedItems()) == 1 and
+                self._old_pos is not None):
             self.is_dragging = True
             distance = e.pos() - self._old_pos
-            perpendicular = compute_perpendicular_direction(self.s_item.pos(), self.t_item.pos())
-            self.curve_distance += 2 * QPointF.dotProduct(distance, perpendicular) / SCALE
+            perpendicular = compute_perpendicular_direction(
+                self.s_item.pos(), self.t_item.pos())
+            dot_product = QPointF.dotProduct(distance, perpendicular)
+            self.curve_distance += 2 * dot_product / SCALE
             self._old_pos = e.pos()
             self.refresh()
         e.ignore()
@@ -174,7 +200,8 @@ class EItem(QGraphicsPathItem):
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(e)
         if self.is_dragging:
-            self.graph_scene.edge_dragged.emit(self, self.curve_distance, self._old_curve_distance)
+            self.graph_scene.edge_dragged.emit(
+                self, self.curve_distance, self._old_curve_distance)
             self._old_pos = None
         self.is_dragging = False
         self.is_mouse_pressed = False
@@ -186,20 +213,24 @@ class EItem(QGraphicsPathItem):
             e.ignore()
             return
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         scene.edge_double_clicked.emit(self.e)
 
     def shape(self) -> QPainterPath:
         path = self.path()
         stroker = QPainterPathStroker()
-        stroker.setWidth(max(self.thickness, 8))  # 8 px is a reasonable clickable width
+        # 8 px is a reasonable clickable width
+        stroker.setWidth(max(self.thickness, 8))
         return stroker.createStroke(path)
 
 
 class EDragItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge in construction during a drag"""
 
-    def __init__(self, g: GraphT, ety: EdgeType, start: VItem, mouse_pos: QPointF) -> None:
+    def __init__(
+            self, g: GraphT, ety: EdgeType, start: VItem,
+            mouse_pos: QPointF) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.g = g
@@ -229,7 +260,10 @@ class EDragItem(QGraphicsPathItem):
         path.lineTo(self.mouse_pos)
         self.setPath(path)
 
-def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float) -> QPointF:
+
+def calculate_control_point(
+        source_pos: QPointF, target_pos: QPointF,
+        curve_distance: float) -> QPointF:
     """Calculate the control point for the curve"""
     perpendicular = compute_perpendicular_direction(source_pos, target_pos)
     source_plus_target = source_pos + target_pos
@@ -238,7 +272,9 @@ def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_dist
     control_point = midpoint + offset
     return control_point
 
-def compute_perpendicular_direction(source_pos: QPointF, target_pos: QPointF) -> QPointF:
+
+def compute_perpendicular_direction(
+        source_pos: QPointF, target_pos: QPointF) -> QPointF:
     if source_pos == target_pos:
         return QPointF(0, -2/3)
     direction = target_pos - source_pos
@@ -252,9 +288,9 @@ class EItemAnimation(QVariantAnimation):
     """Animator for edge graphics items.
 
     This animator lets the edge know that its being animated which stops any
-    interaction with the user. Furthermore, this animator
-    ensures that it's not garbage collected until the animation is finished, so there is
-    no need to hold onto a reference of this class."""
+    interaction with the user. Furthermore, this animator ensures that
+    it's not garbage collected until the animation is finished, so there
+    is no need to hold onto a reference of this class."""
 
     _it: Optional[EItem]
     prop: EItem.Properties
@@ -262,8 +298,10 @@ class EItemAnimation(QVariantAnimation):
 
     e: Optional[ET]
 
-    def __init__(self, item: Union[EItem, ET], property: EItem.Properties,
-                 scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
+    def __init__(
+            self, item: Union[EItem, ET], property: EItem.Properties,
+            scene: Optional[GraphScene] = None,
+            refresh: bool = False) -> None:
         super().__init__()
         self.e = None
         self._it = None
@@ -287,7 +325,8 @@ class EItemAnimation(QVariantAnimation):
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        if (state == QAbstractAnimation.State.Running and
+                self not in self.it.active_animations):
             # Stop all animations that target the same property
             for anim in self.it.active_animations.copy():
                 if anim.prop == self.prop:
@@ -297,9 +336,9 @@ class EItemAnimation(QVariantAnimation):
             self.it.active_animations.remove(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
-            #   Note that we cannot just remove ourselves from the set since the garbage
-            #   collector will eat us in that case. We'll probably need something like
-            #   `it.paused_animations`
+            #   Note that we cannot just remove ourselves from the set
+            #   since the garbage collector will eat us in that case.
+            #   We'll probably need something like `it.paused_animations`
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
