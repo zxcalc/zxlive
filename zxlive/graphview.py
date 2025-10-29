@@ -171,68 +171,87 @@ class GraphView(QGraphicsView):
         Also handles merging selected vertices with Ctrl+M.
         """
         if Qt.KeyboardModifier.ControlModifier & e.modifiers():
-            g = self.graph_scene.g
-            if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
-                distance = 1 / get_settings_value(
-                    "snap-granularity", int)
-            else:
-                distance = 0.5
             if e.key() == Qt.Key.Key_M:
                 # Merge vertices at the same position
                 self.merge_triggered.emit()
                 return
-            for v in self.graph_scene.selected_vertices:
-                vitem = self.graph_scene.vertex_map[v]
-                x = g.row(v)
-                y = g.qubit(v)
-                if e.key() == Qt.Key.Key_Up:
-                    g.set_position(v, y - distance, x)
-                elif e.key() == Qt.Key.Key_Down:
-                    g.set_position(v, y + distance, x)
-                elif e.key() == Qt.Key.Key_Left:
-                    g.set_position(v, y, x - distance)
-                elif e.key() == Qt.Key.Key_Right:
-                    g.set_position(v, y, x + distance)
-                vitem.set_pos_from_graph()
+            self._handle_vertex_movement(e)
         else:
             super().keyPressEvent(e)
+
+    def _handle_vertex_movement(self, e: QKeyEvent) -> None:
+        """Move selected vertices based on arrow key input."""
+        g = self.graph_scene.g
+        if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
+            distance = 1 / get_settings_value("snap-granularity", int)
+        else:
+            distance = 0.5
+        # Determine movement direction
+        dx, dy = 0.0, 0.0
+        if e.key() == Qt.Key.Key_Up:
+            dy = -distance
+        elif e.key() == Qt.Key.Key_Down:
+            dy = distance
+        elif e.key() == Qt.Key.Key_Left:
+            dx = -distance
+        elif e.key() == Qt.Key.Key_Right:
+            dx = distance
+        else:
+            return  # Not an arrow key
+        # Apply movement to all selected vertices
+        for v in self.graph_scene.selected_vertices:
+            vitem = self.graph_scene.vertex_map[v]
+            x = g.row(v)
+            y = g.qubit(v)
+            g.set_position(v, y + dy, x + dx)
+            vitem.set_pos_from_graph()
 
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         super().mouseMoveEvent(e)
         if self.tool == GraphTool.Selection:
-            if self.rubberband.isVisible():
-                self.rubberband.setGeometry(
-                    QRect(self._rubberband_start, e.pos()).normalized())
+            self._handle_selection_move(e)
         elif self.tool == GraphTool.MagicWand:
-            if self.wand_trace is not None:
-                if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
-                    self.wand_trace.shift = False
-                assert self.wand_path is not None
-                pos = self.mapToScene(e.pos())
-                prev = self.wand_trace.end
-                self.wand_trace.end = pos
-                path = self.wand_path.path()
-                path.lineTo(pos)
-                self.wand_path.setPath(path)
-                for i in range(10):
-                    t = i / 9
-                    ipos = QPointF(pos * t + prev * (1.0 - t))
-                    if self.sparkle_mode:
-                        self.sparkles.emit_sparkles(ipos, 1)
-                    items = self.graph_scene.items(ipos)
-                    for item in items:
-                        if (isinstance(item, VItem) and
-                                item not in self.wand_trace.hit):
-                            anims.anticipate_fuse(item)
-                        if (item is not self.wand_path and
-                                isinstance(item, (VItem, EItem))):
-                            if item not in self.wand_trace.hit:
-                                self.wand_trace.hit[item] = []
-                            self.wand_trace.hit[item].append(ipos)
-            else:
-                e.ignore()
+            self._handle_wand_move(e)
         else:
             e.ignore()
+
+    def _handle_selection_move(self, e: QMouseEvent) -> None:
+        """Handle mouse movement for selection tool (rubberband resize)."""
+        if self.rubberband.isVisible():
+            self.rubberband.setGeometry(
+                QRect(self._rubberband_start, e.pos()).normalized())
+
+    def _handle_wand_move(self, e: QMouseEvent) -> None:
+        """Handle mouse movement for magic wand tool (trace path)."""
+        if self.wand_trace is None:
+            e.ignore()
+            return
+        if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+            self.wand_trace.shift = False
+        assert self.wand_path is not None
+        pos = self.mapToScene(e.pos())
+        prev = self.wand_trace.end
+        self.wand_trace.end = pos
+        # Update wand path
+        path = self.wand_path.path()
+        path.lineTo(pos)
+        self.wand_path.setPath(path)
+        # Sample points along the path to detect item hits
+        for i in range(10):
+            t = i / 9
+            ipos = QPointF(pos * t + prev * (1.0 - t))
+            if self.sparkle_mode:
+                self.sparkles.emit_sparkles(ipos, 1)
+            items = self.graph_scene.items(ipos)
+            for item in items:
+                if (isinstance(item, VItem) and
+                        item not in self.wand_trace.hit):
+                    anims.anticipate_fuse(item)
+                if (item is not self.wand_path and
+                        isinstance(item, (VItem, EItem))):
+                    if item not in self.wand_trace.hit:
+                        self.wand_trace.hit[item] = []
+                    self.wand_trace.hit[item].append(ipos)
 
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:
         if (self.tool == GraphTool.Selection and
@@ -242,45 +261,58 @@ class GraphView(QGraphicsView):
         super().mouseReleaseEvent(e)
         if e.button() == Qt.MouseButton.LeftButton:
             if self.tool == GraphTool.Selection:
-                if self.rubberband.isVisible():
-                    self.rubberband.hide()
-                    key_modifiers = e.modifiers()
-                    if not (Qt.KeyboardModifier.ShiftModifier &
-                            key_modifiers or
-                            Qt.KeyboardModifier.ControlModifier &
-                            key_modifiers):
-                        self.graph_scene.clearSelection()
-                    rect = self.rubberband.geometry()
-                    items = [
-                        it for it in self.graph_scene.items(
-                            self.mapToScene(rect).boundingRect())
-                        if isinstance(it, VItem)]
-                    for it in items:
-                        it.setSelected(
-                            not (len(items) == 1 or
-                                 e.modifiers() &
-                                 Qt.KeyboardModifier.ShiftModifier) or
-                            not it.isSelected())
-                    self.graph_scene.selection_changed_custom.emit()
+                self._handle_selection_release(e)
             elif self.tool == GraphTool.MagicWand:
-                if self.wand_trace is not None:
-                    if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
-                        self.wand_trace.shift = False
-                    assert self.wand_path is not None
-                    if self.sparkle_mode:
-                        self.sparkles.stop()
-                    for item in self.wand_trace.hit:
-                        if isinstance(item, VItem):
-                            anims.back_to_default(item)
-                    self.wand_path.hide()
-                    self.graph_scene.removeItem(self.wand_path)
-                    self.wand_path = None
-                    self.wand_trace_finished.emit(self.wand_trace)
-                    self.wand_trace = None
-                else:
-                    e.ignore()
+                self._handle_wand_release(e)
         else:
             e.ignore()
+
+    def _handle_selection_release(self, e: QMouseEvent) -> None:
+        """Handle mouse release for selection tool (complete rubberband)."""
+        if not self.rubberband.isVisible():
+            return
+        self.rubberband.hide()
+        key_modifiers = e.modifiers()
+        # Clear selection if neither Shift nor Control is pressed
+        if not (Qt.KeyboardModifier.ShiftModifier & key_modifiers or
+                Qt.KeyboardModifier.ControlModifier & key_modifiers):
+            self.graph_scene.clearSelection()
+        # Get vertex items in rubberband rectangle
+        rect = self.rubberband.geometry()
+        items = [
+            it for it in self.graph_scene.items(
+                self.mapToScene(rect).boundingRect())
+            if isinstance(it, VItem)]
+        for it in items:
+            if key_modifiers & Qt.KeyboardModifier.ShiftModifier:
+                # Shift+drag: toggle each item
+                it.setSelected(not it.isSelected())
+            else:
+                # Drag without Shift: select all
+                it.setSelected(True)
+        self.graph_scene.selection_changed_custom.emit()
+
+    def _handle_wand_release(self, e: QMouseEvent) -> None:
+        """Handle mouse release for magic wand tool (finish trace)."""
+        if self.wand_trace is None:
+            e.ignore()
+            return
+        if not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+            self.wand_trace.shift = False
+        assert self.wand_path is not None
+        # Stop sparkles and reset animations
+        if self.sparkle_mode:
+            self.sparkles.stop()
+        for item in self.wand_trace.hit:
+            if isinstance(item, VItem):
+                anims.back_to_default(item)
+        # Clean up wand path
+        self.wand_path.hide()
+        self.graph_scene.removeItem(self.wand_path)
+        self.wand_path = None
+        # Emit finished signal
+        self.wand_trace_finished.emit(self.wand_trace)
+        self.wand_trace = None
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
