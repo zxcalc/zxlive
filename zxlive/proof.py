@@ -19,18 +19,22 @@ from .settings import display_setting
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
-    display_name: str # Name of proof displayed to user
+    display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: Optional[list['Rewrite']] = None # Optional field to store the grouped rewrites
+    # Optional field to store the grouped rewrites
+    grouped_rewrites: Optional[list['Rewrite']] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
+        grouped = None
+        if self.grouped_rewrites:
+            grouped = [r.to_dict() for r in self.grouped_rewrites]
         return {
             "display_name": self.display_name,
             "rule": self.rule,
             "graph": self.graph.to_dict(),
-            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None
+            "grouped_rewrites": grouped
         }
 
     def to_json(self) -> str:
@@ -38,7 +42,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str,Dict[str,Any]]) -> "Rewrite":
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -49,18 +53,24 @@ class Rewrite(NamedTuple):
         assert isinstance(graph, GraphT)
         graph.set_auto_simplify(False)
 
+        grouped = None
+        if grouped_rewrites:
+            grouped = [Rewrite.from_json(r) for r in grouped_rewrites]
+        # Old proofs may not have display names
+        display_name = d.get("display_name", d["rule"])
         return Rewrite(
-            display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
+            display_name=display_name,
             rule=d["rule"],
             graph=graph,
-            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
+            grouped_rewrites=grouped
         )
+
 
 class ProofModel(QAbstractListModel):
     """List model capturing the individual steps in a proof.
 
-    There is a row for each graph in the proof sequence. Furthermore, we store the
-    rewrite that was used to go from one graph to next.
+    There is a row for each graph in the proof sequence. Furthermore,
+    we store the rewrite that was used to go from one graph to next.
     """
 
     initial_graph: GraphT
@@ -82,8 +92,10 @@ class ProofModel(QAbstractListModel):
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
-    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int=Qt.ItemDataRole.DisplayRole) -> Any:
-        """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
+    def data(self, index: Union[QModelIndex, QPersistentModelIndex],
+             role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        """Overrides `QAbstractItemModel.data` to populate a view with
+        rewrite steps"""
 
         if index.row() >= len(self.steps)+1 or index.column() >= 1:
             return None
@@ -96,7 +108,9 @@ class ProofModel(QAbstractListModel):
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
 
-    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
+    def flags(self,
+              index: Union[QModelIndex, QPersistentModelIndex]
+              ) -> Qt.ItemFlag:
         if index.row() == 0:
             return super().flags(index)
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
@@ -109,21 +123,29 @@ class ProofModel(QAbstractListModel):
         """
         return None
 
-    def columnCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def columnCount(self,
+                    index: Union[QModelIndex,
+                                 QPersistentModelIndex] = QModelIndex()
+                    ) -> int:
         """The number of columns"""
         return 1
 
-    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def rowCount(self,
+                 index: Union[QModelIndex,
+                              QPersistentModelIndex] = QModelIndex()
+                 ) -> int:
         """The number of rows"""
-        # This is a quirk of Qt list models: Since they are based on tree models, the
-        # user has to specify the index of the parent. In a list, we always expect the
-        # parent to be `None` or the empty `QModelIndex()`
+        # This is a quirk of Qt list models: Since they are based on
+        # tree models, the user has to specify the index of the parent.
+        # In a list, we always expect the parent to be `None` or the
+        # empty `QModelIndex()`
         if not index or not index.isValid():
             return len(self.steps)+1
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
+    def add_rewrite(self, rewrite: Rewrite,
+                    position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
         if position is None:
             position = len(self.steps)
@@ -131,10 +153,13 @@ class ProofModel(QAbstractListModel):
         self.steps.insert(position, rewrite)
         self.endInsertRows()
 
-    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self,
+                    position: Optional[int] = None
+                    ) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
-        Returns the rewrite and the graph that previously resulted from this rewrite.
+        Returns the rewrite and the graph that previously resulted from
+        this rewrite.
         """
         if position is None:
             position = len(self.steps) - 1
@@ -156,9 +181,10 @@ class ProofModel(QAbstractListModel):
         """Change the display name"""
         old_step = self.steps[index]
 
-        # Must create a new Rewrite object instead of modifying current object
-        # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
+        # Must create a new Rewrite object instead of modifying current
+        # object since Rewrite inherits NamedTuple and is hence immutable
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph,
+                                    old_step.grouped_rewrites)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
@@ -166,9 +192,12 @@ class ProofModel(QAbstractListModel):
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def group_steps(self, start_index: int, end_index: int) -> None:
-        """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
+        """Replace the individual steps from `start_index` to `end_index`
+        with a new grouped step"""
+        names = [self.steps[i].display_name
+                 for i in range(start_index, end_index + 1)]
         new_rewrite = Rewrite(
-            "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
+            "Grouped Steps: " + " 🡒 ".join(names),
             "Grouped",
             self.get_graph(end_index + 1),
             self.steps[start_index:end_index + 1]
@@ -188,10 +217,11 @@ class ProofModel(QAbstractListModel):
         for i, step in enumerate(individual_steps):
             self.add_rewrite(step, index + i)
         self.dataChanged.emit(self.createIndex(index, 0),
-                              self.createIndex(index + len(individual_steps), 0),
+                              self.createIndex(
+                                  index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> Dict[str,Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -206,7 +236,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str,Dict[str,Any]]) -> "ProofModel":
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -214,13 +244,15 @@ class ProofModel(QAbstractListModel):
             d = json_str
         initial_graph = GraphT.from_json(d["initial_graph"])
         # Mypy issue: https://github.com/python/mypy/issues/11673
-        if TYPE_CHECKING: assert isinstance(initial_graph, GraphT)
+        if TYPE_CHECKING:
+            assert isinstance(initial_graph, GraphT)
         initial_graph.set_auto_simplify(False)
         model = ProofModel(initial_graph)
         for step in d["proof_steps"]:
             rewrite = Rewrite.from_json(step)
             model.add_rewrite(rewrite)
         return model
+
 
 class ProofStepView(QListView):
     """A view for displaying the steps in a proof."""
@@ -245,21 +277,26 @@ class ProofStepView(QListView):
             pal.setColor(self.viewport().backgroundRole(), QColor(35, 39, 46))
         else:
             pal.setColor(self.backgroundRole(), QColor(255, 255, 255))
-            pal.setColor(self.viewport().backgroundRole(), QColor(255, 255, 255))
+            bg_role = self.viewport().backgroundRole()
+            pal.setColor(bg_role, QColor(255, 255, 255))
         self.setPalette(pal)
         self.setSpacing(0)
-        self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
-        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        mode = QAbstractItemView.SelectionMode.ContiguousSelection
+        self.setSelectionMode(mode)
+        behavior = QAbstractItemView.SelectionBehavior.SelectRows
+        self.setSelectionBehavior(behavior)
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(True)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
-        self.selectionModel().selectionChanged.connect(self.proof_step_selected)
+        sel_model = self.selectionModel()
+        sel_model.selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
 
-    # overriding this method to change the return type and stop mypy from complaining
+    # overriding this method to change the return type and stop mypy
+    # from complaining
     def model(self) -> ProofModel:
         model = super().model()
         assert isinstance(model, ProofModel)
@@ -267,8 +304,10 @@ class ProofStepView(QListView):
 
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
-        # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
-        self.selectionModel().selectionChanged.connect(self.proof_step_selected)  
+        # it looks like the selectionModel is linked to the model, so after
+        # updating the model we need to reconnect the selectionModel signals.
+        sel_model = self.selectionModel()
+        sel_model.selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
 
     def move_to_step(self, index: int) -> None:
@@ -294,10 +333,15 @@ class ProofStepView(QListView):
             action_function_map[group_action] = self.group_selected_steps
         elif index != 0:
             rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
-            if self.model().steps[index - 1].grouped_rewrites is not None:
+
+            def edit_func() -> None:
+                self.edit(selected_indexes[0])
+            action_function_map[rename_action] = edit_func
+            grouped_rewrites = self.model().steps[index - 1].grouped_rewrites
+            if grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
-                action_function_map[ungroup_action] = self.ungroup_selected_step
+                ungroup_func = self.ungroup_selected_step
+                action_function_map[ungroup_action] = ungroup_func
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
@@ -306,13 +350,15 @@ class ProofStepView(QListView):
     def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange
         old_name = self.model().steps[index].display_name
-        cmd = UndoableChange(self.graph_view,
+        cmd = UndoableChange(
+            self.graph_view,
             lambda: self.model().rename_step(index, old_name),
             lambda: self.model().rename_step(index, new_name)
         )
         self.undo_stack.push(cmd)
 
-    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+    def proof_step_selected(self, selected: QItemSelection,
+                            deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
         step_index = selected.first().topLeft().row()
@@ -334,7 +380,8 @@ class ProofStepView(QListView):
             raise ValueError("Cannot group the first step")
 
         self.move_to_step(indices[-1] - 1)
-        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
+        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1,
+                                indices[-1] - 1)
         self.undo_stack.push(cmd)
 
     def ungroup_selected_step(self) -> None:
@@ -344,7 +391,8 @@ class ProofStepView(QListView):
             raise ValueError("Can only ungroup one step")
 
         index = selected_indexes[0].row()
-        if index == 0 or self.model().steps[index - 1].grouped_rewrites is None:
+        grouped_rewrites = self.model().steps[index - 1].grouped_rewrites
+        if index == 0 or grouped_rewrites is None:
             raise ValueError("Step is not grouped")
 
         self.move_to_step(index - 1)
@@ -353,9 +401,11 @@ class ProofStepView(QListView):
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
-    """This class controls the painting of items in the proof steps list view.
+    """This class controls the painting of items in the proof steps list
+    view.
 
-    We paint a "git-style" line with circles to denote individual steps in a proof.
+    We paint a "git-style" line with circles to denote individual steps
+    in a proof.
     """
 
     line_width = 3
@@ -366,21 +416,27 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def paint(
+            self, painter: QPainter, option: QStyleOptionViewItem,
+            index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
+        is_selected: bool = bool(
+            option.state & QStyle.StateFlag.State_Selected)  # type: ignore
+        is_mouse_over: bool = bool(
+            option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore
         if display_setting.dark_mode:
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            if is_selected:
                 painter.setBrush(QColor(60, 80, 120))
-            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
+            elif is_mouse_over:
                 painter.setBrush(QColor(50, 60, 80))
             else:
                 painter.setBrush(QColor(35, 39, 46))
         else:
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            if is_selected:
                 painter.setBrush(QColor(204, 232, 255))
-            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
+            elif is_mouse_over:
                 painter.setBrush(QColor(229, 243, 255))
             else:
                 painter.setBrush(Qt.GlobalColor.white)
@@ -388,11 +444,13 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw line
         is_last = index.row() == index.model().rowCount() - 1
+        rect_height = option.rect.height()  # type: ignore
+        line_height = rect_height if not is_last else rect_height / 2
         line_rect = QRect(
             self.line_padding,
             int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
+            int(line_height)
         )
         if display_setting.dark_mode:
             painter.setBrush(QColor(180, 180, 180))
@@ -402,28 +460,40 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw circle
         if display_setting.dark_mode:
-            painter.setPen(QPen(QColor(180, 180, 180), self.circle_outline_width))
+            gray_color = QColor(180, 180, 180)
+            painter.setPen(QPen(gray_color, self.circle_outline_width))
         else:
-            painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
+            black_pen = QPen(Qt.GlobalColor.black, self.circle_outline_width)
+            painter.setPen(black_pen)
         painter.setBrush(display_setting.effective_colors["z_spider"])
-        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
+        if is_selected:
+            circle_radius = self.circle_radius_selected
+        else:
+            circle_radius = self.circle_radius
+        circle_x = self.line_padding + self.line_width / 2
+        circle_y = option.rect.y() + option.rect.height() / 2  # type: ignore
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
+            QPointF(circle_x, circle_y),
             circle_radius,
             circle_radius
         )
 
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        font_metrics = QFontMetrics(option.font)  # type: ignore
+        text_height = font_metrics.height()
+        text_x = (option.rect.x() + self.line_width +  # type: ignore
+                  2 * self.line_padding)
+        text_y = (option.rect.y() + option.rect.height() / 2 -  # type: ignore
+                  text_height / 2)
         text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            int(text_x),
+            int(text_y),
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
         font = option.font  # type: ignore[attr-defined]
-        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+        if is_selected:
             font.setWeight(QFont.Weight.Bold)
         painter.setFont(font)
         if display_setting.dark_mode:
@@ -436,19 +506,29 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
+    def sizeHint(
+            self, option: QStyleOptionViewItem,
+            index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        return QSize(
+            size.width(),
+            size.height() + 2 * self.vert_padding)  # noqa: E501
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
+    def createEditor(
+            self, parent: QWidget, option: QStyleOptionViewItem,
+            index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
 
-    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def setEditorData(
+            self, editor: QWidget,
+            index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
-        value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-        editor.setText(str(value))
+        text = index.model().data(index, Qt.ItemDataRole.DisplayRole)
+        editor.setText(text)
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def setModelData(
+            self, editor: QWidget, model: QAbstractItemModel,
+            index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
         assert isinstance(editor, QLineEdit)
