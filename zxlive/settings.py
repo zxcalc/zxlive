@@ -158,7 +158,9 @@ gidney: ColorScheme = {
 }
 
 color_schemes = {
-    scheme["id"]: scheme for scheme in [modern_red_green, classic_red_green, white_gray, gidney]
+    scheme["id"]: scheme for scheme in [
+        modern_red_green, classic_red_green, white_gray, gidney
+    ]
 }
 
 color_scheme_ids = list(color_schemes.keys())
@@ -166,19 +168,45 @@ color_scheme_ids = list(color_schemes.keys())
 
 def load_tikz_classes() -> dict[str, str]:
     return {
-        'boundary': str(settings.value('tikz/boundary-export', pyzx.settings.tikz_classes['boundary'])),
-        'Z': str(settings.value('tikz/Z-spider-export', pyzx.settings.tikz_classes['Z'])),
-        'X': str(settings.value('tikz/X-spider-export', pyzx.settings.tikz_classes['X'])),
-        'Z phase': str(settings.value('tikz/Z-phase-export', pyzx.settings.tikz_classes['Z phase'])),
-        'X phase': str(settings.value('tikz/X-phase-export', pyzx.settings.tikz_classes['X phase'])),
-        'Z box': str(settings.value('tikz/Z-box-export', pyzx.settings.tikz_classes['Z box'])),
-        'H': str(settings.value('tikz/Hadamard-export', pyzx.settings.tikz_classes['H'])),
-        'W': str(settings.value('tikz/W-output-export', pyzx.settings.tikz_classes['W'])),
-        'W input': str(settings.value('tikz/W-input-export', pyzx.settings.tikz_classes['W input'])),
-        'dummy': str(settings.value('tikz/dummy-export', pyzx.settings.tikz_classes['dummy'])),
-        'edge': str(settings.value('tikz/edge-export', pyzx.settings.tikz_classes['edge'])),
-        'H-edge': str(settings.value('tikz/edge-H-export', pyzx.settings.tikz_classes['H-edge'])),
-        'W-io-edge': str(settings.value('tikz/edge-W-export', pyzx.settings.tikz_classes['W-io-edge'])),
+        'boundary': str(settings.value(
+            'tikz/boundary-export',
+            pyzx.settings.tikz_classes['boundary'])),
+        'Z': str(settings.value(
+            'tikz/Z-spider-export',
+            pyzx.settings.tikz_classes['Z'])),
+        'X': str(settings.value(
+            'tikz/X-spider-export',
+            pyzx.settings.tikz_classes['X'])),
+        'Z phase': str(settings.value(
+            'tikz/Z-phase-export',
+            pyzx.settings.tikz_classes['Z phase'])),
+        'X phase': str(settings.value(
+            'tikz/X-phase-export',
+            pyzx.settings.tikz_classes['X phase'])),
+        'Z box': str(settings.value(
+            'tikz/Z-box-export',
+            pyzx.settings.tikz_classes['Z box'])),
+        'H': str(settings.value(
+            'tikz/Hadamard-export',
+            pyzx.settings.tikz_classes['H'])),
+        'W': str(settings.value(
+            'tikz/W-output-export',
+            pyzx.settings.tikz_classes['W'])),
+        'W input': str(settings.value(
+            'tikz/W-input-export',
+            pyzx.settings.tikz_classes['W input'])),
+        'dummy': str(settings.value(
+            'tikz/dummy-export',
+            pyzx.settings.tikz_classes['dummy'])),
+        'edge': str(settings.value(
+            'tikz/edge-export',
+            pyzx.settings.tikz_classes['edge'])),
+        'H-edge': str(settings.value(
+            'tikz/edge-H-export',
+            pyzx.settings.tikz_classes['H-edge'])),
+        'W-io-edge': str(settings.value(
+            'tikz/edge-W-export',
+            pyzx.settings.tikz_classes['W-io-edge'])),
     }
 
 
@@ -190,17 +218,28 @@ def refresh_pyzx_tikz_settings() -> None:
         return [s.strip().lower() for s in str(val).split(',')]
 
     pyzx.settings.tikz_classes = load_tikz_classes()
-    pyzx.tikz.synonyms_boundary = _get_synonyms('tikz/boundary-import', pyzx.tikz.synonyms_boundary)
-    pyzx.tikz.synonyms_z = _get_synonyms('tikz/Z-spider-import', pyzx.tikz.synonyms_z)
-    pyzx.tikz.synonyms_x = _get_synonyms('tikz/X-spider-import', pyzx.tikz.synonyms_x)
-    pyzx.tikz.synonyms_hadamard = _get_synonyms('tikz/Hadamard-import', pyzx.tikz.synonyms_hadamard)
-    pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/W-input-import', pyzx.tikz.synonyms_w_input)
-    pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/W-output-import', pyzx.tikz.synonyms_w_output)
-    pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/Z-box-import', pyzx.tikz.synonyms_z_box)
-    pyzx.tikz.synonyms_dummy = _get_synonyms('tikz/dummy-import', pyzx.tikz.synonyms_dummy)
-    pyzx.tikz.synonyms_edge = _get_synonyms('tikz/edge-import', pyzx.tikz.synonyms_edge)
-    pyzx.tikz.synonyms_hedge = _get_synonyms('tikz/edge-H-import', pyzx.tikz.synonyms_hedge)
-    pyzx.tikz.synonyms_wedge = _get_synonyms('tikz/edge-W-import', pyzx.tikz.synonyms_wedge)
+    pyzx.tikz.synonyms_boundary = _get_synonyms(
+        'tikz/boundary-import', pyzx.tikz.synonyms_boundary)
+    pyzx.tikz.synonyms_z = _get_synonyms(
+        'tikz/Z-spider-import', pyzx.tikz.synonyms_z)
+    pyzx.tikz.synonyms_x = _get_synonyms(
+        'tikz/X-spider-import', pyzx.tikz.synonyms_x)
+    pyzx.tikz.synonyms_hadamard = _get_synonyms(
+        'tikz/Hadamard-import', pyzx.tikz.synonyms_hadamard)
+    pyzx.tikz.synonyms_w_input = _get_synonyms(
+        'tikz/W-input-import', pyzx.tikz.synonyms_w_input)
+    pyzx.tikz.synonyms_w_output = _get_synonyms(
+        'tikz/W-output-import', pyzx.tikz.synonyms_w_output)
+    pyzx.tikz.synonyms_z_box = _get_synonyms(
+        'tikz/Z-box-import', pyzx.tikz.synonyms_z_box)
+    pyzx.tikz.synonyms_dummy = _get_synonyms(
+        'tikz/dummy-import', pyzx.tikz.synonyms_dummy)
+    pyzx.tikz.synonyms_edge = _get_synonyms(
+        'tikz/edge-import', pyzx.tikz.synonyms_edge)
+    pyzx.tikz.synonyms_hedge = _get_synonyms(
+        'tikz/edge-H-import', pyzx.tikz.synonyms_hedge)
+    pyzx.tikz.synonyms_wedge = _get_synonyms(
+        'tikz/edge-W-import', pyzx.tikz.synonyms_wedge)
 
 
 class DisplaySettings:
@@ -257,23 +296,30 @@ class DisplaySettings:
 
     @property
     def effective_colors(self) -> dict[str, QColor]:
-        # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
-        from PySide6.QtGui import QColor
+        # Return a color scheme adapted for dark mode (subtle
+        # adjustment), no change for light mode
+
         def adjust_for_dark(color: QColor) -> QColor:
-            if not isinstance(color, QColor):
-                raise ValueError(f"Expected QColor, got {type(color)}")
-            h: int = color.hslHue()
-            s: int = color.hslSaturation()
-            l: int = color.lightness()
-            a: int = color.alpha()            # Make colors slightly darker and less saturated for dark mode
-            l = int(l * 0.6)
-            s = int(s * 0.4)
-            return QColor.fromHsl(h, s, l, a)
-        base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
+            hue: int = color.hslHue()
+            sat: int = color.hslSaturation()
+            lightness: int = color.lightness()
+            alpha: int = color.alpha()
+            # Make colors slightly darker and less saturated
+            lightness = int(lightness * 0.6)
+            sat = int(sat * 0.4)
+            return QColor.fromHsl(hue, sat, lightness, alpha)
+        base: dict[str, QColor] = {
+            k: v for k, v in self.colors.items()
+            if isinstance(v, QColor)
+        }
         if self.dark_mode:
             for k in base:
-                if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
-                    base[k] = QColor("#dbdbdb") if k != "outline" else QColor("#dbdbdb")
+                if k in ("outline", "edge", "boundary",
+                         "boundary_pressed", "w_input",
+                         "w_input_pressed", "w_output",
+                         "w_output_pressed"):
+                    base[k] = (QColor("#dbdbdb") if k != "outline"
+                               else QColor("#dbdbdb"))
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode
