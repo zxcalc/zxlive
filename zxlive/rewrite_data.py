@@ -27,7 +27,8 @@ MATCHES_EDGES: MatchType = 2
 class RewriteData(TypedDict):
     text: str
     matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
+    rule: (Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] |
+           Callable[[GraphT, list], GraphT])
     type: MatchType
     tooltip: str
     copy_first: NotRequired[bool]
@@ -46,14 +47,15 @@ def is_rewrite_data(d: dict) -> bool:
 
 def read_custom_rules() -> list[RewriteData]:
     custom_rules = []
-    for root, dirs, files in os.walk(get_custom_rules_path()):
+    for root, _dirs, files in os.walk(get_custom_rules_path()):
         for file in files:
             if file.endswith(".zxr"):
                 zxr_file = os.path.join(root, file)
-                with open(zxr_file, "r") as f:
+                with open(zxr_file, "r", encoding="utf-8") as f:
                     rule = CustomRule.from_json(f.read()).to_rewrite_data()
                     custom_rules.append(rule)
     return custom_rules
+
 
 operations["unfuse"] = {
     "text": "unfuse",
@@ -67,7 +69,8 @@ operations["unfuse"] = {
 rewrites_graph_theoretic: dict[str, RewriteData] = {
     "lcomp": {
         "text": "local complementation",
-        "tooltip": "Deletes a spider with a pi/2 phase by performing a local complementation on its neighbors",
+        "tooltip": ("Deletes a spider with a pi/2 phase by performing a "
+                    "local complementation on its neighbors"),
         "matcher": pyzx.rules.match_lcomp_parallel,
         "rule": pyzx.rules.lcomp,
         "type": MATCHES_VERTICES,
@@ -76,8 +79,10 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
     "pivot": {
         "text": "pivot",
-        "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
-        "matcher": lambda g, matchf: pyzx.rules.match_pivot_parallel(g, matchf, check_edge_types=True),
+        "tooltip": ("Deletes a pair of spiders with 0/pi phases by "
+                    "performing a pivot"),
+        "matcher": lambda g, matchf: pyzx.rules.match_pivot_parallel(
+            g, matchf, check_edge_types=True),
         "rule": pyzx.rules.pivot,
         "type": MATCHES_EDGES,
         "copy_first": True,
@@ -85,7 +90,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
     "pivot_boundary": {
         "text": "boundary pivot",
-        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
+        "tooltip": ("Performs a pivot between a Pauli spider and a spider "
+                    "on the boundary."),
         "matcher": pyzx.rules.match_pivot_boundary,
         "rule": pyzx.rules.pivot,
         "type": MATCHES_VERTICES,
@@ -93,7 +99,8 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
     "pivot_gadget": {
         "text": "gadget pivot",
-        "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
+        "tooltip": ("Performs a pivot between a Pauli spider and a spider "
+                    "with an arbitrary phase, creating a phase gadget."),
         "matcher": pyzx.rules.match_pivot_gadget,
         "rule": pyzx.rules.pivot,
         "type": MATCHES_EDGES,
@@ -111,7 +118,9 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
     "supplementarity": {
         "text": "Supplementarity",
-        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
+        "tooltip": ("Looks for a pair of internal spiders with the same "
+                    "connectivity and supplementary angles and removes "
+                    "them."),
         "matcher": pyzx.rules.match_supplementarity,
         "rule": pyzx.rules.apply_supplementarity,
         "type": MATCHES_VERTICES,
@@ -119,15 +128,21 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
 }
 
-def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
-    """Returns a list of vertices in the selection or all vertices if no selection is made."""
+
+def selection_or_all_matcher(
+        graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
+    """Returns a list of vertices in the selection or all vertices if
+    no selection is made.
+    """
     matches_list = [v for v in graph.vertices() if matches(v)]
     if len(matches_list) == 0:
         return list(graph.vertices())
     return matches_list
 
 
-def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
+def apply_simplification(
+        simplification: Callable[[GraphT], Optional[int]]
+) -> Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]]:
     def rule(g: GraphT, matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
         if set(g.vertices()) == set(matches):
             simplification(g)
@@ -137,6 +152,7 @@ def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> C
         simplification(simplified)
         return CustomRule(subgraph, simplified, "", "")(g, matches)
     return rule
+
 
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
@@ -150,7 +166,7 @@ def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     return subgraph
 
 
-def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
+def _extract_circuit(graph: GraphT, _matches: list) -> GraphT:  # noqa: E501
     graph.auto_detect_io()
     simplify.full_reduce(graph)
     return cast(GraphT, extract_circuit(graph).to_graph())
@@ -158,13 +174,16 @@ def _extract_circuit(graph: GraphT, matches: list) -> GraphT:
 
 # The OCM action simply saves the current graph without modifying anything.
 # This can be used to make repositioning the vertices an explicit proof step.
-def ocm_rule(_graph: GraphT, _matches: list) -> pyzx.rules.RewriteOutputType[VT, ET]:
+def ocm_rule(
+        _graph: GraphT, _matches: list
+) -> pyzx.rules.RewriteOutputType[VT, ET]:
     return ({}, [], [], True)
 
 
 ocm_action: RewriteData = {
     "text": "OCM",
-    "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
+    "tooltip": ("Only Connectivity Matters. Saves the graph with the "
+                "current vertex positions"),
     "matcher": selection_or_all_matcher,
     "rule": ocm_rule,
     "type": MATCHES_VERTICES,
@@ -300,8 +319,9 @@ simplifications: dict[str, RewriteData] = {
     },
 }
 
-rules_basic = ["spider", "unfuse", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
-               "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
+rules_basic = ["spider", "unfuse", "rem_id", "copy", "pauli", "hopf",
+               "remove_self_loops", "bialgebra", "bialgebra_op", "euler",
+               "to_z", "to_x"]
 
 operations["spider"]["repeat_rule_application"] = True
 operations["rem_id"]["repeat_rule_application"] = True
@@ -314,7 +334,10 @@ rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
 rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 action_groups = {
-    "Basic rules": {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
+    "Basic rules": (
+        {'ocm': ocm_action} |
+        {key: operations[key] for key in rules_basic}
+    ),
     "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,
     "ZXW rules": {key: operations[key] for key in rules_zxw},
@@ -324,7 +347,10 @@ action_groups = {
 
 
 def refresh_custom_rules() -> None:
-    action_groups["Custom rules"] = {rule["text"]: rule for rule in read_custom_rules()}
+    custom_rules_dict = {
+        rule["text"]: rule for rule in read_custom_rules()
+    }
+    action_groups["Custom rules"] = custom_rules_dict
 
 
 refresh_custom_rules()
