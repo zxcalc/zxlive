@@ -8,8 +8,10 @@ from concurrent.futures import ThreadPoolExecutor
 import pyzx
 from pyzx.utils import VertexType
 
-from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
-                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
+from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex,
+                            QPersistentModelIndex, Signal, QObject,
+                            QMetaObject, QIODevice, QBuffer, QPoint,
+                            QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen
 from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView
 
@@ -18,7 +20,9 @@ from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
-from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES, refresh_custom_rules, action_groups
+from .rewrite_data import (is_rewrite_data, RewriteData, MatchType,
+                           MATCHES_VERTICES, refresh_custom_rules,
+                           action_groups)
 from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -33,16 +37,18 @@ operations = copy.deepcopy(pyzx.editor.operations)
 class RewriteAction:
     name: str
     matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
+    rule: (Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] |
+           Callable[[GraphT, list], GraphT])
     match_type: MatchType
     tooltip_str: str
     picture_path: Optional[str] = field(default=None)
     lhs_graph: Optional[GraphT] = field(default=None)
     rhs_graph: Optional[GraphT] = field(default=None)
-    # Whether the graph should be copied before trying to test whether it matches.
-    # Needed if the matcher changes the graph.
+    # Whether the graph should be copied before trying to test whether
+    # it matches. Needed if the matcher changes the graph.
     copy_first: bool = field(default=False)
-    # Whether the rule returns a new graph instead of returning the rewrite changes.
+    # Whether the rule returns a new graph instead of returning the
+    # rewrite changes.
     returns_new_graph: bool = field(default=False)
     enabled: bool = field(default=False)
     repeat_rule_application: bool = False
@@ -61,9 +67,9 @@ class RewriteAction:
             rule=d['rule'],
             match_type=d['type'],
             tooltip_str=d['tooltip'],
-            picture_path = picture_path,
-            lhs_graph = d.get('lhs', None),
-            rhs_graph = d.get('rhs', None),
+            picture_path=picture_path,
+            lhs_graph=d.get('lhs', None),
+            rhs_graph=d.get('rhs', None),
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
             repeat_rule_application=d.get('repeat_rule_application', False),
@@ -115,11 +121,14 @@ class RewriteAction:
                 break
 
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
-        anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
-        panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
+        anim_before, anim_after = make_animation(
+            self, panel, g, matches_list, rem_verts_list)
+        panel.undo_stack.push(
+            cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Narrow down the type of the first return value.
-    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[GraphT, list[VT]]:
+    def apply_rewrite(
+            self, g: GraphT, matches: list) -> tuple[GraphT, list[VT]]:
         if self.returns_new_graph:
             graph = self.rule(g, matches)
             assert isinstance(graph, GraphT)
@@ -133,7 +142,8 @@ class RewriteAction:
         g.add_edge_table(etab)
         return g, rem_verts
 
-    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
+    def update_active(
+            self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         if self.copy_first:
             g = copy.deepcopy(g)
         self.enabled = bool(
@@ -144,10 +154,12 @@ class RewriteAction:
 
     @property
     def tooltip(self) -> str:
-        if self.picture_path is None or display_setting.previews_show == False:
+        if (self.picture_path is None or
+                not display_setting.previews_show):
             return self.tooltip_str
         if self.picture_path == 'custom':
-            # We will create a custom tooltip picture representing the custom rewrite
+            # We will create a custom tooltip picture representing the
+            # custom rewrite
             graph_scene_left = GraphScene()
             graph_scene_right = GraphScene()
             graph_view_left = GraphView(graph_scene_left)
@@ -160,36 +172,50 @@ class RewriteAction:
                 graph_view_right.set_graph(self.rhs_graph)
             graph_view_left.fit_view()
             graph_view_right.fit_view()
-            graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
-            graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
+            graph_view_left.setSceneRect(
+                graph_scene_left.itemsBoundingRect())
+            graph_view_right.setSceneRect(
+                graph_scene_right.itemsBoundingRect())
             lhs_size = graph_view_left.viewport().size()
             rhs_size = graph_view_right.viewport().size()
-            # The picture needs to be wide enough to fit both of them and have some space for the = sign
-            pixmap = QPixmap(lhs_size.width() + rhs_size.width() + 160, max(lhs_size.height(), rhs_size.height()))
+            # The picture needs to be wide enough to fit both of them
+            # and have some space for the = sign
+            pixmap_width = lhs_size.width() + rhs_size.width() + 160
+            pixmap_height = max(lhs_size.height(), rhs_size.height())
+            pixmap = QPixmap(pixmap_width, pixmap_height)
             pixmap.fill(QColor("#ffffff"))
             graph_view_left.viewport().render(pixmap)
-            graph_view_right.viewport().render(pixmap, QPoint(lhs_size.width() + 160, 0))
+            render_x = lhs_size.width() + 160
+            graph_view_right.viewport().render(pixmap, QPoint(render_x, 0))
             # We create a new scene to render the = sign
             new_scene = GraphScene()
             new_view = GraphView(new_scene)
             new_view.draw_background_lines = False
-            new_scene.addLine(QLineF(QPointF(10,40), QPointF(80,40)), QPen(QColor("#000000"), 8))
-            new_scene.addLine(QLineF(QPointF(10,10), QPointF(80,10)), QPen(QColor("#000000"), 8))
+            black_pen = QPen(QColor("#000000"), 8)
+            new_scene.addLine(
+                QLineF(QPointF(10, 40), QPointF(80, 40)), black_pen)
+            new_scene.addLine(
+                QLineF(QPointF(10, 10), QPointF(80, 10)), black_pen)
             new_view.setSceneRect(new_scene.itemsBoundingRect())
-            new_view.viewport().render(pixmap, QPoint(lhs_size.width(), int(max(lhs_size.height(), rhs_size.height())/2 - 20)))
+            render_y = int(max(lhs_size.height(), rhs_size.height()) / 2 - 20)
+            new_view.viewport().render(
+                pixmap, QPoint(lhs_size.width(), render_y))
 
             buffer = QBuffer()
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode() # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
+            # QByteArray can be converted to bytes (type: ignore)
+            image = bytes(buffer.data().toBase64()).decode()  # type: ignore
         else:
             pixmap = QPixmap()
             pixmap.load(get_data("tooltips/"+self.picture_path))
             buffer = QBuffer()
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode() #type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
-        self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
+            # QByteArray can be converted to bytes (type: ignore)
+            image = bytes(buffer.data().toBase64()).decode()  # type: ignore
+        img_tag = '<img src="data:image/png;base64,{}" width="500">'
+        self.tooltip_str = img_tag.format(image) + self.tooltip_str
         self.picture_path = None
         return self.tooltip_str
 
@@ -233,17 +259,22 @@ class RewriteActionTree:
         return self.rewrite is None or self.rewrite.enabled
 
     @classmethod
-    def from_dict(cls, d: dict, header: str = "", parent: RewriteActionTree | None = None) -> RewriteActionTree:
+    def from_dict(
+            cls, d: dict, header: str = "",
+            parent: RewriteActionTree | None = None) -> RewriteActionTree:
         if is_rewrite_data(d):
             return RewriteActionTree(
-                header, RewriteAction.from_rewrite_data(cast(RewriteData, d)), [], parent
+                header, RewriteAction.from_rewrite_data(
+                    cast(RewriteData, d)), [], parent
             )
         ret = RewriteActionTree(header, None, [], parent)
         for group, actions in d.items():
             ret.append_child(cls.from_dict(actions, group, ret))
         return ret
 
-    def update_on_selection(self, g: GraphT, selection: list[VT], edges: list[ET]) -> None:
+    def update_on_selection(
+            self, g: GraphT, selection: list[VT],
+            edges: list[ET]) -> None:
         for child in self.child_items:
             child.update_on_selection(g, selection, edges)
         if self.rewrite is not None:
@@ -253,10 +284,13 @@ class RewriteActionTree:
 class SignalEmitter(QObject):
     finished = Signal()
 
+
 class RewriteActionTreeModel(QAbstractItemModel):
     root_item: RewriteActionTree
 
-    def __init__(self, data: RewriteActionTree, proof_panel: ProofPanel) -> None:
+    def __init__(
+            self, data: RewriteActionTree,
+            proof_panel: ProofPanel) -> None:
         super().__init__(proof_panel)
         self.proof_panel = proof_panel
         self.root_item = data
@@ -265,24 +299,33 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     @classmethod
-    def from_dict(cls, d: dict, proof_panel: ProofPanel) -> RewriteActionTreeModel:
+    def from_dict(
+            cls, d: dict,
+            proof_panel: ProofPanel) -> RewriteActionTreeModel:
         return RewriteActionTreeModel(
             RewriteActionTree.from_dict(d),
             proof_panel
         )
 
-    def index(self, row: int, column: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> \
-            QModelIndex:
+    def index(
+            self, row: int, column: int,
+            parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()
+    ) -> QModelIndex:
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
 
-        parent_item = cast(RewriteActionTree, parent.internalPointer()) if parent.isValid() else self.root_item
+        if parent.isValid():
+            parent_item = cast(RewriteActionTree, parent.internalPointer())
+        else:
+            parent_item = self.root_item
 
         if childItem := parent_item.child(row):
             return self.createIndex(row, column, childItem)
         return QModelIndex()
 
-    def parent(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> QModelIndex:  # type: ignore[override]
+    def parent(
+            self, index: QModelIndex | QPersistentModelIndex = QModelIndex()  # type: ignore
+    ) -> QModelIndex:
         if not index.isValid():
             return QModelIndex()
 
@@ -294,22 +337,37 @@ class RewriteActionTreeModel(QAbstractItemModel):
 
         return self.createIndex(row, 0, parent_item)
 
-    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def rowCount(
+            self,
+            parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         if parent.column() > 0:
             return 0
-        parent_item = cast(RewriteActionTree, parent.internalPointer()) if parent.isValid() else self.root_item
+        if parent.isValid():
+            parent_item = cast(RewriteActionTree, parent.internalPointer())
+        else:
+            parent_item = self.root_item
         return parent_item.child_count()
 
-    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def columnCount(
+            self,
+            parent: QModelIndex | QPersistentModelIndex = QModelIndex()
+    ) -> int:
         return 1
 
     def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         if index.isValid():
-            rewrite_action_tree = cast(RewriteActionTree, index.internalPointer())
-            return Qt.ItemFlag.ItemIsEnabled if rewrite_action_tree.enabled() else Qt.ItemFlag.NoItemFlags
+            rewrite_action_tree = cast(
+                RewriteActionTree, index.internalPointer())
+            if rewrite_action_tree.enabled():
+                return Qt.ItemFlag.ItemIsEnabled
+            else:
+                return Qt.ItemFlag.NoItemFlags
         return Qt.ItemFlag.ItemIsEnabled
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> str | None:
+    def data(
+            self, index: QModelIndex | QPersistentModelIndex,
+            role: int = Qt.ItemDataRole.DisplayRole) -> str | None:
         if not index.isValid():
             return self.root_item.header()
         rewrite_action_tree = cast(RewriteActionTree, index.internalPointer())
@@ -321,7 +379,8 @@ class RewriteActionTreeModel(QAbstractItemModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole) -> str:
-        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
+        if (orientation == Qt.Orientation.Horizontal and
+                role == Qt.ItemDataRole.DisplayRole):
             return self.root_item.header()
         return ""
 
@@ -340,7 +399,10 @@ class RewriteActionTreeModel(QAbstractItemModel):
         selection, edges = self.proof_panel.parse_selection()
         g = self.proof_panel.graph_scene.g
         self.root_item.update_on_selection(g, selection, edges)
-        QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
+        QMetaObject.invokeMethod(
+            self.emitter, "finished",  # type: ignore
+            Qt.ConnectionType.QueuedConnection)
+
 
 class RewriteActionTreeView(QTreeView):
     def __init__(self, parent: 'ProofPanel'):
@@ -376,8 +438,11 @@ class RewriteActionTreeView(QTreeView):
 
     def refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
-        model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
+        model = RewriteActionTreeModel.from_dict(
+            action_groups, self.proof_panel)
         self.setModel(model)
-        self.expand(model.index(0,0))
+        self.expand(model.index(0, 0))
         self.clicked.connect(model.do_rewrite)
-        self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
+        graph_scene = self.proof_panel.graph_scene
+        graph_scene.selection_changed_custom.connect(
+            lambda: model.executor.submit(model.update_on_selection))
