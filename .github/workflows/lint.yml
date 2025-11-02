@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ 3.9 ]
+        python-version: [ '3.11' ]
     steps:
     - uses: actions/checkout@v3
     - name: Setup Python ${{ matrix.python-version }}
@@ -25,14 +25,13 @@ jobs:
     - name: Install dependecies
       run:
         pip install ".[test]"
+    - name: mypy
+      run:
+        mypy zxlive
     - name: Flake8
-      continue-on-error: true
       run:
         pflake8 zxlive
     - name: Pylint
       continue-on-error: true
       run:
         pylint zxlive
-    - name: mypy
-      run:
-        mypy zxlive

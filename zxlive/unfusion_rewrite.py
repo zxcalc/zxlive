@@ -21,7 +21,7 @@ def match_unfuse_single_vertex(graph: GraphT, matches: Callable[[VT], bool]) -> 
                                                                VertexType.DUMMY,
                                                                VertexType.H_BOX,
                                                                VertexType.W_INPUT,
-                                                               VertexType.W_OUTPUT)): #TODO: Support H_BOX and W node unfusions
+                                                               VertexType.W_OUTPUT)):  # TODO: Support H_BOX and W node unfusions
         return vertices
     return []
 
@@ -96,8 +96,8 @@ class UnfusionRewriteAction:
         self._cleanup()
 
     def _apply_unfusion(self, original_vertex: VT, node1_edges: list[ET],
-                       node2_edges: list[ET], num_connecting_edges: int,
-                       phase1: FractionLike, phase2: FractionLike) -> None:
+                        node2_edges: list[ET], num_connecting_edges: int,
+                        phase1: FractionLike, phase2: FractionLike) -> None:
         """Apply the actual unfusion transformation."""
         from .commands import AddRewriteStep
         from . import animations as anims
@@ -113,11 +113,11 @@ class UnfusionRewriteAction:
         # Position them slightly apart from the original position
         offset = 0.3
         node1 = new_g.add_vertex(original_type,
-                                qubit=original_qubit - offset,
-                                row=original_row - offset)
+                                 qubit=original_qubit - offset,
+                                 row=original_row - offset)
         node2 = new_g.add_vertex(original_type,
-                                qubit=original_qubit + offset,
-                                row=original_row + offset)
+                                 qubit=original_qubit + offset,
+                                 row=original_row + offset)
 
         # Set phases for the new vertices
         if original_type in (VertexType.Z, VertexType.X):
@@ -153,7 +153,7 @@ class UnfusionRewriteAction:
         new_g.remove_vertex(original_vertex)
 
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                           self.proof_panel.step_view, "unfuse")
+                             self.proof_panel.step_view, "unfuse")
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
         self.proof_panel.undo_stack.push(cmd, anim_after=anim)
 

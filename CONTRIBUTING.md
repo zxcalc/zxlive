@@ -11,4 +11,4 @@ Thanks for wanting to contribute to ZXLive! Here are a couple of things you migh
 
 Overview of the different source files of ZXLive:
 
-![ZXLive file structure](ZXLive_file_overview.png "ZXLive file structure")
+![ZXLive file structure](ZXLive-file-overview.svg "ZXLive file structure")

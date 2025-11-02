@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Any, TypedDict
+from typing import TypedDict
 
 import pyzx
-from PySide6.QtCore import QSettings
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QFont
-from PySide6.QtWidgets import QTabWidget
+from PySide6.QtWidgets import QApplication, QTabWidget
 
 from .common import get_settings_value, SCALE
 
@@ -33,7 +33,7 @@ class ColorScheme(TypedDict):
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
-    "path/custom-rules": "lemmas/",
+    "path/custom-rules": "rules/",
     "color-scheme": "modern-red-green",
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
@@ -42,7 +42,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "sparkle-mode": True,
     'sound-effects': False,
     "matrix/precision": 4,
-    "dark-mode": False,
+    "dark-mode": "system",
     "auto-save": False,
     "patterns-folder": "patterns/",
 }
@@ -101,7 +101,7 @@ tikz_names_defaults: dict[str, str] = {
 }
 
 defaults = general_defaults | font_defaults | tikz_export_defaults | \
-           tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
+    tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
 
 
 modern_red_green: ColorScheme = {
@@ -232,26 +232,44 @@ class DisplaySettings:
 
     @property
     def dark_mode(self) -> bool:
-        return get_settings_value("dark-mode", bool)
+        dark_mode_setting = str(settings.value("dark-mode", "system"))
+        if dark_mode_setting == "system":
+            # Check if we can detect system theme
+            app = QApplication.instance()
+            if isinstance(app, QApplication):
+                try:
+                    # Try Qt 6.5+ ColorScheme API
+                    color_scheme = app.styleHints().colorScheme()
+                    return color_scheme == Qt.ColorScheme.Dark
+                except AttributeError:
+                    # Fallback for older Qt versions
+                    pass
+            return False  # Default to light mode if can't detect
+        elif dark_mode_setting == "dark":
+            return True
+        else:  # "light"
+            return False
 
     @dark_mode.setter
-    def dark_mode(self, value: bool) -> None:
+    def dark_mode(self, value: str | bool) -> None:
+        if isinstance(value, bool):
+            value = "dark" if value else "light"
         settings.setValue("dark-mode", value)
 
     @property
     def effective_colors(self) -> dict[str, QColor]:
         # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
-        from PySide6.QtGui import QColor
+
         def adjust_for_dark(color: QColor) -> QColor:
             if not isinstance(color, QColor):
                 raise ValueError(f"Expected QColor, got {type(color)}")
-            h: int = color.hslHue()
-            s: int = color.hslSaturation()
-            l: int = color.lightness()
-            a: int = color.alpha()            # Make colors slightly darker and less saturated for dark mode
-            l = int(l * 0.6)
-            s = int(s * 0.4)
-            return QColor.fromHsl(h, s, l, a)
+            hue: int = color.hslHue()
+            saturation: int = color.hslSaturation()
+            lightness: int = color.lightness()
+            alpha: int = color.alpha()  # Make colors slightly darker and less saturated for dark mode
+            lightness = int(lightness * 0.6)
+            saturation = int(saturation * 0.4)
+            return QColor.fromHsl(hue, saturation, lightness, alpha)
         base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
         if self.dark_mode:
             for k in base:

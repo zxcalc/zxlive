@@ -21,7 +21,7 @@ import math
 import random
 from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
-from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform, 
+from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform,
                            QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence,
                            QKeyEvent)
 
@@ -60,7 +60,7 @@ class WandTrace:
 WAND_COLOR = "#500050"
 WAND_WIDTH = 3.0
 
-ZOOMFACTOR = 0.002 # Specifies how sensitive zooming with the mousewheel is
+ZOOMFACTOR = 0.002  # Specifies how sensitive zooming with the mousewheel is
 
 GRID_SCALE = SCALE / 2
 
@@ -85,7 +85,7 @@ class GraphView(QGraphicsView):
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         # self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        #self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # This has to be enabled based on keyboard shortcuts
+        # self.setDragMode(QGraphicsView.DragMode.ScrollHandDrag) # This has to be enabled based on keyboard shortcuts
         self.setCacheMode(QGraphicsView.CacheModeFlag.CacheBackground)
         self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.BoundingRectViewportUpdate)
 
@@ -99,7 +99,7 @@ class GraphView(QGraphicsView):
         self.wand_trace: Optional[WandTrace] = None
         self.wand_path: Optional[QGraphicsPathItem] = None
 
-        self.centerOn(OFFSET_X,OFFSET_Y)
+        self.centerOn(OFFSET_X, OFFSET_Y)
 
         self.sparkles = Sparkles(self.graph_scene)
         QShortcut(QKeySequence("Ctrl+Shift+Alt+S"), self).activated.connect(self._toggle_sparkles)
@@ -223,7 +223,7 @@ class GraphView(QGraphicsView):
                 if self.rubberband.isVisible():
                     self.rubberband.hide()
                     key_modifiers = e.modifiers()
-                    if not(Qt.KeyboardModifier.ShiftModifier & key_modifiers or Qt.KeyboardModifier.ControlModifier & key_modifiers):
+                    if not (Qt.KeyboardModifier.ShiftModifier & key_modifiers or Qt.KeyboardModifier.ControlModifier & key_modifiers):
                         self.graph_scene.clearSelection()
                     rect = self.rubberband.geometry()
                     items = [it for it in self.graph_scene.items(self.mapToScene(rect).boundingRect()) if isinstance(it, VItem)]
@@ -273,7 +273,7 @@ class GraphView(QGraphicsView):
         if ydelta > 0:
             zoom_factor = 1 + ZOOMFACTOR * ydelta
         elif ydelta < 0:
-            zoom_factor = 1/(1 - ZOOMFACTOR * ydelta)
+            zoom_factor = 1 / (1 - ZOOMFACTOR * ydelta)
 
         current_zoom = self.transform().m11()
         if current_zoom * zoom_factor < MIN_ZOOM:
@@ -317,7 +317,8 @@ class GraphView(QGraphicsView):
         painter.setBrush(bg_color)
         painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
-        if not self.draw_background_lines: return
+        if not self.draw_background_lines:
+            return
 
         # Calculate grid lines
         lines, thick_lines = [], []
@@ -345,6 +346,7 @@ class GraphView(QGraphicsView):
             if isinstance(i, VItem):
                 i.update_font()
 
+
 class ProofGraphView(GraphView):
     def __init__(self, graph_scene: GraphScene) -> None:
         super().__init__(graph_scene)
@@ -365,7 +367,7 @@ class ProofGraphView(GraphView):
         self.scalar = scalar
         try:
             scalar_string = f" Scalar: {scalar.polar_str()}"
-        except:
+        except Exception:
             scalar_string = f" Scalar: {scalar}"
 
         if scalar.is_zero:
@@ -467,7 +469,7 @@ class Sparkle(QGraphicsEllipseItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
-        col = SPARKLE_COLOR[random.randint(0,3)]
+        col = SPARKLE_COLOR[random.randint(0, 3)]
         self.setBrush(QBrush(QColor(col)))
         self.setPen(QPen(Qt.PenStyle.NoPen))
 

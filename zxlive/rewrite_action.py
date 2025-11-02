@@ -61,9 +61,9 @@ class RewriteAction:
             rule=d['rule'],
             match_type=d['type'],
             tooltip_str=d['tooltip'],
-            picture_path = picture_path,
-            lhs_graph = d.get('lhs', None),
-            rhs_graph = d.get('rhs', None),
+            picture_path=picture_path,
+            lhs_graph=d.get('lhs', None),
+            rhs_graph=d.get('rhs', None),
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
             repeat_rule_application=d.get('repeat_rule_application', False),
@@ -144,7 +144,7 @@ class RewriteAction:
 
     @property
     def tooltip(self) -> str:
-        if self.picture_path is None or display_setting.previews_show == False:
+        if self.picture_path is None or not display_setting.previews_show:
             return self.tooltip_str
         if self.picture_path == 'custom':
             # We will create a custom tooltip picture representing the custom rewrite
@@ -173,22 +173,22 @@ class RewriteAction:
             new_scene = GraphScene()
             new_view = GraphView(new_scene)
             new_view.draw_background_lines = False
-            new_scene.addLine(QLineF(QPointF(10,40), QPointF(80,40)), QPen(QColor("#000000"), 8))
-            new_scene.addLine(QLineF(QPointF(10,10), QPointF(80,10)), QPen(QColor("#000000"), 8))
+            new_scene.addLine(QLineF(QPointF(10, 40), QPointF(80, 40)), QPen(QColor("#000000"), 8))
+            new_scene.addLine(QLineF(QPointF(10, 10), QPointF(80, 10)), QPen(QColor("#000000"), 8))
             new_view.setSceneRect(new_scene.itemsBoundingRect())
-            new_view.viewport().render(pixmap, QPoint(lhs_size.width(), int(max(lhs_size.height(), rhs_size.height())/2 - 20)))
+            new_view.viewport().render(pixmap, QPoint(lhs_size.width(), int(max(lhs_size.height(), rhs_size.height()) / 2 - 20)))
 
             buffer = QBuffer()
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode() # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
+            image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
         else:
             pixmap = QPixmap()
-            pixmap.load(get_data("tooltips/"+self.picture_path))
+            pixmap.load(get_data("tooltips/" + self.picture_path))
             buffer = QBuffer()
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode() #type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
+            image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
         self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
         self.picture_path = None
         return self.tooltip_str
@@ -253,6 +253,7 @@ class RewriteActionTree:
 class SignalEmitter(QObject):
     finished = Signal()
 
+
 class RewriteActionTreeModel(QAbstractItemModel):
     root_item: RewriteActionTree
 
@@ -261,7 +262,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.proof_panel = proof_panel
         self.root_item = data
         self.emitter = SignalEmitter()
-        self.emitter.finished.connect(lambda: self.dataChanged.emit(QModelIndex(), QModelIndex(), []))
+        self.emitter.finished.connect(self.layoutChanged.emit)
         self.executor = ThreadPoolExecutor(max_workers=1)
 
     @classmethod
@@ -342,6 +343,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.root_item.update_on_selection(g, selection, edges)
         QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
 
+
 class RewriteActionTreeView(QTreeView):
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
@@ -378,6 +380,6 @@ class RewriteActionTreeView(QTreeView):
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
         self.setModel(model)
-        self.expand(model.index(0,0))
+        self.expand(model.index(0, 0))
         self.clicked.connect(model.do_rewrite)
         self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))

@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream
+from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget, QInputDialog)
@@ -61,17 +62,20 @@ class FileFormat(Enum):
         Used by `QFileDialog` to filter the shown file extensions."""
         return f"{self.name} (*.{self.extension})"
 
+
 @dataclass
 class ImportGraphOutput:
     file_type: FileFormat
     file_path: str
     g: GraphT
 
+
 @dataclass
 class ImportProofOutput:
     file_type: FileFormat
     file_path: str
     p: ProofModel
+
 
 @dataclass
 class ImportRuleOutput:
@@ -82,7 +86,7 @@ class ImportRuleOutput:
 
 def show_error_msg(title: str, description: Optional[str] = None, parent: Optional[QWidget] = None) -> None:
     """Displays an error message box."""
-    msg = QMessageBox(parent) #Set the parent of the QMessageBox
+    msg = QMessageBox(parent)  # Set the parent of the QMessageBox
     msg.setText(title)
     msg.setIcon(QMessageBox.Icon.Critical)
     if description is not None:
@@ -142,18 +146,21 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
             return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
             g = GraphT.from_json(data)
-            if TYPE_CHECKING: assert isinstance(g, GraphT)
+            if TYPE_CHECKING:
+                assert isinstance(g, GraphT)
             g.set_auto_simplify(False)
             return ImportGraphOutput(selected_format, file_path, g)  # type: ignore # This is something that needs to be better annotated in PyZX
         elif selected_format == FileFormat.QASM:
-            g = Circuit.from_qasm(data).to_graph(zh=True,backend='multigraph') # type: ignore # We know the return type is Multigraph, but mypy doesn't
-            if TYPE_CHECKING: assert isinstance(g, GraphT)
+            g = Circuit.from_qasm(data).to_graph(zh=True, backend='multigraph')  # type: ignore # We know the return type is Multigraph, but mypy doesn't
+            if TYPE_CHECKING:
+                assert isinstance(g, GraphT)
             g.set_auto_simplify(False)
-            return ImportGraphOutput(selected_format, file_path, ) # type: ignore
+            return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
         elif selected_format == FileFormat.TikZ:
             try:
-                g = GraphT.from_tikz(data) # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                if TYPE_CHECKING: assert isinstance(g, GraphT)
+                g = GraphT.from_tikz(data)  # type: ignore # We know the return type is Multigraph, but mypy doesn't
+                if TYPE_CHECKING:
+                    assert isinstance(g, GraphT)
                 g.set_auto_simplify(False)
                 return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
             except ValueError:
@@ -161,23 +168,26 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
         else:
             assert selected_format == FileFormat.All
             try:
-                g = Circuit.load(file_path).to_graph(zh=True,backend='multigraph') # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                if TYPE_CHECKING: assert isinstance(g, GraphT)
+                g = Circuit.load(file_path).to_graph(zh=True, backend='multigraph')  # type: ignore # We know the return type is Multigraph, but mypy doesn't
+                if TYPE_CHECKING:
+                    assert isinstance(g, GraphT)
                 g.set_auto_simplify(False)
                 return ImportGraphOutput(FileFormat.QASM, file_path, g)  # type: ignore
             except TypeError:
                 try:
                     g = GraphT.from_json(data)
-                    if TYPE_CHECKING: assert isinstance(g, GraphT)
+                    if TYPE_CHECKING:
+                        assert isinstance(g, GraphT)
                     g.set_auto_simplify(False)
                     return ImportGraphOutput(FileFormat.QGraph, file_path, g)  # type: ignore
                 except Exception:
                     try:
-                        g = GraphT.from_tikz(data) # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                        if TYPE_CHECKING: assert isinstance(g, GraphT)
+                        g = GraphT.from_tikz(data)  # type: ignore # We know the return type is Multigraph, but mypy doesn't
+                        if TYPE_CHECKING:
+                            assert isinstance(g, GraphT)
                         g.set_auto_simplify(False)
                         return ImportGraphOutput(FileFormat.TikZ, file_path, g)  # type: ignore
-                    except:
+                    except Exception:
                         show_error_msg(f"Failed to import {selected_format.name} file",
                                        f"Couldn't determine filetype: {file_path}.", parent=parent)
                         return None
@@ -185,6 +195,7 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
     except Exception as e:
         show_error_msg(f"Failed to import {selected_format.name} file: {file_path}", str(e), parent=parent)
         return None
+
 
 def write_to_file(file_path: str, data: str, parent: QWidget) -> bool:
     file = QFile(file_path)
@@ -223,6 +234,7 @@ def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = 
 
     return file_path, selected_format
 
+
 def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, ";;".join([f.filter for f in FileFormat if f != FileFormat.ZXProof]))
     if file_path_and_format is None or not file_path_and_format[0]:
@@ -251,6 +263,7 @@ def save_diagram_dialog(graph: GraphT, parent: QWidget) -> Optional[tuple[str, F
 
     return file_path, selected_format
 
+
 def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str, filename: str = "") -> Optional[tuple[str, FileFormat]]:
     file_path_and_format = get_file_path_and_format(parent, filter, filename)
     if file_path_and_format is None or not file_path_and_format[0]:
@@ -260,11 +273,14 @@ def _save_rule_or_proof_dialog(data: str, parent: QWidget, filter: str, filename
         return None
     return file_path, selected_format
 
+
 def save_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tuple[str, FileFormat]]:
     return _save_rule_or_proof_dialog(proof_model.to_json(), parent, FileFormat.ZXProof.filter)
 
-def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str ="") -> Optional[tuple[str, FileFormat]]:
+
+def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str = "") -> Optional[tuple[str, FileFormat]]:
     return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, filename)
+
 
 def export_proof_dialog(parent: QWidget) -> Optional[str]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.TikZ.filter)
@@ -272,11 +288,13 @@ def export_proof_dialog(parent: QWidget) -> Optional[str]:
         return None
     return file_path_and_format[0]
 
+
 def export_gif_dialog(parent: QWidget) -> Optional[str]:
     file_path_and_format = get_file_path_and_format(parent, FileFormat.Gif.filter)
     if file_path_and_format is None or not file_path_and_format[0]:
         return None
     return file_path_and_format[0]
+
 
 def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], Optional[str]]:
     dialog = QDialog(parent)
@@ -292,6 +310,7 @@ def get_lemma_name_and_description(parent: MainWindow) -> tuple[Optional[str], O
     if dialog.exec() == QDialog.DialogCode.Accepted:
         return name.text(), description.toPlainText()
     return None, None
+
 
 def create_new_rewrite(parent: MainWindow) -> None:
     dialog = QDialog(parent)
@@ -335,7 +354,9 @@ def create_new_rewrite(parent: MainWindow) -> None:
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
-    if not dialog.exec(): return
+    if not dialog.exec():
+        return
+
 
 def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[GraphT]:
     """Prompt the user for text and return a new graph with the text stored in the vertex's vdata under key 'text'.
@@ -351,3 +372,22 @@ def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[
     new_g = copy.deepcopy(graph)
     new_g.set_vdata(v, 'text', input_)
     return new_g
+
+
+def show_update_available_dialog(current_version: str, latest_version: str, release_url: str, parent: Optional[QWidget] = None) -> None:
+    """Shows a dialog informing the user about a new version."""
+    msg = QMessageBox(parent)
+    msg.setWindowTitle("Update Available")
+    msg.setText("A new version of ZXLive is available!")
+    msg.setInformativeText(
+        f"Current version: {current_version}\n"
+        f"Latest version: {latest_version}\n\n"
+        f"Visit the releases page to download the latest version."
+    )
+    msg.setIcon(QMessageBox.Icon.Information)
+    view_release_button = msg.addButton("View Release", QMessageBox.ButtonRole.AcceptRole)
+    msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+    msg.setDefaultButton(view_release_button)
+    msg.exec()
+    if msg.clickedButton() == view_release_button:
+        QDesktopServices.openUrl(QUrl(release_url))

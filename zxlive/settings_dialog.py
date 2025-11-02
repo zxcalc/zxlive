@@ -25,7 +25,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
-    QComboBox, QApplication, QCheckBox
+    QComboBox, QApplication, QCheckBox, QMessageBox
 )
 
 from .common import get_settings_value, T, get_data
@@ -72,11 +72,17 @@ input_circuit_formats = {
     'sqasm-no-simplification': "Spider QASM (no simplification)",
 }
 
+dark_mode_options = {
+    'system': "Same as system",
+    'light': "Light",
+    'dark': "Dark"
+}
+
 general_settings: list[SettingsData] = [
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
-    {"id": "dark-mode", "label": "Dark Mode (UI)", "type": FormInputType.Bool},
+    {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
-    {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
+    {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
@@ -156,6 +162,7 @@ class SettingsDialog(QDialog):
         self.value_dict: Dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        self.prev_dark_mode = self.get_settings_value("dark-mode", str)
         load_font_families()
 
         layout = QVBoxLayout()
@@ -180,8 +187,8 @@ class SettingsDialog(QDialog):
 
         self.add_settings_tab(tikz_subtab_widget, "Rule names", "Tikz rule name settings", tikz_rule_name_settings)
         self.add_settings_tab(tikz_subtab_widget, "Export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
-        self.add_settings_tab(tikz_subtab_widget, "Import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
-        self.add_settings_tab(tikz_subtab_widget, "Layout",  "Tikz layout settings", tikz_layout_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Import", "These are the class names that are understood when importing from tikz.", tikz_import_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Layout", "Tikz layout settings", tikz_layout_settings)
         # --- End TikZ nested tab structure ---
 
         self.init_okay_cancel_buttons(layout)
@@ -193,7 +200,6 @@ class SettingsDialog(QDialog):
         name = data["id"]
         assert isinstance(default := defaults[name], _type)
         return self.get_settings_value(name, _type, default)
-
 
     def add_settings_tab(self, tab_widget: QTabWidget, tab_name: str, label: str, data: list[SettingsData]) -> None:
         panel_tikz_names, vlayout = QWidget(), QVBoxLayout()
@@ -248,7 +254,7 @@ class SettingsDialog(QDialog):
 
         def browse() -> None:
             directory = QFileDialog.getExistingDirectory(
-                self,"Pick folder", options=QFileDialog.Option.ShowDirsOnly
+                self, "Pick folder", options=QFileDialog.Option.ShowDirsOnly
             )
             if directory:
                 widget_line.setText(directory)
@@ -293,6 +299,7 @@ class SettingsDialog(QDialog):
         # Update previous values after applying
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
+        self.prev_dark_mode = self.get_settings_value("dark-mode", str)
 
     def okay(self) -> None:
         self.apply()
@@ -309,12 +316,19 @@ class SettingsDialog(QDialog):
             elif isinstance(widget, QComboBox):
                 self.settings.setValue(name, widget.currentData())
             elif isinstance(widget, QCheckBox):
-               self.settings.setValue(name, widget.isChecked())
+                self.settings.setValue(name, widget.isChecked())
         self.settings.sync()
         display_setting.update()
 
     def apply_global_settings(self) -> None:
         refresh_pyzx_tikz_settings()
+        current_dark_mode = self.get_settings_value("dark-mode", str)
+        if current_dark_mode != self.prev_dark_mode:
+            QMessageBox.information(
+                self,
+                "Theme Change",
+                "You may need to restart the application for the theme change to take full effect."
+            )
         theme = self.get_settings_value("color-scheme", str)
         if theme != self.prev_color_scheme:
             display_setting.set_color_scheme(theme)

@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 import pyzx
 from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.rewrite_rules import editor_actions
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
@@ -122,7 +123,7 @@ class ProofPanel(BasePanel):
         edges = set(self.graph_scene.selected_edges)
         g = self.graph_scene.g
         for e in g.edges():
-            s,t = g.edge_st(e)
+            s, t = g.edge_st(e)
             if s in selection and t in selection:
                 edges.add(e)
 
@@ -150,7 +151,9 @@ class ProofPanel(BasePanel):
                 anims.anticipate_fuse(self.graph_scene.vertex_map[w])
             elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)): # This function takes a vertex matching function, which we restrict to just match to v and w
+            elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)):  # This function takes a vertex matching function, which we restrict to just match to v and w
+                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
+            elif editor_actions.pauli_matcher(self.graph, lambda x: x in (v, w)):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
@@ -166,13 +169,26 @@ class ProofPanel(BasePanel):
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.hrules.match_copy(g, lambda x: x in (v, w)):
-            match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, match)
+            copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
             g.add_edge_table(etab)
             g.remove_edges(rem_edges)
             g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            self.undo_stack.push(cmd, anim_after=anim)
+        elif editor_actions.pauli_matcher(g, lambda x: x in (v, w)):
+            # Check if we can push a Pauli spider through the other vertex
+            pauli_match = editor_actions.pauli_matcher(g, lambda x: x in (v, w))
+            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.pauli_push(g, pauli_match)
+            g.add_edge_table(etab)
+            g.remove_edges(rem_edges)
+            g.remove_vertices(rem_verts)
+            # Determine which vertex is the target (the one being pushed through)
+            # The match is (pauli_vertex, target_vertex)
+            target = pauli_match[0][1] if pauli_match else w
+            anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "push Pauli")
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.basicrules.check_strong_comp(g, v, w):
             pyzx.basicrules.strong_comp(g, w, v)
@@ -214,7 +230,7 @@ class ProofPanel(BasePanel):
             # Remove even number of edges
             if num_edges % 2 != 0:
                 num_edges -= 1
-            for _ in range(num_edges): # TODO: This doesn't take into account the global scalar factor.
+            for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
@@ -243,13 +259,13 @@ class ProofPanel(BasePanel):
             raise ValueError("Neither of the spider types are checked.")
 
         new_g = copy.deepcopy(self.graph)
-        v = new_g.add_vertex(vty, row=pos.x()/SCALE, qubit=pos.y()/SCALE)
+        v = new_g.add_vertex(vty, row=pos.x() / SCALE, qubit=pos.y() / SCALE)
         new_g.add_edge((s, v), self.graph.edge_type(item.e))
         new_g.add_edge((v, t))
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "add identity")
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
@@ -309,7 +325,7 @@ class ProofPanel(BasePanel):
                     left.append(eitem)
                 else:
                     right.append(eitem)
-        mouse_dir = ((start + end) * (1/2)) - pos
+        mouse_dir = ((start + end) * (1 / 2)) - pos
 
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
             self._unfuse_w(vertex, left, mouse_dir)
@@ -321,7 +337,7 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph)
         basicrules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "id")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
@@ -369,22 +385,22 @@ class ProofPanel(BasePanel):
             self.graph.qubit(v) - self.graph.qubit(vi)
         ).normalized()
 
-        perp_dir = QVector2D(mouse_dir - QPointF(self.graph.row(v)/SCALE, self.graph.qubit(v)/SCALE)).normalized()
+        perp_dir = QVector2D(mouse_dir - QPointF(self.graph.row(v) / SCALE, self.graph.qubit(v) / SCALE)).normalized()
         perp_dir -= par_dir * QVector2D.dotProduct(perp_dir, par_dir)
         perp_dir.normalize()
 
         out_offset_x = par_dir.x() * 0.5 + perp_dir.x() * 0.5
         out_offset_y = par_dir.y() * 0.5 + perp_dir.y() * 0.5
 
-        in_offset_x = out_offset_x - par_dir.x()*W_INPUT_OFFSET
-        in_offset_y = out_offset_y - par_dir.y()*W_INPUT_OFFSET
+        in_offset_x = out_offset_x - par_dir.x() * W_INPUT_OFFSET
+        in_offset_y = out_offset_y - par_dir.y() * W_INPUT_OFFSET
 
         left_vert = new_g.add_vertex(VertexType.W_OUTPUT,
                                      qubit=self.graph.qubit(v) + out_offset_y,
                                      row=self.graph.row(v) + out_offset_x)
         left_vert_i = new_g.add_vertex(VertexType.W_INPUT,
-                                     qubit=self.graph.qubit(v) + in_offset_y,
-                                     row=self.graph.row(v) + in_offset_x)
+                                       qubit=self.graph.qubit(v) + in_offset_y,
+                                       row=self.graph.row(v) + in_offset_x)
         new_g.add_edge((left_vert_i, left_vert), EdgeType.W_IO)
         new_g.add_edge((v, left_vert_i))
         new_g.set_row(v, self.graph.row(v))
@@ -433,10 +449,10 @@ class ProofPanel(BasePanel):
 
         new_g: GraphT = copy.deepcopy(self.graph)
         left_vert = new_g.add_vertex(self.graph.type(v),
-                                     qubit=self.graph.qubit(v) + dist*avg_left.y(),
-                                     row=self.graph.row(v) + dist*avg_left.x())
-        new_g.set_row(v, self.graph.row(v) + dist*avg_right.x())
-        new_g.set_qubit(v, self.graph.qubit(v) + dist*avg_right.y())
+                                     qubit=self.graph.qubit(v) + dist * avg_left.y(),
+                                     row=self.graph.row(v) + dist * avg_left.x())
+        new_g.set_row(v, self.graph.row(v) + dist * avg_right.x())
+        new_g.set_qubit(v, self.graph.qubit(v) + dist * avg_right.y())
         new_g.add_edge((v, left_vert))
 
         # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
@@ -517,7 +533,8 @@ class ProofPanel(BasePanel):
         for e in self.graph_scene.selected_edges:
             if g.type(g.edge_s(e)) == VertexType.DUMMY and g.type(g.edge_t(e)) == VertexType.DUMMY:
                 rem_edges.append(e)
-        if not rem_vertices and not rem_edges: return
+        if not rem_vertices and not rem_edges:
+            return
         new_g = copy.deepcopy(self.graph_scene.g)
         new_g.remove_edges(rem_edges)
         new_g.remove_vertices(list(set(rem_vertices)))

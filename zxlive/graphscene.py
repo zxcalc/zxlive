@@ -25,7 +25,6 @@ from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
 
 
-
 from .common import SCALE, VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
 from .vitem import VItem
 from .eitem import EItem, EDragItem
@@ -59,7 +58,7 @@ class GraphScene(QGraphicsScene):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setSceneRect(0, 0, 2*OFFSET_X, 2*OFFSET_Y)
+        self.setSceneRect(0, 0, 2 * OFFSET_X, 2 * OFFSET_Y)
         self.update_background_brush()
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
@@ -161,7 +160,7 @@ class GraphScene(QGraphicsScene):
                 selected_vertices.add(v)
 
         for (s, t), typ in diff.new_edges:
-            e = (s,t,typ)
+            e = (s, t, typ)
             if e not in self.edge_map:
                 self.edge_map[e] = {}
             idx = len(self.edge_map[e])
@@ -284,7 +283,7 @@ class EditGraphScene(GraphScene):
         # Right-press on a vertex means the start of a drag for edge adding
         super().mousePressEvent(e)
         if (self.curr_tool == ToolType.EDGE) or \
-            (self.curr_tool == ToolType.SELECT and e.button() == Qt.MouseButton.RightButton):
+                (self.curr_tool == ToolType.SELECT and e.button() == Qt.MouseButton.RightButton):
             if self.items(e.scenePos(), deviceTransform=QTransform()):
                 for it in self.items(e.scenePos(), deviceTransform=QTransform()):
                     if isinstance(it, VItem):
@@ -307,7 +306,7 @@ class EditGraphScene(GraphScene):
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseReleaseEvent(e)
-        isRightClickOnSelectTool = (self.curr_tool == ToolType.SELECT and \
+        isRightClickOnSelectTool = (self.curr_tool == ToolType.SELECT and
                                     e.button() == Qt.MouseButton.RightButton)
         if self._drag and (self.curr_tool == ToolType.EDGE or isRightClickOnSelectTool):
             self._drag.start.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
@@ -323,9 +322,9 @@ class EditGraphScene(GraphScene):
         p = e.scenePos()
         # create a rectangle around the mouse position which will be used to check of edge intersections
         snap = display_setting.SNAP_DIVISION
-        rect = QRectF(p.x() - SCALE/(2*snap), p.y() - SCALE/(2*snap), SCALE/snap, SCALE/snap)
+        rect = QRectF(p.x() - SCALE / (2 * snap), p.y() - SCALE / (2 * snap), SCALE / snap, SCALE / snap)
         # edges under current mouse position
-        edges: list[EItem] = [e for e in self.items(rect, deviceTransform=QTransform()) if isinstance(e,EItem)]
+        edges: list[EItem] = [e for e in self.items(rect, deviceTransform=QTransform()) if isinstance(e, EItem)]
         self.vertex_added.emit(*pos_from_view(p.x(), p.y()), edges)
 
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
@@ -337,16 +336,16 @@ class EditGraphScene(GraphScene):
             if isinstance(it, VItem):
                 v2 = it
                 break
-        else: # It wasn't actually dropped on a vertex
+        else:  # It wasn't actually dropped on a vertex
             e.ignore()
             return
         path = QPainterPath(v1.pos())
         path.lineTo(e.scenePos())
         colliding_verts = []
         for it in self.items(path, Qt.ItemSelectionMode.IntersectsItemShape, Qt.SortOrder.DescendingOrder, deviceTransform=QTransform()):
-            if isinstance(it, VItem) and it not in (v1,v2):
+            if isinstance(it, VItem) and it not in (v1, v2):
                 colliding_verts.append(it)
-        self.edge_added.emit(v1.v,v2.v,colliding_verts)
+        self.edge_added.emit(v1.v, v2.v, colliding_verts)
 
     def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent) -> None:
         from PySide6.QtWidgets import QMenu
