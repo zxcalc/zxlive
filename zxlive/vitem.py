@@ -19,16 +19,20 @@ import math
 
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
-from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
-from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont, QPainterPath
-from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
-     QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
+from PySide6.QtCore import (Qt, QPointF, QVariantAnimation, QAbstractAnimation,
+                            QRectF)
+from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
+from PySide6.QtWidgets import (QWidget, QGraphicsPathItem, QGraphicsTextItem,
+                               QGraphicsItem, QStyle,
+                               QStyleOptionGraphicsItem,
+                               QGraphicsSceneMouseEvent)
 
 
+from pyzx.utils import (VertexType, phase_to_s, get_w_partner, vertex_is_w,
+                        get_z_box_label)
 
-from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
-
-from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
+from .common import (VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view,
+                     pos_from_view)
 from .settings import display_setting
 
 if TYPE_CHECKING:
@@ -46,11 +50,12 @@ VITEM_UNSELECTED_Z = 0
 VITEM_SELECTED_Z = 1
 PHASE_ITEM_Z = 2
 
+
 class DragState(Enum):
-        """A vertex can be dragged onto another vertex, or if it was dragged onto
-         before, it can be dragged off of it again."""
-        Onto = 0
-        OffOf = 1
+    """A vertex can be dragged onto another vertex, or if it was
+    dragged onto before, it can be dragged off of it again."""
+    Onto = 0
+    OffOf = 1
 
 
 class VItem(QGraphicsPathItem):
@@ -60,9 +65,11 @@ class VItem(QGraphicsPathItem):
     phase_item: PhaseItem
     adj_items: Set[EItem]  # Connected edges
     graph_scene: GraphScene
-    dummy_text_item: Optional[QGraphicsTextItem] = None  # For dummy node text
+    # For dummy node text
+    dummy_text_item: Optional[QGraphicsTextItem] = None
 
-    halftone = "1000100010001000" #QPixmap("images/halftone.png")
+    # QPixmap("images/halftone.png")
+    halftone = "1000100010001000"
 
     # Set of animations that are currently running on this vertex
     active_animations: set[VItemAnimation]
@@ -99,7 +106,8 @@ class VItem(QGraphicsPathItem):
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
-        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+        self.setFlag(
+            QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
 
         self.refresh()
 
@@ -111,7 +119,6 @@ class VItem(QGraphicsPathItem):
     def ty(self) -> VertexType:
         _ty: VertexType = self.g.type(self.v)
         return _ty
-
 
     @property
     def is_dragging(self) -> bool:
@@ -145,21 +152,22 @@ class VItem(QGraphicsPathItem):
         pen = QPen()
         if not self.isSelected():
             color_key = color_map.get(self.ty, "boundary")
-            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush = QBrush(display_setting.effective_colors[color_key])
             pen.setWidthF(3)
             pen.setColor(display_setting.effective_colors["outline"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush = QBrush(display_setting.effective_colors[color_key])
             brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
-            # Use a light outline in dark mode, otherwise use the pressed color
+            # Use a light outline in dark mode, otherwise use pressed color
             if display_setting.dark_mode:
                 pen.setColor(QColor("#dbdbdb"))
             else:
-                pen.setColor(display_setting.effective_colors["boundary_pressed"])
+                pen.setColor(
+                    display_setting.effective_colors["boundary_pressed"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy_pressed"])
         self.prepareGeometryChange()
@@ -176,7 +184,8 @@ class VItem(QGraphicsPathItem):
             self.dummy_text_item.setPlainText(text)
             # Center the text in the node
             rect = self.dummy_text_item.boundingRect()
-            self.dummy_text_item.setPos(-rect.width()/2, -rect.height()/2 - 0.25 * SCALE)
+            self.dummy_text_item.setPos(
+                -rect.width()/2, -rect.height()/2 - 0.25 * SCALE)
             self.dummy_text_item.setVisible(bool(text))
         elif self.dummy_text_item is not None:
             self.dummy_text_item.setVisible(False)
@@ -201,11 +210,14 @@ class VItem(QGraphicsPathItem):
             path.lineTo(0.25 * SCALE, -0.15 * SCALE)
             path.lineTo(-0.25 * SCALE, -0.15 * SCALE)
             path.closeSubpath()
-        elif self.ty in {VertexType.W_INPUT, VertexType.BOUNDARY, VertexType.DUMMY}:
+        elif self.ty in {VertexType.W_INPUT, VertexType.BOUNDARY,
+                         VertexType.DUMMY}:
             scale = 0.3 * SCALE
-            path.addEllipse(-0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
+            path.addEllipse(
+                -0.2 * scale, -0.2 * scale, 0.4 * scale, 0.4 * scale)
         else:
-            path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
+            path.addEllipse(
+                -0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         return path
 
     def update_shape(self) -> None:
@@ -223,7 +235,9 @@ class VItem(QGraphicsPathItem):
         if self.ty == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self)
             if w_in:
-                angle = math.atan2(self.pos().x() - w_in.pos().x(), w_in.pos().y() - self.pos().y())
+                angle = math.atan2(
+                    self.pos().x() - w_in.pos().x(),
+                    w_in.pos().y() - self.pos().y())
                 self.setRotation(math.degrees(angle))
         else:
             self.setRotation(0)
@@ -231,7 +245,10 @@ class VItem(QGraphicsPathItem):
     def set_pos_from_graph(self) -> None:
         self.setPos(*pos_to_view(self.g.row(self.v), self.g.qubit(self.v)))
 
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
+    def paint(
+            self, painter: QPainter,
+            option: QStyleOptionGraphicsItem,
+            widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
@@ -239,17 +256,21 @@ class VItem(QGraphicsPathItem):
         option.state &= ~QStyle.StateFlag.State_Selected
         super().paint(painter, option, widget)
 
-    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
+    def itemChange(
+            self, change: QGraphicsItem.GraphicsItemChange,
+            value: Any) -> Any:
         # Snap items to grid on movement by intercepting the position-change
         # event and returning a new position
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and not self.is_animated:
+        pos_change = QGraphicsItem.GraphicsItemChange.ItemPositionChange
+        if change == pos_change and not self.is_animated:
             assert isinstance(value, QPointF)
             if self.ty == VertexType.W_INPUT:
                 x = value.x()
                 y = value.y()
             else:
-                x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
-                y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
+                snap = display_setting.SNAP
+                x = round(value.x() / snap) * snap
+                y = round(value.y() / snap) * snap
             return QPointF(x, y)
 
         # When selecting/deselecting items, we move them to the front/back
@@ -258,18 +279,23 @@ class VItem(QGraphicsPathItem):
             self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
             return value
 
-        # Intercept selection- and position-has-changed events to call `refresh`.
-        # Note that the position and selected values are already updated when
-        # this event fires.
-        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
-            # If we're being animated, the animation will decide for itself whether we
-            # should be refreshed or not
+        # Intercept selection- and position-has-changed events to call
+        # `refresh`. Note that the position and selected values are already
+        # updated when this event fires.
+        selected_changed = (
+            QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged)
+        position_changed = (
+            QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged)
+        if change in (selected_changed, position_changed):
+            # If we're being animated, the animation will decide for
+            # itself whether we should be refreshed or not
             if not self.is_animated:
                 self.refresh()
-            
-            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+
+            if change == selected_changed:
                 scene = self.scene()
-                if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+                if TYPE_CHECKING:
+                    assert isinstance(scene, GraphScene)
                 scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
@@ -280,7 +306,8 @@ class VItem(QGraphicsPathItem):
             e.ignore()
             return
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         scene.vertex_double_clicked.emit(self.v)
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
@@ -296,7 +323,8 @@ class VItem(QGraphicsPathItem):
             e.ignore()
             return
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         if self.is_dragging and self.ty == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self)
             assert w_in is not None
@@ -313,28 +341,32 @@ class VItem(QGraphicsPathItem):
         if self.is_dragging and len(scene.selectedItems()) == 1:
             reset = True
             for it in scene.items():
-                if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
+                if not (it.sceneBoundingRect().intersects(
+                        self.sceneBoundingRect())):
                     continue
-                if isinstance(it, VItem) and vertex_is_w(self.ty) and get_w_partner(self.g, self.v) == it.v:
+                if (isinstance(it, VItem) and vertex_is_w(self.ty) and
+                        get_w_partner(self.g, self.v) == it.v):
                     continue
                 if it == self._dragged_on:
                     reset = False
                 elif isinstance(it, VItem) and it != self:
                     scene.vertex_dragged.emit(DragState.Onto, self.v, it.v)
-                    # If we previously hovered over a vertex, notify the scene that we
-                    # are no longer
+                    # If we previously hovered over a vertex, notify
+                    # the scene that we are no longer
                     if self._dragged_on is not None:
-                        scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
+                        scene.vertex_dragged.emit(
+                            DragState.OffOf, self.v, self._dragged_on.v)
                     self._dragged_on = it
                     return
             if reset and self._dragged_on is not None:
-                scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
+                scene.vertex_dragged.emit(
+                    DragState.OffOf, self.v, self._dragged_on.v)
                 self._dragged_on = None
         e.ignore()
 
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
-        # manually detect mouse releases.
+        # Unfortunately, Qt does not provide a "MoveFinished" event,
+        # so we have to manually detect mouse releases.
         super().mouseReleaseEvent(e)
         if self.is_animated:
             e.ignore()
@@ -342,15 +374,20 @@ class VItem(QGraphicsPathItem):
         if e.button() == Qt.MouseButton.LeftButton:
             if self._old_pos is None or self._old_pos != self.pos():
                 if self.ty == VertexType.W_INPUT:
-                    # set the position of w_in to next to w_out at the same angle
+                    # Set the position of w_in to next to w_out
+                    # at the same angle
                     w_out = get_w_partner_vitem(self)
                     assert w_out is not None
-                    w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
-                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
+                    w_in_pos = w_out.pos() + QPointF(
+                        0, W_INPUT_OFFSET * SCALE)
+                    w_in_pos = rotate_point(
+                        w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
                 scene = self.scene()
-                if TYPE_CHECKING: assert isinstance(scene, GraphScene)
-                if self._dragged_on is not None and len(scene.selectedItems()) == 1:
+                if TYPE_CHECKING:
+                    assert isinstance(scene, GraphScene)
+                if (self._dragged_on is not None and
+                        len(scene.selectedItems()) == 1):
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
                     moved_vertices = []
@@ -362,7 +399,9 @@ class VItem(QGraphicsPathItem):
                             partner = get_w_partner_vitem(it)
                             if partner:
                                 moved_vertices.append(partner)
-                    scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
+                    scene.vertices_moved.emit([
+                        (it.v, *pos_from_view(it.pos().x(), it.pos().y()))
+                        for it in moved_vertices])
                 self._dragged_on = None
                 self._old_pos = None
             else:
@@ -374,7 +413,8 @@ class VItem(QGraphicsPathItem):
         self.phase_item.setFont(display_setting.font)
 
     def boundingRect(self) -> 'QRectF':
-        # Ensure the bounding rect includes the outline (pen width) and antialiasing
+        # Ensure the bounding rect includes the outline (pen width)
+        # and antialiasing
         path_rect = self._make_shape_path().boundingRect()
         pen_width = self.pen().widthF() if self.pen() else 1.0
         margin = pen_width / 2.0 + 1.0  # +1 for antialiasing
@@ -384,10 +424,11 @@ class VItem(QGraphicsPathItem):
 class VItemAnimation(QVariantAnimation):
     """Animator for vertex graphics items.
 
-    This animator lets the vertex know that its being animated which stops any
-    interaction with the user and disables grid snapping. Furthermore, this animator
-    ensures that it's not garbage collected until the animation is finished, so there is
-    no need to hold onto a reference of this class."""
+    This animator lets the vertex know that its being animated which
+    stops any interaction with the user and disables grid snapping.
+    Furthermore, this animator ensures that it's not garbage collected
+    until the animation is finished, so there is no need to hold onto a
+    reference of this class."""
 
     _it: Optional[VItem]
     prop: VItem.Properties
@@ -395,8 +436,9 @@ class VItemAnimation(QVariantAnimation):
 
     v: Optional[VT]
 
-    def __init__(self, item: Union[VItem, VT], property: VItem.Properties,
-                 scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
+    def __init__(
+            self, item: Union[VItem, VT], property: VItem.Properties,
+            scene: Optional[GraphScene] = None, refresh: bool = False) -> None:
         super().__init__()
         self.v = None
         self._it = None
@@ -406,7 +448,8 @@ class VItemAnimation(QVariantAnimation):
         if isinstance(item, VItem):
             self._it = item
         elif scene is None:
-            raise ValueError("Scene is required to obtain VItem from vertex id")
+            raise ValueError(
+                "Scene is required to obtain VItem from vertex id")
         else:
             self.v = item
             self.scene = scene
@@ -422,7 +465,8 @@ class VItemAnimation(QVariantAnimation):
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        running = QAbstractAnimation.State.Running
+        if state == running and self not in self.it.active_animations:
             # Stop all animations that target the same property
             for anim in self.it.active_animations.copy():
                 if anim.prop == self.prop:
@@ -432,9 +476,9 @@ class VItemAnimation(QVariantAnimation):
             self.it.active_animations.remove(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
-            #   Note that we cannot just remove ourselves from the set since the garbage
-            #   collector will eat us in that case. We'll probably need something like
-            #   `it.paused_animations`
+            #   Note that we cannot just remove ourselves from the set
+            #   since the garbage collector will eat us in that case.
+            #   We'll probably need something like `it.paused_animations`
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
@@ -461,9 +505,11 @@ class PhaseItem(QGraphicsTextItem):
 
         # Set phase label color based on dark mode
         if display_setting.dark_mode:
-            self.setDefaultTextColor(QColor("#00e6e6"))  # bright cyan for dark mode
+            # Bright cyan for dark mode
+            self.setDefaultTextColor(QColor("#00e6e6"))
         else:
-            self.setDefaultTextColor(QColor("#006bb3"))  # original blue for light mode
+            # Original blue for light mode
+            self.setDefaultTextColor(QColor("#006bb3"))
         self.v_item = v_item
         self.refresh()
 
@@ -471,7 +517,8 @@ class PhaseItem(QGraphicsTextItem):
         """Call this when a vertex moves or its phase changes"""
         vertex_type = self.v_item.ty
         if vertex_type == VertexType.Z_BOX:
-            self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
+            self.setPlainText(
+                str(get_z_box_label(self.v_item.g, self.v_item.v)))
         elif vertex_type != VertexType.BOUNDARY:
             phase = self.v_item.g.phase(self.v_item.v)
             self.setPlainText(phase_to_s(phase, vertex_type))
@@ -482,10 +529,15 @@ class PhaseItem(QGraphicsTextItem):
 def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
     """Rotate a point around an origin by an angle in degrees."""
     angle = math.radians(angle)
+    cos_a = math.cos(angle)
+    sin_a = math.sin(angle)
+    dx = p.x() - origin.x()
+    dy = p.y() - origin.y()
     return QPointF(
-        math.cos(angle) * (p.x() - origin.x()) - math.sin(angle) * (p.y() - origin.y()) + origin.x(),
-        math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
+        cos_a * dx - sin_a * dy + origin.x(),
+        sin_a * dx + cos_a * dy + origin.y()
     )
+
 
 def get_w_partner_vitem(vitem: VItem) -> Optional[VItem]:
     """Get the VItem of the partner of a w_in or w_out vertex."""
