@@ -20,21 +20,26 @@ from .eitem import EItem
 if TYPE_CHECKING:
     from .graphscene import GraphScene
 
+
 class UnfusionDialog(QDialog):
     """Dialog for configuring the unfusion operation."""
 
     confirmed = Signal(int, object, object)  # num_edges, phase1, phase2
     cancelled = Signal()
 
-    def __init__(self, original_phase: Union[Fraction, Poly, complex], graph: GraphT, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+            self, original_phase: Union[Fraction, Poly, complex],
+            graph: GraphT, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.graph = graph
         self.original_phase = original_phase
         self.setWindowTitle("Unfuse Node Configuration")
-        self.setModal(False)  # Allow interaction with the graph behind the dialog
+        # Allow interaction with the graph behind the dialog
+        self.setModal(False)
         self.setFixedSize(250, 250)
         # Keep dialog on top but allow interaction with parent
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(
+            self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self._updating_phases = False
         self._setup_ui()
 
@@ -42,7 +47,8 @@ class UnfusionDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Instructions
-        instructions = QLabel("Click edges to assign to Node 1 (orange) or Node 2 (grey)")
+        instructions = QLabel(
+            "Click edges to assign to Node 1 (orange) or Node 2 (grey)")
         instructions.setWordWrap(True)
         instructions.setStyleSheet("font-weight: bold; padding: 5px;")
         layout.addWidget(instructions)
@@ -85,8 +91,10 @@ class UnfusionDialog(QDialog):
         phase2_layout.addWidget(self.phase2_edit)
         layout.addLayout(phase2_layout)
 
-        self.phase1_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase1_edit, self.phase2_edit))
-        self.phase2_edit.textChanged.connect(lambda: self._on_phase_changed(self.phase2_edit, self.phase1_edit))
+        self.phase1_edit.textChanged.connect(
+            lambda: self._on_phase_changed(self.phase1_edit, self.phase2_edit))
+        self.phase2_edit.textChanged.connect(
+            lambda: self._on_phase_changed(self.phase2_edit, self.phase1_edit))
 
         # Info label
         self.info_label = QLabel("Original phase: " + str(self.original_phase))
@@ -107,8 +115,10 @@ class UnfusionDialog(QDialog):
         # Make confirm button default
         self.confirm_button.setDefault(True)
 
-    def _on_phase_changed(self, source_edit: QLineEdit, target_edit: QLineEdit) -> None:
-        """Update the target phase field when the source phase field changes."""
+    def _on_phase_changed(
+            self, source_edit: QLineEdit, target_edit: QLineEdit) -> None:
+        """Update the target phase field when the source phase field
+        changes."""
         if self._updating_phases:
             return
         self._updating_phases = True
