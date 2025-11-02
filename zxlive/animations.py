@@ -77,7 +77,6 @@ class AnimatedUndoStack(QUndoStack):
         self.running_anim.start()
 
 
-
 def scale(it: VItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> VItemAnimation:
     anim = VItemAnimation(it, VItem.Properties.Scale)
     anim.setDuration(duration)
@@ -97,6 +96,7 @@ def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve, start: O
     anim.setEasingCurve(ease)
     return anim
 
+
 def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
     anim = EItemAnimation(it, EItem.Properties.Thickness, refresh=True)
     anim.setDuration(duration)
@@ -104,6 +104,7 @@ def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, 
     anim.setEndValue(target)
     anim.setEasingCurve(ease)
     return anim
+
 
 def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callable[[VT], Optional[VT]],
                 to_end: Callable[[VT], Optional[VT]], duration: int, ease: QEasingCurve) -> QAbstractAnimation:
@@ -152,6 +153,7 @@ def _morph_graph_to_or_from_center(to_center: bool,
         group.addAnimation(anim)
     return group
 
+
 def morph_graph_to_center(graph: GraphT,
                           vertex_filter: Callable[[VT], bool],
                           scene: GraphScene,
@@ -159,6 +161,7 @@ def morph_graph_to_center(graph: GraphT,
                           duration: int,
                           ease: QEasingCurve) -> QAbstractAnimation:
     return _morph_graph_to_or_from_center(True, graph, vertex_filter, scene, center, duration, ease)
+
 
 def morph_graph_from_center(graph: GraphT,
                             vertex_filter: Callable[[VT], bool],
@@ -221,7 +224,7 @@ def fuse(dragged: VItem, target: VItem, meet_halfway: bool = False) -> QAbstract
 
     def set_z(state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running:
-            target.setZValue(VITEM_SELECTED_Z+1)
+            target.setZValue(VITEM_SELECTED_Z + 1)
         elif state == QAbstractAnimation.State.Stopped:
             target.setZValue(VITEM_UNSELECTED_Z)
 
@@ -264,6 +267,7 @@ def remove_id(it: VItem) -> VItemAnimation:
     anim.setEasingCurve(QEasingCurve.Type.InBack)
     return anim
 
+
 def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     """Animation that is played when an identity spider is added using
     the magic wand."""
@@ -273,6 +277,7 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     anim.setEndValue(1.0)
     anim.setEasingCurve(QEasingCurve.Type.OutElastic)
     return anim
+
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused."""
@@ -301,7 +306,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         anim_before = QParallelAnimationGroup()
         for m in matches:
             anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
-                                                panel.graph_scene.vertex_map[m[1]]))
+                                          panel.graph_scene.vertex_map[m[1]]))
         anim_after = QParallelAnimationGroup()
         for m in matches:
             anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
@@ -309,7 +314,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
             anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v1],
-                                                panel.graph_scene.vertex_map[v2], meet_halfway=True))
+                                          panel.graph_scene.vertex_map[v2], meet_halfway=True))
         anim_after = QParallelAnimationGroup()
         for v1, v2 in matches:
             v2_row, v2_qubit = panel.graph.row(v2), panel.graph.qubit(v2)
@@ -322,10 +327,10 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         center = self.rule.last_rewrite_center
         duration = ANIMATION_DURATION / 2
         anim_before = morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
-                                                  panel.graph_scene, center, duration,
-                                                  QEasingCurve(QEasingCurve.Type.InQuad))
+                                            panel.graph_scene, center, duration,
+                                            QEasingCurve(QEasingCurve.Type.InQuad))
         anim_after = morph_graph_from_center(g, lambda v: v not in panel.graph.graph,
-                                                   panel.graph_scene, center, duration,
-                                                   QEasingCurve(QEasingCurve.Type.OutQuad))
+                                             panel.graph_scene, center, duration,
+                                             QEasingCurve(QEasingCurve.Type.OutQuad))
 
     return anim_before, anim_after

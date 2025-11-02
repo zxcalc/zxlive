@@ -33,22 +33,22 @@ def construct_circuit() -> GraphT:
 
     # Adding the actual vertices to the nvlist.
     for vert in vlist:
-        nvlist.append((vert[0]+qubits, vert[1], vert[2]))
+        nvlist.append((vert[0] + qubits, vert[1], vert[2]))
 
     # Adding the output nodes to the nvlist.
     for i in range(qubits):
         nvlist.append((nvertices - qubits + i, i, VertexType.BOUNDARY))
 
-    nelist:  list[tuple[int, int, EdgeType]] = []
+    nelist: list[tuple[int, int, EdgeType]] = []
 
     # Updating the user provided elist to include input indices
     for edge in elist:
-        nelist.append((edge[0]+qubits, edge[1]+qubits, edge[2]))
+        nelist.append((edge[0] + qubits, edge[1] + qubits, edge[2]))
 
     # Adding the edges between inputs nodes and output nodes to internal nodes
     for i in range(qubits):
-        nelist.append((i, i+qubits, EdgeType.SIMPLE))
-        nelist.append((nvertices - qubits + i, nvertices - (2*qubits) + i, EdgeType.SIMPLE))
+        nelist.append((i, i + qubits, EdgeType.SIMPLE))
+        nelist.append((nvertices - qubits + i, nvertices - (2 * qubits) + i, EdgeType.SIMPLE))
 
     cur_row = [1] * qubits
 
@@ -75,7 +75,7 @@ def construct_circuit() -> GraphT:
 
     for i in range(qubits):
         inputs.append(i)
-        outputs.append(nvertices-qubits+i)
+        outputs.append(nvertices - qubits + i)
 
     g.set_inputs(tuple(inputs))
     g.set_outputs(tuple(outputs))

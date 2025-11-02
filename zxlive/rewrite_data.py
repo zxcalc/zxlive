@@ -55,6 +55,7 @@ def read_custom_rules() -> list[RewriteData]:
                     custom_rules.append(rule)
     return custom_rules
 
+
 operations["unfuse"] = {
     "text": "unfuse",
     "tooltip": "Unfuse a spider",
@@ -119,6 +120,7 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
 }
 
+
 def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
     """Returns a list of vertices in the selection or all vertices if no selection is made."""
     matches_list = [v for v in graph.vertices() if matches(v)]
@@ -137,6 +139,7 @@ def apply_simplification(simplification: Callable[[GraphT], Optional[int]]) -> C
         simplification(simplified)
         return CustomRule(subgraph, simplified, "", "")(g, matches)
     return rule
+
 
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]

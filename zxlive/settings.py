@@ -100,7 +100,7 @@ tikz_names_defaults: dict[str, str] = {
 }
 
 defaults = general_defaults | font_defaults | tikz_export_defaults | \
-           tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
+    tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
 
 
 modern_red_green: ColorScheme = {
@@ -258,17 +258,17 @@ class DisplaySettings:
     @property
     def effective_colors(self) -> dict[str, QColor]:
         # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
-        from PySide6.QtGui import QColor
+
         def adjust_for_dark(color: QColor) -> QColor:
             if not isinstance(color, QColor):
                 raise ValueError(f"Expected QColor, got {type(color)}")
-            h: int = color.hslHue()
-            s: int = color.hslSaturation()
-            l: int = color.lightness()
-            a: int = color.alpha()            # Make colors slightly darker and less saturated for dark mode
-            l = int(l * 0.6)
-            s = int(s * 0.4)
-            return QColor.fromHsl(h, s, l, a)
+            hue: int = color.hslHue()
+            saturation: int = color.hslSaturation()
+            lightness: int = color.lightness()
+            alpha: int = color.alpha()  # Make colors slightly darker and less saturated for dark mode
+            lightness = int(lightness * 0.6)
+            saturation = int(saturation * 0.4)
+            return QColor.fromHsl(hue, saturation, lightness, alpha)
         base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
         if self.dark_mode:
             for k in base:

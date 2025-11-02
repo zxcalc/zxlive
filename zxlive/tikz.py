@@ -28,7 +28,7 @@ def proof_to_tikz(proof: ProofModel) -> str:
         g = g_t
 
         if i > 0:
-            rewrite = proof.steps[i-1]
+            rewrite = proof.steps[i - 1]
             # Try to look up name in settings
             name = settings.value(f"tikz/names/{rewrite.rule}") if settings.contains(f"tikz/names/{rewrite.rule}") else rewrite.rule
             eq = f"\\node [style=none] ({idoffset}) at ({xoffset - hspace/2:.2f}, {-yoffset - height/2:.2f}) {{$\\overset{{\\mathit{{{name}}}}}{{=}}$}};"
@@ -49,4 +49,3 @@ def proof_to_tikz(proof: ProofModel) -> str:
         idoffset += max_index
 
     return TIKZ_BASE.format(vertices="\n".join(total_verts), edges="\n".join(total_edges))
-

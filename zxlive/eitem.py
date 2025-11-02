@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
 HAD_EDGE_BLUE = "#0077ff"
 
+
 class EItem(QGraphicsPathItem):
     """A QGraphicsItem representing an edge"""
 
@@ -111,7 +112,7 @@ class EItem(QGraphicsPathItem):
             self.curve_distance = self.g.edata(self.e, f"curve_{self.index}", self.curve_distance)
 
         path = QPainterPath()
-        if self.s_item == self.t_item: # self-loop
+        if self.s_item == self.t_item:  # self-loop
             cd = self.curve_distance
             cd = cd + 0.5 if cd >= 0 else cd - 0.5
             s_pos = self.s_item.pos()
@@ -129,7 +130,6 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
-
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
@@ -144,12 +144,11 @@ class EItem(QGraphicsPathItem):
         # this event fires.
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             self.refresh()
-            
+
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
                 self.graph_scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
-
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mousePressEvent(e)
@@ -161,7 +160,8 @@ class EItem(QGraphicsPathItem):
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         if self.is_mouse_pressed and len(scene.selectedItems()) == 1 and self._old_pos is not None:
             self.is_dragging = True
             distance = e.pos() - self._old_pos
@@ -186,7 +186,8 @@ class EItem(QGraphicsPathItem):
             e.ignore()
             return
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         scene.edge_double_clicked.emit(self.e)
 
     def shape(self) -> QPainterPath:
@@ -229,6 +230,7 @@ class EDragItem(QGraphicsPathItem):
         path.lineTo(self.mouse_pos)
         self.setPath(path)
 
+
 def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float) -> QPointF:
     """Calculate the control point for the curve"""
     perpendicular = compute_perpendicular_direction(source_pos, target_pos)
@@ -238,9 +240,10 @@ def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_dist
     control_point = midpoint + offset
     return control_point
 
+
 def compute_perpendicular_direction(source_pos: QPointF, target_pos: QPointF) -> QPointF:
     if source_pos == target_pos:
-        return QPointF(0, -2/3)
+        return QPointF(0, -2 / 3)
     direction = target_pos - source_pos
     norm = sqrt(direction.x()**2 + direction.y()**2)
     direction = QPointF(direction.x() / norm, direction.y() / norm)

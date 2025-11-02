@@ -20,6 +20,7 @@ from .eitem import EItem
 if TYPE_CHECKING:
     from .graphscene import GraphScene
 
+
 class UnfusionDialog(QDialog):
     """Dialog for configuring the unfusion operation."""
 
