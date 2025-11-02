@@ -20,10 +20,9 @@ import math
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
-from PySide6.QtGui import QPen, QBrush,  QPainter, QColor, QFont, QPainterPath
+from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QFont, QPainterPath
 from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
-     QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
-
+    QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 
 
 from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
@@ -46,11 +45,12 @@ VITEM_UNSELECTED_Z = 0
 VITEM_SELECTED_Z = 1
 PHASE_ITEM_Z = 2
 
+
 class DragState(Enum):
-        """A vertex can be dragged onto another vertex, or if it was dragged onto
-         before, it can be dragged off of it again."""
-        Onto = 0
-        OffOf = 1
+    """A vertex can be dragged onto another vertex, or if it was dragged onto
+    before, it can be dragged off of it again."""
+    Onto = 0
+    OffOf = 1
 
 
 class VItem(QGraphicsPathItem):
@@ -62,7 +62,7 @@ class VItem(QGraphicsPathItem):
     graph_scene: GraphScene
     dummy_text_item: Optional[QGraphicsTextItem] = None  # For dummy node text
 
-    halftone = "1000100010001000" #QPixmap("images/halftone.png")
+    halftone = "1000100010001000"  # QPixmap("images/halftone.png")
 
     # Set of animations that are currently running on this vertex
     active_animations: set[VItemAnimation]
@@ -112,7 +112,6 @@ class VItem(QGraphicsPathItem):
         _ty: VertexType = self.g.type(self.v)
         return _ty
 
-
     @property
     def is_dragging(self) -> bool:
         return self._old_pos is not None
@@ -145,14 +144,14 @@ class VItem(QGraphicsPathItem):
         pen = QPen()
         if not self.isSelected():
             color_key = color_map.get(self.ty, "boundary")
-            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
             pen.setColor(display_setting.effective_colors["outline"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            brush = QBrush(display_setting.effective_colors[color_key]) # type: ignore # https://github.com/python/mypy/issues/7178
+            brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
             brush.setStyle(Qt.BrushStyle.Dense1Pattern)
             pen.setWidthF(5)
             # Use a light outline in dark mode, otherwise use the pressed color
@@ -176,7 +175,7 @@ class VItem(QGraphicsPathItem):
             self.dummy_text_item.setPlainText(text)
             # Center the text in the node
             rect = self.dummy_text_item.boundingRect()
-            self.dummy_text_item.setPos(-rect.width()/2, -rect.height()/2 - 0.25 * SCALE)
+            self.dummy_text_item.setPos(-rect.width() / 2, -rect.height() / 2 - 0.25 * SCALE)
             self.dummy_text_item.setVisible(bool(text))
         elif self.dummy_text_item is not None:
             self.dummy_text_item.setVisible(False)
@@ -266,10 +265,11 @@ class VItem(QGraphicsPathItem):
             # should be refreshed or not
             if not self.is_animated:
                 self.refresh()
-            
+
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
                 scene = self.scene()
-                if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+                if TYPE_CHECKING:
+                    assert isinstance(scene, GraphScene)
                 scene.selection_changed_custom.emit()
 
         return super().itemChange(change, value)
@@ -280,7 +280,8 @@ class VItem(QGraphicsPathItem):
             e.ignore()
             return
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         scene.vertex_double_clicked.emit(self.v)
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
@@ -296,7 +297,8 @@ class VItem(QGraphicsPathItem):
             e.ignore()
             return
         scene = self.scene()
-        if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
         if self.is_dragging and self.ty == VertexType.W_OUTPUT:
             w_in = get_w_partner_vitem(self)
             assert w_in is not None
@@ -349,7 +351,8 @@ class VItem(QGraphicsPathItem):
                     w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
                     self.setPos(w_in_pos)
                 scene = self.scene()
-                if TYPE_CHECKING: assert isinstance(scene, GraphScene)
+                if TYPE_CHECKING:
+                    assert isinstance(scene, GraphScene)
                 if self._dragged_on is not None and len(scene.selectedItems()) == 1:
                     scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
                 else:
@@ -486,6 +489,7 @@ def rotate_point(p: QPointF, origin: QPointF, angle: float) -> QPointF:
         math.cos(angle) * (p.x() - origin.x()) - math.sin(angle) * (p.y() - origin.y()) + origin.x(),
         math.sin(angle) * (p.x() - origin.x()) + math.cos(angle) * (p.y() - origin.y()) + origin.y()
     )
+
 
 def get_w_partner_vitem(vitem: VItem) -> Optional[VItem]:
     """Get the VItem of the partner of a w_in or w_out vertex."""

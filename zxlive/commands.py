@@ -48,6 +48,7 @@ class BaseCommand(QUndoCommand):
         #  we could store "dirty flags" for each node/edge.
         self.graph_view.update_graph(self.g, select_new)
 
+
 @dataclass
 class UndoableChange(BaseCommand):
     """ Generic undoable change in the graph that can be appended to the
@@ -94,6 +95,7 @@ class SetGraph(BaseCommand):
         self.old_g = self.graph_view.graph_scene.g
         self.graph_view.set_graph(self.new_g)
 
+
 @dataclass
 class UpdateGraph(BaseCommand):
     """Updates the current graph with a modified one.
@@ -114,6 +116,7 @@ class UpdateGraph(BaseCommand):
             self.old_selected = set(self.graph_view.graph_scene.selected_vertices)
         self.g = self.new_g
         self.update_graph_view(True)
+
 
 @dataclass
 class ChangeNodeType(BaseCommand):
@@ -137,10 +140,10 @@ class ChangeNodeType(BaseCommand):
                 self.g.set_type(v2, self._old_w_info[v].partner_type)
                 self.g.set_row(v2, self._old_w_info[v].partner_pos[0])
                 self.g.set_qubit(v2, self._old_w_info[v].partner_pos[1])
-                self.g.add_edge((v,v2), edgetype=EdgeType.W_IO)
+                self.g.add_edge((v, v2), edgetype=EdgeType.W_IO)
                 for v3 in self._old_w_info[v].neighbors:
-                    self.g.add_edge((v2,v3), edgetype=self.g.edge_type(self.g.edge(v,v3)))
-                    self.g.remove_edge(self.g.edge(v,v3))
+                    self.g.add_edge((v2, v3), edgetype=self.g.edge_type(self.g.edge(v, v3)))
+                    self.g.remove_edge(self.g.edge(v, v3))
             self.g.set_type(v, old_vty)
         if self._new_w_inputs is not None:
             for w_in in self._new_w_inputs.copy():
@@ -174,7 +177,7 @@ class ChangeNodeType(BaseCommand):
                 v2 = get_w_partner(self.g, v)
                 v2_neighbors = [vn for vn in self.g.neighbors(v2) if vn != v]
                 for v3 in v2_neighbors:
-                    self.g.add_edge((v,v3), edgetype=self.g.edge_type(self.g.edge(v2,v3)))
+                    self.g.add_edge((v, v3), edgetype=self.g.edge_type(self.g.edge(v2, v3)))
                 self._old_w_info[v] = self.WInfo(partner=v2,
                                                  partner_type=self.g.type(v2),
                                                  partner_pos=(self.g.row(v2), self.g.qubit(v2)),
@@ -222,7 +225,7 @@ class AddNode(BaseCommand):
     def redo(self) -> None:
         y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        self._added_vert = self.g.add_vertex(self.vty, y,x)
+        self._added_vert = self.g.add_vertex(self.vty, y, x)
         self.update_graph_view()
 
 
@@ -245,14 +248,14 @@ class AddNodeSnapped(BaseCommand):
         assert self.t is not None
         assert self._et is not None
         self.g.remove_vertex(self.added_vert)
-        self.g.add_edge((self.s,self.t), self._et)
+        self.g.add_edge((self.s, self.t), self._et)
         self.update_graph_view()
 
     def redo(self) -> None:
         y = round(self.y * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
         x = round(self.x * display_setting.SNAP_DIVISION) / display_setting.SNAP_DIVISION
-        self.added_vert = self.g.add_vertex(self.vty, y,x) 
-        s,t = self.g.edge_st(self.e)
+        self.added_vert = self.g.add_vertex(self.vty, y, x)
+        s, t = self.g.edge_st(self.e)
         self._et = self.g.edge_type(self.e)
         if self._et == EdgeType.SIMPLE:
             self.g.add_edge((s, self.added_vert), EdgeType.SIMPLE)
@@ -267,6 +270,7 @@ class AddNodeSnapped(BaseCommand):
 
         self.g.remove_edge(self.e)
         self.update_graph_view()
+
 
 @dataclass
 class AddWNode(BaseCommand):
@@ -292,6 +296,7 @@ class AddWNode(BaseCommand):
         self.g.add_edge((self._added_input_vert, self._added_output_vert), EdgeType.W_IO)
         self.update_graph_view()
 
+
 @dataclass
 class AddEdge(BaseCommand):
     """Adds an edge between two spiders."""
@@ -311,7 +316,7 @@ class AddEdge(BaseCommand):
 @dataclass
 class AddEdges(BaseCommand):
     """Adds multiple edges of the same type to a graph."""
-    pairs: list[tuple[VT,VT]]
+    pairs: list[tuple[VT, VT]]
     ety: EdgeType
 
     def undo(self) -> None:
@@ -347,6 +352,7 @@ class MoveNode(BaseCommand):
             self.g.set_qubit(v, y)
         self.update_graph_view()
 
+
 @dataclass
 class ChangeEdgeCurve(BaseCommand):
     """Changes the curve of an edge."""
@@ -366,11 +372,12 @@ class ChangeEdgeCurve(BaseCommand):
     def redo(self) -> None:
         self._set_distance(self.new_distance)
 
+
 @dataclass
 class MergeNodes(BaseCommand):
     """Merges groups of vertices that are at the same position."""
     vertices_to_merge: list[VT]
-    
+
     _old_g: Optional[GraphT] = field(default=None, init=False)
 
     def undo(self) -> None:
@@ -387,7 +394,7 @@ class MergeNodes(BaseCommand):
             if v not in self.g.vertices():
                 continue
             for e in self.g.incident_edges(v):
-                s,t = self.g.edge_st(e)
+                s, t = self.g.edge_st(e)
                 if s == target or t == target:
                     continue
                 ety = self.g.edge_type(e)
@@ -495,6 +502,7 @@ class GroupRewriteSteps(BaseCommand):
     def undo(self) -> None:
         self.step_view.model().ungroup_steps(self.start_index)
         self.step_view.move_to_step(self.end_index + 1)
+
 
 @dataclass
 class UngroupRewriteSteps(BaseCommand):

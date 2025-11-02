@@ -55,7 +55,7 @@ class BasePanel(QWidget):
         # Use box layout that fills the entire tab
         self.setLayout(QVBoxLayout())
         layout = self.layout()
-        assert layout is not None # for mypy
+        assert layout is not None  # for mypy
         layout.setSpacing(0)
         self.toolbar = QToolBar()
         layout.addWidget(self.toolbar)
@@ -136,7 +136,6 @@ class BasePanel(QWidget):
         if self.__class__ in self.splitter_sizes:
             self.splitter.setSizes(self.splitter_sizes[self.__class__])
 
-
     def update_font(self) -> None:
         self.graph_view.update_font()
 
@@ -148,6 +147,7 @@ class BasePanel(QWidget):
         from .common import get_settings_value
         from .dialogs import show_error_msg
         precision: int = get_settings_value("matrix/precision", int, 4)
+
         def format_str(c: complex, p: int) -> str:
             tol = 1e-8
             if abs(c.real) < tol and abs(c.imag) < tol:
@@ -190,6 +190,7 @@ class BasePanel(QWidget):
         controls_layout.addWidget(copy_btn)
         layout.addLayout(controls_layout)
         dialog.setLayout(layout)
+
         def update_precision() -> None:
             p = precision_spin.value()
             for i in range(matrix.shape[0]):
@@ -198,6 +199,7 @@ class BasePanel(QWidget):
                     if item is not None:
                         item.setText(format_str(matrix[i, j], p))
         precision_spin.valueChanged.connect(update_precision)
+
         def copy_matrix() -> None:
             p = precision_spin.value()
             rows = [

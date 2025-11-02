@@ -18,6 +18,7 @@ from .graphview import RuleEditGraphView
 from .eitem import EItem
 from .vitem import VItem
 
+
 class RulePanel(EditorBasePanel):
     """Panel for the Rule editor of ZXLive."""
 
@@ -27,7 +28,6 @@ class RulePanel(EditorBasePanel):
 
     _curr_ety: EdgeType
     _curr_vty: VertexType
-
 
     def __init__(self, graph1: GraphT, graph2: GraphT, name: str, description: str, *actions: QAction) -> None:
         self.name = name

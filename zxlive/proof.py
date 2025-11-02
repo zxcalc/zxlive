@@ -19,10 +19,10 @@ from .settings import display_setting
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
-    display_name: str # Name of proof displayed to user
+    display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: Optional[list['Rewrite']] = None # Optional field to store the grouped rewrites
+    grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -38,7 +38,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str,Dict[str,Any]]) -> "Rewrite":
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -50,11 +50,12 @@ class Rewrite(NamedTuple):
         graph.set_auto_simplify(False)
 
         return Rewrite(
-            display_name=d.get("display_name", d["rule"]), # Old proofs may not have display names
+            display_name=d.get("display_name", d["rule"]),  # Old proofs may not have display names
             rule=d["rule"],
             graph=graph,
             grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
         )
+
 
 class ProofModel(QAbstractListModel):
     """List model capturing the individual steps in a proof.
@@ -75,24 +76,24 @@ class ProofModel(QAbstractListModel):
         if index == 0:
             self.initial_graph = graph
         else:
-            old_step = self.steps[index-1]
+            old_step = self.steps[index - 1]
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
-            self.steps[index-1] = new_step
+            self.steps[index - 1] = new_step
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
-    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int=Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
 
-        if index.row() >= len(self.steps)+1 or index.column() >= 1:
+        if index.row() >= len(self.steps) + 1 or index.column() >= 1:
             return None
 
         if role == Qt.ItemDataRole.DisplayRole:
             if index.row() == 0:
                 return "START"
             else:
-                return self.steps[index.row()-1].display_name
+                return self.steps[index.row() - 1].display_name
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
 
@@ -119,7 +120,7 @@ class ProofModel(QAbstractListModel):
         # user has to specify the index of the parent. In a list, we always expect the
         # parent to be `None` or the empty `QModelIndex()`
         if not index or not index.isValid():
-            return len(self.steps)+1
+            return len(self.steps) + 1
         else:
             return 0
 
@@ -148,7 +149,7 @@ class ProofModel(QAbstractListModel):
         if index == 0:
             copy = self.initial_graph.copy()
         else:
-            copy = self.steps[index-1].graph.copy()
+            copy = self.steps[index - 1].graph.copy()
         assert isinstance(copy, GraphT)
         return copy
 
@@ -191,7 +192,7 @@ class ProofModel(QAbstractListModel):
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> Dict[str,Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -206,7 +207,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str,Dict[str,Any]]) -> "ProofModel":
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -214,13 +215,15 @@ class ProofModel(QAbstractListModel):
             d = json_str
         initial_graph = GraphT.from_json(d["initial_graph"])
         # Mypy issue: https://github.com/python/mypy/issues/11673
-        if TYPE_CHECKING: assert isinstance(initial_graph, GraphT)
+        if TYPE_CHECKING:
+            assert isinstance(initial_graph, GraphT)
         initial_graph.set_auto_simplify(False)
         model = ProofModel(initial_graph)
         for step in d["proof_steps"]:
             rewrite = Rewrite.from_json(step)
             model.add_rewrite(rewrite)
         return model
+
 
 class ProofStepView(QListView):
     """A view for displaying the steps in a proof."""
@@ -268,7 +271,7 @@ class ProofStepView(QListView):
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
-        self.selectionModel().selectionChanged.connect(self.proof_step_selected)  
+        self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
 
     def move_to_step(self, index: int) -> None:
@@ -307,9 +310,8 @@ class ProofStepView(QListView):
         from .commands import UndoableChange
         old_name = self.model().steps[index].display_name
         cmd = UndoableChange(self.graph_view,
-            lambda: self.model().rename_step(index, old_name),
-            lambda: self.model().rename_step(index, new_name)
-        )
+                             lambda: self.model().rename_step(index, old_name),
+                             lambda: self.model().rename_step(index, new_name))
         self.undo_stack.push(cmd)
 
     def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:

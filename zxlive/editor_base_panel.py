@@ -37,6 +37,7 @@ class ShapeType(Enum):
     LINE = 4
     DASHED_LINE = 5
 
+
 class DrawPanelNodeType(TypedDict):
     text: str
     icon: tuple[ShapeType, QColor]
@@ -52,6 +53,7 @@ def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
         VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])},
         VertexType.DUMMY: {"text": "Dummy", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["dummy"])},
     }
+
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
     return {
@@ -130,7 +132,7 @@ class EditorBasePanel(BasePanel):
     def paste_graph(self, graph: GraphT) -> None:
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
-        cmd = UpdateGraph(self.graph_view,new_g)
+        cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
 
@@ -141,12 +143,13 @@ class EditorBasePanel(BasePanel):
         for v in selection:
             if vertex_is_w(self.graph_scene.g.type(v)):
                 rem_vertices.append(get_w_partner(self.graph_scene.g, v))
-        if not rem_vertices and not selected_edges: return
+        if not rem_vertices and not selected_edges:
+            return
         new_g = copy.deepcopy(self.graph_scene.g)
         new_g.remove_edges(selected_edges)
         new_g.remove_vertices(list(set(rem_vertices)))
-        cmd = SetGraph(self.graph_view,new_g) if len(set(rem_vertices)) > 128 \
-            else UpdateGraph(self.graph_view,new_g)
+        cmd = SetGraph(self.graph_view, new_g) if len(set(rem_vertices)) > 128 \
+            else UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
 
     def merge_vertices(self) -> None:
@@ -176,17 +179,17 @@ class EditorBasePanel(BasePanel):
                 group = QParallelAnimationGroup()
                 for e in [next(g.edges(cmd.s, cmd.added_vert)), next(g.edges(cmd.t, cmd.added_vert))]:
                     eitem = self.graph_scene.edge_map[e][0]
-                    anim = animations.edge_thickness(eitem,3,400,
-                                                     QEasingCurve(QEasingCurve.Type.InCubic),start=7)
+                    anim = animations.edge_thickness(eitem, 3, 400,
+                                                     QEasingCurve(QEasingCurve.Type.InCubic), start=7)
                     group.addAnimation(anim)
                 self.undo_stack.set_anim(group)
                 return
 
-        cmd = AddWNode(self.graph_view, x, y) if self._curr_vty == VertexType.W_OUTPUT \
-                else AddNode(self.graph_view, x, y, self._curr_vty)
-                
+        if self._curr_vty == VertexType.W_OUTPUT:
+            self.undo_stack.push(AddWNode(self.graph_view, x, y))
+        else:
+            self.undo_stack.push(AddNode(self.graph_view, x, y, self._curr_vty))
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
-        self.undo_stack.push(cmd)
 
     def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
         """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
@@ -197,36 +200,37 @@ class EditorBasePanel(BasePanel):
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
             return None
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
-            graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
+                graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
             return None
         if (graph.type(u) == VertexType.DUMMY and graph.type(v) != VertexType.DUMMY) or \
-              (graph.type(u) != VertexType.DUMMY and graph.type(v) == VertexType.DUMMY):
+                (graph.type(u) != VertexType.DUMMY and graph.type(v) == VertexType.DUMMY):
             return None
 
         # We will try to connect all the vertices together in order
         # First we filter out the vertices that are not compatible with the edge.
-        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT] # we will be adding two edges, which is not compatible with W_INPUT
+        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
         # but first we check if there any vertices that we do want to additionally connect.
         if not self.snap_vertex_edge or not verts:
             cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
             self.undo_stack.push(cmd)
             return
-        
+
         ux, uy = graph.row(u), graph.qubit(u)
         # Line was drawn from u to v, we want to order vs with the earlier items first.
+
         def dist(vitem: VItem) -> float:
             return (graph.row(vitem.v) - ux)**2 + (graph.qubit(vitem.v) - uy)**2  # type: ignore
         verts.sort(key=dist)
         vs = [vitem.v for vitem in verts]
         pairs = [(u, vs[0])]
         for i in range(1, len(vs)):
-            pairs.append((vs[i-1],vs[i]))
-        pairs.append((vs[-1],v))
+            pairs.append((vs[i - 1], vs[i]))
+        pairs.append((vs[-1], v))
         cmd = AddEdges(self.graph_view, pairs, self._curr_ety)
         self.undo_stack.push(cmd)
         group = QParallelAnimationGroup()
         for vitem in verts:
-            anim = animations.scale(vitem,1.0,400,QEasingCurve(QEasingCurve.Type.InCubic),start=1.3)
+            anim = animations.scale(vitem, 1.0, 400, QEasingCurve(QEasingCurve.Type.InCubic), start=1.3)
             group.addAnimation(anim)
         self.undo_stack.set_anim(group)
 
@@ -348,7 +352,7 @@ class VariableViewer(QScrollArea):
         combobox.setCurrentIndex(1 if is_bool else 0)
         combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
         item = self._layout.itemAtPosition(2 + self._items, 2)
-        assert item is not None # For mypy
+        assert item is not None  # For mypy
         self._layout.removeItem(item)
         self._layout.addWidget(QLabel(f"<pre>{name}</pre>"), 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
         self._layout.addWidget(combobox, 2 + self._items, 2, Qt.AlignmentFlag.AlignCenter)
@@ -416,8 +420,7 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection
 def create_list_widget(parent: EditorBasePanel,
                        data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                        onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
-                       ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) \
-                          -> QListWidget:
+                       ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> QListWidget:
     list_widget = QListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
     list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -433,8 +436,7 @@ def create_list_widget(parent: EditorBasePanel,
 def populate_list_widget(list_widget: QListWidget,
                          data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                          onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
-                         ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) \
-                            -> None:
+                         ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> None:
     row = list_widget.currentRow()
     list_widget.clear()
     for typ, value in data.items():

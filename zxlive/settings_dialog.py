@@ -82,7 +82,7 @@ general_settings: list[SettingsData] = [
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
-    {"id": "previews-show", "label": "Show rewrite previews","type": FormInputType.Bool},
+    {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
@@ -186,8 +186,8 @@ class SettingsDialog(QDialog):
 
         self.add_settings_tab(tikz_subtab_widget, "Rule names", "Tikz rule name settings", tikz_rule_name_settings)
         self.add_settings_tab(tikz_subtab_widget, "Export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
-        self.add_settings_tab(tikz_subtab_widget, "Import",  "These are the class names that are understood when importing from tikz.", tikz_import_settings)
-        self.add_settings_tab(tikz_subtab_widget, "Layout",  "Tikz layout settings", tikz_layout_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Import", "These are the class names that are understood when importing from tikz.", tikz_import_settings)
+        self.add_settings_tab(tikz_subtab_widget, "Layout", "Tikz layout settings", tikz_layout_settings)
         # --- End TikZ nested tab structure ---
 
         self.init_okay_cancel_buttons(layout)
@@ -199,7 +199,6 @@ class SettingsDialog(QDialog):
         name = data["id"]
         assert isinstance(default := defaults[name], _type)
         return self.get_settings_value(name, _type, default)
-
 
     def add_settings_tab(self, tab_widget: QTabWidget, tab_name: str, label: str, data: list[SettingsData]) -> None:
         panel_tikz_names, vlayout = QWidget(), QVBoxLayout()
@@ -254,7 +253,7 @@ class SettingsDialog(QDialog):
 
         def browse() -> None:
             directory = QFileDialog.getExistingDirectory(
-                self,"Pick folder", options=QFileDialog.Option.ShowDirsOnly
+                self, "Pick folder", options=QFileDialog.Option.ShowDirsOnly
             )
             if directory:
                 widget_line.setText(directory)

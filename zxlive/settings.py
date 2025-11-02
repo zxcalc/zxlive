@@ -100,7 +100,7 @@ tikz_names_defaults: dict[str, str] = {
 }
 
 defaults = general_defaults | font_defaults | tikz_export_defaults | \
-           tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
+    tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
 
 
 modern_red_green: ColorScheme = {
@@ -259,6 +259,7 @@ class DisplaySettings:
     def effective_colors(self) -> dict[str, QColor]:
         # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
         from PySide6.QtGui import QColor
+
         def adjust_for_dark(color: QColor) -> QColor:
             if not isinstance(color, QColor):
                 raise ValueError(f"Expected QColor, got {type(color)}")

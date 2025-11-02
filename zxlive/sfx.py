@@ -4,6 +4,7 @@ from PySide6.QtMultimedia import QSoundEffect
 
 from .common import get_data
 
+
 class SFXEnum(Enum):
     BOOM_BOOM_BOOM = "boom-boom-boom.wav"
     IRANIAN_BUS = "iranian-bus.wav"
@@ -17,10 +18,10 @@ class SFXEnum(Enum):
 
 
 def load_sfx(e: SFXEnum) -> QSoundEffect:
-        """Load a sound effect from a file."""
-        effect = QSoundEffect()
-        fullpath = get_data("sfx/" + e.value)
-        url = QUrl.fromLocalFile(fullpath)
-        effect.setSource(url)
+    """Load a sound effect from a file."""
+    effect = QSoundEffect()
+    fullpath = get_data("sfx/" + e.value)
+    url = QUrl.fromLocalFile(fullpath)
+    effect.setSource(url)
 
-        return effect
+    return effect
