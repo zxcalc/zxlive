@@ -72,6 +72,7 @@ reportWildcardImportFromLibrary = "none"
 [tool.flake8]
 extend-ignore = [
     "E501",
+    "E721",  # False positive: triggers on .type() method calls, not just type() builtin
 ]
 
 [tool.autopep8]
