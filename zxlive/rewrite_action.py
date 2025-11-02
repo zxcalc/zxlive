@@ -323,8 +323,8 @@ class RewriteActionTreeModel(QAbstractItemModel):
             return self.createIndex(row, column, childItem)
         return QModelIndex()
 
-    def parent(
-            self, index: QModelIndex | QPersistentModelIndex = QModelIndex()  # type: ignore
+    def parent(  # type: ignore[override]
+            self, index: QModelIndex | QPersistentModelIndex = QModelIndex()
     ) -> QModelIndex:
         if not index.isValid():
             return QModelIndex()

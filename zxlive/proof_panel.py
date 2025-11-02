@@ -346,6 +346,7 @@ class ProofPanel(BasePanel):
             if not ok:
                 return False
             try:
+                phase: Union[FractionLike, complex]
                 if phase_is_complex:
                     phase = string_to_complex(text)
                 else:
