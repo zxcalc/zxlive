@@ -21,7 +21,9 @@ class UpdateChecker(QObject):
     update_available = Signal(str, str)  # version, url
     check_complete = Signal()
 
-    def __init__(self, current_version: str, settings: Optional[QSettings] = None) -> None:
+    def __init__(
+            self, current_version: str,
+            settings: Optional[QSettings] = None) -> None:
         super().__init__()
         self.current_version = current_version
         self.settings = settings or QSettings("zxlive", "zxlive")
@@ -29,12 +31,14 @@ class UpdateChecker(QObject):
 
     def should_check_for_updates(self) -> bool:
         """Check if enough time has passed since the last update check."""
-        last_check_str = get_settings_value("last-update-check", str, "", self.settings)
+        last_check_str = get_settings_value(
+            "last-update-check", str, "", self.settings)
         if not last_check_str:
             return True
         try:
             last_check = datetime.fromisoformat(last_check_str)
-            return datetime.now() - last_check > timedelta(days=CHECK_INTERVAL_DAYS)
+            return (datetime.now() - last_check >
+                    timedelta(days=CHECK_INTERVAL_DAYS))
         except Exception:
             return True
 
@@ -57,7 +61,9 @@ class UpdateChecker(QObject):
                 release_url = data.get('html_url', '')
                 if latest_version and self._is_newer_version(latest_version):
                     self.update_available.emit(latest_version, release_url)
-            set_settings_value("last-update-check", datetime.now().isoformat(), str, self.settings)
+            set_settings_value(
+                "last-update-check", datetime.now().isoformat(),
+                str, self.settings)
         except Exception:
             pass  # Silently ignore errors
         finally:
@@ -67,6 +73,7 @@ class UpdateChecker(QObject):
     def _is_newer_version(self, latest: str) -> bool:
         """Compare versions to determine if an update is available."""
         try:
-            return pkg_version.parse(latest) > pkg_version.parse(self.current_version)
+            return (pkg_version.parse(latest) >
+                    pkg_version.parse(self.current_version))
         except Exception:
             return False
