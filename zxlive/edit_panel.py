@@ -6,7 +6,7 @@ from typing import Any, Iterator
 
 from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QToolButton)
+from PySide6.QtWidgets import QInputDialog, QToolButton
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
 
@@ -17,7 +17,6 @@ from .dialogs import show_error_msg, create_circuit_dialog
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
-from .patterns_sidebar import PatternsSidebar
 from .settings_dialog import input_circuit_formats
 
 
@@ -45,25 +44,12 @@ class GraphEditPanel(EditorBasePanel):
         self._curr_ety = EdgeType.SIMPLE
 
         self.graph_view = GraphView(self.graph_scene)
-        self.patterns_sidebar = PatternsSidebar(self, get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns")), self._insert_pattern_from_sidebar)
-        self.splitter.addWidget(self.patterns_sidebar)
         self.splitter.addWidget(self.graph_view)
         self.graph_view.set_graph(graph)
         self.graph_view.merge_triggered.connect(self.merge_vertices)
 
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
-
-    def _insert_pattern_from_sidebar(self, pattern_path: str) -> None:
-        # Insert the pattern into the current graph
-        try:
-            from .dialogs import import_diagram_from_file
-            out = import_diagram_from_file(pattern_path, parent=self)
-            if out is not None and hasattr(out, 'g'):
-                self.paste_graph(out.g)
-        except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Pattern Insert Error", str(e))
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
@@ -127,7 +113,6 @@ class GraphEditPanel(EditorBasePanel):
             show_error_msg("No selection", "Please select part of the graph to add as a pattern.", parent=self)
             return
         subgraph = self.graph_scene.g.subgraph_from_vertices([vi.v for vi in selected])
-        from PySide6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getText(self, "Pattern Name", "Enter a name for the pattern:")
         if not ok or not name:
             return
@@ -136,3 +121,4 @@ class GraphEditPanel(EditorBasePanel):
         path: str = os.path.join(patterns_folder, f"{name}.zxg")
         with open(path, "w") as f:
             f.write(subgraph.to_json())
+        self.refresh_patterns()

@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import copy
+import os
 from enum import Enum
-from typing import Callable, Iterator, TypedDict
+from typing import Callable, Iterator, Optional, TypedDict
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
                            QPixmap)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
-                               QListWidgetItem, QScrollArea, QSizePolicy,
-                               QSpacerItem, QSplitter, QToolButton, QWidget)
+                               QListWidgetItem, QMessageBox, QScrollArea, QSizePolicy,
+                               QSpacerItem, QSplitter, QToolButton, QVBoxLayout, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w, phase_to_s, get_z_box_label
 from pyzx.graph.jsonparser import string_to_phase
@@ -20,8 +21,8 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data, pos_from_view
-from .dialogs import show_error_msg, update_dummy_vertex_text
+from .common import VT, GraphT, ToolType, get_data, pos_from_view, get_settings_value
+from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene
@@ -73,11 +74,13 @@ class EditorBasePanel(BasePanel):
     _curr_ety: EdgeType
     _curr_vty: VertexType
     snap_vertex_edge = True
+    patterns_folder: Optional[str] = None
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__(*actions)
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
+        self.patterns_folder = get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns"))
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from toolbar_select_node_edge(self)
@@ -86,16 +89,45 @@ class EditorBasePanel(BasePanel):
     def create_side_bar(self) -> None:
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
+
+        vertex_container, vertex_layout = self._create_titled_widget("Vertices")
         self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked, self._vty_double_clicked)
+        vertex_layout.addWidget(self.vertex_list)
+        self.sidebar.addWidget(vertex_container)
+
+        edge_container, edge_layout = self._create_titled_widget("Edges")
         self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked, self._ety_double_clicked)
+        edge_layout.addWidget(self.edge_list)
+        self.sidebar.addWidget(edge_container)
+
+        if self.patterns_folder is not None:
+            patterns_container, patterns_layout = self._create_titled_widget("Patterns")
+            self.patterns_list = PatternsListWidget(self, self.patterns_folder)
+            patterns_layout.addWidget(self.patterns_list)
+            self.sidebar.addWidget(patterns_container)
+
         self.variable_viewer = VariableViewer(self)
-        self.sidebar.addWidget(self.vertex_list)
-        self.sidebar.addWidget(self.edge_list)
         self.sidebar.addWidget(self.variable_viewer)
+
+    def _create_titled_widget(self, title: str) -> tuple[QWidget, QVBoxLayout]:
+        """Create a container widget with a title label and return both the widget and layout."""
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-weight: bold; padding: 4px;")
+        layout.addWidget(title_label)
+        return container, layout
 
     def update_side_bar(self) -> None:
         populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked, self._vty_double_clicked)
         populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked)
+
+    def refresh_patterns(self) -> None:
+        """Refresh the patterns list if it exists."""
+        if hasattr(self, 'patterns_list'):
+            self.patterns_list.refresh_patterns()
 
     def update_colors(self) -> None:
         super().update_colors()
@@ -135,6 +167,15 @@ class EditorBasePanel(BasePanel):
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
+
+    def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
+        """Insert a pattern into the current graph view."""
+        try:
+            out = import_diagram_from_file(pattern_path, parent=self)
+            if out is not None and hasattr(out, 'g'):
+                self.paste_graph(out.g)
+        except Exception as e:
+            QMessageBox.warning(self, "Pattern Insert Error", str(e))
 
     def delete_selection(self) -> None:
         selection = list(self.graph_scene.selected_vertices)
@@ -379,6 +420,40 @@ class VariableViewer(QScrollArea):
             self.parent_panel.graph_scene_right.g.var_registry.set_type(name, new_type)
         else:
             self.parent_panel.graph_scene.g.var_registry.set_type(name, new_type)
+
+
+class PatternsListWidget(QListWidget):
+    """Widget for displaying and selecting pattern files."""
+
+    def __init__(self, parent: EditorBasePanel, patterns_folder: str) -> None:
+        super().__init__(parent)
+        self.parent_panel = parent
+        self.patterns_folder = patterns_folder
+
+        self.setResizeMode(QListView.ResizeMode.Adjust)
+        self.setViewMode(QListView.ViewMode.ListMode)
+        self.setMovement(QListView.Movement.Static)
+        self.setWordWrap(True)
+
+        self.itemDoubleClicked.connect(self._pattern_selected)
+        self.refresh_patterns()
+
+    def refresh_patterns(self) -> None:
+        """Refresh the list of patterns from the patterns folder."""
+        self.clear()
+        if not os.path.isdir(self.patterns_folder):
+            return
+        for fname in os.listdir(self.patterns_folder):
+            if fname.endswith(".zxg"):
+                # remove the extension for display
+                fname = fname[:-4]
+                item = QListWidgetItem(fname)
+                self.addItem(item)
+
+    def _pattern_selected(self, item: QListWidgetItem) -> None:
+        """Handle pattern selection."""
+        pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
+        self.parent_panel.insert_pattern_from_sidebar(pattern_path)
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
