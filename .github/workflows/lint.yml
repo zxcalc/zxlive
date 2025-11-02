@@ -29,7 +29,6 @@ jobs:
       run:
         mypy zxlive
     - name: Flake8
-      continue-on-error: true
       run:
         pflake8 zxlive
     - name: Pylint

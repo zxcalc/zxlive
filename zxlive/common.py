@@ -36,19 +36,25 @@ def get_settings_value(
         arg: str, _type: Type[T], default: T | None = None,
         settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
-    val = _settings.value(arg, default)
-    if _type == bool:
-        val = str(val) == "True" or str(val) == "true"
-    if _type == int:
-        val = int(str(val))
-    if _type == float:
-        val = float(str(val))
-    if not isinstance(val, _type):
+    try:
+        val = _settings.value(arg, default)
+        if _type == bool:
+            val = str(val) == "True" or str(val) == "true"
+        if _type == int:
+            val = int(str(val))
+        if _type == float:
+            val = float(str(val))
+        if not isinstance(val, _type):
+            if default is not None:
+                return default
+            raise ValueError(f"Unexpected type for {arg} ({val}): expected {_type}, got {type(val)}")
+    except Exception as e:
         if default is not None:
             return default
-        raise ValueError(
-            f"Unexpected type for {arg} ({val}): expected {_type}, "
-            f"got {type(val)}")
+        from .settings import defaults
+        if arg in defaults:
+            return defaults[arg]  # type: ignore
+        raise e
     return val
 
 
