@@ -80,8 +80,7 @@ class MainWindow(QMainWindow):
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
         tab_widget.setMovable(True)
-        tab_position = self.settings.value(
-            "tab-bar-location", QTabWidget.TabPosition.North)
+        tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
         self.tab_widget = tab_widget
@@ -89,9 +88,8 @@ class MainWindow(QMainWindow):
         # Apply custom tab styling
         self.update_colors()
 
-        # Currently the copied part is stored internally, and is not
-        # made available to the clipboard. We could do this by using
-        # pyperclip.
+        # Currently the copied part is stored internally, and is not made
+        # available to the clipboard. We could do this by using pyperclip.
         self.copied_graph: Optional[GraphT] = None
 
         menu = self.menuBar()
@@ -236,8 +234,7 @@ class MainWindow(QMainWindow):
 
         user_guide = self._new_action(
             "&User Guide",
-            lambda: QDesktopServices.openUrl(
-                QUrl("https://zxlive.readthedocs.io/")),
+            lambda: QDesktopServices.openUrl(QUrl("https://zxlive.readthedocs.io/")),
             None, "Open ZXLive user guide")
         check_for_updates = self._new_action(
             "Check for &Updates...", self.check_for_updates, None,
@@ -270,19 +267,14 @@ class MainWindow(QMainWindow):
         self.zoom_out_action.setEnabled(has_active_tab)
         self.fit_view_action.setEnabled(has_active_tab)
 
-        # Export to tikz and gif are enabled only if there is a proof
-        # in the active tab.
-        self.export_tikz_proof.setEnabled(
-            has_active_tab and isinstance(self.active_panel, ProofPanel))
-        self.export_gif_proof.setEnabled(
-            has_active_tab and isinstance(self.active_panel, ProofPanel))
+        # Export to tikz and gif are enabled only if there is a proof in the active tab.
+        self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
-        self.paste_action.setEnabled(
-            has_active_tab and self.copied_graph is not None)
+        self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
 
-        # Undo and redo are always disabled whether on a new tab or
-        # closing the last tab.
+        # Undo and redo are always disabled whether on a new tab or closing the last tab.
         self.undo_action.setEnabled(False)
         self.redo_action.setEnabled(False)
 
@@ -294,8 +286,8 @@ class MainWindow(QMainWindow):
             self, name: str, trigger: Callable,
             shortcut: QKeySequence | QKeySequence.StandardKey | None,
             tooltip: str, icon_file: Optional[str] = None,
-            alt_shortcut: Optional[QKeySequence | QKeySequence.StandardKey]
-            = None) -> QAction:
+            alt_shortcut: Optional[QKeySequence | QKeySequence.StandardKey] = None
+            ) -> QAction:
         assert not alt_shortcut or shortcut
         action = QAction(name, self)
         if icon_file:
@@ -308,8 +300,7 @@ class MainWindow(QMainWindow):
                 if not action.shortcuts():
                     action.setShortcut(alt_shortcut)
                 elif alt_shortcut not in action.shortcuts():
-                    shortcuts = [shortcut, alt_shortcut]
-                    action.setShortcuts(shortcuts)  # type: ignore
+                    action.setShortcuts([shortcut, alt_shortcut])  # type: ignore
         return action
 
     @property
@@ -326,8 +317,7 @@ class MainWindow(QMainWindow):
         new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
-        # We close all the tabs and ask the user if they want to
-        # save progress
+        # We close all the tabs and ask the user if they want to save progress
         while self.active_panel is not None:
             success = self.handle_close_action()
             if not success:
@@ -390,8 +380,8 @@ class MainWindow(QMainWindow):
             self._open_file_from_output(out)
 
     def _open_file_from_output(
-            self, out: ImportGraphOutput | ImportProofOutput
-            | ImportRuleOutput) -> None:
+            self, out: ImportGraphOutput | ImportProofOutput | ImportRuleOutput
+            ) -> None:
         name = QFileInfo(out.file_path).baseName()
         if isinstance(out, ImportGraphOutput):
             self.new_graph(out.g, name)
@@ -422,16 +412,14 @@ class MainWindow(QMainWindow):
         assert isinstance(widget, BasePanel)
         if not widget.undo_stack.isClean():
             name = self.tab_widget.tabText(i).replace("*", "")
+            button = QMessageBox.StandardButton
             answer = QMessageBox.question(
                 self, "Save Changes",
-                f"Do you wish to save your changes to {name} before "
-                f"closing?",
-                QMessageBox.StandardButton.Yes
-                | QMessageBox.StandardButton.No
-                | QMessageBox.StandardButton.Cancel)  # type: ignore
-            if answer == QMessageBox.StandardButton.Cancel:
+                f"Do you wish to save your changes to {name} before closing?",
+                button.Yes | button.No | button.Cancel)  # type: ignore
+            if answer == button.Cancel:
                 return False
-            if answer == QMessageBox.StandardButton.Yes:
+            if answer == button.Yes:
                 self.tab_widget.setCurrentIndex(i)
                 val = self.handle_save_file_action()
                 if not val:
@@ -451,8 +439,8 @@ class MainWindow(QMainWindow):
         if self.active_panel.file_type == FileFormat.QASM:
             show_error_msg(
                 "Can't save to circuit file",
-                "You imported this file from a circuit description. You "
-                "can currently only save it in a graph format.",
+                "You imported this file from a circuit description. "
+                "You can currently only save it in a graph format.",
                 parent=self)
             return self.handle_save_as_action()
 
@@ -464,18 +452,15 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             data = self.active_panel.get_rule().to_json()
-        elif self.active_panel.file_type in (
-                FileFormat.QGraph, FileFormat.Json):
+        elif self.active_panel.file_type in (FileFormat.QGraph, FileFormat.Json):
             data = self.active_panel.graph.to_json()
         elif self.active_panel.file_type == FileFormat.TikZ:
             data = self.active_panel.graph.to_tikz()
         else:
-            raise TypeError("Unknown file format",
-                            self.active_panel.file_type)
+            raise TypeError("Unknown file format", self.active_panel.file_type)
 
         file = QFile(self.active_panel.file_path)
-        if not file.open(QIODevice.OpenModeFlag.WriteOnly
-                         | QIODevice.OpenModeFlag.Text):
+        if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
             show_error_msg("Could not write to file", parent=self)
             return False
         out = QTextStream(file)
@@ -525,8 +510,7 @@ class MainWindow(QMainWindow):
         if path is None:
             show_error_msg("Export failed", "Invalid path", parent=self)
             return False
-        graphs: list[BaseGraph] = list(
-            self.active_panel.proof_model.graphs())
+        graphs: list[BaseGraph] = list(self.active_panel.proof_model.graphs())
         graphs_to_gif(graphs, path, 1000)  # 1000ms per frame
         return True
 
@@ -583,8 +567,7 @@ class MainWindow(QMainWindow):
                 get_settings_value("auto-save", bool, False)):
             self.handle_save_file_action()
 
-    def new_graph(self, graph: Optional[GraphT] = None,
-                  name: Optional[str] = None) -> None:
+    def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
         _graph = graph or new_graph()
         panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
@@ -742,13 +725,11 @@ class MainWindow(QMainWindow):
 
     @property
     def sfx_on(self) -> bool:
-        return get_settings_value(
-            "sound-effects", bool, False, self.settings)
+        return get_settings_value("sound-effects", bool, False, self.settings)
 
     @sfx_on.setter
     def sfx_on(self, value: bool) -> None:
-        set_settings_value(
-            "sound-effects", value, bool, self.settings)
+        set_settings_value("sound-effects", value, bool, self.settings)
 
     def play_sound(self, s: SFXEnum) -> None:
         if self.sfx_on:
@@ -792,11 +773,9 @@ class MainWindow(QMainWindow):
         checking_msg.show()
         QApplication.processEvents()
 
-        # Temporarily disconnect app-level handler to prevent
-        # double dialogs. We assume it's connected (it should be from
-        # app startup)
-        zx_app.update_checker.update_available.disconnect(
-            zx_app.on_update_available)
+        # Temporarily disconnect app-level handler to prevent double dialogs.
+        # We assume it's connected (it should be from app startup)
+        zx_app.update_checker.update_available.disconnect(zx_app.on_update_available)
         update_found = False
 
         def on_update_available(latest_version: str, url: str) -> None:
@@ -808,18 +787,12 @@ class MainWindow(QMainWindow):
 
         def on_check_complete() -> None:
             checking_msg.accept()
-            # Disconnect our temporary connections and reconnect the
-            # app-level one
-            zx_app.update_checker.update_available.disconnect(
-                on_update_available)
-            zx_app.update_checker.check_complete.disconnect(
-                on_check_complete)
-            zx_app.update_checker.update_available.connect(
-                zx_app.on_update_available)
+            # Disconnect our temporary connections and reconnect the app-level one
+            zx_app.update_checker.update_available.disconnect(on_update_available)
+            zx_app.update_checker.check_complete.disconnect(on_check_complete)
+            zx_app.update_checker.update_available.connect(zx_app.on_update_available)
             if not update_found:
-                QMessageBox.information(
-                    self, "No Updates",
-                    "You are using the latest version of ZXLive!")
+                QMessageBox.information(self, "No Updates", "You are using the latest version of ZXLive!")
 
         zx_app.update_checker.update_available.connect(on_update_available)
         zx_app.update_checker.check_complete.connect(on_check_complete)
