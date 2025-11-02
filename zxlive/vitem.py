@@ -20,7 +20,7 @@ import math
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
-from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QFont, QPainterPath
+from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
 from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
     QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 

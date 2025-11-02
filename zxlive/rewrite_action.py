@@ -144,7 +144,7 @@ class RewriteAction:
 
     @property
     def tooltip(self) -> str:
-        if self.picture_path is None or display_setting.previews_show == False:
+        if self.picture_path is None or not display_setting.previews_show:
             return self.tooltip_str
         if self.picture_path == 'custom':
             # We will create a custom tooltip picture representing the custom rewrite

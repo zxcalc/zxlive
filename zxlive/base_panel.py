@@ -8,9 +8,8 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
                                QToolBar, QVBoxLayout, QWidget)
 
-from .eitem import EItem
 from .animations import AnimatedUndoStack
-from .commands import ChangeEdgeCurve, SetGraph
+from .commands import SetGraph
 from .common import GraphT, new_graph
 from .dialogs import FileFormat
 from .graphscene import GraphScene

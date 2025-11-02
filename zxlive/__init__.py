@@ -14,5 +14,5 @@
 # limitations under the License.
 
 
-from . import app
-from .graphview import GraphView
+from . import app  # noqa: F401
+from .graphview import GraphView  # noqa: F401

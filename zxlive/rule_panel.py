@@ -6,11 +6,10 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
 from pyzx import EdgeType, VertexType
-from pyzx.symbolic import Poly
 
 
 from .base_panel import ToolbarSection
-from .common import GraphT, ToolType, VT, ET
+from .common import GraphT, ToolType, VT
 from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene

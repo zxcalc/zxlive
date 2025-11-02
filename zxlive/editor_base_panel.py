@@ -4,9 +4,9 @@ import copy
 from enum import Enum
 from typing import Callable, Iterator, TypedDict
 
-from PySide6.QtCore import QPoint, QPointF, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
+from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
-                           QPixmap, QTransform)
+                           QPixmap)
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
                                QListWidgetItem, QScrollArea, QSizePolicy,
@@ -22,8 +22,8 @@ from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, 
                        UpdateGraph)
 from .common import VT, GraphT, ToolType, get_data, pos_from_view
 from .dialogs import show_error_msg, update_dummy_vertex_text
-from .eitem import EItem, HAD_EDGE_BLUE, EItemAnimation
-from .vitem import VItem, BLACK, VItemAnimation
+from .eitem import EItem, HAD_EDGE_BLUE
+from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene
 from .settings import display_setting
 

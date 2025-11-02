@@ -8,7 +8,6 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (QToolButton)
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
-from pyzx.symbolic import Poly
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
