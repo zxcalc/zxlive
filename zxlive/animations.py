@@ -13,7 +13,8 @@ from .custom_rule import CustomRule
 from .rewrite_data import operations
 from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
 from .graphscene import GraphScene
-from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
+from .vitem import (VItem, VItemAnimation, VITEM_UNSELECTED_Z,
+                    VITEM_SELECTED_Z, get_w_partner_vitem)
 from .eitem import EItem, EItemAnimation
 
 if TYPE_CHECKING:
@@ -31,7 +32,8 @@ class AnimatedUndoStack(QUndoStack):
     # Animation that is currently playing
     running_anim: Optional[QAbstractAnimation] = None
 
-    def push(self, cmd: QUndoCommand, anim_before: Optional[QAbstractAnimation] = None,
+    def push(self, cmd: QUndoCommand,
+             anim_before: Optional[QAbstractAnimation] = None,
              anim_after: Optional[QAbstractAnimation] = None) -> None:
         # Stop previously running animation
         if self.running_anim:
@@ -44,7 +46,8 @@ class AnimatedUndoStack(QUndoStack):
 
         if anim_before:
             self.queued_cmd = cmd
-            anim_before.finished.connect(lambda: self._push_now(cmd, anim_after))
+            anim_before.finished.connect(
+                lambda: self._push_now(cmd, anim_after))
             anim_before.start()
             self.running_anim = anim_before
         else:
@@ -62,7 +65,8 @@ class AnimatedUndoStack(QUndoStack):
 
         super().undo()
 
-    def _push_now(self, cmd: QUndoCommand, anim_after: Optional[QAbstractAnimation] = None) -> None:
+    def _push_now(self, cmd: QUndoCommand,
+                  anim_after: Optional[QAbstractAnimation] = None) -> None:
         self.queued_cmd = None
         super().push(cmd)
 
@@ -77,19 +81,20 @@ class AnimatedUndoStack(QUndoStack):
         self.running_anim.start()
 
 
-
-def scale(it: VItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> VItemAnimation:
+def scale(it: VItem, target: float, duration: int, ease: QEasingCurve,
+          start: Optional[float] = None) -> VItemAnimation:
     anim = VItemAnimation(it, VItem.Properties.Scale)
     anim.setDuration(duration)
     anim.setStartValue(start or it.scale())
-    # Important: end value must be a float, otherwise the animation doesn't work because
-    # start and end have different types
+    # Important: end value must be a float, otherwise the animation
+    # doesn't work because start and end have different types
     anim.setEndValue(float(target))
     anim.setEasingCurve(ease)
     return anim
 
 
-def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve, start: Optional[QPointF] = None) -> VItemAnimation:
+def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve,
+         start: Optional[QPointF] = None) -> VItemAnimation:
     anim = VItemAnimation(it, VItem.Properties.Position, refresh=True)
     anim.setDuration(duration)
     anim.setStartValue(start or it.pos())
@@ -97,7 +102,10 @@ def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve, start: O
     anim.setEasingCurve(ease)
     return anim
 
-def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
+
+def edge_thickness(it: EItem, target: float, duration: int,
+                   ease: QEasingCurve,
+                   start: Optional[float] = None) -> EItemAnimation:
     anim = EItemAnimation(it, EItem.Properties.Thickness, refresh=True)
     anim.setDuration(duration)
     anim.setStartValue(start or it.thickness)
@@ -105,8 +113,11 @@ def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, 
     anim.setEasingCurve(ease)
     return anim
 
-def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callable[[VT], Optional[VT]],
-                to_end: Callable[[VT], Optional[VT]], duration: int, ease: QEasingCurve) -> QAbstractAnimation:
+
+def morph_graph(start: GraphT, end: GraphT, scene: GraphScene,
+                to_start: Callable[[VT], Optional[VT]],
+                to_end: Callable[[VT], Optional[VT]], duration: int,
+                ease: QEasingCurve) -> QAbstractAnimation:
     """Morphs a graph into another graph by moving the vertices."""
     moves = set()
     for v in itertools.chain(iter(start.vertices()), iter(end.vertices())):
@@ -120,10 +131,14 @@ def morph_graph(start: GraphT, end: GraphT, scene: GraphScene, to_start: Callabl
             moves.add((v, v, v))
     group = QParallelAnimationGroup()
     for v, start_pos, end_pos in moves:
-        anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
+        anim = VItemAnimation(
+            v, VItem.Properties.Position, scene, refresh=True)
         anim.setDuration(duration)
-        anim.setStartValue(QPointF(*pos_to_view(start.row(start_pos), start.qubit(start_pos))))
-        anim.setEndValue(QPointF(*pos_to_view(end.row(end_pos), end.qubit(end_pos))))
+        anim.setStartValue(
+            QPointF(*pos_to_view(start.row(start_pos),
+                                 start.qubit(start_pos))))
+        anim.setEndValue(
+            QPointF(*pos_to_view(end.row(end_pos), end.qubit(end_pos))))
         anim.setEasingCurve(ease)
         group.addAnimation(anim)
     return group
@@ -144,7 +159,8 @@ def _morph_graph_to_or_from_center(to_center: bool,
             start_pos, end_pos = (graph.row(v), graph.qubit(v)), center
         else:
             start_pos, end_pos = center, (graph.row(v), graph.qubit(v))
-        anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
+        anim = VItemAnimation(
+            v, VItem.Properties.Position, scene, refresh=True)
         anim.setDuration(duration)
         anim.setStartValue(QPointF(*pos_to_view(*start_pos)))
         anim.setEndValue(QPointF(*pos_to_view(*end_pos)))
@@ -152,21 +168,27 @@ def _morph_graph_to_or_from_center(to_center: bool,
         group.addAnimation(anim)
     return group
 
-def morph_graph_to_center(graph: GraphT,
-                          vertex_filter: Callable[[VT], bool],
-                          scene: GraphScene,
-                          center: tuple[int, int],
-                          duration: int,
-                          ease: QEasingCurve) -> QAbstractAnimation:
-    return _morph_graph_to_or_from_center(True, graph, vertex_filter, scene, center, duration, ease)
 
-def morph_graph_from_center(graph: GraphT,
-                            vertex_filter: Callable[[VT], bool],
-                            scene: GraphScene,
-                            center: tuple[int, int],
-                            duration: int,
-                            ease: QEasingCurve) -> QAbstractAnimation:
-    return _morph_graph_to_or_from_center(False, graph, vertex_filter, scene, center, duration, ease)
+def morph_graph_to_center(
+        graph: GraphT,
+        vertex_filter: Callable[[VT], bool],
+        scene: GraphScene,
+        center: tuple[int, int],
+        duration: int,
+        ease: QEasingCurve) -> QAbstractAnimation:
+    return _morph_graph_to_or_from_center(
+        True, graph, vertex_filter, scene, center, duration, ease)
+
+
+def morph_graph_from_center(
+        graph: GraphT,
+        vertex_filter: Callable[[VT], bool],
+        scene: GraphScene,
+        center: tuple[int, int],
+        duration: int,
+        ease: QEasingCurve) -> QAbstractAnimation:
+    return _morph_graph_to_or_from_center(
+        False, graph, vertex_filter, scene, center, duration, ease)
 
 
 def shake(it: VItem, amount: float, duration: int) -> None:
@@ -193,31 +215,47 @@ def shake(it: VItem, amount: float, duration: int) -> None:
 
 
 def anticipate_fuse(it: VItem) -> None:
-    """Animation that is played when a fuseable spider is dragged onto a vertex."""
+    """Animation that is played when a fuseable spider is dragged
+    onto a vertex."""
     if vertex_is_w(it.ty):
         assert (w_partner := get_w_partner_vitem(it)) is not None
-        scale(w_partner, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
-    scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
+        scale(w_partner, target=1.25, duration=100,
+              ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
+    scale(it, target=1.25, duration=100,
+          ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
 
 
-def fuse(dragged: VItem, target: VItem, meet_halfway: bool = False) -> QAbstractAnimation:
-    """Animation that is played when a fuseable spider is dropped onto a vertex."""
+def fuse(dragged: VItem,
+         target: VItem,
+         meet_halfway: bool = False) -> QAbstractAnimation:
+    """Animation that is played when a fuseable spider is dropped
+    onto a vertex."""
     group = QParallelAnimationGroup()
     if not meet_halfway:
-        group.addAnimation(move(dragged, target=target.pos(), duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+        group.addAnimation(
+            move(dragged, target=target.pos(), duration=100,
+                 ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
     else:
         sum_pos = dragged.pos() + target.pos()
         halfway_pos = QPointF(sum_pos.x() / 2, sum_pos.y() / 2)
-        group.addAnimation(move(dragged, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
-        group.addAnimation(move(target, target=halfway_pos, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
-    group.addAnimation(scale(target, target=1, duration=100, ease=QEasingCurve(QEasingCurve.Type.InBack)))
+        group.addAnimation(
+            move(dragged, target=halfway_pos, duration=100,
+                 ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+        group.addAnimation(
+            move(target, target=halfway_pos, duration=100,
+                 ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+    group.addAnimation(
+        scale(target, target=1, duration=100,
+              ease=QEasingCurve(QEasingCurve.Type.InBack)))
     if vertex_is_w(dragged.ty):
         assert (dragged_w_partner := get_w_partner_vitem(dragged)) is not None
         assert (target_w_partner := get_w_partner_vitem(target)) is not None
-        group.addAnimation(move(dragged_w_partner, target=target.pos(), duration=100,
-                                ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
-        group.addAnimation(scale(target_w_partner, target=1, duration=100,
-                                 ease=QEasingCurve(QEasingCurve.Type.InBack)))
+        group.addAnimation(
+            move(dragged_w_partner, target=target.pos(), duration=100,
+                 ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+        group.addAnimation(
+            scale(target_w_partner, target=1, duration=100,
+                  ease=QEasingCurve(QEasingCurve.Type.InBack)))
 
     def set_z(state: QAbstractAnimation.State) -> None:
         if state == QAbstractAnimation.State.Running:
@@ -230,28 +268,34 @@ def fuse(dragged: VItem, target: VItem, meet_halfway: bool = False) -> QAbstract
 
 
 def anticipate_strong_comp(it: VItem) -> None:
-    """Animation that is played when a bialgebra-capable spider is dragged onto a
-    vertex."""
-    scale(it, target=1.25, duration=100, ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
+    """Animation that is played when a bialgebra-capable spider is
+    dragged onto a vertex."""
+    scale(it, target=1.25, duration=100,
+          ease=QEasingCurve(QEasingCurve.Type.OutInQuad)).start()
     # shake(it, amount=1.0, duration=70)  # TODO: This could be improved...
 
 
-def strong_comp(before: GraphT, after: GraphT, target: VT, scene: GraphScene) -> QAbstractAnimation:
-    """Animation that is played when a bialgebra-capable spider is dropped onto a
-    vertex."""
-    return morph_graph(before, after, scene, to_start=lambda _: target,
-                       to_end=lambda _: None, duration=150, ease=QEasingCurve(QEasingCurve.Type.OutQuad))
+def strong_comp(before: GraphT, after: GraphT, target: VT,
+                scene: GraphScene) -> QAbstractAnimation:
+    """Animation that is played when a bialgebra-capable spider is
+    dropped onto a vertex."""
+    return morph_graph(
+        before, after, scene, to_start=lambda _: target,
+        to_end=lambda _: None, duration=150,
+        ease=QEasingCurve(QEasingCurve.Type.OutQuad))
 
 
 def back_to_default(it: VItem) -> None:
-    """Stops all running animations on an VItem and animates all properties back to
-    their default values."""
+    """Stops all running animations on an VItem and animates all
+    properties back to their default values."""
     for anim in it.active_animations.copy():
         anim.stop()
-    scale(it, target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
+    scale(it, target=1, duration=250,
+          ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
     if vertex_is_w(it.ty):
         assert (w_partner := get_w_partner_vitem(it)) is not None
-        scale(w_partner, target=1, duration=250, ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
+        scale(w_partner, target=1, duration=250,
+              ease=QEasingCurve(QEasingCurve.Type.InOutQuad)).start()
 
 
 def remove_id(it: VItem) -> VItemAnimation:
@@ -264,6 +308,7 @@ def remove_id(it: VItem) -> VItemAnimation:
     anim.setEasingCurve(QEasingCurve.Type.InBack)
     return anim
 
+
 def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     """Animation that is played when an identity spider is added using
     the magic wand."""
@@ -274,21 +319,29 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     anim.setEasingCurve(QEasingCurve.Type.OutElastic)
     return anim
 
-def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
+
+def unfuse(before: GraphT, after: GraphT, src: VT,
+           scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused."""
-    return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
-                       duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
+    return morph_graph(
+        before, after, scene, to_start=lambda _: src,
+        to_end=lambda _: None, duration=700,
+        ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 
 
-def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:
+def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT,
+                   matches: list, rem_verts: list[VT]) -> tuple:
     anim_before = None
     anim_after = None
-    if self.name == operations['spider']['text'] or self.name == operations['fuse_w']['text']:
+    if (self.name == operations['spider']['text'] or
+            self.name == operations['fuse_w']['text']):
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
             if v1 in rem_verts:
                 v1, v2 = v2, v1
-            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v2], panel.graph_scene.vertex_map[v1]))
+            anim_before.addAnimation(
+                fuse(panel.graph_scene.vertex_map[v2],
+                     panel.graph_scene.vertex_map[v1]))
     elif self.name == operations['to_z']['text']:
         print('To do: animate ' + self.name)
     elif self.name == operations['to_x']['text']:
@@ -296,36 +349,46 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
     elif self.name == operations['rem_id']['text']:
         anim_before = QParallelAnimationGroup()
         for v in rem_verts:
-            anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
-    elif self.name == operations['copy']['text'] or self.name == operations['pauli']['text']:
+            anim_before.addAnimation(
+                remove_id(panel.graph_scene.vertex_map[v]))
+    elif (self.name == operations['copy']['text'] or
+          self.name == operations['pauli']['text']):
         anim_before = QParallelAnimationGroup()
         for m in matches:
-            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
-                                                panel.graph_scene.vertex_map[m[1]]))
+            anim_before.addAnimation(
+                fuse(panel.graph_scene.vertex_map[m[0]],
+                     panel.graph_scene.vertex_map[m[1]]))
         anim_after = QParallelAnimationGroup()
         for m in matches:
-            anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
+            anim_after.addAnimation(
+                strong_comp(panel.graph, g, m[1], panel.graph_scene))
     elif self.name == operations['bialgebra']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
-            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v1],
-                                                panel.graph_scene.vertex_map[v2], meet_halfway=True))
+            anim_before.addAnimation(
+                fuse(panel.graph_scene.vertex_map[v1],
+                     panel.graph_scene.vertex_map[v2],
+                     meet_halfway=True))
         anim_after = QParallelAnimationGroup()
         for v1, v2 in matches:
             v2_row, v2_qubit = panel.graph.row(v2), panel.graph.qubit(v2)
             panel.graph.set_row(v2, (panel.graph.row(v1) + v2_row) / 2)
             panel.graph.set_qubit(v2, (panel.graph.qubit(v1) + v2_qubit) / 2)
-            anim_after.addAnimation(strong_comp(panel.graph, g, v2, panel.graph_scene))
+            anim_after.addAnimation(
+                strong_comp(panel.graph, g, v2, panel.graph_scene))
             panel.graph.set_row(v2, v2_row)
             panel.graph.set_qubit(v2, v2_qubit)
-    elif isinstance(self.rule, CustomRule) and self.rule.last_rewrite_center is not None:
+    elif (isinstance(self.rule, CustomRule) and
+          self.rule.last_rewrite_center is not None):
         center = self.rule.last_rewrite_center
-        duration = ANIMATION_DURATION / 2
-        anim_before = morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
-                                                  panel.graph_scene, center, duration,
-                                                  QEasingCurve(QEasingCurve.Type.InQuad))
-        anim_after = morph_graph_from_center(g, lambda v: v not in panel.graph.graph,
-                                                   panel.graph_scene, center, duration,
-                                                   QEasingCurve(QEasingCurve.Type.OutQuad))
+        duration = int(ANIMATION_DURATION / 2)
+        anim_before = morph_graph_to_center(
+            panel.graph, lambda v: v not in g.graph,
+            panel.graph_scene, center, duration,
+            QEasingCurve(QEasingCurve.Type.InQuad))
+        anim_after = morph_graph_from_center(
+            g, lambda v: v not in panel.graph.graph,
+            panel.graph_scene, center, duration,
+            QEasingCurve(QEasingCurve.Type.OutQuad))
 
     return anim_before, anim_after

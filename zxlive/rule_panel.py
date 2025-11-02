@@ -6,17 +6,17 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
 from pyzx import EdgeType, VertexType
-from pyzx.symbolic import Poly
 
 
 from .base_panel import ToolbarSection
-from .common import GraphT, ToolType, VT, ET
+from .common import GraphT, ToolType, VT
 from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView
 from .eitem import EItem
 from .vitem import VItem
+
 
 class RulePanel(EditorBasePanel):
     """Panel for the Rule editor of ZXLive."""
@@ -28,8 +28,9 @@ class RulePanel(EditorBasePanel):
     _curr_ety: EdgeType
     _curr_vty: VertexType
 
-
-    def __init__(self, graph1: GraphT, graph2: GraphT, name: str, description: str, *actions: QAction) -> None:
+    def __init__(
+            self, graph1: GraphT, graph2: GraphT, name: str,
+            description: str, *actions: QAction) -> None:
         self.name = name
         self.description = description
         super().__init__(*actions)
@@ -47,16 +48,20 @@ class RulePanel(EditorBasePanel):
         self.splitter.addWidget(self.graph_view_right)
 
         self.graph_scene_left.vertices_moved.connect(self.vert_moved)
-        self.graph_scene_left.vertex_dropped_onto.connect(self._vertex_dropped_onto)
-        self.graph_scene_left.vertex_double_clicked.connect(self.vert_double_clicked)
+        self.graph_scene_left.vertex_dropped_onto.connect(
+            self._vertex_dropped_onto)
+        self.graph_scene_left.vertex_double_clicked.connect(
+            self.vert_double_clicked)
         self.graph_scene_left.vertex_added.connect(self.add_vert)
         self.graph_scene_left.edge_added.connect(self.add_edge)
         self.graph_scene_left.edge_dragged.connect(self.change_edge_curves)
         self.graph_view_left.merge_triggered.connect(self.merge_vertices)
 
         self.graph_scene_right.vertices_moved.connect(self.vert_moved)
-        self.graph_scene_right.vertex_dropped_onto.connect(self._vertex_dropped_onto)
-        self.graph_scene_right.vertex_double_clicked.connect(self.vert_double_clicked)
+        self.graph_scene_right.vertex_dropped_onto.connect(
+            self._vertex_dropped_onto)
+        self.graph_scene_right.vertex_double_clicked.connect(
+            self.vert_double_clicked)
         self.graph_scene_right.vertex_added.connect(self.add_vert)
         self.graph_scene_right.edge_added.connect(self.add_edge)
         self.graph_scene_right.edge_dragged.connect(self.change_edge_curves)
@@ -105,8 +110,12 @@ class RulePanel(EditorBasePanel):
             scene.g.auto_detect_io()
             for v in scene.g.vertices():
                 if v in scene.g.inputs():
-                    scene.vertex_map[v].phase_item.setPlainText("in-" + str(scene.g.inputs().index(v)))
+                    input_index = scene.g.inputs().index(v)
+                    label = "in-" + str(input_index)
+                    scene.vertex_map[v].phase_item.setPlainText(label)
                 elif v in scene.g.outputs():
-                    scene.vertex_map[v].phase_item.setPlainText("out-" + str(scene.g.outputs().index(v)))
+                    output_index = scene.g.outputs().index(v)
+                    label = "out-" + str(output_index)
+                    scene.vertex_map[v].phase_item.setPlainText(label)
         except TypeError:
             return
