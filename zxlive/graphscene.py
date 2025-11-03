@@ -359,4 +359,3 @@ class EditGraphScene(GraphScene):
             event.accept()
             return
         super().contextMenuEvent(event)
-
