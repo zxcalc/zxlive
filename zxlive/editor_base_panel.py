@@ -463,6 +463,10 @@ class PatternsListWidget(QListWidget):
             QListWidget::item:hover {
                 background-color: palette(midlight);
             }
+            QListWidget::item:selected {
+                background-color: palette(highlight);
+                color: palette(highlighted-text);
+            }
         """)
 
         self.itemDoubleClicked.connect(self._pattern_selected)
