@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from typing import Callable, TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -10,13 +13,13 @@ from pyzx.utils import VertexType
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
-from PySide6.QtGui import QPixmap, QColor, QPen
-from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView
+from PySide6.QtGui import QPixmap, QColor, QPen, QAction
+from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QInputDialog, QMessageBox
 
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT, get_data
+from .common import ET, GraphT, VT, get_data, get_custom_rules_path
 from .dialogs import show_error_msg
 from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES, refresh_custom_rules, action_groups
 from .settings import display_setting
@@ -46,6 +49,8 @@ class RewriteAction:
     returns_new_graph: bool = field(default=False)
     enabled: bool = field(default=False)
     repeat_rule_application: bool = False
+    is_custom_rule: bool = field(default=False)
+    file_path: Optional[str] = field(default=None)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -67,6 +72,8 @@ class RewriteAction:
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
             repeat_rule_application=d.get('repeat_rule_application', False),
+            is_custom_rule=d.get('custom_rule', False),
+            file_path=d.get('file_path', None),
         )
 
     def do_rewrite(self, panel: ProofPanel) -> None:
@@ -370,11 +377,116 @@ class RewriteActionTreeView(QTreeView):
             ''')
 
     def show_context_menu(self, position: QPoint) -> None:
+        index = self.indexAt(position)
         context_menu = QMenu(self)
+        
+        # Check if the clicked item is a custom rule
+        is_custom = False
+        rewrite_action = None
+        if index.isValid():
+            node = cast(RewriteActionTree, index.internalPointer())
+            if node.is_rewrite:
+                rewrite_action = node.rewrite_action
+                is_custom = rewrite_action.is_custom_rule
+        
+        if is_custom and rewrite_action and rewrite_action.file_path:
+            # Add custom rule specific options
+            edit_action = QAction("Edit", self)
+            edit_action.triggered.connect(lambda: self._edit_custom_rule(rewrite_action.file_path))
+            context_menu.addAction(edit_action)
+            
+            rename_action = QAction("Rename", self)
+            rename_action.triggered.connect(lambda: self._rename_custom_rule(rewrite_action))
+            context_menu.addAction(rename_action)
+            
+            context_menu.addSeparator()
+            
+            delete_action = QAction("Delete", self)
+            delete_action.triggered.connect(lambda: self._delete_custom_rule(rewrite_action))
+            context_menu.addAction(delete_action)
+            
+            context_menu.addSeparator()
+            
+            show_in_folder_action = QAction("Show in folder", self)
+            show_in_folder_action.triggered.connect(lambda: self._show_in_folder(rewrite_action.file_path))
+            context_menu.addAction(show_in_folder_action)
+            
+            context_menu.addSeparator()
+        
         refresh_rules = context_menu.addAction("Refresh rules")
         action = context_menu.exec_(self.mapToGlobal(position))
         if action == refresh_rules:
             self.refresh_rewrites_model()
+    
+    def _edit_custom_rule(self, file_path: Optional[str]) -> None:
+        """Open the custom rule file for editing."""
+        if not file_path or not os.path.exists(file_path):
+            return
+        main_window = self.proof_panel.window()
+        if hasattr(main_window, 'open_file_from_path'):
+            main_window.open_file_from_path(file_path)
+    
+    def _rename_custom_rule(self, rewrite_action: RewriteAction) -> None:
+        """Rename the custom rule file."""
+        if not rewrite_action.file_path or not os.path.exists(rewrite_action.file_path):
+            return
+        
+        old_name = rewrite_action.name
+        new_name, ok = QInputDialog.getText(self, "Rename Custom Rule", "Enter new name:", text=old_name)
+        if not ok or not new_name or new_name == old_name:
+            return
+        
+        old_path = rewrite_action.file_path
+        dir_path = os.path.dirname(old_path)
+        new_path = os.path.join(dir_path, new_name + ".zxr")
+        
+        if os.path.exists(new_path):
+            QMessageBox.warning(self, "Rename Failed", f"A custom rule named '{new_name}' already exists.")
+            return
+        
+        try:
+            os.rename(old_path, new_path)
+            self.refresh_rewrites_model()
+        except Exception as e:
+            QMessageBox.warning(self, "Rename Failed", f"Could not rename custom rule: {str(e)}")
+    
+    def _delete_custom_rule(self, rewrite_action: RewriteAction) -> None:
+        """Delete the custom rule file after confirmation."""
+        if not rewrite_action.file_path or not os.path.exists(rewrite_action.file_path):
+            return
+        
+        rule_name = rewrite_action.name
+        reply = QMessageBox.question(
+            self,
+            "Delete Custom Rule",
+            f"Are you sure you want to delete the custom rule '{rule_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                os.remove(rewrite_action.file_path)
+                self.refresh_rewrites_model()
+            except Exception as e:
+                QMessageBox.warning(self, "Delete Failed", f"Could not delete custom rule: {str(e)}")
+    
+    def _show_in_folder(self, file_path: Optional[str]) -> None:
+        """Open the folder containing the custom rule file in the system file explorer."""
+        if not file_path or not os.path.exists(file_path):
+            return
+        
+        folder_path = os.path.dirname(file_path)
+        if not os.path.isdir(folder_path):
+            return
+        
+        abs_path = os.path.abspath(folder_path)
+        if sys.platform == "win32":
+            os.startfile(abs_path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", abs_path])
+        else:
+            subprocess.run(["xdg-open", abs_path])
 
     def refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
