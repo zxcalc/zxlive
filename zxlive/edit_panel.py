@@ -13,7 +13,7 @@ from pyzx.circuit.qasmparser import QASMParser
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
 from .common import GraphT, get_settings_value
-from .dialogs import show_error_msg, create_circuit_dialog
+from .dialogs import create_circuit_dialog, show_error_msg, write_to_file
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
@@ -119,6 +119,5 @@ class GraphEditPanel(EditorBasePanel):
         patterns_folder: str = get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns"))
         os.makedirs(patterns_folder, exist_ok=True)
         path: str = os.path.join(patterns_folder, f"{name}.zxg")
-        with open(path, "w") as f:
-            f.write(subgraph.to_json())
+        write_to_file(path, data=subgraph.to_json(), parent=self)
         self.refresh_patterns()
