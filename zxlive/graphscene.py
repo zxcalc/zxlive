@@ -19,7 +19,7 @@ from typing import Optional, Iterator, Iterable
 
 from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent, QMenu
 
 from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
@@ -348,7 +348,6 @@ class EditGraphScene(GraphScene):
         self.edge_added.emit(v1.v, v2.v, colliding_verts)
 
     def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent) -> None:
-        from PySide6.QtWidgets import QMenu
         selected_items = self.selectedItems() if hasattr(self, 'selectedItems') else []
         if selected_items:
             menu = QMenu()

@@ -89,53 +89,24 @@ class EditorBasePanel(BasePanel):
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
 
-        vertex_container, vertex_layout = self._create_titled_widget("Vertices")
+        vertex_container, vertex_layout = create_titled_widget("Vertices")
         self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked, self._vty_double_clicked)
         vertex_layout.addWidget(self.vertex_list)
         self.sidebar.addWidget(vertex_container)
 
-        edge_container, edge_layout = self._create_titled_widget("Edges")
+        edge_container, edge_layout = create_titled_widget("Edges")
         self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked, self._ety_double_clicked)
         edge_layout.addWidget(self.edge_list)
         self.sidebar.addWidget(edge_container)
 
         if self.patterns_folder is not None:
-            patterns_container, patterns_layout = self._create_titled_widget("Patterns", "↻", self.refresh_patterns)
+            patterns_container, patterns_layout = create_titled_widget("Patterns", "↻", self.refresh_patterns)
             self.patterns_list = PatternsListWidget(self, self.patterns_folder)
             patterns_layout.addWidget(self.patterns_list)
             self.sidebar.addWidget(patterns_container)
 
         self.variable_viewer = VariableViewer(self)
         self.sidebar.addWidget(self.variable_viewer)
-
-    def _create_titled_widget(self, title: str, button_text: Optional[str] = None,
-                              button_callback: Optional[Callable[[], None]] = None) -> tuple[QWidget, QVBoxLayout]:
-        """Create a container widget with a title label and a button on the right."""
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
-
-        title_layout = QHBoxLayout()
-        title_layout.setContentsMargins(0, 0, 0, 0)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet("font-weight: bold; padding: 4px;")
-        title_layout.addWidget(title_label)
-
-        if button_text and button_callback:
-            # Add stretch to push button to the right
-            title_layout.addStretch()
-            # Create a button
-            button = QPushButton(button_text)
-            button.setFixedSize(24, 24)
-            button.setStyleSheet("font-size: 16px; padding: 0px;")
-            button.clicked.connect(button_callback)
-            button.setToolTip("Refresh patterns list")
-            title_layout.addWidget(button)
-
-        layout.addLayout(title_layout)
-        return container, layout
 
     def update_side_bar(self) -> None:
         populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked, self._vty_double_clicked)
@@ -535,11 +506,7 @@ class PatternsListWidget(QListWidget):
                 os.remove(pattern_path)
                 self.refresh_patterns()
             except Exception as e:
-                QMessageBox.warning(
-                    self,
-                    "Delete Failed",
-                    f"Could not delete pattern: {str(e)}"
-                )
+                QMessageBox.warning(self, "Delete Failed", f"Could not delete pattern: {str(e)}")
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
@@ -576,6 +543,36 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection
     snap.setShortcut("f")
     snap.clicked.connect(lambda: parent._snap_vertex_edge_clicked())
     yield ToolbarSection(snap)
+
+
+def create_titled_widget(title: str, button_text: Optional[str] = None,
+                         button_callback: Optional[Callable[[], None]] = None) -> tuple[QWidget, QVBoxLayout]:
+    """Create a container widget with a title label and a button on the right."""
+    container = QWidget()
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(2)
+
+    title_layout = QHBoxLayout()
+    title_layout.setContentsMargins(0, 0, 0, 0)
+
+    title_label = QLabel(title)
+    title_label.setStyleSheet("font-weight: bold; padding: 4px;")
+    title_layout.addWidget(title_label)
+
+    if button_text and button_callback:
+        # Add stretch to push button to the right
+        title_layout.addStretch()
+        # Create a button
+        button = QPushButton(button_text)
+        button.setFixedSize(24, 24)
+        button.setStyleSheet("font-size: 16px; padding: 0px;")
+        button.clicked.connect(button_callback)
+        button.setToolTip("Refresh patterns list")
+        title_layout.addWidget(button)
+
+    layout.addLayout(title_layout)
+    return container, layout
 
 
 def create_list_widget(parent: EditorBasePanel,
