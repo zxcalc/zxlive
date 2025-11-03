@@ -6,11 +6,10 @@ from enum import Enum
 from typing import Callable, Iterator, Optional, TypedDict
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
-from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
-                           QPixmap)
+from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
-                               QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
+                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
                                QSpacerItem, QSplitter, QToolButton, QVBoxLayout, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w, phase_to_s, get_z_box_label
@@ -485,6 +484,50 @@ class PatternsListWidget(QListWidget):
         """Handle pattern selection."""
         pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
         self.parent_panel.insert_pattern_from_sidebar(pattern_path)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Show context menu on right-click."""
+        item = self.itemAt(event.pos())
+        if item is None:
+            return
+        menu = QMenu(self)
+        edit_action = QAction("Edit", self)
+        edit_action.triggered.connect(lambda: self._edit_pattern(item))
+        menu.addAction(edit_action)
+        delete_action = QAction("Delete", self)
+        delete_action.triggered.connect(lambda: self._delete_pattern(item))
+        menu.addAction(delete_action)
+        menu.exec(event.globalPos())
+
+    def _edit_pattern(self, item: QListWidgetItem) -> None:
+        """Open the pattern file for editing."""
+        pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
+        # Get the main window and call open_file_from_path
+        main_window = self.parent_panel.window()
+        if hasattr(main_window, 'open_file_from_path'):
+            main_window.open_file_from_path(pattern_path)
+
+    def _delete_pattern(self, item: QListWidgetItem) -> None:
+        """Delete the pattern file after confirmation."""
+        pattern_name = item.text()
+        pattern_path = os.path.join(self.patterns_folder, pattern_name + ".zxg")
+        reply = QMessageBox.question(
+            self,
+            "Delete Pattern",
+            f"Are you sure you want to delete the pattern '{pattern_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                os.remove(pattern_path)
+                self.refresh_patterns()
+            except Exception as e:
+                QMessageBox.warning(
+                    self,
+                    "Delete Failed",
+                    f"Could not delete pattern: {str(e)}"
+                )
 
 
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
