@@ -628,7 +628,7 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection
 
 def create_titled_widget(
     title: str,
-    buttons: list[tuple[str, Callable[[], None], str]] = []
+    buttons: Optional[list[tuple[str, Callable[[], None], str]]] = None
 ) -> tuple[QWidget, QVBoxLayout]:
     """Create a container widget with a title label and multiple buttons on the right.
 
@@ -636,6 +636,8 @@ def create_titled_widget(
         title: The title text
         buttons: List of (button_text, callback, tooltip) tuples
     """
+    if buttons is None:
+        buttons = []
     container = QWidget()
     layout = QVBoxLayout(container)
     layout.setContentsMargins(0, 0, 0, 0)

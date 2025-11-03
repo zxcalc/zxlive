@@ -348,10 +348,10 @@ class EditGraphScene(GraphScene):
         self.edge_added.emit(v1.v, v2.v, colliding_verts)
 
     def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent) -> None:
-        selected_items = self.selectedItems() if hasattr(self, 'selectedItems') else []
+        selected_items = self.selectedItems()
         if selected_items:
             menu = QMenu()
-            add_pattern_action = menu.addAction("Add selection as pattern")
+            add_pattern_action = menu.addAction("Add selection to patterns")
             action = menu.exec_(event.screenPos())
             if action == add_pattern_action:
                 self.add_selection_as_pattern_signal.emit()

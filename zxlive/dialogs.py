@@ -203,7 +203,7 @@ def write_to_file(file_path: str, data: str, parent: QWidget) -> bool:
             f.write(data)
         return True
     except Exception as e:
-        show_error_msg("Could not write to file", description=f"{file_path}\n{str(e)}", parent=parent)
+        show_error_msg("Could not write to file", f"{file_path}\n{str(e)}", parent=parent)
         return False
 
 

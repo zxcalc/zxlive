@@ -12,7 +12,7 @@ from pyzx.circuit.qasmparser import QASMParser
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import GraphT, get_settings_value
+from .common import VT, GraphT, get_settings_value
 from .dialogs import create_circuit_dialog, show_error_msg, write_to_file
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
@@ -108,11 +108,11 @@ class GraphEditPanel(EditorBasePanel):
             self.graph_scene.select_vertices(new_verts)
 
     def add_selection_as_pattern(self) -> None:
-        selected: list[Any] = self.graph_scene.selectedItems() if hasattr(self.graph_scene, 'selectedItems') else []
+        selected: list[VT] = list(self.graph_scene.selected_vertices)
         if not selected:
             show_error_msg("No selection", "Please select part of the graph to add as a pattern.", parent=self)
             return
-        subgraph = self.graph_scene.g.subgraph_from_vertices([vi.v for vi in selected])
+        subgraph = self.graph_scene.g.subgraph_from_vertices(selected)
         name, ok = QInputDialog.getText(self, "Pattern Name", "Enter a name for the pattern:")
         if not ok or not name:
             return
