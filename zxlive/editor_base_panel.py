@@ -473,12 +473,20 @@ class PatternsListWidget(QListWidget):
         self.clear()
         if not os.path.isdir(self.patterns_folder):
             return
+        pattern_count = 0
         for fname in os.listdir(self.patterns_folder):
             if fname.endswith(".zxg"):
                 # remove the extension for display
                 fname = fname[:-4]
                 item = QListWidgetItem(fname)
                 self.addItem(item)
+                pattern_count += 1
+        # Show placeholder text if no patterns exist
+        if pattern_count == 0:
+            placeholder = QListWidgetItem("Right-click a selection to save it as a pattern")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)  # Make it non-selectable
+            placeholder.setForeground(QPalette().color(QPalette.ColorRole.PlaceholderText))
+            self.addItem(placeholder)
 
     def _pattern_selected(self, item: QListWidgetItem) -> None:
         """Handle pattern selection."""
