@@ -198,14 +198,13 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
 
 
 def write_to_file(file_path: str, data: str, parent: QWidget) -> bool:
-    file = QFile(file_path)
-    if not file.open(QIODevice.OpenModeFlag.WriteOnly | QIODevice.OpenModeFlag.Text):
-        show_error_msg("Could not write to file", parent=parent)
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(data)
+        return True
+    except Exception as e:
+        show_error_msg("Could not write to file", description=f"{file_path}\n{str(e)}", parent=parent)
         return False
-    out = QTextStream(file)
-    out << data
-    file.close()
-    return True
 
 
 def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = "") -> Optional[tuple[str, FileFormat]]:
