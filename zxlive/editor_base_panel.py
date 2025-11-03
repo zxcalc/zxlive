@@ -452,6 +452,19 @@ class PatternsListWidget(QListWidget):
         self.setViewMode(QListView.ViewMode.ListMode)
         self.setMovement(QListView.Movement.Static)
         self.setWordWrap(True)
+        self.setSpacing(2)
+        self.setStyleSheet("""
+            QListWidget {
+                padding: 4px;
+            }
+            QListWidget::item {
+                padding: 4px 8px;
+                border-radius: 3px;
+            }
+            QListWidget::item:hover {
+                background-color: palette(midlight);
+            }
+        """)
 
         self.itemDoubleClicked.connect(self._pattern_selected)
         self.refresh_patterns()
