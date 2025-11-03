@@ -125,3 +125,12 @@ def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     app.select_all_action.trigger()
     app.close_action.trigger()
+
+
+def test_tab_scrolling_enabled(app: MainWindow) -> None:
+    # Test that scroll buttons are enabled for the tab widget.
+    # This ensures that when many tabs are open, users can scroll through them
+    # instead of tabs going off-screen.
+    # See GitHub issue about tab scrolling.
+    assert app.tab_widget.usesScrollButtons(), \
+        "Tab widget should have scroll buttons enabled"
