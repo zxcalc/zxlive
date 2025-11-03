@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import os
-from typing import Any, Iterator
+from typing import Iterator
 
 from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
