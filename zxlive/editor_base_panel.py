@@ -8,9 +8,9 @@ from typing import Callable, Iterator, Optional, TypedDict
 from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
                            QPixmap)
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
+from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QListView, QListWidget,
-                               QListWidgetItem, QMessageBox, QScrollArea, QSizePolicy,
+                               QListWidgetItem, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
                                QSpacerItem, QSplitter, QToolButton, QVBoxLayout, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w, phase_to_s, get_z_box_label
@@ -101,7 +101,7 @@ class EditorBasePanel(BasePanel):
         self.sidebar.addWidget(edge_container)
 
         if self.patterns_folder is not None:
-            patterns_container, patterns_layout = self._create_titled_widget("Patterns")
+            patterns_container, patterns_layout = self._create_titled_widget("Patterns", "↻", self.refresh_patterns)
             self.patterns_list = PatternsListWidget(self, self.patterns_folder)
             patterns_layout.addWidget(self.patterns_list)
             self.sidebar.addWidget(patterns_container)
@@ -109,15 +109,33 @@ class EditorBasePanel(BasePanel):
         self.variable_viewer = VariableViewer(self)
         self.sidebar.addWidget(self.variable_viewer)
 
-    def _create_titled_widget(self, title: str) -> tuple[QWidget, QVBoxLayout]:
-        """Create a container widget with a title label and return both the widget and layout."""
+    def _create_titled_widget(self, title: str, button_text: Optional[str] = None,
+                              button_callback: Optional[Callable[[], None]] = None) -> tuple[QWidget, QVBoxLayout]:
+        """Create a container widget with a title label and a button on the right."""
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
+
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)
+
         title_label = QLabel(title)
         title_label.setStyleSheet("font-weight: bold; padding: 4px;")
-        layout.addWidget(title_label)
+        title_layout.addWidget(title_label)
+
+        if button_text and button_callback:
+            # Add stretch to push button to the right
+            title_layout.addStretch()
+            # Create a button
+            button = QPushButton(button_text)
+            button.setFixedSize(24, 24)
+            button.setStyleSheet("font-size: 16px; padding: 0px;")
+            button.clicked.connect(button_callback)
+            button.setToolTip("Refresh patterns list")
+            title_layout.addWidget(button)
+
+        layout.addLayout(title_layout)
         return container, layout
 
     def update_side_bar(self) -> None:
