@@ -6,7 +6,7 @@ from typing import Any, Iterator
 
 from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QInputDialog, QToolButton
+from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
 
@@ -119,5 +119,17 @@ class GraphEditPanel(EditorBasePanel):
         patterns_folder: str = get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns"))
         os.makedirs(patterns_folder, exist_ok=True)
         path: str = os.path.join(patterns_folder, f"{name}.zxg")
+        # Check if pattern already exists
+        if os.path.exists(path):
+            reply = QMessageBox.question(
+                self,
+                "Pattern Exists",
+                f"A pattern named '{name}' already exists. Do you want to replace it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                self.add_selection_as_pattern()
+                return
         write_to_file(path, data=subgraph.to_json(), parent=self)
         self.refresh_patterns()
