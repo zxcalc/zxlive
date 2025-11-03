@@ -481,12 +481,16 @@ class RewriteActionTreeView(QTreeView):
             return
 
         abs_path = os.path.abspath(folder_path)
+        # Basic security check: ensure path is a real directory
+        if not os.path.isdir(abs_path):
+            return
+
         if sys.platform == "win32":
             os.startfile(abs_path)
         elif sys.platform == "darwin":
-            subprocess.run(["open", abs_path])
+            subprocess.run(["open", abs_path], check=False)
         else:
-            subprocess.run(["xdg-open", abs_path])
+            subprocess.run(["xdg-open", abs_path], check=False)
 
     def refresh_rewrites_model(self) -> None:
         refresh_custom_rules()
