@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import copy
+import os
+import subprocess
+import sys
 from enum import Enum
-from typing import Callable, Iterator, TypedDict
+from typing import Callable, Iterator, Optional, TypedDict
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
-from PySide6.QtGui import (QAction, QColor, QIcon, QPainter, QPalette, QPen,
-                           QPixmap)
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout,
-                               QInputDialog, QLabel, QListView, QListWidget,
-                               QListWidgetItem, QScrollArea, QSizePolicy,
-                               QSpacerItem, QSplitter, QToolButton, QWidget)
+from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QPainter, QPalette, QPen, QPixmap
+from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
+                               QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
+                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
+                               QSpacerItem, QSplitter, QToolButton, QVBoxLayout, QWidget)
 from pyzx import EdgeType, VertexType
 from pyzx.utils import get_w_partner, vertex_is_w, phase_to_s, get_z_box_label
 from pyzx.graph.jsonparser import string_to_phase
@@ -20,8 +22,8 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data, pos_from_view
-from .dialogs import show_error_msg, update_dummy_vertex_text
+from .common import VT, GraphT, ToolType, get_data, pos_from_view, get_settings_value
+from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene
@@ -73,11 +75,13 @@ class EditorBasePanel(BasePanel):
     _curr_ety: EdgeType
     _curr_vty: VertexType
     snap_vertex_edge = True
+    patterns_folder: Optional[str] = None
 
     def __init__(self, *actions: QAction) -> None:
         super().__init__(*actions)
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
+        self.patterns_folder = get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns"))
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from toolbar_select_node_edge(self)
@@ -86,16 +90,65 @@ class EditorBasePanel(BasePanel):
     def create_side_bar(self) -> None:
         self.sidebar = QSplitter(self)
         self.sidebar.setOrientation(Qt.Orientation.Vertical)
+
+        vertex_container, vertex_layout = create_titled_widget("Vertices")
         self.vertex_list = create_list_widget(self, vertices_data(), self._vty_clicked, self._vty_double_clicked)
+        vertex_layout.addWidget(self.vertex_list)
+        self.sidebar.addWidget(vertex_container)
+
+        edge_container, edge_layout = create_titled_widget("Edges")
         self.edge_list = create_list_widget(self, edges_data(), self._ety_clicked, self._ety_double_clicked)
+        edge_layout.addWidget(self.edge_list)
+        self.sidebar.addWidget(edge_container)
+
+        if self.patterns_folder is not None:
+            patterns_container, patterns_layout = create_titled_widget(
+                "Patterns",
+                [("↻", self.refresh_patterns, "Refresh patterns list"),
+                 ("📁", self._open_patterns_folder, "Open patterns folder")]
+            )
+            # Add search box
+            self.patterns_search = QLineEdit()
+            self.patterns_search.setPlaceholderText("Search patterns...")
+            self.patterns_search.textChanged.connect(self._filter_patterns)
+            patterns_layout.addWidget(self.patterns_search)
+
+            self.patterns_list = PatternsListWidget(self, self.patterns_folder)
+            patterns_layout.addWidget(self.patterns_list)
+            self.sidebar.addWidget(patterns_container)
+
         self.variable_viewer = VariableViewer(self)
-        self.sidebar.addWidget(self.vertex_list)
-        self.sidebar.addWidget(self.edge_list)
         self.sidebar.addWidget(self.variable_viewer)
 
     def update_side_bar(self) -> None:
         populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked, self._vty_double_clicked)
         populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked)
+
+    def refresh_patterns(self) -> None:
+        """Refresh the patterns list if it exists."""
+        if hasattr(self, 'patterns_list'):
+            self.patterns_search.clear()
+            self.patterns_list.refresh_patterns()
+
+    def _filter_patterns(self, text: str) -> None:
+        """Filter patterns based on search text."""
+        if hasattr(self, 'patterns_list'):
+            self.patterns_list.filter_patterns(text)
+
+    def _open_patterns_folder(self) -> None:
+        """Open the patterns folder in the system file explorer."""
+        if self.patterns_folder and os.path.isdir(self.patterns_folder):
+            abs_path = os.path.abspath(self.patterns_folder)
+            if sys.platform == "win32":
+                os.startfile(abs_path)
+            elif sys.platform == "darwin":
+                subprocess.run(["open", abs_path])
+            else:
+                subprocess.run(["xdg-open", abs_path])
+        elif self.patterns_folder:
+            # Create the folder if it doesn't exist
+            os.makedirs(self.patterns_folder, exist_ok=True)
+            self._open_patterns_folder()  # Try again
 
     def update_colors(self) -> None:
         super().update_colors()
@@ -135,6 +188,15 @@ class EditorBasePanel(BasePanel):
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
+
+    def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
+        """Insert a pattern into the current graph view."""
+        try:
+            out = import_diagram_from_file(pattern_path, parent=self)
+            if out is not None and hasattr(out, 'g'):
+                self.paste_graph(out.g)
+        except Exception as e:
+            QMessageBox.warning(self, "Pattern Insert Error", str(e))
 
     def delete_selection(self) -> None:
         selection = list(self.graph_scene.selected_vertices)
@@ -381,6 +443,153 @@ class VariableViewer(QScrollArea):
             self.parent_panel.graph_scene.g.var_registry.set_type(name, new_type)
 
 
+class PatternsListWidget(QListWidget):
+    """Widget for displaying and selecting pattern files."""
+
+    def __init__(self, parent: EditorBasePanel, patterns_folder: str) -> None:
+        super().__init__(parent)
+        self.parent_panel = parent
+        self.patterns_folder = patterns_folder
+        self.all_patterns: list[str] = []  # Store all pattern names for filtering
+
+        self.setResizeMode(QListView.ResizeMode.Adjust)
+        self.setViewMode(QListView.ViewMode.ListMode)
+        self.setMovement(QListView.Movement.Static)
+        self.setWordWrap(True)
+        self.setSpacing(2)
+        self.setStyleSheet("""
+            QListWidget {
+                padding: 4px;
+            }
+            QListWidget::item {
+                padding: 4px 8px;
+                border-radius: 3px;
+            }
+            QListWidget::item:hover {
+                background-color: palette(midlight);
+            }
+            QListWidget::item:selected {
+                background-color: palette(highlight);
+                color: palette(highlighted-text);
+            }
+        """)
+
+        self.itemDoubleClicked.connect(self._pattern_selected)
+        self.refresh_patterns()
+
+    def refresh_patterns(self) -> None:
+        """Refresh the list of patterns from the patterns folder."""
+        self.clear()
+        self.all_patterns.clear()
+
+        if not os.path.isdir(self.patterns_folder):
+            return
+
+        for fname in os.listdir(self.patterns_folder):
+            if fname.endswith(".zxg"):
+                # remove the extension for display
+                fname = fname[:-4]
+                self.all_patterns.append(fname)
+
+        self.all_patterns.sort()
+        self._display_patterns(self.all_patterns)
+
+    def filter_patterns(self, search_text: str) -> None:
+        """Filter patterns based on search text."""
+        search_text = search_text.lower()
+        if not search_text:
+            self._display_patterns(self.all_patterns)
+        else:
+            filtered = [p for p in self.all_patterns if search_text in p.lower()]
+            self._display_patterns(filtered)
+
+    def _display_patterns(self, patterns: list[str]) -> None:
+        """Display the given list of patterns."""
+        self.clear()
+        if not patterns:
+            placeholder = QListWidgetItem("Right-click a selection to save it as a pattern")
+            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
+            placeholder.setForeground(QPalette().color(QPalette.ColorRole.PlaceholderText))
+            self.addItem(placeholder)
+        else:
+            for pattern_name in patterns:
+                item = QListWidgetItem(pattern_name)
+                self.addItem(item)
+
+    def _pattern_selected(self, item: QListWidgetItem) -> None:
+        """Handle pattern selection."""
+        # Don't insert if it's the placeholder
+        if item.flags() == Qt.ItemFlag.NoItemFlags:
+            return
+        pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
+        self.parent_panel.insert_pattern_from_sidebar(pattern_path)
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Show context menu on right-click."""
+        item = self.itemAt(event.pos())
+        if item is None or item.flags() == Qt.ItemFlag.NoItemFlags:
+            return
+        menu = QMenu(self)
+
+        insert_action = QAction("Insert", self)
+        insert_action.triggered.connect(lambda: self._pattern_selected(item))
+        menu.addAction(insert_action)
+        menu.addSeparator()
+        edit_action = QAction("Edit", self)
+        edit_action.triggered.connect(lambda: self._edit_pattern(item))
+        menu.addAction(edit_action)
+        rename_action = QAction("Rename", self)
+        rename_action.triggered.connect(lambda: self._rename_pattern(item))
+        menu.addAction(rename_action)
+        menu.addSeparator()
+        delete_action = QAction("Delete", self)
+        delete_action.triggered.connect(lambda: self._delete_pattern(item))
+        menu.addAction(delete_action)
+        menu.exec(event.globalPos())
+
+    def _edit_pattern(self, item: QListWidgetItem) -> None:
+        """Open the pattern file for editing."""
+        pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
+        main_window = self.parent_panel.window()
+        if hasattr(main_window, 'open_file_from_path'):
+            main_window.open_file_from_path(pattern_path)
+
+    def _rename_pattern(self, item: QListWidgetItem) -> None:
+        """Rename the pattern file."""
+        old_name = item.text()
+        new_name, ok = QInputDialog.getText(self, "Rename Pattern", "Enter new name:", text=old_name)
+        if not ok or not new_name or new_name == old_name:
+            return
+        old_path = os.path.join(self.patterns_folder, old_name + ".zxg")
+        new_path = os.path.join(self.patterns_folder, new_name + ".zxg")
+        if os.path.exists(new_path):
+            QMessageBox.warning(self, "Rename Failed", f"A pattern named '{new_name}' already exists.")
+            return
+        try:
+            os.rename(old_path, new_path)
+            self.refresh_patterns()
+        except Exception as e:
+            QMessageBox.warning(self, "Rename Failed", f"Could not rename pattern: {str(e)}")
+
+    def _delete_pattern(self, item: QListWidgetItem) -> None:
+        """Delete the pattern file after confirmation."""
+        pattern_name = item.text()
+        pattern_path = os.path.join(self.patterns_folder, pattern_name + ".zxg")
+        reply = QMessageBox.question(
+            self,
+            "Delete Pattern",
+            f"Are you sure you want to delete the pattern '{pattern_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                os.remove(pattern_path)
+                self.refresh_patterns()
+            except Exception as e:
+                QMessageBox.warning(self, "Delete Failed", f"Could not delete pattern: {str(e)}")
+
+
 def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection]:
     icon_size = QSize(32, 32)
     select = QToolButton(parent)  # Selected by default
@@ -415,6 +624,44 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection
     snap.setShortcut("f")
     snap.clicked.connect(lambda: parent._snap_vertex_edge_clicked())
     yield ToolbarSection(snap)
+
+
+def create_titled_widget(
+    title: str,
+    buttons: Optional[list[tuple[str, Callable[[], None], str]]] = None
+) -> tuple[QWidget, QVBoxLayout]:
+    """Create a container widget with a title label and multiple buttons on the right.
+
+    Args:
+        title: The title text
+        buttons: List of (button_text, callback, tooltip) tuples
+    """
+    if buttons is None:
+        buttons = []
+    container = QWidget()
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(2)
+
+    title_layout = QHBoxLayout()
+    title_layout.setContentsMargins(0, 0, 0, 0)
+
+    title_label = QLabel(title)
+    title_label.setStyleSheet("font-weight: bold; padding: 4px;")
+    title_layout.addWidget(title_label)
+
+    # Add stretch to push buttons to the right
+    title_layout.addStretch()
+    for button_text, callback, tooltip in buttons:
+        button = QPushButton(button_text)
+        button.setFixedSize(24, 24)
+        button.setStyleSheet("font-size: 16px; padding: 0px;")
+        button.clicked.connect(callback)
+        button.setToolTip(tooltip)
+        title_layout.addWidget(button)
+
+    layout.addLayout(title_layout)
+    return container, layout
 
 
 def create_list_widget(parent: EditorBasePanel,

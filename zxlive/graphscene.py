@@ -19,7 +19,7 @@ from typing import Optional, Iterator, Iterable
 
 from PySide6.QtCore import Qt, Signal, QRectF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem
+from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent, QMenu
 
 from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
@@ -54,6 +54,7 @@ class GraphScene(QGraphicsScene):
     edge_double_clicked = Signal(object)  # Actual type: ET
 
     selection_changed_custom = Signal()
+    add_selection_as_pattern_signal = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -277,6 +278,8 @@ class EditGraphScene(GraphScene):
         self._is_mouse_pressed = False
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        if e.button() == Qt.MouseButton.RightButton and self.selectedItems():
+            return
         # Right-press on a vertex means the start of a drag for edge adding
         super().mousePressEvent(e)
         if (self.curr_tool == ToolType.EDGE) or \
@@ -343,3 +346,15 @@ class EditGraphScene(GraphScene):
             if isinstance(it, VItem) and it not in (v1, v2):
                 colliding_verts.append(it)
         self.edge_added.emit(v1.v, v2.v, colliding_verts)
+
+    def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent) -> None:
+        selected_items = self.selectedItems()
+        if selected_items:
+            menu = QMenu()
+            add_pattern_action = menu.addAction("Add selection to patterns")
+            action = menu.exec_(event.screenPos())
+            if action == add_pattern_action:
+                self.add_selection_as_pattern_signal.emit()
+            event.accept()
+            return
+        super().contextMenuEvent(event)

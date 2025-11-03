@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import copy
+import os
 from typing import Iterator
 
 from PySide6.QtCore import Signal, QSettings
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QToolButton)
+from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import GraphT
-from .dialogs import show_error_msg, create_circuit_dialog
+from .common import VT, GraphT, get_settings_value
+from .dialogs import create_circuit_dialog, show_error_msg, write_to_file
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
 from .graphview import GraphView
@@ -31,6 +32,7 @@ class GraphEditPanel(EditorBasePanel):
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
         self.graph_scene = EditGraphScene()
+        self.graph_scene.add_selection_as_pattern_signal.connect(self.add_selection_as_pattern)
         self.graph_scene.vertices_moved.connect(self.vert_moved)
         self.graph_scene.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene.vertex_added.connect(self.add_vert)
@@ -104,3 +106,30 @@ class GraphEditPanel(EditorBasePanel):
             cmd = UpdateGraph(self.graph_view, new_g)
             self.undo_stack.push(cmd)
             self.graph_scene.select_vertices(new_verts)
+
+    def add_selection_as_pattern(self) -> None:
+        selected: list[VT] = list(self.graph_scene.selected_vertices)
+        if not selected:
+            show_error_msg("No selection", "Please select part of the graph to add as a pattern.", parent=self)
+            return
+        subgraph = self.graph_scene.g.subgraph_from_vertices(selected)
+        name, ok = QInputDialog.getText(self, "Pattern Name", "Enter a name for the pattern:")
+        if not ok or not name:
+            return
+        patterns_folder: str = get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns"))
+        os.makedirs(patterns_folder, exist_ok=True)
+        path: str = os.path.join(patterns_folder, f"{name}.zxg")
+        # Check if pattern already exists
+        if os.path.exists(path):
+            reply = QMessageBox.question(
+                self,
+                "Pattern Exists",
+                f"A pattern named '{name}' already exists. Do you want to replace it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                self.add_selection_as_pattern()
+                return
+        write_to_file(path, data=subgraph.to_json(), parent=self)
+        self.refresh_patterns()
