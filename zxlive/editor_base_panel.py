@@ -81,7 +81,7 @@ class EditorBasePanel(BasePanel):
         super().__init__(*actions)
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
-        self.patterns_folder = get_settings_value("patterns-folder", str, os.path.join(os.path.expanduser("~"), "zxlive_patterns"))
+        self.patterns_folder = get_settings_value("patterns-folder", str)
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from toolbar_select_node_edge(self)
