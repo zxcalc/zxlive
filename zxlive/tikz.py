@@ -31,7 +31,7 @@ def proof_to_tikz(proof: ProofModel) -> str:
             rewrite = proof.steps[i-1]
             # Try to look up name in settings
             name = settings.value(f"tikz/names/{rewrite.rule}") if settings.contains(f"tikz/names/{rewrite.rule}") else rewrite.rule
-            eq = f"\\node [style=none] ({idoffset}) at ({xoffset - hspace/2:.2f}, {-yoffset - height/2:.2f}) {{$\\overset{{\\mathit{{{name}}}}}{{=}}$}};"
+            eq = f"\\node [style=none] ({idoffset}) at ({xoffset - hspace/2:.2f}, {-yoffset - height/2:.2f}) {{$\\mathrel{{\\mathop{{=}}\\limits^{{\\mathit{{{name}}}}}}}$}};"
             total_verts.append(eq)
             idoffset += 1
 
