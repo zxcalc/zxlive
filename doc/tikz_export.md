@@ -13,6 +13,13 @@ To export a proof to TikZ:
 
 The exported file will contain TikZ code that represents your entire proof as a series of diagrams with rewrite steps labeled between them.
 
+To export a single diagram:
+
+1. Open the diagram in ZXLive
+2. Go to **File > Save as**
+3. Choose "TikZ (*.tikz)" as the file type
+4. Save the file
+
 ## Setting up LaTeX
 
 To use the exported TikZ diagrams in your LaTeX documents, you need to set up your preamble with the required packages and style definitions.
