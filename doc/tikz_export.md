@@ -77,7 +77,8 @@ ZXLive's TikZ exports are compatible with [TikZit](https://tikzit.github.io/), a
 
 1. Export from ZXLive to a `.tikz` file
 2. Open the file in TikZit for further editing
-3. Use TikZit's style editor to create custom styles
+3. Load the same style file (e.g., `zx.tikzstyles`) in TikZit to ensure consistency
+4. Use TikZit's style editor to create custom styles
 
 ## TikZ export settings in ZXLive
 
@@ -113,5 +114,5 @@ This is useful for using shorter notation (e.g., "f" for "fuse spiders", "b" for
 If you encounter compilation errors:
 
 1. **Missing packages**: Make sure tikzit.sty is included and accessible in your LaTeX document directory.
-2. **Undefined styles**: Verify that all style definitions are in your .tikzstyles file and that the style names match those in ZXLive's export settings
+2. **Undefined styles**: Verify that all style definitions are in your .tikzstyles file and that the style names match those in ZXLive's export settings.
 
