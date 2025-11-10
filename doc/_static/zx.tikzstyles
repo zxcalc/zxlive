@@ -12,7 +12,7 @@
 \tikzstyle{Z box}=[draw=black, shape=rectangle, fill={rgb,255: red,216; green,248; blue,216}, minimum size=.55em, inner sep=0.15em, scale=0.85, font={\scriptsize}]
 \tikzstyle{W triangle}=[shape=isosceles triangle, isosceles triangle stretches=true, fill=black, draw=black, minimum width=2.8mm, minimum height=2mm, inner sep=1pt, outer sep=0pt, shape border rotate=90]
 \tikzstyle{W input}=[fill=none, inner sep=0mm, outer sep=0mm, minimum width=0mm]
-\tikzstyle{empty}=[inner sep=0mm, font={\small}]
+\tikzstyle{label}=[inner sep=0mm, font={\small}]
 
 % Edge styles
 \tikzstyle{hadamard edge}=[-, dashed, dash pattern=on 2pt off 1.5pt, thick, draw={rgb,255: red,68; green,136; blue,255}]
