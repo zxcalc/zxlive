@@ -52,19 +52,19 @@ font_defaults: dict[str, str | int | None] = {
 }
 
 tikz_export_defaults: dict[str, str] = {
-    "tikz/boundary-export": pyzx.settings.tikz_classes['boundary'],
-    "tikz/Z-spider-export": pyzx.settings.tikz_classes['Z'],
-    "tikz/X-spider-export": pyzx.settings.tikz_classes['X'],
-    "tikz/Z-phase-export": pyzx.settings.tikz_classes['Z phase'],
-    "tikz/X-phase-export": pyzx.settings.tikz_classes['X phase'],
-    "tikz/z-box-export": pyzx.settings.tikz_classes['Z box'],
-    "tikz/Hadamard-export": pyzx.settings.tikz_classes['H'],
-    "tikz/w-output-export": pyzx.settings.tikz_classes['W'],
-    "tikz/w-input-export": pyzx.settings.tikz_classes['W input'],
-    "tikz/dummy-export": pyzx.settings.tikz_classes['dummy'],
-    "tikz/edge-export": pyzx.settings.tikz_classes['edge'],
-    "tikz/edge-H-export": pyzx.settings.tikz_classes['H-edge'],
-    "tikz/edge-W-export": pyzx.settings.tikz_classes['W-io-edge'],
+    "tikz/boundary-export": 'none',
+    "tikz/Z-spider-export": 'Z dot',
+    "tikz/X-spider-export": 'X dot',
+    "tikz/Z-phase-export": 'Z phase dot',
+    "tikz/X-phase-export": 'X phase dot',
+    "tikz/z-box-export": 'Z box',
+    "tikz/Hadamard-export": 'hadamard',
+    "tikz/w-output-export": 'W triangle',
+    "tikz/w-input-export": 'W input',
+    "tikz/dummy-export": 'label',
+    "tikz/edge-export": '',
+    "tikz/edge-H-export": 'hadamard edge',
+    "tikz/edge-W-export": 'W io edge',
 }
 
 tikz_import_defaults: dict[str, str] = {
