@@ -1,0 +1,20 @@
+% ZXLive TikZ Style Definitions
+% Include this file in your LaTeX preamble.
+
+\definecolor{zx_green}{RGB}{216,248,216}
+\definecolor{zx_red}{RGB}{232,165,165}
+
+% ZX-calculus node styles
+\tikzstyle{Z dot}=[draw=black, shape=circle, fill={zx_green}, inner sep=0.7mm, minimum width=0pt, minimum height=0pt]
+\tikzstyle{Z phase dot}=[shape=rectangle, fill={zx_green}, draw=black, minimum size=1em, rounded corners=0.4em, inner sep=0.2em, outer sep=-0.2em, scale=0.8, font={\scriptsize}]
+\tikzstyle{X dot}=[Z dot, fill={zx_red}, draw=black]
+\tikzstyle{X phase dot}=[Z phase dot, fill={zx_red}, draw=black]
+\tikzstyle{hadamard}=[draw=black, shape=rectangle, fill=yellow, inner sep=0.6mm, minimum height=1.5mm, minimum width=1.5mm]
+\tikzstyle{Z box}=[draw=black, shape=rectangle, fill={zx_green}, minimum size=.55em, inner sep=0.15em, scale=0.85, font={\scriptsize}]
+\tikzstyle{W triangle}=[regular polygon, regular polygon sides=3, fill=white, draw=black, line width=0.8pt, minimum size=5mm]
+\tikzstyle{W input}=[inner sep=0mm]
+\tikzstyle{text}=[inner sep=0mm, font={\small}]
+
+% Edge styles
+\tikzstyle{hadamard edge}=[-, dashed, dash pattern=on 2pt off 1.5pt, thick, draw={rgb,255: red,68; green,136; blue,255}]
+\tikzstyle{W io edge}=[-, draw=black]
