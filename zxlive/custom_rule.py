@@ -14,6 +14,7 @@ from shapely import Polygon
 
 from pyzx.symbolic import Poly, Var
 from pyzx.graph import jsonparser
+from pyzx.rewrite import RewriteSimpGraph
 
 from .common import ET, VT, GraphT
 
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from .rewrite_data import RewriteData
 
 
-class CustomRule:
+class CustomRule(RewriteSimpGraph[VT,ET]):
     def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()
@@ -37,7 +38,7 @@ class CustomRule:
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
-    def __call__(self, graph: GraphT, vertices: list[VT]) -> pyzx.rules.RewriteOutputType[VT, ET]:
+    def applier(self, graph: GraphT, vertices: list[VT]) -> bool:
         if self.is_rewrite_unfusable:
             self.unfuse_subgraph_for_rewrite(graph, vertices)
 
@@ -93,7 +94,9 @@ class CustomRule:
                 etab[(v1, v2)] = [0, 0]
             etab[(v1, v2)][data['type'] - 1] += 1
 
-        return etab, vertices_to_remove, [], True
+        graph.add_edge_table(etab)
+        graph.remove_vertices(vertices_to_remove)
+        return True
 
     def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
         def get_adjacent_boundary_vertices(g: nx.MultiGraph, v: VT) -> Sequence[VT]:
@@ -155,8 +158,8 @@ class CustomRule:
             graph.add_edge((w_in, new_w_out), EdgeType.SIMPLE)
         graph.add_edge((new_w_in, new_w_out), EdgeType.W_IO)
 
-    def matcher(self, graph: GraphT, in_selection: Callable[[VT], bool]) -> list[VT]:
-        vertices = [v for v in graph.vertices() if in_selection(v)]
+    def is_match(self, graph: GraphT, in_selection: list[VT]) -> list[VT]:
+        vertices = [v for v in graph.vertices() if v in in_selection]
         if self.is_rewrite_unfusable:
             subgraph_nx = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
             lhs_graph_nx = self.lhs_graph_without_boundaries_nx
@@ -192,8 +195,8 @@ class CustomRule:
         return cls(lhs_graph, rhs_graph, d['name'], d['description'])
 
     def to_rewrite_data(self) -> "RewriteData":
-        from .rewrite_data import MATCHES_VERTICES
-        return {"text": self.name, "matcher": self.matcher, "rule": self, "type": MATCHES_VERTICES,
+        from .rewrite_data import MATCH_COMPOUND
+        return {"text": self.name, "rule": self, "type": MATCH_COMPOUND,
                 "tooltip": self.description, 'copy_first': False, 'returns_new_graph': False,
                 "custom_rule": True, "lhs": self.lhs_graph, "rhs": self.rhs_graph}
 

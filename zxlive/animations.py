@@ -10,7 +10,7 @@ from PySide6.QtGui import QUndoStack, QUndoCommand
 from pyzx.utils import vertex_is_w
 
 from .custom_rule import CustomRule
-from .rewrite_data import operations
+from .rewrite_data import rules_basic
 from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
@@ -288,21 +288,21 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
 def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:
     anim_before = None
     anim_after = None
-    if self.name == operations['spider']['text'] or self.name == operations['fuse_w']['text']:
+    if self.name == rules_basic['fuse_simp']['text']: #or self.name == operations['fuse_w']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
             if v1 in rem_verts:
                 v1, v2 = v2, v1
             anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v2], panel.graph_scene.vertex_map[v1]))
-    elif self.name == operations['to_z']['text']:
-        print('To do: animate ' + self.name)
-    elif self.name == operations['to_x']['text']:
-        print('To do: animate ' + self.name)
-    elif self.name == operations['rem_id']['text']:
+    # elif self.name == operations['to_z']['text']:
+    #     print('To do: animate ' + self.name)
+    # elif self.name == operations['to_x']['text']:
+    #     print('To do: animate ' + self.name)
+    elif self.name == rules_basic['id_simp']['text']:
         anim_before = QParallelAnimationGroup()
         for v in rem_verts:
             anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
-    elif self.name == operations['copy']['text'] or self.name == operations['pauli']['text']:
+    elif self.name == rules_basic['copy']['text'] or self.name == operations['pauli']['text']:
         anim_before = QParallelAnimationGroup()
         for m in matches:
             anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
@@ -310,7 +310,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         anim_after = QParallelAnimationGroup()
         for m in matches:
             anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
-    elif self.name == operations['bialgebra']['text']:
+    elif self.name == rules_basic['bialgebra']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
             anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v1],
