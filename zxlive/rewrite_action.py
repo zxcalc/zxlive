@@ -99,7 +99,10 @@ class RewriteAction:
                 matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]
             elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
-                matches = [verts.copy()] # type: ignore
+                if len(verts) == 0:
+                    matches = [list(g.vertices())] # type: ignore
+                else:
+                    matches = [verts.copy()] # type: ignore
             matches_list.extend(matches)
             if not matches:
                 break
@@ -150,7 +153,7 @@ class RewriteAction:
             g = copy.deepcopy(g)
         if self.match_type == MATCH_SINGLE:
             for v in verts:
-                if self.rule.is_match(g, v):
+                if self.rule.is_match(g, v): # type: ignore
                     self.enabled = True
                     return
             self.enabled = False
@@ -159,13 +162,13 @@ class RewriteAction:
             for e in edges:
                 s, t = g.edge_st(e)
                 if s == t: continue
-                if self.rule.is_match(g, s, t):
+                if self.rule.is_match(g, s, t): # type: ignore
                     self.enabled = True
                     return
             self.enabled = False
             return
         elif self.match_type == MATCH_COMPOUND:
-            self.enabled =  self.rule.is_match(g, verts)
+            self.enabled =  True #self.rule.is_match(g, verts)
             return
 
     @property
