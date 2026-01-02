@@ -229,7 +229,6 @@ class ProofStepView(QListView):
     """A view for displaying the steps in a proof."""
 
     def __init__(self, parent: 'ProofPanel'):
-        print("Initializing ProofStepView")
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack

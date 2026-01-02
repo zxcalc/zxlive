@@ -168,7 +168,13 @@ class RewriteAction:
             self.enabled = False
             return
         elif self.match_type == MATCH_COMPOUND:
-            self.enabled =  True #self.rule.is_match(g, verts)
+            if hasattr(self.rule, 'is_match'):
+                if self.rule.is_match(g, verts): # type: ignore
+                    self.enabled =  True
+                else:
+                    self.enabled =  False
+            else:
+                self.enabled =  True
             return
 
     @property

@@ -13,7 +13,7 @@ from pyzx.rewrite import Rewrite, RewriteSimpGraph
 
 from .common import ET, GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
-from .unfusion_rewrite import match_unfuse_single_vertex, apply_unfuse_rule
+from .unfusion_rewrite import unfusion_rewrite
 
 
 # operations = copy.deepcopy(editor_actions.operations)
@@ -300,20 +300,18 @@ rules_basic = {
     #     "rule": rewrite_strategy_to_rewrite(simplify.spider_simp),
     #     "type": MATCH_COMPOUND,
     # },
-    # 'unfuse': {
-    #     "text": "unfuse",
-    #     "tooltip": "Unfuse a spider",
-    #     # "matcher": match_unfuse_single_vertex,
-    #     "rule": apply_unfuse_rule,
-    #     "type": MATCH_SINGLE,
-    #     "copy_first": False,
-    # },
-    # 'ocm': {
-    #     "text": "OCM",
-    #     "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
-    #     "rule": rewrite_strategy_to_rewrite(ocm_rule),
-    #     "type": MATCH_COMPOUND,
-    # },
+    'unfuse': {
+        "text": "unfuse",
+        "tooltip": "Unfuse a spider",
+        "rule": unfusion_rewrite,
+        "type": MATCH_COMPOUND,
+    },
+    'ocm': {
+        "text": "OCM",
+        "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
+        "rule": rewrite_strategy_to_rewrite(ocm_rule),
+        "type": MATCH_COMPOUND,
+    },
     "hopf": {
         "text": "Hopf rule",
         "tooltip": "Applies the Hopf rule between pairs of spiders that share parallel edges",
