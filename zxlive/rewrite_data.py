@@ -7,7 +7,6 @@ from typing_extensions import TypedDict, NotRequired
 
 import pyzx
 from pyzx import simplify, extract_circuit
-# from pyzx.rewrite_rules import editor_actions
 from pyzx.graph import VertexType
 from pyzx.rewrite import Rewrite, RewriteSimpGraph
 
@@ -16,11 +15,8 @@ from .custom_rule import CustomRule
 from .unfusion_rewrite import unfusion_rewrite
 
 
-# operations = copy.deepcopy(editor_actions.operations)
-
 MatchType = Literal[1, 2, 3]
 
-# Copied from pyzx.editor_actions
 MATCH_SINGLE: MatchType = 1
 MATCH_DOUBLE: MatchType = 2
 MATCH_COMPOUND: MatchType = 3
@@ -268,7 +264,7 @@ rules_basic = {
     },
     'fuse_simp': {
         "text": "Fuse spiders",
-        "tooltip": "Fuses connected spiders of the same color",
+        "tooltip": "Fuses connected spiders of the same color, also works for W-spiders",
         "rule": simplify.fuse_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": True
@@ -335,10 +331,6 @@ rules_basic = {
         "type": MATCH_DOUBLE,
     },
 }
-
-# rules_basic = ["spider", "unfuse", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
-#                "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
-
 
 # rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
 
