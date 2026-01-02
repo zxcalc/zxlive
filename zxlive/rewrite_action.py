@@ -88,18 +88,18 @@ class RewriteAction:
         verts, edges = panel.parse_selection()
 
         rem_verts_list: list[VT] = []
-        matches_list: list[VT | tuple[VT, VT]] = []
+        matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
         while True:
-            matches: list[VT | tuple[VT, VT]] = []
+            matches: list[VT | tuple[VT, VT] | list[VT]] = []
             if isinstance(self.rule, CustomRule):
-                matches = self.rule.is_match(g, verts) # type: ignore
+                matches = [self.rule.is_match(g, verts)] # type: ignore
             elif self.match_type == MATCH_SINGLE:
-                matches = [v for v in verts if self.rule.is_match(g, v)]
+                matches = [v for v in verts if self.rule.is_match(g, v)]  # type: ignore
             elif self.match_type == MATCH_DOUBLE:
                 matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]
             elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
-                matches = verts.copy() # type: ignore
+                matches = [verts.copy()] # type: ignore
             matches_list.extend(matches)
             if not matches:
                 break

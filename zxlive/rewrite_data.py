@@ -283,12 +283,14 @@ rules_basic = {
     'copy': {
         "text": "copy 0/pi spider through its neighbour", 
         "tooltip": "Copies a single-legged spider with a 0/pi phase through its neighbor",
+        "picture": "copy_pi.png",
         "rule": simplify.copy_simp,
         "type": MATCH_SINGLE,
     },
     "pauli": {
         "text": "push Pauli", 
         "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
+        "picture": "push_pauli.png",
         "rule": simplify.push_pauli_rewrite,
         "type": MATCH_DOUBLE
     },
@@ -328,6 +330,7 @@ rules_basic = {
     'bialgebra': {
         "text": "bialgebra",
         "tooltip": "Apply bialgebra to connected spiders of different colors",
+        "picture": "bialgebra.png",
         "rule": simplify.bialg_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": False
@@ -337,11 +340,6 @@ rules_basic = {
 # rules_basic = ["spider", "unfuse", "rem_id", "copy", "pauli", "hopf", "remove_self_loops",
 #                "bialgebra", "bialgebra_op", "euler", "to_z", "to_x"]
 
-# operations["spider"]["repeat_rule_application"] = True
-# operations["rem_id"]["repeat_rule_application"] = True
-# operations["pauli"]["picture"] = "push_pauli.png"
-# operations["copy"]["picture"] = "copy_pi.png"
-# operations["bialgebra"]["picture"] = "bialgebra.png"
 
 # rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
 
