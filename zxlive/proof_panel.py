@@ -494,7 +494,7 @@ class ProofPanel(BasePanel):
         """When an edge is double clicked, we change it to an H-box if it is a Hadamard edge."""
         new_g = copy.deepcopy(self.graph)
         if new_g.edge_type(e) == EdgeType.HADAMARD:
-            pyzx.rewrite_rules.had_edge_to_hbox(new_g, e)
+            pyzx.rewrite_rules.had_edge_to_hbox(new_g, *new_g.edge_st(e))
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
             self.undo_stack.push(cmd)
 
