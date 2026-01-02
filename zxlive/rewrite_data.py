@@ -260,78 +260,72 @@ def ocm_rule(_graph: GraphT) -> int:
 
 rules_basic = {
     'id_simp': {
-        "text": "remove identity",
+        "text": "Remove identity",
         "tooltip": "Removes a 2-ary phaseless spider",
         "rule": simplify.id_simp,
         "type": MATCH_SINGLE,
         "repeat_rule_application": True
     },
     'fuse_simp': {
-        "text": "fuse spiders",
+        "text": "Fuse spiders",
         "tooltip": "Fuses connected spiders of the same color",
         "rule": simplify.fuse_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": True
     },
     'remove_self_loops': {
-        "text": "remove self-loops",
+        "text": "Remove self-loops",
         "tooltip": "Removes all self-loops on a spider",
         "rule": simplify.remove_self_loop_simp,
         "type": MATCH_SINGLE,
         "repeat_rule_application": True
     },
+    "hopf": {
+        "text": "Remove parallel edges",
+        "tooltip": "Applies the Hopf rule between pairs of spiders that share parallel edges",
+        "rule": simplify.hopf_simp,
+        "type": MATCH_DOUBLE,
+        "repeat_rule_application": True
+    },
+    'unfuse': {
+        "text": "Unfuse spider",
+        "tooltip": "Unfuse a spider",
+        "rule": unfusion_rewrite,
+        "type": MATCH_COMPOUND,
+    },
+    'ocm': {
+        "text": "Save changed positions",
+        "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
+        "rule": rewrite_strategy_to_rewrite(ocm_rule),
+        "type": MATCH_COMPOUND,
+    },
     'copy': {
-        "text": "copy 0/pi spider through its neighbour", 
+        "text": "Copy 0/pi spider through its neighbour", 
         "tooltip": "Copies a single-legged spider with a 0/pi phase through its neighbor",
         "picture": "copy_pi.png",
         "rule": simplify.copy_simp,
         "type": MATCH_SINGLE,
     },
     "pauli": {
-        "text": "push Pauli", 
+        "text": "Push Pauli", 
         "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
         "picture": "push_pauli.png",
         "rule": simplify.push_pauli_rewrite,
         "type": MATCH_DOUBLE
     },
-    # 'spider_simp': {
-    #     "text": "fuse spiders",
-    #     "tooltip": "Fuses connected spiders of the same color",
-    #     "rule": rewrite_strategy_to_rewrite(simplify.spider_simp),
-    #     "type": MATCH_COMPOUND,
-    # },
-    'unfuse': {
-        "text": "unfuse",
-        "tooltip": "Unfuse a spider",
-        "rule": unfusion_rewrite,
-        "type": MATCH_COMPOUND,
-    },
-    'ocm': {
-        "text": "OCM",
-        "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
-        "rule": rewrite_strategy_to_rewrite(ocm_rule),
-        "type": MATCH_COMPOUND,
-    },
-    "hopf": {
-        "text": "Hopf rule",
-        "tooltip": "Applies the Hopf rule between pairs of spiders that share parallel edges",
-        "rule": simplify.hopf_simp,
-        "type": MATCH_DOUBLE,
-        "repeat_rule_application": True
-    },
-    "euler": {
-        "text": "decompose Hadamard", 
-        "tooltip": "Expands a Hadamard-edge into its component spiders using its Euler decomposition",
-        "rule": simplify.euler_expansion_rewrite,
-        "type": MATCH_DOUBLE,
-    },
     'bialgebra': {
-        "text": "bialgebra",
+        "text": "Bialgebra",
         "tooltip": "Apply bialgebra to connected spiders of different colors",
         "picture": "bialgebra.png",
         "rule": simplify.bialg_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": False
+    },
+    "euler": {
+        "text": "Decompose Hadamard", 
+        "tooltip": "Expands a Hadamard-edge into its component spiders using its Euler decomposition",
+        "rule": simplify.euler_expansion_rewrite,
+        "type": MATCH_DOUBLE,
     },
 }
 
