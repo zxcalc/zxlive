@@ -163,7 +163,7 @@ class ProofPanel(BasePanel):
         if pyzx.rewrite_rules.check_fuse(g, v, w):
             pyzx.rewrite_rules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "fuse spiders")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.rewrite_rules.check_copy(g, v):
@@ -174,7 +174,7 @@ class ProofPanel(BasePanel):
             # g.remove_edges(rem_edges)
             # g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_pauli(g, w, v): # Second parameter is the Pauli
             # Check if we can push a Pauli spider through the other vertex
@@ -183,12 +183,12 @@ class ProofPanel(BasePanel):
             # The match is (pauli_vertex, target_vertex)
             target = w
             anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "push Pauli")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli")
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_bialgebra(g, v, w):
             pyzx.rewrite_rules.bialgebra(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity")
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
         else:
@@ -229,7 +229,7 @@ class ProofPanel(BasePanel):
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Hopf")
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
             self.undo_stack.push(cmd)
             return True
         return False
@@ -260,7 +260,7 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "add identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity")
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
@@ -332,7 +332,7 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph)
         pyzx.rewrite_rules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity")
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
@@ -472,7 +472,7 @@ class ProofPanel(BasePanel):
         if ty in (VertexType.Z, VertexType.X):
             new_g = copy.deepcopy(self.graph)
             pyzx.rewrite_rules.color_change(new_g, v)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Color change spider")
             self.undo_stack.push(cmd)
             return
         if ty == VertexType.H_BOX:

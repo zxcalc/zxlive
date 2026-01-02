@@ -314,12 +314,19 @@ rules_basic = {
         "type": MATCH_DOUBLE
     },
     'bialgebra': {
-        "text": "Bialgebra",
-        "tooltip": "Apply bialgebra to connected spiders of different colors",
+        "text": "Strong complementarity",
+        "tooltip": "Apply the strong complementarity rule to connected spiders of different colors",
         "picture": "bialgebra.png",
         "rule": simplify.bialg_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": False
+    },
+    'bialgebra_op': {
+        "text": "Strong complementarity in opposite direction",
+        "tooltip": "Apply strong complementarity from right to left, matching on complete bipartite graph of Z- and X-spiders",
+        "picture": "bialgebra.png",
+        "rule": simplify.bialg_op_simp,
+        "type": MATCH_COMPOUND,
     },
     "euler": {
         "text": "Decompose Hadamard", 
