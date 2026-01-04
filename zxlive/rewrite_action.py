@@ -528,9 +528,23 @@ class RewriteActionTreeView(QTreeView):
             subprocess.run(["xdg-open", abs_path], check=False)
 
     def refresh_rewrites_model(self) -> None:
+        # Preserve expanded state
+        expanded_indexes = []
+        if self.model():
+            for row in range(self.model().rowCount()):
+                index = self.model().index(row, 0)
+                if self.isExpanded(index):
+                    expanded_indexes.append(self.model().index(row, 0).data())
+        # Refresh the custom rules and update the model
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
         self.setModel(model)
-        self.expand(model.index(0, 0))
+        if not expanded_indexes:
+            self.expand(model.index(0, 0))
+        else:
+            for row in range(model.rowCount()):
+                index = model.index(row, 0)
+                if index.data() in expanded_indexes:
+                    self.expand(index)
         self.clicked.connect(model.do_rewrite)
         self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
