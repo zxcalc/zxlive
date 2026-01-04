@@ -14,7 +14,7 @@ from pyzx.rewrite import Rewrite
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen, QAction
-from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QInputDialog, QMessageBox
+from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
 
 
 from .animations import make_animation
