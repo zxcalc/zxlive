@@ -5,11 +5,11 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import Callable, TYPE_CHECKING, cast, Union, Optional
+from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 import pyzx
-from pyzx.utils import VertexType
+from pyzx.rewrite import Rewrite
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
@@ -21,22 +21,25 @@ from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
-from .rewrite_data import is_rewrite_data, RewriteData, MatchType, MATCHES_VERTICES, refresh_custom_rules, action_groups
+from .rewrite_data import (is_rewrite_data, RewriteData, 
+                           MatchType, MATCH_SINGLE, MATCH_DOUBLE, MATCH_COMPOUND,
+                           refresh_custom_rules, action_groups)
 from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
+from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-operations = copy.deepcopy(pyzx.editor.operations)
+# operations = copy.deepcopy(pyzx.editor.operations)
 
 
 @dataclass
 class RewriteAction:
     name: str
-    matcher: Callable[[GraphT, Callable], list]
-    rule: Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
+    # matcher: Callable[[GraphT, Callable], list]
+    rule: Rewrite#Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
     match_type: MatchType
     tooltip_str: str
     picture_path: Optional[str] = field(default=None)
@@ -62,7 +65,6 @@ class RewriteAction:
             picture_path = None
         return cls(
             name=d['text'],
-            matcher=d['matcher'],
             rule=d['rule'],
             match_type=d['type'],
             tooltip_str=d['tooltip'],
@@ -80,7 +82,7 @@ class RewriteAction:
         if not self.enabled:
             return
 
-        # Special handling for unfusion rule
+        # Special handling for unfusion rule, since this launches a dialog
         if self.name == "unfuse":
             from .unfusion_rewrite import UnfusionRewriteAction
             verts, _ = panel.parse_selection()
@@ -93,34 +95,41 @@ class RewriteAction:
         verts, edges = panel.parse_selection()
 
         rem_verts_list: list[VT] = []
-        matches_list: list[VT | ET] = []
+        matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
         while True:
-            if self.match_type == MATCHES_VERTICES:
-                matches = self.matcher(
-                    g,
-                    lambda v: v in verts and g.type(v) != VertexType.DUMMY
-                )
-            else:
-                matches = self.matcher(
-                    g,
-                    lambda e: (
-                        e in edges and
-                        g.type(g.edge_s(e)) != VertexType.DUMMY and
-                        g.type(g.edge_t(e)) != VertexType.DUMMY
-                    )
-                )
+            matches: list[VT | tuple[VT, VT] | list[VT]] = []
+            if isinstance(self.rule, CustomRule):
+                matches = [self.rule.is_match(g, verts)] # type: ignore
+            elif self.match_type == MATCH_SINGLE:
+                matches = [v for v in verts if self.rule.is_match(g, v)]  # type: ignore
+            elif self.match_type == MATCH_DOUBLE:
+                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]
+            elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
+                # if self.rule.is_match(g, verts):
+                if len(verts) == 0:
+                    matches = [list(g.vertices())] # type: ignore
+                else:
+                    matches = [verts.copy()] # type: ignore
             matches_list.extend(matches)
             if not matches:
                 break
             try:
-                g, rem_verts = self.apply_rewrite(g, matches)
-                rem_verts_list.extend(rem_verts)
+                applied = False
+                for m in matches:
+                    if self.match_type == MATCH_DOUBLE:
+                        v1, v2 = cast(tuple[VT, VT], m)
+                        if self.rule.apply(g, v1, v2):
+                            applied = True
+                    elif self.rule.apply(g, m):
+                        applied = True
+                # g, rem_verts = self.apply_rewrite(g, matches)
+                # rem_verts_list.extend(rem_verts)
             except Exception as ex:
                 show_error_msg('Error while applying rewrite rule', str(ex))
                 return
-            if not self.repeat_rule_application:
+            if not self.repeat_rule_application or not applied:
                 break
-
+                
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
@@ -132,22 +141,48 @@ class RewriteAction:
             assert isinstance(graph, GraphT)
             return graph, []
 
-        rewrite = self.rule(g, matches)
-        assert isinstance(rewrite, tuple) and len(rewrite) == 4
-        etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
-        g.remove_edges(rem_edges)
-        g.remove_vertices(rem_verts)
-        g.add_edge_table(etab)
-        return g, rem_verts
+        for m in matches:
+            if self.match_type == MATCH_DOUBLE:
+                v1, v2 = cast(tuple[VT, VT], m)
+                self.rule.apply(g, v1, v2)
+            else: self.rule.apply(g, m)
+        # rewrite = self.rule(g, matches)
+        # assert isinstance(rewrite, tuple) and len(rewrite) == 4
+        # etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
+        # g.remove_edges(rem_edges)
+        # g.remove_vertices(rem_verts)
+        # g.add_edge_table(etab)
+        # return g, rem_verts
+        return g, []
 
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         if self.copy_first:
             g = copy.deepcopy(g)
-        self.enabled = bool(
-            self.matcher(g, lambda v: v in verts)
-            if self.match_type == MATCHES_VERTICES
-            else self.matcher(g, lambda e: e in edges)
-        )
+        if self.match_type == MATCH_SINGLE:
+            for v in verts:
+                if self.rule.is_match(g, v): # type: ignore
+                    self.enabled = True
+                    return
+            self.enabled = False
+            return
+        elif self.match_type == MATCH_DOUBLE:
+            for e in edges:
+                s, t = g.edge_st(e)
+                if s == t: continue
+                if self.rule.is_match(g, s, t): # type: ignore
+                    self.enabled = True
+                    return
+            self.enabled = False
+            return
+        elif self.match_type == MATCH_COMPOUND:
+            if hasattr(self.rule, 'is_match'):
+                if self.rule.is_match(g, verts): # type: ignore
+                    self.enabled =  True
+                else:
+                    self.enabled =  False
+            else:
+                self.enabled =  True
+            return
 
     @property
     def tooltip(self) -> str:

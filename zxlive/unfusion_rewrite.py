@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable
 
 import pyzx
 from pyzx.utils import VertexType, FractionLike
+from pyzx.rewrite import Rewrite, RewriteSimpGraph
 
 from .common import VT, ET, GraphT
 from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
@@ -14,9 +15,8 @@ if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 
-def match_unfuse_single_vertex(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
+def match_unfuse_single_vertex(graph: GraphT, vertices: list[VT]) -> list[VT]:
     """Matcher for unfusion - matches single selected vertices that can be unfused."""
-    vertices = [v for v in graph.vertices() if matches(v)]
     if len(vertices) == 1 and (graph.type(vertices[0]) not in (VertexType.BOUNDARY,
                                                                VertexType.DUMMY,
                                                                VertexType.H_BOX,
@@ -31,8 +31,11 @@ def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rewrite_rules.r
     # This function should not be called directly for the interactive unfusion
     # It's here for compatibility with the rewrite system structure
     # The actual unfusion logic is handled by the UnfusionRewriteAction
-    return ({}, [], [], True)
+    raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+    return True
 
+unfusion_rewrite = RewriteSimpGraph(apply_unfuse_rule, apply_unfuse_rule)
+unfusion_rewrite.is_match = match_unfuse_single_vertex
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""

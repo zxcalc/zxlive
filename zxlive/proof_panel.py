@@ -9,9 +9,7 @@ from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
 
 import pyzx
-from pyzx import basicrules
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.rewrite_rules import editor_actions
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
@@ -147,13 +145,13 @@ class ProofPanel(BasePanel):
 
     def _vertex_dragged(self, state: DragState, v: VT, w: VT) -> None:
         if state == DragState.Onto:
-            if pyzx.basicrules.check_fuse(self.graph, v, w):
+            if pyzx.rewrite_rules.check_fuse(self.graph, v, w):
                 anims.anticipate_fuse(self.graph_scene.vertex_map[w])
-            elif pyzx.basicrules.check_strong_comp(self.graph, v, w):
+            elif pyzx.rewrite_rules.check_bialgebra(self.graph, v, w):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif pyzx.hrules.match_copy(self.graph, lambda x: x in (v, w)):  # This function takes a vertex matching function, which we restrict to just match to v and w
+            elif pyzx.rewrite_rules.check_copy(self.graph, v):  # TODO: Should check if copy can be applied between v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif editor_actions.pauli_matcher(self.graph, lambda x: x in (v, w)):
+            elif pyzx.rewrite_rules.check_pauli(self.graph, w, v): # Second parameter is the Pauli
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
@@ -161,39 +159,36 @@ class ProofPanel(BasePanel):
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
         g = copy.deepcopy(self.graph)
         if len(list(self.graph.edges(v, w))) == 1 and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
-            basicrules.color_change(g, w)
-        if pyzx.basicrules.check_fuse(g, v, w):
-            pyzx.basicrules.fuse(g, w, v)
+            pyzx.rewrite_rules.color_change(g, w)
+        if pyzx.rewrite_rules.check_fuse(g, v, w):
+            pyzx.rewrite_rules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "fuse spiders")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
-        elif pyzx.hrules.match_copy(g, lambda x: x in (v, w)):
-            copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
-            g.add_edge_table(etab)
-            g.remove_edges(rem_edges)
-            g.remove_vertices(rem_verts)
+        elif pyzx.rewrite_rules.check_copy(g, v):
+            pyzx.rewrite_rules.copy(g, v)
+            # copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
+            # etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
+            # g.add_edge_table(etab)
+            # g.remove_edges(rem_edges)
+            # g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "copy")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
             self.undo_stack.push(cmd, anim_after=anim)
-        elif editor_actions.pauli_matcher(g, lambda x: x in (v, w)):
+        elif pyzx.rewrite_rules.check_pauli(g, w, v): # Second parameter is the Pauli
             # Check if we can push a Pauli spider through the other vertex
-            pauli_match = editor_actions.pauli_matcher(g, lambda x: x in (v, w))
-            etab, rem_verts, rem_edges, check_isolated_vertices = editor_actions.pauli_push(g, pauli_match)
-            g.add_edge_table(etab)
-            g.remove_edges(rem_edges)
-            g.remove_vertices(rem_verts)
+            pyzx.rewrite_rules.pauli_push(g, w, v)
             # Determine which vertex is the target (the one being pushed through)
             # The match is (pauli_vertex, target_vertex)
-            target = pauli_match[0][1] if pauli_match else w
+            target = w
             anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "push Pauli")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli")
             self.undo_stack.push(cmd, anim_after=anim)
-        elif pyzx.basicrules.check_strong_comp(g, v, w):
-            pyzx.basicrules.strong_comp(g, w, v)
+        elif pyzx.rewrite_rules.check_bialgebra(g, v, w):
+            pyzx.rewrite_rules.bialgebra(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "bialgebra")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity")
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
         else:
@@ -234,7 +229,7 @@ class ProofPanel(BasePanel):
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Hopf")
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
             self.undo_stack.push(cmd)
             return True
         return False
@@ -265,7 +260,7 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "add identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity")
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
@@ -280,7 +275,7 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX, VertexType.W_OUTPUT):
             return False
 
-        if not trace.shift and basicrules.check_remove_id(self.graph, vertex):
+        if not trace.shift and pyzx.rewrite_rules.check_remove_id(self.graph, vertex):
             self._remove_id(vertex)
             return True
 
@@ -335,9 +330,9 @@ class ProofPanel(BasePanel):
 
     def _remove_id(self, v: VT) -> None:
         new_g = copy.deepcopy(self.graph)
-        basicrules.remove_id(new_g, v)
+        pyzx.rewrite_rules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "remove identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity")
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
@@ -476,15 +471,15 @@ class ProofPanel(BasePanel):
             return
         if ty in (VertexType.Z, VertexType.X):
             new_g = copy.deepcopy(self.graph)
-            basicrules.color_change(new_g, v)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "color change")
+            pyzx.rewrite_rules.color_change(new_g, v)
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Color change spider")
             self.undo_stack.push(cmd)
             return
         if ty == VertexType.H_BOX:
             new_g = copy.deepcopy(self.graph)
-            if not pyzx.hrules.is_hadamard(new_g, v):
+            if not pyzx.rewrite_rules.check_hadamard(new_g, v):
                 return
-            pyzx.hrules.replace_hadamard(new_g, v)
+            pyzx.rewrite_rules.replace_hadamard(new_g, v)
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
             self.undo_stack.push(cmd)
             return
@@ -499,7 +494,7 @@ class ProofPanel(BasePanel):
         """When an edge is double clicked, we change it to an H-box if it is a Hadamard edge."""
         new_g = copy.deepcopy(self.graph)
         if new_g.edge_type(e) == EdgeType.HADAMARD:
-            pyzx.hrules.had_edge_to_hbox(new_g, e)
+            pyzx.rewrite_rules.had_edge_to_hbox(new_g, *new_g.edge_st(e))
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
             self.undo_stack.push(cmd)
 
