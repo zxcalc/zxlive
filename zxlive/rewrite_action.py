@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -10,8 +13,8 @@ from pyzx.rewrite import Rewrite
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
-from PySide6.QtGui import QPixmap, QColor, QPen
-from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView
+from PySide6.QtGui import QPixmap, QColor, QPen, QAction
+from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QInputDialog, QMessageBox
 
 
 from .animations import make_animation
@@ -49,6 +52,8 @@ class RewriteAction:
     returns_new_graph: bool = field(default=False)
     enabled: bool = field(default=False)
     repeat_rule_application: bool = False
+    is_custom_rule: bool = field(default=False)
+    file_path: Optional[str] = field(default=None)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -69,6 +74,8 @@ class RewriteAction:
             copy_first=d.get('copy_first', False),
             returns_new_graph=d.get('returns_new_graph', False),
             repeat_rule_application=d.get('repeat_rule_application', False),
+            is_custom_rule=d.get('custom_rule', False),
+            file_path=d.get('file_path', None),
         )
 
     def do_rewrite(self, panel: ProofPanel) -> None:
@@ -122,7 +129,7 @@ class RewriteAction:
                 return
             if not self.repeat_rule_application or not applied:
                 break
-                
+
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
@@ -405,16 +412,109 @@ class RewriteActionTreeView(QTreeView):
             ''')
 
     def show_context_menu(self, position: QPoint) -> None:
+        index = self.indexAt(position)
         context_menu = QMenu(self)
+
+        # Check if the clicked item is a custom rule
+        is_custom = False
+        rewrite_action = None
+        if index.isValid():
+            node = cast(RewriteActionTree, index.internalPointer())
+            if node.is_rewrite:
+                rewrite_action = node.rewrite_action
+                is_custom = rewrite_action.is_custom_rule
+
+        if is_custom and rewrite_action and rewrite_action.file_path:
+            # Add custom rule specific options
+            edit_action = QAction("Edit", self)
+            edit_action.triggered.connect(lambda: self._edit_custom_rule(rewrite_action.file_path))
+            context_menu.addAction(edit_action)
+
+            delete_action = QAction("Delete", self)
+            delete_action.triggered.connect(lambda: self._delete_custom_rule(rewrite_action))
+            context_menu.addAction(delete_action)
+
+            context_menu.addSeparator()
+
+            show_in_folder_action = QAction("Show in folder", self)
+            show_in_folder_action.triggered.connect(lambda: self._show_in_folder(rewrite_action.file_path))
+            context_menu.addAction(show_in_folder_action)
+
+            context_menu.addSeparator()
+
         refresh_rules = context_menu.addAction("Refresh rules")
         action = context_menu.exec_(self.mapToGlobal(position))
         if action == refresh_rules:
             self.refresh_rewrites_model()
 
+    def _edit_custom_rule(self, file_path: Optional[str]) -> None:
+        """Open the custom rule file for editing."""
+        if not file_path or not os.path.exists(file_path):
+            return
+        main_window = self.proof_panel.window()
+        if hasattr(main_window, 'open_file_from_path'):
+            main_window.open_file_from_path(file_path)
+
+    def _delete_custom_rule(self, rewrite_action: RewriteAction) -> None:
+        """Delete the custom rule file after confirmation."""
+        if not rewrite_action.file_path or not os.path.exists(rewrite_action.file_path):
+            return
+
+        rule_name = rewrite_action.name
+        reply = QMessageBox.question(
+            self,
+            "Delete Custom Rule",
+            f"Are you sure you want to delete the custom rule '{rule_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                os.remove(rewrite_action.file_path)
+                self.refresh_rewrites_model()
+            except Exception as e:
+                QMessageBox.warning(self, "Delete Failed", f"Could not delete custom rule: {str(e)}")
+
+    def _show_in_folder(self, file_path: Optional[str]) -> None:
+        """Open the folder containing the custom rule file in the system file explorer."""
+        if not file_path or not os.path.exists(file_path):
+            return
+
+        folder_path = os.path.dirname(file_path)
+        if not os.path.isdir(folder_path):
+            return
+
+        abs_path = os.path.abspath(folder_path)
+        # Basic security check: ensure path is a real directory
+        if not os.path.isdir(abs_path):
+            return
+
+        if sys.platform == "win32":
+            os.startfile(abs_path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", abs_path], check=False)
+        else:
+            subprocess.run(["xdg-open", abs_path], check=False)
+
     def refresh_rewrites_model(self) -> None:
+        # Preserve expanded state
+        expanded_indexes = []
+        if self.model():
+            for row in range(self.model().rowCount()):
+                index = self.model().index(row, 0)
+                if self.isExpanded(index):
+                    expanded_indexes.append(self.model().index(row, 0).data())
+        # Refresh the custom rules and update the model
         refresh_custom_rules()
         model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
         self.setModel(model)
-        self.expand(model.index(0, 0))
+        if not expanded_indexes:
+            self.expand(model.index(0, 0))
+        else:
+            for row in range(model.rowCount()):
+                index = model.index(row, 0)
+                if index.data() in expanded_indexes:
+                    self.expand(index)
         self.clicked.connect(model.do_rewrite)
         self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
