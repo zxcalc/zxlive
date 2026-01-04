@@ -129,7 +129,7 @@ class RewriteAction:
                 return
             if not self.repeat_rule_application or not applied:
                 break
-                
+
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
@@ -430,12 +430,6 @@ class RewriteActionTreeView(QTreeView):
             edit_action.triggered.connect(lambda: self._edit_custom_rule(rewrite_action.file_path))
             context_menu.addAction(edit_action)
 
-            rename_action = QAction("Rename", self)
-            rename_action.triggered.connect(lambda: self._rename_custom_rule(rewrite_action))
-            context_menu.addAction(rename_action)
-
-            context_menu.addSeparator()
-
             delete_action = QAction("Delete", self)
             delete_action.triggered.connect(lambda: self._delete_custom_rule(rewrite_action))
             context_menu.addAction(delete_action)
@@ -460,30 +454,6 @@ class RewriteActionTreeView(QTreeView):
         main_window = self.proof_panel.window()
         if hasattr(main_window, 'open_file_from_path'):
             main_window.open_file_from_path(file_path)
-
-    def _rename_custom_rule(self, rewrite_action: RewriteAction) -> None:
-        """Rename the custom rule file."""
-        if not rewrite_action.file_path or not os.path.exists(rewrite_action.file_path):
-            return
-
-        old_name = rewrite_action.name
-        new_name, ok = QInputDialog.getText(self, "Rename Custom Rule", "Enter new name:", text=old_name)
-        if not ok or not new_name or new_name == old_name:
-            return
-
-        old_path = rewrite_action.file_path
-        dir_path = os.path.dirname(old_path)
-        new_path = os.path.join(dir_path, new_name + ".zxr")
-
-        if os.path.exists(new_path):
-            QMessageBox.warning(self, "Rename Failed", f"A custom rule named '{new_name}' already exists.")
-            return
-
-        try:
-            os.rename(old_path, new_path)
-            self.refresh_rewrites_model()
-        except Exception as e:
-            QMessageBox.warning(self, "Rename Failed", f"Could not rename custom rule: {str(e)}")
 
     def _delete_custom_rule(self, rewrite_action: RewriteAction) -> None:
         """Delete the custom rule file after confirmation."""
