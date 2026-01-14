@@ -104,6 +104,72 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
     },
 }
 
+rewrites_fault_tolerant: dict[str, RewriteData] = {
+    "Elim Rewrite": {
+        "text": "Elim Rewrite",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.elim_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Fuse-1 Rewrite": {
+        "text": "Fuse-1 Rewrite",
+        "tooltip": "temp",  
+        "rule": pyzx.ft_simplify.fuse_1_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Unfuse-1 Rewrite": {
+        "text": "Unfuse-1 Rewrite",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Unfuse-4 Simp": {
+        "text": "Unfuse-4 Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Unfuse-5 Simp": {
+        "text": "Unfuse-5 Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Unfuse-2n Simp": {
+        "text": "Unfuse-2n Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Unfuse-2n Plus Simp": {
+        "text": "Unfuse-2n Plus Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    "Recursive Unfuse Simp": {
+        "text": "Recursive Unfuse Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "repeat_rule_application": True
+    },
+    }
 
 def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
     """Returns a list of vertices in the selection or all vertices if no selection is made."""
@@ -338,6 +404,7 @@ rules_basic = {
 
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
+
 action_groups = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
@@ -345,6 +412,7 @@ action_groups = {
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
     "Simplification routines": simplifications,
+    "Fault Equivalent Rewrites": rewrites_fault_tolerant,
 }
 
 
