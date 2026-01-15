@@ -109,7 +109,7 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
         "text": "Elim Rewrite",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.elim_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
         "repeat_rule_application": True
     },
@@ -117,57 +117,56 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
         "text": "Fuse-1 Rewrite",
         "tooltip": "temp",  
         "rule": pyzx.ft_simplify.fuse_1_FE_simp,
-        "type": MATCH_COMPOUND,
-        "copy_first": False,
+        "type": MATCH_DOUBLE,
         "repeat_rule_application": True
     },
     "Unfuse-1 Rewrite": {
         "text": "Unfuse-1 Rewrite",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": False
     },
     "Unfuse-4 Simp": {
         "text": "Unfuse-4 Simp",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": False
     },
     "Unfuse-5 Simp": {
         "text": "Unfuse-5 Simp",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": False
     },
     "Unfuse-2n Simp": {
         "text": "Unfuse-2n Simp",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": False
     },
     "Unfuse-2n Plus Simp": {
         "text": "Unfuse-2n Plus Simp",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": False
     },
     "Recursive Unfuse Simp": {
         "text": "Recursive Unfuse Simp",
         "tooltip": "temp",
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
-        "type": MATCH_COMPOUND,
+        "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": False
     },
     }
 

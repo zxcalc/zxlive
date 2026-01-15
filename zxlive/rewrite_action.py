@@ -103,7 +103,7 @@ class RewriteAction:
             elif self.match_type == MATCH_SINGLE:
                 matches = [v for v in verts if self.rule.is_match(g, v)]  # type: ignore
             elif self.match_type == MATCH_DOUBLE:
-                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]
+                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))] # type: ignore
             elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
                 if len(verts) == 0:
