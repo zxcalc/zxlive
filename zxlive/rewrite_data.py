@@ -55,121 +55,6 @@ def read_custom_rules() -> list[RewriteData]:
     return custom_rules
 
 
-rewrites_graph_theoretic: dict[str, RewriteData] = {
-    "lcomp": {
-        "text": "local complementation",
-        "tooltip": "Deletes a spider with a pi/2 phase by performing a local complementation on its neighbors",
-        "rule": pyzx.simplify.lcomp_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": True,
-        "picture": "lcomp.png"
-    },
-    "pivot": {
-        "text": "pivot",
-        "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
-        "rule": pyzx.simplify.pivot_simp,
-        "type": MATCH_DOUBLE,
-        "copy_first": True,
-        "picture": "pivot_regular.png"
-    },
-    "pivot_boundary": {
-        "text": "boundary pivot",
-        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
-        "rule": pyzx.simplify.pivot_boundary_simp,
-        "type": MATCH_DOUBLE,
-        "copy_first": True
-    },
-    "pivot_gadget": {
-        "text": "gadget pivot",
-        "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
-        "rule": pyzx.simplify.pivot_gadget_simp,
-        "type": MATCH_DOUBLE,
-        "copy_first": True,
-        "picture": "pivot_gadget.png"
-    },
-    "phase_gadget_fuse": {
-        "text": "Fuse phase gadgets",
-        "tooltip": "Fuses two phase gadgets with the same connectivity.",
-        "rule": pyzx.simplify.gadget_simp,
-        "type": MATCH_COMPOUND,
-        "copy_first": True,
-        "picture": "gadget_fuse.png"
-    },
-    "supplementarity": {
-        "text": "Supplementarity",
-        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
-        "rule": pyzx.simplify.supplementarity_simp,
-        "type": MATCH_COMPOUND,
-        "copy_first": False
-    },
-}
-
-rewrites_fault_tolerant: dict[str, RewriteData] = {
-    "Elim Rewrite": {
-        "text": "Identity removal",
-        "tooltip": "Removes a 2-ary phaseless spider",
-        "rule": pyzx.ft_simplify.elim_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": True,
-        "picture": "FE_id_removal.png"
-    },
-    "Fuse-1 Rewrite": {
-        "text": "Fuse-1 Rewrite",
-        "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
-        "rule": pyzx.ft_simplify.fuse_1_FE_simp,
-        "type": MATCH_DOUBLE,
-        "repeat_rule_application": True
-    },
-    "Unfuse-1 Rewrite": {
-        "text": "Unfuse-1 Rewrite",
-        "tooltip": "temp",
-        "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
-    },
-    "Unfuse-4 Simp": {
-        "text": "Unfuse-4 Simp",
-        "tooltip": "temp",
-        "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
-    },
-    "Unfuse-5 Simp": {
-        "text": "Unfuse-5 Simp",
-        "tooltip": "temp",
-        "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
-    },
-    "Unfuse-2n Simp": {
-        "text": "Unfuse-2n Simp",
-        "tooltip": "temp",
-        "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
-    },
-    "Unfuse-2n Plus Simp": {
-        "text": "Unfuse-2n Plus Simp",
-        "tooltip": "temp",
-        "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
-    },
-    "Recursive Unfuse Simp": {
-        "text": "Recursive Unfuse Simp",
-        "tooltip": "temp",
-        "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
-    },
-    }
 
 def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
     """Returns a list of vertices in the selection or all vertices if no selection is made."""
@@ -218,6 +103,55 @@ def _extract_circuit(graph: GraphT) -> GraphT:
     simplify.full_reduce(graph)
     return cast(GraphT, extract_circuit(graph).to_graph())
 
+
+rewrites_graph_theoretic: dict[str, RewriteData] = {
+    "lcomp": {
+        "text": "local complementation",
+        "tooltip": "Deletes a spider with a pi/2 phase by performing a local complementation on its neighbors",
+        "rule": pyzx.simplify.lcomp_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": True,
+        "picture": "lcomp.png"
+    },
+    "pivot": {
+        "text": "pivot",
+        "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
+        "rule": pyzx.simplify.pivot_simp,
+        "type": MATCH_DOUBLE,
+        "copy_first": True,
+        "picture": "pivot_regular.png"
+    },
+    "pivot_boundary": {
+        "text": "boundary pivot",
+        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
+        "rule": pyzx.simplify.pivot_boundary_simp,
+        "type": MATCH_DOUBLE,
+        "copy_first": True
+    },
+    "pivot_gadget": {
+        "text": "gadget pivot",
+        "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
+        "rule": pyzx.simplify.pivot_gadget_simp,
+        "type": MATCH_DOUBLE,
+        "copy_first": True,
+        "picture": "pivot_gadget.png"
+    },
+    "phase_gadget_fuse": {
+        "text": "Fuse phase gadgets",
+        "tooltip": "Fuses two phase gadgets with the same connectivity.",
+        "rule": pyzx.simplify.gadget_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": True,
+        "picture": "gadget_fuse.png"
+    },
+    "supplementarity": {
+        "text": "Supplementarity",
+        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
+        "rule": pyzx.simplify.supplementarity_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False
+    },
+}
 
 
 simplifications: dict[str, RewriteData] = {
@@ -400,6 +334,73 @@ rules_basic = {
     },
 }
 
+rewrites_fault_tolerant = {
+    "Elim Rewrite": {
+        "text": "Identity removal",
+        "tooltip": "Removes a 2-ary phaseless spider",
+        "rule": pyzx.ft_simplify.elim_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": True,
+        "picture": "FE_id_removal.png"
+    },
+    "Fuse-1 Rewrite": {
+        "text": "Fuse-1 Rewrite",
+        "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
+        "rule": pyzx.ft_simplify.fuse_1_FE_simp,
+        "type": MATCH_SINGLE,
+        "repeat_rule_application": False
+    },
+    "Unfuse-1 Rewrite": {
+        "text": "Unfuse-1 Rewrite",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
+    "Unfuse-4 Simp": {
+        "text": "Unfuse-4 Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
+    "Unfuse-5 Simp": {
+        "text": "Unfuse-5 Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
+    "Unfuse-2n Simp": {
+        "text": "Unfuse-2n Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
+    "Unfuse-2n Plus Simp": {
+        "text": "Unfuse-2n Plus Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
+    "Recursive Unfuse Simp": {
+        "text": "Recursive Unfuse Simp",
+        "tooltip": "temp",
+        "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
+}
+
 # rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
 
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
@@ -411,7 +412,7 @@ action_groups = {
     "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
-    "Simplification routines": simplifications,
+    "Simplification routines": simplifications, 
     "Fault Equivalent Rewrites": rewrites_fault_tolerant,
 }
 
