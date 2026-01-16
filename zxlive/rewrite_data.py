@@ -106,16 +106,17 @@ rewrites_graph_theoretic: dict[str, RewriteData] = {
 
 rewrites_fault_tolerant: dict[str, RewriteData] = {
     "Elim Rewrite": {
-        "text": "Elim Rewrite",
-        "tooltip": "temp",
+        "text": "Identity removal",
+        "tooltip": "Removes a 2-ary phaseless spider",
         "rule": pyzx.ft_simplify.elim_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "picture": "FE_id_removal.png"
     },
     "Fuse-1 Rewrite": {
         "text": "Fuse-1 Rewrite",
-        "tooltip": "temp",  
+        "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
         "rule": pyzx.ft_simplify.fuse_1_FE_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": True
