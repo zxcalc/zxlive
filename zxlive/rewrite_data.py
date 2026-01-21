@@ -311,6 +311,12 @@ rules_basic = {
         "rule": simplify.push_pauli_rewrite,
         "type": MATCH_DOUBLE
     },
+     "cc": {
+        "text": "Colour change", 
+        "tooltip": "Changes the color of a given vertex",
+        "rule": simplify.color_change_rewrite,
+        "type": MATCH_SINGLE
+    },
     'bialgebra': {
         "text": "Strong complementarity",
         "tooltip": "Apply the strong complementarity rule to connected spiders of different colors",
@@ -344,56 +350,73 @@ rewrites_fault_tolerant = {
         "repeat_rule_application": True,
         "picture": "FE_id_removal.png"
     },
+    "pauli": {
+        "text": "Push Pauli", 
+        "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
+        "picture": "push_pauli.png",
+        "rule": simplify.push_pauli_rewrite,
+        "type": MATCH_DOUBLE
+    },
+     "cc": {
+        "text": "Colour change", 
+        "tooltip": "Changes the color of a given vertex",
+        "rule": simplify.color_change_rewrite,
+        "type": MATCH_SINGLE
+    },
     "Fuse-1 Rewrite": {
-        "text": "Fuse-1 Rewrite",
+        "text": "Fuse-1",
         "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
         "rule": pyzx.ft_simplify.fuse_1_FE_simp,
         "type": MATCH_SINGLE,
-        "repeat_rule_application": False
+        "repeat_rule_application": False,
+        "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-1 Rewrite": {
-        "text": "Unfuse-1 Rewrite",
-        "tooltip": "temp",
+        "text": "Unfuse-1",
+        "tooltip": "Unfuses connected spiders of the same color, guaranteeing one spider has no additional neighbours",
         "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": False
+        "repeat_rule_application": False,
+        "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-4 Simp": {
-        "text": "Unfuse-4 Simp",
-        "tooltip": "temp",
+        "text": "Unfuse-4",
+        "tooltip": "Unfuses a degree-4 spider into a square",
         "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": False
+        "repeat_rule_application": False,
+        "picture": "FE_(un)fuse_4.png"
     },
     "Unfuse-5 Simp": {
-        "text": "Unfuse-5 Simp",
-        "tooltip": "temp",
+        "text": "Unfuse-5",
+        "tooltip": "Unfuses a degree-5 spider into a pentagon",
         "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
         "repeat_rule_application": False
     },
     "Unfuse-2n Simp": {
-        "text": "Unfuse-2n Simp",
-        "tooltip": "temp",
+        "text": "Unfuse-2n",
+        "tooltip": "Unfuses a degree-2n spider into two degree-n spiders",
         "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": False
+        "repeat_rule_application": False,
+        "picture": "FE_(un)fuse_2n.png"
     },
     "Unfuse-2n Plus Simp": {
-        "text": "Unfuse-2n Plus Simp",
-        "tooltip": "temp",
+        "text": "Unfuse-2n Plus",
+        "tooltip": "Unfuses a degree-(2n + 1) spider into a degree-n spider and a degree-(n + 1) spider",
         "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
-        "repeat_rule_application": False
+        "repeat_rule_application": False,
     },
     "Recursive Unfuse Simp": {
-        "text": "Recursive Unfuse Simp",
-        "tooltip": "temp",
+        "text": "Recursive Unfuse",
+        "tooltip": "Recursively unfuses a spider",
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
@@ -409,7 +432,7 @@ rewrites_fault_tolerant = {
 action_groups = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
-    "Graph-like rules": rewrites_graph_theoretic,
+    # "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
     "Simplification routines": simplifications, 
