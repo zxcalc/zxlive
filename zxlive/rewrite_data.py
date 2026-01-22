@@ -342,7 +342,7 @@ rules_basic = {
 
 rewrites_fault_tolerant = {
     "Elim Rewrite": {
-        "text": "Identity removal",
+        "text": "FE Identity removal",
         "tooltip": "Removes a 2-ary phaseless spider",
         "rule": pyzx.ft_simplify.elim_FE_simp,
         "type": MATCH_SINGLE,
@@ -351,20 +351,20 @@ rewrites_fault_tolerant = {
         "picture": "FE_id_removal.png"
     },
     "pauli": {
-        "text": "Push Pauli", 
+        "text": "FE Push Pauli", 
         "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
         "picture": "push_pauli.png",
         "rule": simplify.push_pauli_rewrite,
         "type": MATCH_DOUBLE
     },
      "cc": {
-        "text": "Colour change", 
+        "text": "FE Colour change", 
         "tooltip": "Changes the color of a given vertex",
         "rule": simplify.color_change_rewrite,
         "type": MATCH_SINGLE
     },
     "Fuse-1 Rewrite": {
-        "text": "Fuse-1",
+        "text": "FE Fuse-1",
         "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
         "rule": pyzx.ft_simplify.fuse_1_FE_simp,
         "type": MATCH_SINGLE,
@@ -372,7 +372,7 @@ rewrites_fault_tolerant = {
         "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-1 Rewrite": {
-        "text": "Unfuse-1",
+        "text": "FE Unfuse-1",
         "tooltip": "Unfuses connected spiders of the same color, guaranteeing one spider has no additional neighbours",
         "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
         "type": MATCH_SINGLE,
@@ -381,7 +381,7 @@ rewrites_fault_tolerant = {
         "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-4 Simp": {
-        "text": "Unfuse-4",
+        "text": "FE Unfuse-4",
         "tooltip": "Unfuses a degree-4 spider into a square",
         "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
         "type": MATCH_SINGLE,
@@ -390,15 +390,23 @@ rewrites_fault_tolerant = {
         "picture": "FE_(un)fuse_4.png"
     },
     "Unfuse-5 Simp": {
-        "text": "Unfuse-5",
+        "text": "FE Unfuse-5",
         "tooltip": "Unfuses a degree-5 spider into a pentagon",
         "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
         "type": MATCH_SINGLE,
         "copy_first": False,
         "repeat_rule_application": False
     },
+     "Unfuse-n Simp": {
+        "text": "2FE Unfuse-n",
+        "tooltip": "Unfuses a degree-n spider into a n-sided polygon",
+        "rule": pyzx.ft_simplify.unfuse_n_2FE_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": False,
+        "repeat_rule_application": False
+    },
     "Unfuse-2n Simp": {
-        "text": "Unfuse-2n",
+        "text": "FE Unfuse-2n",
         "tooltip": "Unfuses a degree-2n spider into two degree-n spiders",
         "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
         "type": MATCH_SINGLE,
@@ -407,7 +415,7 @@ rewrites_fault_tolerant = {
         "picture": "FE_(un)fuse_2n.png"
     },
     "Unfuse-2n Plus Simp": {
-        "text": "Unfuse-2n Plus",
+        "text": "FE Unfuse-2n Plus",
         "tooltip": "Unfuses a degree-(2n + 1) spider into a degree-n spider and a degree-(n + 1) spider",
         "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
         "type": MATCH_SINGLE,
@@ -415,7 +423,7 @@ rewrites_fault_tolerant = {
         "repeat_rule_application": False,
     },
     "Recursive Unfuse Simp": {
-        "text": "Recursive Unfuse",
+        "text": "FE Recursive Unfuse",
         "tooltip": "Recursively unfuses a spider",
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
         "type": MATCH_SINGLE,
