@@ -54,6 +54,7 @@ class RewriteAction:
     repeat_rule_application: bool = False
     is_custom_rule: bool = field(default=False)
     file_path: Optional[str] = field(default=None)
+    current_weight: int = field(default=100)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -234,6 +235,11 @@ class RewriteAction:
         self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
         self.picture_path = None
         return self.tooltip_str
+    
+    def update_weight_considered(self, weight: int) -> None:
+        self.current_weight = weight
+        print("Updated weight considered for", self.name, "to", weight)
+        return
 
 
 @dataclass
