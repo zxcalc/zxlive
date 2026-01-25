@@ -367,6 +367,23 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
+    # Horizontal offset where the text/editor begins (just past the circular step symbol).
+    # Shared between paint() and updateEditorGeometry() so they cannot drift apart.
+    text_left_offset = line_width + 2 * line_padding
+
+    # Item rendering colours. Defined here so paint() and the editor stylesheet
+    # in createEditor() reference the same values and stay visually consistent.
+    bg_selected_dark = QColor(60, 80, 120)
+    bg_hover_dark = QColor(50, 60, 80)
+    bg_default_dark = QColor(35, 39, 46)
+    text_color_dark = QColor(224, 224, 224)
+    line_color_dark = QColor(180, 180, 180)
+    editor_border_dark = QColor(80, 128, 192)
+
+    bg_selected_light = QColor(204, 232, 255)
+    bg_hover_light = QColor(229, 243, 255)
+    editor_border_light = QColor(128, 176, 224)
+
     # TODO: Fix code complexity
     # noqa: complexipy
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
@@ -375,16 +392,16 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
             if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(60, 80, 120))
+                painter.setBrush(self.bg_selected_dark)
             elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(50, 60, 80))
+                painter.setBrush(self.bg_hover_dark)
             else:
-                painter.setBrush(QColor(35, 39, 46))
+                painter.setBrush(self.bg_default_dark)
         else:
             if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(204, 232, 255))
+                painter.setBrush(self.bg_selected_light)
             elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(229, 243, 255))
+                painter.setBrush(self.bg_hover_light)
             else:
                 painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
@@ -392,26 +409,26 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Draw line
         is_last = index.row() == index.model().rowCount() - 1
         line_rect = QRect(
-            self.line_padding,
+            int(option.rect.x() + self.line_padding),  # type: ignore[attr-defined]
             int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
             int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
         )
         if display_setting.dark_mode:
-            painter.setBrush(QColor(180, 180, 180))
+            painter.setBrush(self.line_color_dark)
         else:
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawRect(line_rect)
 
         # Draw circle
         if display_setting.dark_mode:
-            painter.setPen(QPen(QColor(180, 180, 180), self.circle_outline_width))
+            painter.setPen(QPen(self.line_color_dark, self.circle_outline_width))
         else:
             painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
         painter.setBrush(display_setting.effective_colors["z_spider"])
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
+            QPointF(option.rect.x() + self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
             circle_radius,
             circle_radius
         )
@@ -420,7 +437,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
+            int(option.rect.x() + self.text_left_offset),  # type: ignore[attr-defined]
             int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
@@ -430,8 +447,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             font.setWeight(QFont.Weight.Bold)
         painter.setFont(font)
         if display_setting.dark_mode:
-            painter.setPen(QColor(224, 224, 224))
-            painter.setBrush(QColor(224, 224, 224))
+            painter.setPen(self.text_color_dark)
+            painter.setBrush(self.text_color_dark)
         else:
             painter.setPen(Qt.GlobalColor.black)
             painter.setBrush(Qt.GlobalColor.black)
@@ -444,7 +461,54 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         return QSize(size.width(), size.height() + 2 * self.vert_padding)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
-        return QLineEdit(parent)
+        editor = QLineEdit(parent)
+        # Match the editor font to the painted item font so it stays consistent on HiDPI.
+        # The painted text is bold when the item is selected, and items being edited are
+        # typically selected, so apply the same weight here.
+        font = QFont(option.font)  # type: ignore[attr-defined]
+        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            font.setWeight(QFont.Weight.Bold)
+        editor.setFont(font)
+        # Style the editor to match the item appearance. Colours are derived from the same
+        # QColors used by paint() so the painted selection and editor cannot drift apart.
+        if display_setting.dark_mode:
+            bg = self.bg_selected_dark.name()
+            border = self.editor_border_dark.name()
+            text = self.text_color_dark.name()
+        else:
+            bg = self.bg_selected_light.name()
+            border = self.editor_border_light.name()
+            text = "black"
+        editor.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {bg};
+                color: {text};
+                border: 1px solid {border};
+                padding: 2px;
+            }}
+        """)
+        return editor
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        # Position the editor after the circular symbol, using sizeHint so the height
+        # accounts for the stylesheet padding and border rather than hard-coding overhead.
+        # If the row is too narrow to fit after the symbol, fall back to the full row so
+        # renaming remains possible in narrow layouts.
+        editor_height = editor.sizeHint().height()
+        available_width = int(option.rect.width() - self.text_left_offset)  # type: ignore[attr-defined]
+        if available_width > 0:
+            editor_x = int(option.rect.x() + self.text_left_offset)  # type: ignore[attr-defined]
+            editor_width = available_width
+        else:
+            editor_x = int(option.rect.x())  # type: ignore[attr-defined]
+            editor_width = int(option.rect.width())  # type: ignore[attr-defined]
+        editor_rect = QRect(
+            editor_x,
+            int(option.rect.y() + (option.rect.height() - editor_height) / 2),  # type: ignore[attr-defined]
+            editor_width,
+            editor_height
+        )
+        editor.setGeometry(editor_rect)
 
     def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
