@@ -311,7 +311,32 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX, VertexType.W_OUTPUT):
             return False
 
-        if not trace.shift and pyzx.rewrite_rules.check_remove_id(self.graph, vertex):
+        start = trace.hit[item][0]
+        end = trace.hit[item][-1]
+        if start.y() > end.y():
+            start, end = end, start
+        pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
+        left, right = [], []
+        for edge in set(self.graph.incident_edges(vertex)):
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                # we use the selection node to determine the center of the edge
+                epos = eitem.selection_node.pos()
+                # Compute whether each edge is inside the entry and exit points
+                i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
+                i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
+                inside = i1 and i2
+                if inside:
+                    left.append(eitem)
+                else:
+                    right.append(eitem)
+
+        # An identity spider can be removed by slicing fully across it, so that
+        # the slice separates its two edges. If the slice instead stays on one
+        # side of the edges, fall through to the unfusion logic below to create
+        # an arity-1 spider.
+        if not trace.shift and pyzx.rewrite_rules.check_remove_id(self.graph, vertex) \
+                and left and right:
             self._remove_id(vertex)
             return True
 
@@ -337,25 +362,6 @@ class ProofPanel(BasePanel):
             else:
                 phase = self.graph.phase(vertex)
 
-        start = trace.hit[item][0]
-        end = trace.hit[item][-1]
-        if start.y() > end.y():
-            start, end = end, start
-        pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
-        left, right = [], []
-        for edge in set(self.graph.incident_edges(vertex)):
-            eitems = self.graph_scene.edge_map[edge]
-            for eitem in eitems.values():
-                # we use the selection node to determine the center of the edge
-                epos = eitem.selection_node.pos()
-                # Compute whether each edge is inside the entry and exit points
-                i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
-                i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
-                inside = i1 and i2
-                if inside:
-                    left.append(eitem)
-                else:
-                    right.append(eitem)
         mouse_dir = ((start + end) * (1 / 2)) - pos
 
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
