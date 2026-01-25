@@ -80,25 +80,56 @@ def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     assert app.active_panel is not None
     assert isinstance(app.active_panel, GraphEditPanel)
     assert not app.export_tikz_proof.isEnabled()
+    assert not app.export_tikz_series.isEnabled()
 
     # Start a derivation. Export to tikz is enabled.
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     assert app.tab_widget.count() == 2
     assert isinstance(app.active_panel, ProofPanel)
     assert app.export_tikz_proof.isEnabled()
+    assert app.export_tikz_series.isEnabled()
 
     # Switch to the demo graph tab. Export to tikz is disabled.
     app.tab_widget.setCurrentIndex(0)
     assert not app.export_tikz_proof.isEnabled()
+    assert not app.export_tikz_series.isEnabled()
 
     # Switch back to the proof tab. Export to tikz is enabled.
     app.tab_widget.setCurrentIndex(1)
     assert app.export_tikz_proof.isEnabled()
+    assert app.export_tikz_series.isEnabled()
 
     # Close the proof tab. Export to tikz is disabled.
     app.close_action.trigger()
     assert app.tab_widget.count() == 1
     assert not app.export_tikz_proof.isEnabled()
+    assert not app.export_tikz_series.isEnabled()
+
+
+def test_export_tikz_series(app: MainWindow, qtbot: QtBot, tmp_path: Path,
+                            monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exporting proof steps writes one .tikz file per step into the chosen directory."""
+    from PySide6.QtWidgets import QFileDialog
+
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: str(tmp_path))
+    assert app.handle_export_tikz_series_action()
+
+    files = sorted(p.name for p in tmp_path.iterdir())
+    num_steps = len(list(app.active_panel.proof_model.graphs()))
+    assert len(files) == num_steps
+    # Filenames have a zero-padded numeric prefix (minimum 3 digits) and a safe step name.
+    padding_width = max(3, len(str(max(num_steps - 1, 0))))
+    assert files[0] == f"{0:0{padding_width}d}_START.tikz"
+    for i, filename in enumerate(files):
+        prefix, _, rest = filename.partition("_")
+        assert prefix == f"{i:0{padding_width}d}"
+        assert rest.endswith(".tikz")
+        stem = rest[:-len(".tikz")]
+        assert all(c.isalnum() or c in "._-" for c in stem)
 
 
 def test_settings_dialog(app: MainWindow) -> None:
