@@ -1,6 +1,11 @@
 # ZXLive changelog
 
 
+## Unreleased
+
+- Fixed TikZ proof export so that graphs offset from the origin are normalised, equal signs are vertically centred between adjacent steps, and row wrapping works correctly (#198).
+
+
 ## v1.0.0
 This is the first version where changes were tracked. This version 1.0.0 release brings with it many new features, including:
 
