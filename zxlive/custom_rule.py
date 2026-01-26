@@ -1,15 +1,15 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Hashable, Optional, Sequence, Dict, Union, Any
+from typing import TYPE_CHECKING, Hashable, Optional, Sequence, Dict, TypeVar, Union, Any
 
 import networkx as nx
 import numpy as np
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
-from networkx.classes.reportviews import NodeView
 from pyzx.utils import EdgeType, VertexType, get_w_io
 from shapely import Polygon
+from shapely.errors import ShapelyError
 
 from pyzx.symbolic import Poly, Var
 from pyzx.graph import jsonparser
@@ -17,6 +17,8 @@ from pyzx.graph.base import BaseGraph
 from pyzx.rewrite import RewriteSimpGraph
 
 from .common import ET, VT, GraphT
+
+NodeT = TypeVar("NodeT", bound=Hashable)
 
 if TYPE_CHECKING:
     from .rewrite_data import RewriteData
@@ -61,7 +63,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
             if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
                 vertices_to_remove.append(matching[v])
 
-        boundary_vertex_map: dict[NodeView, int] = {}
+        boundary_vertex_map: dict[Hashable, int] = {}
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
                 for x, data in self.lhs_graph_nx.nodes(data=True):
@@ -71,7 +73,10 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
                         break
 
         vertex_positions = get_vertex_positions(graph, self.rhs_graph_nx, boundary_vertex_map)
-        self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+        if boundary_vertex_map:
+            self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+        else:
+            self.last_rewrite_center = None
         vertex_map = dict(boundary_vertex_map)
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY:
@@ -336,26 +341,57 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.MultiGraph, dict
     return subgraph_nx, boundary_mapping
 
 
-def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
-    pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
-    coords = np.array(list(pos_dict.values()))
-    center = np.mean(coords, axis=0)
-    angles = np.arctan2(coords[:, 1] - center[1], coords[:, 0] - center[0])
-    coords = coords[np.argsort(-angles)]
+def _boundary_layout_scale(coords: np.ndarray) -> float:
+    # Approximate area enclosed by the boundary points; falls back to the
+    # squared maximum inter-point distance when the polygon is degenerate
+    # (collinear or coincident points).
     try:
         area = float(Polygon(coords).area)
-    except BaseException:
+    except (ShapelyError, ValueError):
+        area = 0.
+    if area >= 1e-9:
+        return area
+    max_dist = 0.
+    for i in range(len(coords)):
+        for j in range(i + 1, len(coords)):
+            max_dist = max(max_dist, float(np.linalg.norm(coords[i] - coords[j])))
+    return max_dist ** 2 if max_dist > 0 else 1.
+
+
+def _w_output_partner(rhs_graph: nx.MultiGraph, v: NodeT) -> Optional[NodeT]:
+    for n in rhs_graph.neighbors(v):
+        if rhs_graph.nodes()[n]['type'] != VertexType.W_OUTPUT:
+            continue
+        edges = rhs_graph[v][n]
+        if any(rhs_graph.get_edge_data(v, n, k)['type'] == EdgeType.W_IO for k in edges):
+            return n  # type: ignore[no-any-return]
+    return None
+
+
+def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_vertex_map: dict[NodeT, int]) -> dict[NodeT, tuple[float, float]]:
+    if len(rhs_graph) == 0:
+        return {}
+    pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
+    if pos_dict:
+        coords = np.array(list(pos_dict.values()))
+        center = np.mean(coords, axis=0)
+        angles = np.arctan2(coords[:, 1] - center[1], coords[:, 0] - center[0])
+        area = _boundary_layout_scale(coords[np.argsort(-angles)])
+    else:
         area = 1.
+
     k = (area ** 0.5) / len(rhs_graph)
-    ret: dict[NodeView, tuple[float, float]] = dict(nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys()))
-    # if the node type in ret is W_INPUT, move it next to the W_OUTPUT node
+    layout = nx.spring_layout(rhs_graph, k=k, pos=pos_dict or None,
+                              fixed=boundary_vertex_map.keys() or None)
+    ret: dict[NodeT, tuple[float, float]] = {v: (float(pos[0]), float(pos[1]))
+                                             for v, pos in layout.items()}
+    # Snap each W_INPUT next to its W_OUTPUT partner.
     for v in ret:
-        if rhs_graph.nodes()[v]['type'] == VertexType.W_INPUT:
-            w_out = next((n for n in rhs_graph.neighbors(v) if
-                          any(rhs_graph.get_edge_data(v, n, k)['type'] == EdgeType.W_IO for k in rhs_graph[v][n])
-                          and rhs_graph.nodes()[n]['type'] == VertexType.W_OUTPUT), None)
-            if w_out:
-                ret[v] = (ret[w_out][0] - 0.3, ret[w_out][1])
+        if rhs_graph.nodes()[v]['type'] != VertexType.W_INPUT:
+            continue
+        w_out = _w_output_partner(rhs_graph, v)
+        if w_out is not None:
+            ret[v] = (ret[w_out][0] - 0.3, ret[w_out][1])
     return ret
 
 
