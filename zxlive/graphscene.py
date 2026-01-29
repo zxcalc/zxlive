@@ -34,7 +34,6 @@ from .settings import display_setting
 class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
-    g: GraphT
 
     # Signals to handle double-clicking and moving of vertices.
     # Note that we have to set the argument types to `object`,
@@ -52,6 +51,7 @@ class GraphScene(QGraphicsScene):
     # Triggers when an edge is dragged. Actual types: EItem, float (old curve_distance), float (new curve_distance)
     edge_dragged = Signal(object, object, object)
     edge_double_clicked = Signal(object)  # Actual type: ET
+    background_double_clicked = Signal()
 
     selection_changed_custom = Signal()
     add_selection_as_pattern_signal = Signal()
@@ -62,12 +62,23 @@ class GraphScene(QGraphicsScene):
         self.update_background_brush()
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
+        self.g: GraphT
 
     def update_background_brush(self) -> None:
         if display_setting.dark_mode:
             self.setBackgroundBrush(QBrush(QColor(30, 30, 30)))
         else:
             self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+
+    def mouseDoubleClickEvent(self, event):
+        # 1. Check if there is an item at the position of the click
+        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+        
+        if item is None:
+            self.background_double_clicked.emit()
+            super().mouseDoubleClickEvent(event)
+        else:
+            super().mouseDoubleClickEvent(event)
 
     @property
     def selected_vertices(self) -> Iterator[VT]:

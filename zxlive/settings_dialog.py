@@ -85,6 +85,8 @@ general_settings: list[SettingsData] = [
     {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
+    {"id": "swap-pauli-web-colors", "label": "Swap Pauli web colors", "type": FormInputType.Bool},
+    {"id": "blue-y-pauli-web", "label": "Use Blue for Y Pauli web", "type": FormInputType.Bool},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
     {"id": "patterns-folder", "label": "Patterns folder", "type": FormInputType.Folder},
