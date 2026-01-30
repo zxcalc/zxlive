@@ -111,10 +111,11 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setCheckable(True)
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
-        self.fault_equivalent_choice = QToolButton(self)
-        self.fault_equivalent_choice.setToolTip("Fault Equivalent Mode")
-        self.fault_equivalent_choice.setText("FE")
-        self.fault_equivalent_choice.setCheckable(True)
+        self.fault_equivalent_mode = QToolButton(self)
+        self.fault_equivalent_mode.setToolTip("Fault Equivalent Mode")
+        self.fault_equivalent_mode.setText("FE")
+        self.fault_equivalent_mode.setCheckable(True)
+        self.fault_equivalent_mode.toggled.connect(self.toggle_FE_mode)
 
         self.weight_layout = QHBoxLayout()
         self.weight_layout.setSpacing(2)
@@ -135,17 +136,23 @@ class ProofPanel(BasePanel):
         weight_widget.setLayout(self.weight_layout)
         weight_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
 
-        yield ToolbarSection(self.fault_equivalent_choice, weight_widget)
+        yield ToolbarSection(self.fault_equivalent_mode, weight_widget)
 
         yield ToolbarSection(*self.actions())
     
+    def toggle_FE_mode(self, checked: bool):
+        selected_vertices, _ = self.parse_selection()
+        self.rewrites_panel.refresh_rewrites_model()
+        self.graph_scene.select_vertices(selected_vertices)
+        self.graph_scene.selection_changed_custom.emit()
+
+
     class WeightInputValidator(QIntValidator):
         def validate(self, input_str: str, pos: int) -> tuple[QValidator.State, str, int]:
             if input_str == "":
                 return QValidator.State.Acceptable, input_str, pos
             state, _, _ = super().validate(input_str, pos) # type: ignore[assignment] # Pylance stub says return object, actually returns (State, str, int)
             return state, input_str, pos
-
 
     def update_weight(self) -> None:
         new_weight: int | None = (
@@ -179,6 +186,7 @@ class ProofPanel(BasePanel):
         )
 
         self.undo_stack.push(cmd)
+        self.rewrites_panel.refresh_rewrites_model()
         return
     
 

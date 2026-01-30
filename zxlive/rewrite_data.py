@@ -35,7 +35,8 @@ class RewriteData(TypedDict):
     rhs: NotRequired[GraphT]
     repeat_rule_application: NotRequired[bool]
     file_path: NotRequired[str]
-    supports_weight: NotRequired[bool]
+    supports_weight_parameter: NotRequired[bool]
+    max_fault_equivalence: NotRequired[int]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -395,6 +396,7 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses a degree-n spider into a n-sided polygon",
         "rule": pyzx.ft_simplify.unfuse_n_2FE_simp,
         "type": MATCH_SINGLE,
+        "max_fault_equivalence": 2
     },
     "Unfuse-2n Simp": {
         "text": "FE Unfuse-2n",
@@ -402,21 +404,21 @@ rewrites_fault_tolerant = {
         "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
         "type": MATCH_SINGLE,
         "picture": "FE_(un)fuse_2n.png",
-        "supports_weight": True
+        "supports_weight_parameter": True
     },
     "Unfuse-2n Plus Simp": {
         "text": "FE Unfuse-2n Plus",
         "tooltip": "Unfuses a degree-(2n + 1) spider into a degree-n spider and a degree-(n + 1) spider",
         "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
         "type": MATCH_SINGLE,
-        "supports_weight": True
+        "supports_weight_parameter": True
     },
     "Recursive Unfuse Simp": {
         "text": "FE Recursive Unfuse",
         "tooltip": "Recursively unfuses a spider",
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
         "type": MATCH_SINGLE,
-        "supports_weight": True
+        "supports_weight_parameter": True
     },
     "Fuse-4 Simp": {
         "text": "FE Fuse-4",
@@ -434,7 +436,7 @@ rewrites_fault_tolerant = {
 action_groups = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
-    # "Graph-like rules": rewrites_graph_theoretic,
+    "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
     "Simplification routines": simplifications, 

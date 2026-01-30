@@ -55,7 +55,8 @@ class RewriteAction:
     is_custom_rule: bool = field(default=False)
     file_path: Optional[str] = field(default=None)
 
-    supports_weight: bool = field(default=False)
+    supports_weight_parameter: bool = field(default=False)
+    max_fault_equivalence: Optional[int] = field(default=None)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -78,7 +79,8 @@ class RewriteAction:
             repeat_rule_application=d.get('repeat_rule_application', False),
             is_custom_rule=d.get('custom_rule', False),
             file_path=d.get('file_path', None),
-            supports_weight=d.get('supports_weight', False)
+            supports_weight_parameter=d.get('supports_weight_parameter', False),
+            max_fault_equivalence=d.get('max_fault_equivalence', None)
         )
 
     def do_rewrite(self, panel: ProofPanel) -> None:
@@ -120,7 +122,7 @@ class RewriteAction:
             try:
                 applied = False
                 for m in matches:
-                    if self.supports_weight:
+                    if self.supports_weight_parameter:
                         if self.match_type == MATCH_DOUBLE: # keeping in case future w-FE rules are added that use MATCH_DOUBLE
                             v1, v2 = cast(tuple[VT, VT], m)
                             if self.rule.apply(g, v1, v2, weight=weight):
@@ -421,6 +423,8 @@ class RewriteActionTreeView(QTreeView):
         self.reset_rewrite_panel_style()
         self.refresh_rewrites_model()
 
+        self.clicked.connect(self.on_item_clicked)
+
     def reset_rewrite_panel_style(self) -> None:
         self.setUniformRowHeights(True)
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -523,6 +527,11 @@ class RewriteActionTreeView(QTreeView):
         else:
             subprocess.run(["xdg-open", abs_path], check=False)
 
+    def on_item_clicked(self, index: QModelIndex):
+        model = self.model()
+        if hasattr(model,"do_rewrite"):
+            model.do_rewrite(index)
+
     def refresh_rewrites_model(self) -> None:
         # Preserve expanded state
         expanded_indexes = []
@@ -531,10 +540,14 @@ class RewriteActionTreeView(QTreeView):
                 index = self.model().index(row, 0)
                 if self.isExpanded(index):
                     expanded_indexes.append(self.model().index(row, 0).data())
+
         # Refresh the custom rules and update the model
         refresh_custom_rules()
-        model = RewriteActionTreeModel.from_dict(action_groups, self.proof_panel)
+        filtered_action_groups = self.get_fault_equivalent_rules()
+
+        model = RewriteActionTreeModel.from_dict(filtered_action_groups, self.proof_panel)
         self.setModel(model)
+
         if not expanded_indexes:
             self.expand(model.index(0, 0))
         else:
@@ -542,5 +555,37 @@ class RewriteActionTreeView(QTreeView):
                 index = model.index(row, 0)
                 if index.data() in expanded_indexes:
                     self.expand(index)
-        self.clicked.connect(model.do_rewrite)
         self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
+
+    def get_fault_equivalent_rules(self) -> dict:
+        """Return action_groups filtered according to Fault Equivalent mode and weight:
+        
+        -FE mode OFF: show all groups except FE
+        -FE mode ON, w = None: show all FE rules
+        -FE mode ON, w is set: show all FE rules where their max fault equivalence is greater than w
+        """
+        fe_mode = self.proof_panel.fault_equivalent_mode.isChecked()
+        selected_weight = self.proof_panel.fault_equivalent_weight_value
+
+        if fe_mode:
+            fe_rules_group = action_groups.get("Fault Equivalent Rewrites", {})
+            filtered_rules: dict[str, RewriteData] = {}
+            for rule_name, rule in fe_rules_group.items():
+                max_rule_weight = rule.get("max_fault_equivalence", None)
+
+                #include rules if:
+                include_rule = (
+                    max_rule_weight is None # rule is fully fault tolerant or
+                    or selected_weight is None # no weight is selected
+                    or (selected_weight is not None and selected_weight <= max_rule_weight) # fault tolerance of the rule is greater than the fault considered
+                )
+
+                if include_rule:
+                    filtered_rules[rule_name] = rule
+            return filtered_rules
+        else:
+            filtered_groups: dict[str, dict[str, RewriteData]] = {}
+            for group_name, rules in action_groups.items():
+                if group_name != "Fault Equivalent Rewrites":
+                    filtered_groups[group_name] = rules
+            return filtered_groups
