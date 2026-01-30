@@ -430,6 +430,13 @@ rewrites_fault_tolerant = {
         "copy_first": False,
         "repeat_rule_application": False
     },
+    "Fuse-4 Simp": {
+        "text": "FE Fuse-4",
+        "tooltip": "Fuses a square of spiders into a degree-4 spider",
+        "rule": pyzx.ft_simplify.fuse_4_FE_simp,
+        "type": MATCH_COMPOUND,
+        "repeat_rule_application": False,
+    },
 }
 
 # rules_zxw = ["spider", "fuse_w", "z_to_z_box"]

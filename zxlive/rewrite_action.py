@@ -94,6 +94,7 @@ class RewriteAction:
 
         g = copy.deepcopy(panel.graph_scene.g)
         verts, edges = panel.parse_selection()
+        weight = panel.fault_equivalent_weight_value
 
         rem_verts_list: list[VT] = []
         matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
@@ -117,12 +118,29 @@ class RewriteAction:
             try:
                 applied = False
                 for m in matches:
-                    if self.match_type == MATCH_DOUBLE:
-                        v1, v2 = cast(tuple[VT, VT], m)
-                        if self.rule.apply(g, v1, v2):
+                    print(f"Applying rule '{self.name}' on match {m} with weight={weight}")
+
+                    # Check if the rule supports passing in weight
+                    if self.name in ["FE Unfuse-2n", "FE Recursive Unfuse"]:
+                        if self.match_type == MATCH_DOUBLE: # keeping in case future rules are added that use MATCH_DOUBLE
+                            v1, v2 = cast(tuple[VT, VT], m)
+                            if self.rule.apply(g, v1, v2, weight=weight):
+                                applied = True
+                        elif self.rule.apply(g, m, weight=weight):
                             applied = True
-                    elif self.rule.apply(g, m):
-                        applied = True
+                    else:
+                        if self.match_type == MATCH_DOUBLE:
+                            v1, v2 = cast(tuple[VT, VT], m)
+                            if self.rule.apply(g, v1, v2):
+                                applied = True
+                        elif self.rule.apply(g, m):
+                            applied = True
+                    # elif panel.fault_equivalent_weight_value != None:
+                    #     print("Testing with weight:", panel.fault_equivalent_weight_value)
+                    #     weight = panel.fault_equivalent_weight_value
+                    #     if self.rule.apply(g, m, weight=weight):
+                    #         applied = True
+
                 # g, rem_verts = self.apply_rewrite(g, matches)
                 # rem_verts_list.extend(rem_verts)
             except Exception as ex:
@@ -130,8 +148,22 @@ class RewriteAction:
                 return
             if not self.repeat_rule_application or not applied:
                 break
-
-        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
+        def set_weight_callback(w: int | None) -> None:
+            panel.fault_equivalent_weight_value = w
+            if panel.fault_equivalent_weight:
+                panel.fault_equivalent_weight.blockSignals(True)
+                panel.fault_equivalent_weight.setText("" if w is None else str(w))
+                panel.fault_equivalent_weight.blockSignals(False)
+        cmd = AddRewriteStep(
+            graph_view=panel.graph_view,
+            new_g=g,
+            step_view=panel.step_view,
+            name=self.name,
+            saved_weight=weight,
+            old_weight=panel.fault_equivalent_weight_value,
+            weight_callback=set_weight_callback,
+        )
+        #cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
