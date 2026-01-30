@@ -450,7 +450,7 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
 action_groups: dict[str, dict[str, RewriteData]] = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
-    #"Graph-like rules": rewrites_graph_theoretic,
+    "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
     "Simplification routines": simplifications, 
