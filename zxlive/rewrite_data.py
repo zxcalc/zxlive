@@ -258,7 +258,7 @@ simplifications: dict[str, RewriteData] = {
 def ocm_rule(_graph: GraphT) -> int:
     return 1
 
-rules_basic = {
+rules_basic: dict[str, RewriteData] = {
     'id_simp': {
         "text": "Remove identity",
         "tooltip": "Removes a 2-ary phaseless spider",
@@ -342,7 +342,7 @@ rules_basic = {
     },
 }
 
-rewrites_fault_tolerant = {
+rewrites_fault_tolerant: dict[str, RewriteData] = {
     "Elim Rewrite": {
         "text": "FE Identity removal",
         "tooltip": "Removes a 2-ary phaseless spider",
@@ -433,7 +433,7 @@ rewrites_fault_tolerant = {
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 
-action_groups = {
+action_groups: dict[str, dict[str, RewriteData]] = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,

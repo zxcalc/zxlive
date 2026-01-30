@@ -140,7 +140,7 @@ class ProofPanel(BasePanel):
 
         yield ToolbarSection(*self.actions())
     
-    def toggle_FE_mode(self, checked: bool):
+    def toggle_FE_mode(self) -> None:
         selected_vertices, _ = self.parse_selection()
         self.rewrites_panel.refresh_rewrites_model()
         self.graph_scene.select_vertices(selected_vertices)
@@ -151,8 +151,8 @@ class ProofPanel(BasePanel):
         def validate(self, input_str: str, pos: int) -> tuple[QValidator.State, str, int]:
             if input_str == "":
                 return QValidator.State.Acceptable, input_str, pos
-            state, _, _ = super().validate(input_str, pos) # type: ignore[assignment] # Pylance stub says return object, actually returns (State, str, int)
-            return state, input_str, pos
+            result: tuple[QValidator.State, str, int] = super().validate(input_str, pos) # type: ignore # Pylance stub says return object, actually returns (State, str, int)
+            return result[0], input_str, pos
 
     def update_weight(self) -> None:
         new_weight: int | None = (

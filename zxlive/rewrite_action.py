@@ -527,7 +527,7 @@ class RewriteActionTreeView(QTreeView):
         else:
             subprocess.run(["xdg-open", abs_path], check=False)
 
-    def on_item_clicked(self, index: QModelIndex):
+    def on_item_clicked(self, index: QModelIndex) -> None:
         model = self.model()
         if hasattr(model,"do_rewrite"):
             model.do_rewrite(index)
