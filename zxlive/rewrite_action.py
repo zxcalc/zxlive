@@ -56,6 +56,8 @@ class RewriteAction:
     file_path: Optional[str] = field(default=None)
     current_weight: int = field(default=100)
 
+    weighted_rules = ["FE Unfuse-2n", "FE Unfuse-2n Plus", "FE Recursive Unfuse"]
+
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
         if 'custom_rule' in d:
@@ -118,11 +120,10 @@ class RewriteAction:
             try:
                 applied = False
                 for m in matches:
-                    print(f"Applying rule '{self.name}' on match {m} with weight={weight}")
 
                     # Check if the rule supports passing in weight
-                    if self.name in ["FE Unfuse-2n", "FE Recursive Unfuse"]:
-                        if self.match_type == MATCH_DOUBLE: # keeping in case future rules are added that use MATCH_DOUBLE
+                    if self.name in self.weighted_rules:
+                        if self.match_type == MATCH_DOUBLE: # keeping in case future w-FE rules are added that use MATCH_DOUBLE
                             v1, v2 = cast(tuple[VT, VT], m)
                             if self.rule.apply(g, v1, v2, weight=weight):
                                 applied = True
@@ -135,11 +136,6 @@ class RewriteAction:
                                 applied = True
                         elif self.rule.apply(g, m):
                             applied = True
-                    # elif panel.fault_equivalent_weight_value != None:
-                    #     print("Testing with weight:", panel.fault_equivalent_weight_value)
-                    #     weight = panel.fault_equivalent_weight_value
-                    #     if self.rule.apply(g, m, weight=weight):
-                    #         applied = True
 
                 # g, rem_verts = self.apply_rewrite(g, matches)
                 # rem_verts_list.extend(rem_verts)
@@ -163,7 +159,6 @@ class RewriteAction:
             old_weight=panel.fault_equivalent_weight_value,
             weight_callback=set_weight_callback,
         )
-        #cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
