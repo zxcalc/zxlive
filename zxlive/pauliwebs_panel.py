@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 from typing import Iterator, Optional
+from typing_extensions import TypeAlias
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QColor, QBrush, QFont
@@ -21,8 +22,8 @@ import json
 from pyzx.graph.jsonparser import json_to_graph
 from pyzx.web import compute_pauli_webs
 
-# type alias
-PauliWeb = pauliweb.PauliWeb[int, tuple[int, int]]
+
+PauliWeb: TypeAlias = pauliweb.PauliWeb[int, tuple[int, int]]
 
 class PauliWebsPanel(BasePanel):
     """write something here"""
@@ -96,15 +97,15 @@ class PauliWebsPanel(BasePanel):
             show_error_msg("Warning: Could not auto-detect inputs/outputs for Pauli web computation", parent=self)
 
         priority_map = {
-    "Logical": 0,
-    "Co-stabiliser": 1,
-    "Stabiliser": 2,
-    "Detecting Region": 3,
-    "Pauli Web": 4
-}
+            "Logical": 0,
+            "Co-stabiliser": 1,
+            "Stabiliser": 2,
+            "Detecting Region": 3,
+            "Pauli Web": 4
+        }
 
         # 1. Map every web to its type and current object
-        annotated_webs = []
+        annotated_webs: list[tuple[str, PauliWeb]] = []
         for i, web in enumerate(self._pauli_webs):
             is_region = i >= len(stabs)
             is_stab = any(e[0] in outputs or e[1] in outputs for e in web.half_edges())
@@ -117,13 +118,13 @@ class PauliWebsPanel(BasePanel):
                 else "Stabiliser" if is_stab
                 else "Pauli Web"
             )
-            annotated_webs.append({'type': web_type, 'obj': web})
+            annotated_webs.append((web_type, web))
 
         # 2. Sort the annotated list based on priority_map
-        annotated_webs.sort(key=lambda x: priority_map[x['type']])
+        annotated_webs.sort(key=lambda x: priority_map[x[0]])
 
         # 3. OVERWRITE the actual data list with the new order
-        self._pauli_webs = [item['obj'] for item in annotated_webs]
+        self._pauli_webs = [item[1] for item in annotated_webs]
 
         # 4. Populate the UI using the now-sorted self._pauli_webs
         self.web_list.clear()
@@ -132,7 +133,7 @@ class PauliWebsPanel(BasePanel):
         for i, web in enumerate(self._pauli_webs):
             # Re-identify type (since we just sorted them, they are grouped)
             # We use the same logic or just grab it from our sorted list
-            current_type = annotated_webs[i]['type']
+            current_type = annotated_webs[i][0]
 
             type_counts[current_type] += 1
             label = f"{current_type} #{type_counts[current_type]}"
