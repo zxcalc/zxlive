@@ -35,6 +35,7 @@ class RewriteData(TypedDict):
     rhs: NotRequired[GraphT]
     repeat_rule_application: NotRequired[bool]
     file_path: NotRequired[str]
+    supports_weight: NotRequired[bool]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -346,7 +347,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Removes a 2-ary phaseless spider",
         "rule": pyzx.ft_simplify.elim_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
         "repeat_rule_application": True,
         "picture": "FE_id_removal.png"
     },
@@ -368,7 +368,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
         "rule": pyzx.ft_simplify.fuse_1_FE_simp,
         "type": MATCH_SINGLE,
-        "repeat_rule_application": False,
         "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-1 Rewrite": {
@@ -376,8 +375,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses connected spiders of the same color, guaranteeing one spider has no additional neighbours",
         "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
         "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-4 Simp": {
@@ -385,8 +382,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses a degree-4 spider into a square",
         "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
         "picture": "FE_(un)fuse_4.png"
     },
     "Unfuse-5 Simp": {
@@ -394,48 +389,40 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses a degree-5 spider into a pentagon",
         "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
     },
      "Unfuse-n Simp": {
         "text": "2FE Unfuse-n",
         "tooltip": "Unfuses a degree-n spider into a n-sided polygon",
         "rule": pyzx.ft_simplify.unfuse_n_2FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
     },
     "Unfuse-2n Simp": {
         "text": "FE Unfuse-2n",
         "tooltip": "Unfuses a degree-2n spider into two degree-n spiders",
         "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
-        "picture": "FE_(un)fuse_2n.png"
+        "picture": "FE_(un)fuse_2n.png",
+        "supports_weight": True
     },
     "Unfuse-2n Plus Simp": {
         "text": "FE Unfuse-2n Plus",
         "tooltip": "Unfuses a degree-(2n + 1) spider into a degree-n spider and a degree-(n + 1) spider",
         "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
+        "supports_weight": True
     },
     "Recursive Unfuse Simp": {
         "text": "FE Recursive Unfuse",
         "tooltip": "Recursively unfuses a spider",
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
+        "supports_weight": True
     },
     "Fuse-4 Simp": {
         "text": "FE Fuse-4",
         "tooltip": "Fuses a square of spiders into a degree-4 spider",
         "rule": pyzx.ft_simplify.fuse_4_FE_simp,
         "type": MATCH_COMPOUND,
-        "repeat_rule_application": False,
     },
 }
 

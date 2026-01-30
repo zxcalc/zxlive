@@ -5,8 +5,8 @@ import random
 from typing import Iterator, Optional, Union, cast
 
 from PySide6.QtCore import QPointF, QSize
-from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator
-from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit
+from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator, QValidator
+from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit, QLabel, QHBoxLayout, QWidget, QSizePolicy
 
 from matplotlib import text
 import pyzx
@@ -116,16 +116,37 @@ class ProofPanel(BasePanel):
         self.fault_equivalent_choice.setText("FE")
         self.fault_equivalent_choice.setCheckable(True)
 
+        self.weight_layout = QHBoxLayout()
+        self.weight_layout.setSpacing(2)
+
+        self.weight_label = QLabel("w = ")
+        self.weight_label.setMaximumWidth(40)
+        self.weight_layout.addWidget(self.weight_label)
+
         self.fault_equivalent_weight = QLineEdit(self)
         self.fault_equivalent_weight.setToolTip("Fault Weight Considered")
-        self.fault_equivalent_weight.setPlaceholderText("w")
-        self.fault_equivalent_weight.setFixedWidth(40)
-        self.fault_equivalent_weight.setValidator(QIntValidator(0, 100, self))
+        self.fault_equivalent_weight.setPlaceholderText("None")
+        self.fault_equivalent_weight.setFixedWidth(50)
+        self.fault_equivalent_weight.setValidator(self.WeightInputValidator(0, 100, self))
         self.fault_equivalent_weight.editingFinished.connect(self.update_weight)
-        yield ToolbarSection(self.fault_equivalent_choice, self.fault_equivalent_weight)
+        self.weight_layout.addWidget(self.fault_equivalent_weight)
+
+        weight_widget = QWidget(self)
+        weight_widget.setLayout(self.weight_layout)
+        weight_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+
+        yield ToolbarSection(self.fault_equivalent_choice, weight_widget)
 
         yield ToolbarSection(*self.actions())
     
+    class WeightInputValidator(QIntValidator):
+        def validate(self, input_str: str, pos: int) -> tuple[QValidator.State, str, int]:
+            if input_str == "":
+                return QValidator.State.Acceptable, input_str, pos
+            state, _, _ = super().validate(input_str, pos) # type: ignore[assignment] # Pylance stub says return object, actually returns (State, str, int)
+            return state, input_str, pos
+
+
     def update_weight(self) -> None:
         new_weight: int | None = (
             int(self.fault_equivalent_weight.text())

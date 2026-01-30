@@ -54,9 +54,8 @@ class RewriteAction:
     repeat_rule_application: bool = False
     is_custom_rule: bool = field(default=False)
     file_path: Optional[str] = field(default=None)
-    current_weight: int = field(default=100)
 
-    weighted_rules = ["FE Unfuse-2n", "FE Unfuse-2n Plus", "FE Recursive Unfuse"]
+    supports_weight: bool = field(default=False)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -79,6 +78,7 @@ class RewriteAction:
             repeat_rule_application=d.get('repeat_rule_application', False),
             is_custom_rule=d.get('custom_rule', False),
             file_path=d.get('file_path', None),
+            supports_weight=d.get('supports_weight', False)
         )
 
     def do_rewrite(self, panel: ProofPanel) -> None:
@@ -120,9 +120,7 @@ class RewriteAction:
             try:
                 applied = False
                 for m in matches:
-
-                    # Check if the rule supports passing in weight
-                    if self.name in self.weighted_rules:
+                    if self.supports_weight:
                         if self.match_type == MATCH_DOUBLE: # keeping in case future w-FE rules are added that use MATCH_DOUBLE
                             v1, v2 = cast(tuple[VT, VT], m)
                             if self.rule.apply(g, v1, v2, weight=weight):
@@ -262,11 +260,6 @@ class RewriteAction:
         self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
         self.picture_path = None
         return self.tooltip_str
-    
-    def update_weight_considered(self, weight: int) -> None:
-        self.current_weight = weight
-        print("Updated weight considered for", self.name, "to", weight)
-        return
 
 
 @dataclass
