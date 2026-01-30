@@ -14,6 +14,7 @@ from shapely import Polygon
 
 from pyzx.symbolic import Poly, Var
 from pyzx.graph import jsonparser
+from pyzx.graph.base import BaseGraph
 from pyzx.rewrite import RewriteSimpGraph
 
 from .common import ET, VT, GraphT
@@ -38,7 +39,8 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
-    def applier(self, graph: GraphT, vertices: list[VT]) -> bool:
+    def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
+        assert isinstance(graph, GraphT)
         if self.is_rewrite_unfusable:
             self.unfuse_subgraph_for_rewrite(graph, vertices)
 

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable
 import pyzx
 from pyzx.utils import VertexType, FractionLike
 from pyzx.rewrite import Rewrite, RewriteSimpGraph
+from pyzx.graph.base import BaseGraph
 
 from .common import VT, ET, GraphT
 from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
@@ -26,7 +27,7 @@ def match_unfuse_single_vertex(graph: GraphT, vertices: list[VT]) -> list[VT]:
     return []
 
 
-def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rewrite_rules.rules.RewriteOutputType[VT, ET]:
+def apply_unfuse_rule(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
     """Apply the unfusion rule to a single vertex."""
     # This function should not be called directly for the interactive unfusion
     # It's here for compatibility with the rewrite system structure
@@ -34,7 +35,15 @@ def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rewrite_rules.r
     raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
     return True
 
-unfusion_rewrite = RewriteSimpGraph(apply_unfuse_rule, apply_unfuse_rule)
+def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
+    """A no-op simplification applier for the unfusion rule."""
+    # This function should not be called directly for the interactive unfusion
+    # It's here for compatibility with the rewrite system structure
+    # The actual unfusion logic is handled by the UnfusionRewriteAction
+    raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+    return True
+
+unfusion_rewrite: RewriteSimpGraph[VT, ET] = RewriteSimpGraph(apply_unfuse_rule, unfuse_rule_simp_applier)
 unfusion_rewrite.is_match = match_unfuse_single_vertex
 
 class UnfusionRewriteAction:
