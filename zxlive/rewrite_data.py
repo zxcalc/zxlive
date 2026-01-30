@@ -389,6 +389,13 @@ rewrites_fault_tolerant = {
         "repeat_rule_application": False,
         "picture": "FE_(un)fuse_4.png"
     },
+    "fuse-4 simp": {
+        "text": "FE Fuse-4",
+        "tooltip": "fuses 4 spiders of the same type in a square configuration into a single spider (right to left)",
+        "rule": pyzx.ft_simplify.fuse_4_FE_simp,
+        "type": MATCH_COMPOUND,
+        "picture": "FE_(un)fuse_4.png"
+    },
     "Unfuse-5 Simp": {
         "text": "FE Unfuse-5",
         "tooltip": "Unfuses a degree-5 spider into a pentagon",
@@ -397,6 +404,12 @@ rewrites_fault_tolerant = {
         "copy_first": False,
         "repeat_rule_application": False
     },
+    "fuse-5 simp": {
+        "text": "FE Fuse-5",
+        "tooltip": "fuses 5 spiders of the same type in a square configuration into a single spider (right to left)",
+        "rule": pyzx.ft_simplify.fuse_5_FE_simp,
+        "type": MATCH_COMPOUND,
+    },
      "Unfuse-n Simp": {
         "text": "2FE Unfuse-n",
         "tooltip": "Unfuses a degree-n spider into a n-sided polygon",
@@ -404,6 +417,12 @@ rewrites_fault_tolerant = {
         "type": MATCH_SINGLE,
         "copy_first": False,
         "repeat_rule_application": False
+    },
+    "fuse-n simp": {
+        "text": "2FE Fuse-n",
+        "tooltip": "fuses n (at least 6) spiders of the same type in a square configuration into a single spider (right to left)",
+        "rule": pyzx.ft_simplify.fuse_n_2FE_simp,
+        "type": MATCH_COMPOUND,
     },
     "Unfuse-2n Simp": {
         "text": "FE Unfuse-2n",
@@ -429,7 +448,7 @@ rewrites_fault_tolerant = {
         "type": MATCH_SINGLE,
         "copy_first": False,
         "repeat_rule_application": False
-    },
+    }
 }
 
 # rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
@@ -440,7 +459,7 @@ rewrites_fault_tolerant = {
 action_groups = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
-    # "Graph-like rules": rewrites_graph_theoretic,
+    #"Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
     "Simplification routines": simplifications, 
