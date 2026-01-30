@@ -5,9 +5,10 @@ import random
 from typing import Iterator, Optional, Union, cast
 
 from PySide6.QtCore import QPointF, QSize
-from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator
-from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit
+from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator, QValidator
+from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit, QLabel, QHBoxLayout, QWidget, QSizePolicy
 
+from matplotlib import text
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
@@ -33,6 +34,7 @@ class ProofPanel(BasePanel):
     """Panel for the proof mode of ZXLive."""
 
     graph_scene: EditGraphScene
+    fault_equivalent_weight_value: Optional[int] = None
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -109,28 +111,84 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setCheckable(True)
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
-        self.fault_equivalent_choice = QToolButton(self)
-        self.fault_equivalent_choice.setToolTip("Fault Equivalent Mode")
-        self.fault_equivalent_choice.setText("FE")
-        self.fault_equivalent_choice.setCheckable(True)
+        self.fault_equivalent_mode = QToolButton(self)
+        self.fault_equivalent_mode.setToolTip("Fault Equivalent Mode")
+        self.fault_equivalent_mode.setText("FE")
+        self.fault_equivalent_mode.setCheckable(True)
+        self.fault_equivalent_mode.toggled.connect(self.toggle_FE_mode)
 
-        self.fault_equivalent_weight_choice = QLineEdit(self)
-        self.fault_equivalent_weight_choice.setToolTip("Fault Weight Considered")
-        self.fault_equivalent_weight_choice.setPlaceholderText("w")
-        self.fault_equivalent_weight_choice.setFixedWidth(40)
-        self.fault_equivalent_weight_choice.setValidator(QIntValidator(0, 100, self))
-        self.fault_equivalent_weight_choice.editingFinished.connect(self.update_weight)
-        # AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
-        # run AddRewriteStep with the w parameter when this is changed (text edited or edit finished)
-        yield ToolbarSection(self.fault_equivalent_choice, self.fault_equivalent_weight_choice)
+        self.weight_layout = QHBoxLayout()
+        self.weight_layout.setSpacing(2)
+
+        self.weight_label = QLabel("w = ")
+        self.weight_label.setMaximumWidth(40)
+        self.weight_layout.addWidget(self.weight_label)
+
+        self.fault_equivalent_weight = QLineEdit(self)
+        self.fault_equivalent_weight.setToolTip("Fault Weight Considered")
+        self.fault_equivalent_weight.setPlaceholderText("None")
+        self.fault_equivalent_weight.setFixedWidth(50)
+        self.fault_equivalent_weight.setValidator(self.WeightInputValidator(0, 100, self))
+        self.fault_equivalent_weight.editingFinished.connect(self.update_weight)
+        self.weight_layout.addWidget(self.fault_equivalent_weight)
+
+        weight_widget = QWidget(self)
+        weight_widget.setLayout(self.weight_layout)
+        weight_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+
+        yield ToolbarSection(self.fault_equivalent_mode, weight_widget)
 
         yield ToolbarSection(*self.actions())
     
+    def toggle_FE_mode(self) -> None:
+        selected_vertices, _ = self.parse_selection()
+        self.rewrites_panel.refresh_rewrites_model()
+        self.graph_scene.select_vertices(selected_vertices)
+        self.graph_scene.selection_changed_custom.emit()
+
+
+    class WeightInputValidator(QIntValidator):
+        def validate(self, input_str: str, pos: int) -> tuple[QValidator.State, str, int]:
+            if input_str == "":
+                return QValidator.State.Acceptable, input_str, pos
+            result: tuple[QValidator.State, str, int] = super().validate(input_str, pos) # type: ignore # Pylance stub says return object, actually returns (State, str, int)
+            return result[0], input_str, pos
+
     def update_weight(self) -> None:
-        print("Weight updated to:", self.fault_equivalent_weight_choice.text())
-        new_weight = int(self.fault_equivalent_weight_choice.text()) if self.fault_equivalent_weight_choice.text() != '' else 100
-        print("new_weight:", new_weight)
+        new_weight: int | None = (
+            int(self.fault_equivalent_weight.text())
+            if self.fault_equivalent_weight.text() != ""
+            else None
+        )
+        old_weight: int | None = self.fault_equivalent_weight_value
+
+        if new_weight == old_weight:
+            return
+        
+        self.fault_equivalent_weight_value = new_weight
+
+        def set_weight(w: int | None) -> None:
+            self.fault_equivalent_weight_value = w
+            if self.fault_equivalent_weight:
+                self.fault_equivalent_weight.blockSignals(True)
+                self.fault_equivalent_weight.setText("" if w is None else str(w))
+                self.fault_equivalent_weight.blockSignals(False)
+
+        new_g = copy.deepcopy(self.graph)
+        cmd = AddRewriteStep(
+            graph_view=self.graph_view,
+            new_g=new_g,
+            step_view=self.step_view,
+            name=f"w = {new_weight}" if new_weight is not None else "w = None",
+            saved_weight=new_weight,
+            old_weight=old_weight,
+            weight_callback=set_weight
+        )
+
+        self.undo_stack.push(cmd)
+        self.rewrites_panel.refresh_rewrites_model()
         return
+    
 
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
