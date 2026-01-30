@@ -80,6 +80,7 @@ class MainWindow(QMainWindow):
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
         tab_widget.setMovable(True)
+        tab_widget.setUsesScrollButtons(True)
         tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
