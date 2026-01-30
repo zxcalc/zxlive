@@ -35,6 +35,8 @@ class RewriteData(TypedDict):
     rhs: NotRequired[GraphT]
     repeat_rule_application: NotRequired[bool]
     file_path: NotRequired[str]
+    supports_weight_parameter: NotRequired[bool]
+    max_fault_equivalence: NotRequired[int]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -256,7 +258,7 @@ simplifications: dict[str, RewriteData] = {
 def ocm_rule(_graph: GraphT) -> int:
     return 1
 
-rules_basic = {
+rules_basic: dict[str, RewriteData] = {
     'id_simp': {
         "text": "Remove identity",
         "tooltip": "Removes a 2-ary phaseless spider",
@@ -340,13 +342,12 @@ rules_basic = {
     },
 }
 
-rewrites_fault_tolerant = {
+rewrites_fault_tolerant: dict[str, RewriteData] = {
     "Elim Rewrite": {
         "text": "FE Identity removal",
         "tooltip": "Removes a 2-ary phaseless spider",
         "rule": pyzx.ft_simplify.elim_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
         "repeat_rule_application": True,
         "picture": "FE_id_removal.png"
     },
@@ -368,7 +369,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
         "rule": pyzx.ft_simplify.fuse_1_FE_simp,
         "type": MATCH_SINGLE,
-        "repeat_rule_application": False,
         "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-1 Rewrite": {
@@ -376,8 +376,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses connected spiders of the same color, guaranteeing one spider has no additional neighbours",
         "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
         "picture": "FE_(un)fuse_1.png"
     },
     "Unfuse-4 Simp": {
@@ -385,8 +383,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses a degree-4 spider into a square",
         "rule": pyzx.ft_simplify.unfuse_4_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
         "picture": "FE_(un)fuse_4.png"
     },
     "fuse-4 simp": {
@@ -401,8 +397,6 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses a degree-5 spider into a pentagon",
         "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
     },
     "fuse-5 simp": {
         "text": "FE Fuse-5",
@@ -415,39 +409,36 @@ rewrites_fault_tolerant = {
         "tooltip": "Unfuses a degree-n spider into a n-sided polygon",
         "rule": pyzx.ft_simplify.unfuse_n_2FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
+        "max_fault_equivalence": 2
     },
     "fuse-n simp": {
         "text": "2FE Fuse-n",
         "tooltip": "fuses n (at least 6) spiders of the same type in a square configuration into a single spider (right to left)",
         "rule": pyzx.ft_simplify.fuse_n_2FE_simp,
         "type": MATCH_COMPOUND,
+        "max_fault_equivalence": 2
     },
     "Unfuse-2n Simp": {
         "text": "FE Unfuse-2n",
         "tooltip": "Unfuses a degree-2n spider into two degree-n spiders",
         "rule": pyzx.ft_simplify.unfuse_2n_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
-        "picture": "FE_(un)fuse_2n.png"
+        "picture": "FE_(un)fuse_2n.png",
+        "supports_weight_parameter": True
     },
     "Unfuse-2n Plus Simp": {
         "text": "FE Unfuse-2n Plus",
         "tooltip": "Unfuses a degree-(2n + 1) spider into a degree-n spider and a degree-(n + 1) spider",
         "rule": pyzx.ft_simplify.unfuse_2n_plus_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False,
+        "supports_weight_parameter": True
     },
     "Recursive Unfuse Simp": {
         "text": "FE Recursive Unfuse",
         "tooltip": "Recursively unfuses a spider",
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
         "type": MATCH_SINGLE,
-        "copy_first": False,
-        "repeat_rule_application": False
+        "supports_weight_parameter": True
     }
 }
 
@@ -456,7 +447,7 @@ rewrites_fault_tolerant = {
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 
-action_groups = {
+action_groups: dict[str, dict[str, RewriteData]] = {
     "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
     #"Graph-like rules": rewrites_graph_theoretic,
