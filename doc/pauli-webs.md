@@ -48,14 +48,14 @@ You can select multiple Pauli webs at once. ZXLive will automatically add them c
 
 ### Viewing Pauli web types
 
-Each Pauli web in the list displays its type, either
+Pauli webs are categorized according to the types of edges they color. An edge is considered an _input edge_ if its leftmost vertex is a boundary vertex, and an _output edge_ if its rightmost vertex is a boundary vertex. The label of a Pauli web identifies whether it includes any input or output edges:
 
-* Logical
-* Stabilizer
-* Co-stabilizer
-* Detecting region
+- **Logical** – includes at least one input and one output edge
+- **Stabilizer** – includes no input edges and at least one output edge
+- **Co-stabilizer** – includes at least one input edge and no output edges
+- **Detecting region** – includes no input or output edges
 
-This helps you quickly choose the correct web for your task.
+In the case that ZXLive cannot determine input and output edges (for example, if a boundary vertex has multiple neighbors or a boundary edge is vertically oriented), a warning will be displayed.
 
 ---
 
@@ -103,7 +103,8 @@ You can configure:
 
 ---
 
-## Notes
+## Limitations
 
-* Make sure the diagram is a Clifford diagram, as Pauli webs can only be computed for Clifford diagrams in PyZX
-* Make sure the diagram is a simple graph (no more then one edge between two vertices) as Pauli webs can only be computed for simple graphs in PyZX.
+* The diagram must be a Clifford diagram and thus cannot contain spiders with non-Clifford phases
+* The diagram must be a simple graph (i.e., there can be no more than one edge between two vertices)
+* All Hadamard boxes must have exactly two neighbors
