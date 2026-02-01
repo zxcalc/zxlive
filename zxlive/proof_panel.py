@@ -126,7 +126,7 @@ class ProofPanel(BasePanel):
 
         self.fault_equivalent_weight = QLineEdit(self)
         self.fault_equivalent_weight.setToolTip("Fault Weight Considered")
-        self.fault_equivalent_weight.setPlaceholderText("None")
+        self.fault_equivalent_weight.setPlaceholderText("∞")
         self.fault_equivalent_weight.setFixedWidth(50)
         self.fault_equivalent_weight.setValidator(self.WeightInputValidator(0, 100, self))
         self.fault_equivalent_weight.editingFinished.connect(self.update_weight)
@@ -179,7 +179,7 @@ class ProofPanel(BasePanel):
             graph_view=self.graph_view,
             new_g=new_g,
             step_view=self.step_view,
-            name=f"w = {new_weight}" if new_weight is not None else "w = None",
+            name=f"w = {new_weight}" if new_weight is not None else "w = ∞",
             saved_weight=new_weight,
             old_weight=old_weight,
             weight_callback=set_weight
