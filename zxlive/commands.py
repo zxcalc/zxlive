@@ -451,8 +451,6 @@ class AddRewriteStep(UpdateGraph):
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
 
-    
-
     @property
     def proof_model(self) -> ProofModel:
         model = self.step_view.model()
@@ -501,6 +499,7 @@ class AddRewriteStep(UpdateGraph):
         self._apply_weight(self.old_weight)
 
         super().undo()
+
 
 
 @dataclass

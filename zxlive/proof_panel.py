@@ -245,7 +245,7 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
-        elif pyzx.rewrite_rules.check_copy(g, v):
+        elif pyzx.rewrite_rules.check_copy(g, v) and w in self.graph.neighbors(v):
             pyzx.rewrite_rules.copy(g, v)
             # copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
             # etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
@@ -253,6 +253,11 @@ class ProofPanel(BasePanel):
             # g.remove_edges(rem_edges)
             # g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
+            self.undo_stack.push(cmd, anim_after=anim)
+        elif pyzx.rewrite_rules.check_copy(g, w) and v in self.graph.neighbors(w):
+            pyzx.rewrite_rules.copy(g, w)
+            anim = anims.strong_comp(self.graph, g, v, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_pauli(g, w, v): # Second parameter is the Pauli
