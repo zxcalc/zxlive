@@ -364,17 +364,17 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
         "rule": simplify.color_change_rewrite,
         "type": MATCH_SINGLE
     },
-    "Fuse-1 Rewrite": {
-        "text": "FE Fuse-1",
-        "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
-        "rule": pyzx.ft_simplify.fuse_1_FE_simp,
-        "type": MATCH_SINGLE,
-        "picture": "FE_(un)fuse_1.png"
-    },
     "Unfuse-1 Rewrite": {
         "text": "FE Unfuse-1",
         "tooltip": "Unfuses connected spiders of the same color, guaranteeing one spider has no additional neighbours",
         "rule": pyzx.ft_simplify.unfuse_1_FE_simp,
+        "type": MATCH_SINGLE,
+        "picture": "FE_(un)fuse_1.png"
+    },
+    "Fuse-1 Rewrite": {
+        "text": "FE Fuse-1",
+        "tooltip": "Fuses connected spiders of the same color, one of the spiders cannot have any other neighbours",  
+        "rule": pyzx.ft_simplify.fuse_1_FE_simp,
         "type": MATCH_SINGLE,
         "picture": "FE_(un)fuse_1.png"
     },
@@ -385,17 +385,37 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
         "type": MATCH_SINGLE,
         "picture": "FE_(un)fuse_4.png"
     },
+    "fuse-4 simp": {
+        "text": "FE Fuse-4",
+        "tooltip": "fuses 4 spiders of the same type in a square configuration into a single spider (right to left)",
+        "rule": pyzx.ft_simplify.fuse_4_FE_simp,
+        "type": MATCH_COMPOUND,
+        "picture": "FE_(un)fuse_4.png"
+    },
     "Unfuse-5 Simp": {
         "text": "FE Unfuse-5",
         "tooltip": "Unfuses a degree-5 spider into a pentagon",
         "rule": pyzx.ft_simplify.unfuse_5_FE_simp,
         "type": MATCH_SINGLE,
     },
+    "fuse-5 simp": {
+        "text": "FE Fuse-5",
+        "tooltip": "fuses 5 spiders of the same type in a pentagon configuration into a single spider",
+        "rule": pyzx.ft_simplify.fuse_5_FE_simp,
+        "type": MATCH_COMPOUND,
+    },
      "Unfuse-n Simp": {
         "text": "2FE Unfuse-n",
         "tooltip": "Unfuses a degree-n spider into a n-sided polygon",
         "rule": pyzx.ft_simplify.unfuse_n_2FE_simp,
         "type": MATCH_SINGLE,
+        "max_fault_equivalence": 2
+    },
+    "fuse-n simp": {
+        "text": "2FE Fuse-n",
+        "tooltip": "fuses n (at least 6) spiders of the same type in a polygon configuration into a single spider",
+        "rule": pyzx.ft_simplify.fuse_n_2FE_simp,
+        "type": MATCH_COMPOUND,
         "max_fault_equivalence": 2
     },
     "Unfuse-2n Simp": {
@@ -419,13 +439,7 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
         "rule": pyzx.ft_simplify.recursive_unfuse_FE_simp,
         "type": MATCH_SINGLE,
         "supports_weight_parameter": True
-    },
-    "Fuse-4 Simp": {
-        "text": "FE Fuse-4",
-        "tooltip": "Fuses a square of spiders into a degree-4 spider",
-        "rule": pyzx.ft_simplify.fuse_4_FE_simp,
-        "type": MATCH_COMPOUND,
-    },
+    }
 }
 
 # rules_zxw = ["spider", "fuse_w", "z_to_z_box"]
