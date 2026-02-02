@@ -447,6 +447,7 @@ class AddRewriteStep(UpdateGraph):
     saved_weight: int | None = None
     old_weight: int | None = None
     weight_callback: Callable[[int | None], None] | None = None
+    refresh_rules_callback: Callable[[], None] | None = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -460,6 +461,8 @@ class AddRewriteStep(UpdateGraph):
     def _apply_weight(self, w: int | None) -> None:
         if self.weight_callback:
             self.weight_callback(w)
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
 
     def redo(self) -> None:
         # Remove steps from the proof model until we're at the currently selected step
@@ -477,6 +480,10 @@ class AddRewriteStep(UpdateGraph):
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
+
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
+
         super().redo()
 
     def undo(self) -> None:
@@ -497,6 +504,9 @@ class AddRewriteStep(UpdateGraph):
         self.step_view.selectionModel().blockSignals(False)
 
         self._apply_weight(self.old_weight)
+
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
 
         super().undo()
 

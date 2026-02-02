@@ -182,7 +182,8 @@ class ProofPanel(BasePanel):
             name=f"w = {new_weight}" if new_weight is not None else "w = ∞",
             saved_weight=new_weight,
             old_weight=old_weight,
-            weight_callback=set_weight
+            weight_callback=set_weight,
+            refresh_rules_callback=self.rewrites_panel.refresh_rewrites_model
         )
 
         self.undo_stack.push(cmd)

@@ -158,6 +158,7 @@ class RewriteAction:
             saved_weight=weight,
             old_weight=panel.fault_equivalent_weight_value,
             weight_callback=set_weight_callback,
+            refresh_rules_callback=panel.rewrites_panel.refresh_rewrites_model
         )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
