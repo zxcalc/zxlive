@@ -70,15 +70,14 @@ class GraphScene(QGraphicsScene):
         else:
             self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
 
-    def mouseDoubleClickEvent(self, event):
+    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # 1. Check if there is an item at the position of the click
-        item = self.itemAt(event.scenePos(), self.views()[0].transform())
+        item = self.itemAt(e.scenePos(), self.views()[0].transform())
         
         if item is None:
             self.background_double_clicked.emit()
-            super().mouseDoubleClickEvent(event)
-        else:
-            super().mouseDoubleClickEvent(event)
+        
+        super().mouseDoubleClickEvent(e)
 
     @property
     def selected_vertices(self) -> Iterator[VT]:
