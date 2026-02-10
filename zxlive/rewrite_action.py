@@ -23,7 +23,7 @@ from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
 from .rewrite_data import (is_rewrite_data, RewriteData, 
                            MatchType, MATCH_SINGLE, MATCH_DOUBLE, MATCH_COMPOUND,
-                           refresh_custom_rules, action_groups)
+                           refresh_custom_rules, action_groups, rules_basic)
 from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
