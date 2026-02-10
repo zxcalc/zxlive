@@ -83,7 +83,7 @@ class RewriteAction:
             return
 
         # Special handling for unfusion rule, since this launches a dialog
-        if self.name == "unfuse":
+        if self.name == rules_basic['unfuse']['text']:
             from .unfusion_rewrite import UnfusionRewriteAction
             verts, _ = panel.parse_selection()
             if len(verts) == 1:
