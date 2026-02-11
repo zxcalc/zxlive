@@ -8,7 +8,7 @@ from typing import Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
-from PySide6.QtWidgets import QListView
+from PySide6.QtWidgets import QListView, QLineEdit
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
@@ -444,6 +444,10 @@ class AddRewriteStep(UpdateGraph):
     step_view: QListView
     name: str
     diff: Optional[GraphDiff] = None
+    saved_weight: int | None = None
+    old_weight: int | None = None
+    weight_callback: Callable[[int | None], None] | None = None
+    refresh_rules_callback: Callable[[], None] | None = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -453,6 +457,12 @@ class AddRewriteStep(UpdateGraph):
         model = self.step_view.model()
         assert isinstance(model, ProofModel)
         return model
+    
+    def _apply_weight(self, w: int | None) -> None:
+        if self.weight_callback:
+            self.weight_callback(w)
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
 
     def redo(self) -> None:
         # Remove steps from the proof model until we're at the currently selected step
@@ -463,11 +473,17 @@ class AddRewriteStep(UpdateGraph):
 
         self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
 
+        self._apply_weight(self.saved_weight)
+
         # Select the added step
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
+
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
+
         super().redo()
 
     def undo(self) -> None:
@@ -486,7 +502,14 @@ class AddRewriteStep(UpdateGraph):
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
+
+        self._apply_weight(self.old_weight)
+
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
+
         super().undo()
+
 
 
 @dataclass
