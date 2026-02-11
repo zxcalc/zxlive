@@ -164,8 +164,9 @@ class UnfusionRewriteAction:
         # Remove the original vertex
         new_g.remove_vertex(original_vertex)
 
+        from .rewrite_data import rules_basic
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                             self.proof_panel.step_view, "unfuse")
+                             self.proof_panel.step_view, rules_basic['unfuse']['text'])
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
         self.proof_panel.undo_stack.push(cmd, anim_after=anim)
 
