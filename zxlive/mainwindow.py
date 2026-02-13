@@ -42,6 +42,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       show_error_msg)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
+from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel
 from .settings import display_setting
 from .settings_dialog import open_settings_dialog
@@ -572,6 +573,7 @@ class MainWindow(QMainWindow):
         _graph = graph or new_graph()
         panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
+        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
         if name is None:
             name = "New Graph"
         self._new_panel(panel, name)
@@ -629,6 +631,13 @@ class MainWindow(QMainWindow):
         panel = ProofPanel(graph, self.undo_action, self.redo_action)
         if name is None:
             name = "New Proof"
+        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
+        self._new_panel(panel, name)
+
+    def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
+        panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)
+        if name is None:
+            name = "New Pauli Webs"
         self._new_panel(panel, name)
 
     def select_all(self) -> None:

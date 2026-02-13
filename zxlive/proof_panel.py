@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import copy
+import json
 import random
 from typing import Iterator, Optional, Union, cast
 
-from PySide6.QtCore import QPointF, QSize
+from PySide6.QtCore import Signal, QPointF, QSize
 from PySide6.QtGui import QAction, QIcon, QVector2D
 from PySide6.QtWidgets import QInputDialog, QToolButton
 
@@ -33,6 +34,7 @@ class ProofPanel(BasePanel):
     """Panel for the proof mode of ZXLive."""
 
     graph_scene: EditGraphScene
+    start_pauliwebs_signal = Signal(object)
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -88,7 +90,7 @@ class ProofPanel(BasePanel):
         self._dummy_icon.setToolTip("Add Dummy Vertex (v)")
         self._dummy_icon.setShortcut("v")
         self._dummy_icon.clicked.connect(self._dummy_node_mode_clicked)
-
+        
         self._dummy_edge_icon = QToolButton(self)
         self._dummy_edge_icon.setCheckable(True)
         self._dummy_edge_icon.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
@@ -97,7 +99,7 @@ class ProofPanel(BasePanel):
         self._dummy_edge_icon.setShortcut("e")
         self._dummy_edge_icon.clicked.connect(self._dummy_edge_mode_clicked)
         yield ToolbarSection(self.selection, self._dummy_icon, self._dummy_edge_icon, self.magic_wand, exclusive=True)
-
+        
         self.identity_choice = (
             QToolButton(self),
             QToolButton(self)
@@ -107,10 +109,32 @@ class ProofPanel(BasePanel):
         self.identity_choice[0].setChecked(True)
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
-
+        
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
-
+        
+        self.pauli_webs = QToolButton(self)
+        self.pauli_webs.setText("Pauli Webs")
+        self.pauli_webs.clicked.connect(self._start_pauliwebs)
+        yield ToolbarSection(self.pauli_webs)
+    
+    def _start_pauliwebs(self) -> None:
+        # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication
+        if not self.graph_scene.g.is_well_formed():
+            show_error_msg("Graph is not well-formed", parent=self)
+            return
+        
+        graph_json = json.loads(self.graph_scene.g.to_json())
+        edge_pairs = [tuple(sorted(edge[:2])) for edge in graph_json.get("edges", [])]
+        unique_pairs = set(edge_pairs)
+        has_duplicate_edges = len(edge_pairs) != len(unique_pairs)
+        if has_duplicate_edges:
+            show_error_msg("Graph is a multigraph", parent=self)
+            return
+        
+        new_g: GraphT = copy.deepcopy(self.graph_scene.g)
+        self.start_pauliwebs_signal.emit(new_g)
+    
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
         self.rewrites_panel.reset_rewrite_panel_style()

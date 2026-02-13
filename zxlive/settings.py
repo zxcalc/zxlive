@@ -30,11 +30,16 @@ class ColorScheme(TypedDict):
     dummy_pressed: QColor
     edge: QColor
     dummy_edge: QColor
+    z_pauli_web: QColor
+    x_pauli_web: QColor
+    y_pauli_web: QColor
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "path/custom-rules": "rules/",
     "color-scheme": "modern-red-green",
+    "swap-pauli-web-colors": False,
+    "blue-y-pauli-web": False,
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
@@ -124,6 +129,9 @@ modern_red_green: ColorScheme = {
     "dummy_pressed": QColor("#808080"),
     "edge": QColor("#000000"),
     "dummy_edge": QColor("#808080"),
+    "z_pauli_web": QColor("#ccffcc"),
+    "x_pauli_web": QColor("#ff8888"),
+    "y_pauli_web": QColor("#6688ff"),
 }
 
 classic_red_green: ColorScheme = {
@@ -134,6 +142,9 @@ classic_red_green: ColorScheme = {
     "z_spider_pressed": QColor("#00dd00"),
     "x_spider": QColor("#ff0d00"),
     "x_spider_pressed": QColor("#dd0b00"),
+    "z_pauli_web": QColor("#00ff00"),
+    "x_pauli_web": QColor("#ff0d00"),
+    "y_pauli_web": QColor("#0000ff"),
 }
 
 white_gray: ColorScheme = {
@@ -274,7 +285,7 @@ class DisplaySettings:
         if self.dark_mode:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
-                    base[k] = QColor("#dbdbdb") if k != "outline" else QColor("#dbdbdb")
+                    base[k] = QColor("#dbdbdb")
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode
