@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
@@ -114,12 +114,12 @@ class ProofModel(QAbstractListModel):
         """The number of columns"""
         return 1
 
-    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def rowCount(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of rows"""
         # This is a quirk of Qt list models: Since they are based on tree models, the
         # user has to specify the index of the parent. In a list, we always expect the
         # parent to be `None` or the empty `QModelIndex()`
-        if not index or not index.isValid():
+        if not parent or not parent.isValid():
             return len(self.steps) + 1
         else:
             return 0
@@ -169,7 +169,7 @@ class ProofModel(QAbstractListModel):
     def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
         new_rewrite = Rewrite(
-            "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
+            "Grouped Steps: " + " \u2192 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
             self.steps[start_index:end_index + 1]
@@ -232,6 +232,7 @@ class ProofStepView(QListView):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
+        self.expanded_groups: set[int] = set()
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
@@ -253,7 +254,7 @@ class ProofStepView(QListView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
+        self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -269,9 +270,53 @@ class ProofStepView(QListView):
 
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
+        self.expanded_groups.clear()
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
+
+    def toggle_group_expansion(self, step_index: int) -> None:
+        """Toggle the expanded/collapsed state of a grouped step."""
+        if step_index in self.expanded_groups:
+            self.expanded_groups.discard(step_index)
+        else:
+            self.expanded_groups.add(step_index)
+        model_index = self.model().index(step_index + 1, 0)
+        self.model().dataChanged.emit(model_index, model_index, [])
+        self.doItemsLayout()
+
+    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+        """Handle mouse clicks on grouped steps to toggle expansion.
+
+        Collapsed group: clicking anywhere on the row toggles expansion.
+        Expanded group: clicking in the header area (top row) collapses it;
+        clicking in the sub-step area only selects the step.
+        """
+        index = self.indexAt(event.pos())
+        toggle_idx = -1
+
+        if index.isValid() and index.row() > 0:
+            step_idx = index.row() - 1
+            if step_idx < len(self.model().steps):
+                step = self.model().steps[step_idx]
+                if step.grouped_rewrites is not None:
+                    delegate = self.itemDelegate()
+                    if isinstance(delegate, ProofStepItemDelegate):
+                        if step_idx in self.expanded_groups:
+                            # Expanded: only collapse when clicking the header row
+                            rect = self.visualRect(index)
+                            text_h = QFontMetrics(self.font()).height()
+                            header_h = text_h + 2 * delegate.vert_padding
+                            if event.pos().y() - rect.y() <= header_h:
+                                toggle_idx = step_idx
+                        else:
+                            # Collapsed: any click on the row toggles
+                            toggle_idx = step_idx
+
+        super().mousePressEvent(event)
+
+        if toggle_idx >= 0:
+            self.toggle_group_expansion(toggle_idx)
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -357,6 +402,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     """This class controls the painting of items in the proof steps list view.
 
     We paint a "git-style" line with circles to denote individual steps in a proof.
+    Grouped steps render as expandable tree nodes with sub-step branches.
     """
 
     line_width = 3
@@ -367,9 +413,41 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
+    # Sub-tree layout for expanded groups
+    triangle_size = 5
+    sub_indent = 20
+    sub_branch_len = 15
+    sub_circle_radius = 3
+
+    def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> tuple[bool, bool, Optional[list['Rewrite']]]:
+        """Return (is_grouped, is_expanded, grouped_rewrites) for a given row."""
+        if index.row() == 0:
+            return False, False, None
+        model = index.model()
+        if not isinstance(model, ProofModel):
+            return False, False, None
+        step_idx = index.row() - 1
+        if step_idx >= len(model.steps):
+            return False, False, None
+        step = model.steps[step_idx]
+        if step.grouped_rewrites is None:
+            return False, False, None
+        view = self.parent()
+        is_expanded = isinstance(view, ProofStepView) and step_idx in view.expanded_groups
+        return True, is_expanded, step.grouped_rewrites
+
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
-        # Draw background
+
+        is_grouped, is_expanded, grouped_rewrites = self._step_info(index)
+
+        font = QFont(option.font)  # type: ignore[attr-defined]
+        text_height = QFontMetrics(font).height()
+        row_height = text_height + 2 * self.vert_padding
+        fg = QColor(224, 224, 224) if display_setting.dark_mode else QColor(0, 0, 0)
+        line_clr = QColor(180, 180, 180) if display_setting.dark_mode else QColor(0, 0, 0)
+
+        # ── Background ──────────────────────────────────────────────────
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
             if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
@@ -387,59 +465,162 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
-        # Draw line
+        # ── Main timeline line ──────────────────────────────────────────
         is_last = index.row() == index.model().rowCount() - 1
+        if is_last:
+            line_h = int(row_height / 2)
+        else:
+            line_h = int(option.rect.height())  # type: ignore[attr-defined]
         line_rect = QRect(
             self.line_padding,
             int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
+            line_h
         )
-        if display_setting.dark_mode:
-            painter.setBrush(QColor(180, 180, 180))
-        else:
-            painter.setBrush(Qt.GlobalColor.black)
+        painter.setPen(Qt.GlobalColor.transparent)
+        painter.setBrush(line_clr)
         painter.drawRect(line_rect)
 
-        # Draw circle
-        if display_setting.dark_mode:
-            painter.setPen(QPen(QColor(180, 180, 180), self.circle_outline_width))
-        else:
-            painter.setPen(QPen(Qt.GlobalColor.black, self.circle_outline_width))
+        # ── Main circle ─────────────────────────────────────────────────
+        circle_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
+        painter.setPen(QPen(line_clr, self.circle_outline_width))
         painter.setBrush(display_setting.effective_colors["z_spider"])
-        circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
-        painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
-            circle_radius,
-            circle_radius
-        )
+        cr = self.circle_radius_selected \
+            if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
+        main_cx = self.line_padding + self.line_width / 2
+        painter.drawEllipse(QPointF(main_cx, circle_cy), cr, cr)
 
-        # Draw text
-        text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
-        text_rect = QRect(
-            int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
-            option.rect.width(),  # type: ignore[attr-defined]
-            text_height
-        )
-        font = option.font  # type: ignore[attr-defined]
-        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-            font.setWeight(QFont.Weight.Bold)
-        painter.setFont(font)
-        if display_setting.dark_mode:
-            painter.setPen(QColor(224, 224, 224))
-            painter.setBrush(QColor(224, 224, 224))
+        # ── Text / group indicator ──────────────────────────────────────
+        text_x_base = int(option.rect.x() + self.line_width + 2 * self.line_padding)  # type: ignore[attr-defined]
+
+        if is_grouped:
+            s = self.triangle_size
+            tri_cy = int(option.rect.y() + row_height / 2)  # type: ignore[attr-defined]
+            painter.setPen(Qt.GlobalColor.transparent)
+            painter.setBrush(fg)
+
+            if is_expanded:
+                # Down-pointing triangle  ▼
+                triangle = QPolygonF([
+                    QPointF(text_x_base, tri_cy - s * 0.5),
+                    QPointF(text_x_base + s * 2, tri_cy - s * 0.5),
+                    QPointF(text_x_base + s, tri_cy + s * 0.5 + 1),
+                ])
+            else:
+                # Right-pointing triangle  ▶
+                triangle = QPolygonF([
+                    QPointF(text_x_base, tri_cy - s),
+                    QPointF(text_x_base + s, tri_cy),
+                    QPointF(text_x_base, tri_cy + s),
+                ])
+            painter.drawPolygon(triangle)
+
+            tri_offset = s * 2 + 4
+            header_text = "Grouped Steps" if is_expanded else index.data(Qt.ItemDataRole.DisplayRole)
+            text_rect = QRect(
+                text_x_base + tri_offset,
+                int(option.rect.y() + row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
+                int(option.rect.width() - self.line_width - 2 * self.line_padding - tri_offset),  # type: ignore[attr-defined]
+                text_height
+            )
+            bold_font = QFont(font)
+            bold_font.setWeight(QFont.Weight.Bold)
+            painter.setFont(bold_font)
+            painter.setPen(fg)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, header_text)
+
+            # Draw expanded sub-tree
+            if is_expanded and grouped_rewrites:
+                self._paint_sub_tree(painter, option, grouped_rewrites,
+                                     row_height, text_height, font, fg, line_clr)
         else:
-            painter.setPen(Qt.GlobalColor.black)
-            painter.setBrush(Qt.GlobalColor.black)
-        painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
+            # Regular (non-grouped) step text
+            text = index.data(Qt.ItemDataRole.DisplayRole)
+            text_rect = QRect(
+                text_x_base,
+                int(option.rect.y() + row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
+                int(option.rect.width() - self.line_width - 2 * self.line_padding),  # type: ignore[attr-defined]
+                text_height
+            )
+            draw_font = QFont(font)
+            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+                draw_font.setWeight(QFont.Weight.Bold)
+            painter.setFont(draw_font)
+            painter.setPen(fg)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
         painter.restore()
 
+    # ── Expanded sub-tree painting ──────────────────────────────────────
+    def _paint_sub_tree(self, painter: QPainter, option: QStyleOptionViewItem,
+                        grouped_rewrites: list['Rewrite'], row_height: int,
+                        text_height: int, font: QFont,
+                        fg: QColor, line_clr: QColor) -> None:
+        main_cx = self.line_padding + self.line_width / 2
+        sub_tree_x = main_cx + self.sub_indent
+        n = len(grouped_rewrites)
+
+        first_sub_top = option.rect.y() + row_height  # type: ignore[attr-defined]
+        last_sub_cy = first_sub_top + (n - 1) * row_height + row_height / 2
+
+        pen = QPen(line_clr, 2)
+        painter.setPen(pen)
+
+        # Diagonal connector from main circle down to start of sub-tree
+        header_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
+        painter.drawLine(
+            QPointF(main_cx, header_cy + self.circle_radius_selected),
+            QPointF(sub_tree_x, first_sub_top)
+        )
+
+        # Sub-tree vertical line
+        painter.drawLine(
+            QPointF(sub_tree_x, first_sub_top),
+            QPointF(sub_tree_x, last_sub_cy)
+        )
+
+        sub_circle_cx = sub_tree_x + self.sub_branch_len
+        for i, sub_step in enumerate(grouped_rewrites):
+            sub_cy = first_sub_top + i * row_height + row_height / 2
+
+            # Horizontal branch
+            painter.setPen(pen)
+            painter.drawLine(
+                QPointF(sub_tree_x, sub_cy),
+                QPointF(sub_circle_cx - self.sub_circle_radius, sub_cy)
+            )
+
+            # Sub-step circle (steel-blue fill)
+            painter.setPen(QPen(line_clr, 2))
+            painter.setBrush(QColor(70, 130, 180))
+            painter.drawEllipse(
+                QPointF(sub_circle_cx, sub_cy),
+                self.sub_circle_radius, self.sub_circle_radius
+            )
+
+            # Sub-step text
+            sub_text_x = int(sub_circle_cx + self.sub_circle_radius + 8)
+            sub_text_rect = QRect(
+                sub_text_x,
+                int(sub_cy - text_height / 2),
+                int(option.rect.width() - sub_text_x),  # type: ignore[attr-defined]
+                text_height
+            )
+            painter.setFont(font)
+            painter.setPen(fg)
+            painter.drawText(sub_text_rect, Qt.AlignmentFlag.AlignLeft, sub_step.display_name)
+
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        single_row = text_height + 2 * self.vert_padding
+        total = single_row
+
+        is_grouped, is_expanded, grouped_rewrites = self._step_info(index)
+        if is_grouped and is_expanded and grouped_rewrites:
+            total += len(grouped_rewrites) * single_row
+
+        return QSize(size.width(), total)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
