@@ -35,7 +35,8 @@ dependencies = [
     "shapely",
     "pyperclip",
     "imageio",
-    "packaging"
+    "packaging",
+    "pylatexenc",
 ]
 
 [project.optional-dependencies]
