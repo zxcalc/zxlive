@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
 
 from .animations import AnimatedUndoStack
 from .commands import SetGraph
-from .common import GraphT, new_graph
+from .common import GraphT, copy_variable_types, new_graph
 from .dialogs import FileFormat
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -114,6 +114,8 @@ class BasePanel(QWidget):
         copied_graph = self.graph.subgraph_from_vertices(selection)
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(copied_graph, GraphT)  # type: ignore
+        copied_var_names = set(copied_graph.var_registry.vars())
+        copy_variable_types(copied_graph, self.graph, overwrite=True, names=copied_var_names)
         return copied_graph
 
     def delete_selection(self) -> None:

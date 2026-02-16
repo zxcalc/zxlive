@@ -22,7 +22,8 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data, pos_from_view, get_settings_value
+from .common import (VT, GraphT, ToolType, copy_variable_types, get_data,
+                     pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
@@ -183,11 +184,15 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
+        old_vars = set(self.graph_scene.g.var_registry.vars())
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
+        copy_variable_types(new_g, graph)
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
+        for name in new_g.var_registry.vars() - old_vars:
+            self.variable_viewer.add_item(name)
 
     def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
         """Insert a pattern into the current graph view."""

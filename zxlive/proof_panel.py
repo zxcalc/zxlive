@@ -17,7 +17,8 @@ from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
-from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
+from .common import (ET, VT, GraphT, ToolType, copy_variable_types, get_data,
+                     pos_from_view, pos_to_view)
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
@@ -570,6 +571,7 @@ class ProofPanel(BasePanel):
         dummy_graph = graph.subgraph_from_vertices(dummy_vertices)
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
+        copy_variable_types(new_g, dummy_graph)
         cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
