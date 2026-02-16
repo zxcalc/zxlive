@@ -6,8 +6,8 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+                            QPoint, QPointF, QRect, QRectF, QSize, Qt)
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
@@ -57,6 +57,46 @@ class Rewrite(NamedTuple):
         )
 
 
+THUMBNAIL_ROLE = Qt.ItemDataRole.UserRole + 1
+
+
+def render_graph_thumbnail(graph: GraphT) -> QPixmap:
+    """Render a graph to a QPixmap thumbnail using an off-screen GraphScene."""
+    from .graphscene import GraphScene
+
+    scene = GraphScene()
+    scene.set_graph(graph)
+    rect = scene.itemsBoundingRect()
+    if rect.isEmpty():
+        scene.clear()
+        return QPixmap()
+
+    padding = 20.0
+    rect.adjust(-padding, -padding, padding, padding)
+
+    max_dim = 600.0
+    scale = min(max_dim / rect.width(), max_dim / rect.height())
+    if scale > 2.0:
+        scale = 2.0
+
+    w = max(1, int(rect.width() * scale))
+    h = max(1, int(rect.height() * scale))
+
+    pixmap = QPixmap(w, h)
+    if display_setting.dark_mode:
+        pixmap.fill(QColor(30, 30, 30))
+    else:
+        pixmap.fill(QColor(255, 255, 255))
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    scene.render(painter, QRectF(0, 0, w, h), rect)
+    painter.end()
+
+    scene.clear()
+    return pixmap
+
+
 class ProofModel(QAbstractListModel):
     """List model capturing the individual steps in a proof.
 
@@ -71,6 +111,7 @@ class ProofModel(QAbstractListModel):
         super().__init__()
         self.initial_graph = start_graph
         self.steps = []
+        self._thumbnail_cache: dict[int, QPixmap] = {}
 
     def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
@@ -79,6 +120,7 @@ class ProofModel(QAbstractListModel):
             old_step = self.steps[index - 1]
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index - 1] = new_step
+        self._thumbnail_cache.pop(index, None)
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
@@ -96,6 +138,12 @@ class ProofModel(QAbstractListModel):
                 return self.steps[index.row() - 1].display_name
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
+        elif role == THUMBNAIL_ROLE:
+            row = index.row()
+            if row not in self._thumbnail_cache:
+                graph = self.get_graph(row)
+                self._thumbnail_cache[row] = render_graph_thumbnail(graph)
+            return self._thumbnail_cache.get(row)
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
@@ -131,6 +179,7 @@ class ProofModel(QAbstractListModel):
         self.beginInsertRows(QModelIndex(), position + 1, position + 1)
         self.steps.insert(position, rewrite)
         self.endInsertRows()
+        self.invalidate_thumbnails(position + 1)
 
     def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
@@ -142,6 +191,7 @@ class ProofModel(QAbstractListModel):
         self.beginRemoveRows(QModelIndex(), position + 1, position + 1)
         rewrite = self.steps.pop(position)
         self.endRemoveRows()
+        self.invalidate_thumbnails(position + 1)
         return rewrite, rewrite.graph
 
     def get_graph(self, index: int) -> GraphT:
@@ -152,6 +202,12 @@ class ProofModel(QAbstractListModel):
             copy = self.steps[index - 1].graph.copy()
         assert isinstance(copy, GraphT)
         return copy
+
+    def invalidate_thumbnails(self, from_row: int = 0) -> None:
+        """Remove cached thumbnails from the given row index onward."""
+        keys = [k for k in self._thumbnail_cache if k >= from_row]
+        for k in keys:
+            del self._thumbnail_cache[k]
 
     def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""
@@ -253,7 +309,7 @@ class ProofStepView(QListView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
+        self.setUniformItemSizes(not display_setting.thumbnails_show)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -352,6 +408,19 @@ class ProofStepView(QListView):
         cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
         self.undo_stack.push(cmd)
 
+    def set_thumbnails_visible(self, visible: bool) -> None:
+        """Toggle thumbnail previews in the proof step list."""
+        display_setting.thumbnails_show = visible
+        self.setUniformItemSizes(not visible)
+        self.model()._thumbnail_cache.clear()
+        self.scheduleDelayedItemsLayout()
+        self.viewport().update()
+
+    def resizeEvent(self, event: object) -> None:  # type: ignore[override]
+        super().resizeEvent(event)  # type: ignore[arg-type]
+        if display_setting.thumbnails_show:
+            self.scheduleDelayedItemsLayout()
+
 
 class ProofStepItemDelegate(QStyledItemDelegate):
     """This class controls the painting of items in the proof steps list view.
@@ -362,6 +431,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     line_width = 3
     line_padding = 13
     vert_padding = 10
+    thumbnail_padding = 8
 
     circle_radius = 4
     circle_radius_selected = 6
@@ -369,6 +439,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
+        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        text_row_height = text_height + 2 * self.vert_padding
+
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
@@ -387,13 +460,14 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
-        # Draw line
+        # Draw vertical line
         is_last = index.row() == index.model().rowCount() - 1
+        line_height = int(text_row_height / 2) if is_last else int(option.rect.height())  # type: ignore[attr-defined]
         line_rect = QRect(
             self.line_padding,
             int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
+            line_height
         )
         if display_setting.dark_mode:
             painter.setBrush(QColor(180, 180, 180))
@@ -401,7 +475,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawRect(line_rect)
 
-        # Draw circle
+        # Draw circle centered in text row
         if display_setting.dark_mode:
             painter.setPen(QPen(QColor(180, 180, 180), self.circle_outline_width))
         else:
@@ -409,17 +483,16 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setBrush(display_setting.effective_colors["z_spider"])
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
+            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + text_row_height / 2),  # type: ignore[attr-defined]
             circle_radius,
             circle_radius
         )
 
-        # Draw text
+        # Draw text centered in text row
         text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_rect = QRect(
             int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            int(option.rect.y() + text_row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
@@ -435,11 +508,41 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
+        # Draw thumbnail preview if enabled
+        if display_setting.thumbnails_show:
+            pixmap = index.data(THUMBNAIL_ROLE)
+            if pixmap is not None and not pixmap.isNull():
+                thumb_left = int(option.rect.x()) + self.line_width + 2 * self.line_padding  # type: ignore[attr-defined]
+                thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
+                available_width = int(option.rect.width()) - self.line_width - 2 * self.line_padding - self.thumbnail_padding  # type: ignore[attr-defined]
+                if available_width > 0 and pixmap.width() > 0:
+                    thumb_height = int(pixmap.height() * available_width / pixmap.width())
+                    target = QRect(thumb_left, thumb_top, available_width, thumb_height)
+                    border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
+                    painter.setPen(QPen(border_color, 1))
+                    painter.setBrush(Qt.GlobalColor.transparent)
+                    painter.drawRect(target.adjusted(-1, -1, 1, 1))
+                    painter.drawPixmap(target, pixmap)
+
         painter.restore()
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        text_row_height = size.height() + 2 * self.vert_padding
+        if not display_setting.thumbnails_show:
+            return QSize(size.width(), text_row_height)
+        parent = self.parent()
+        if not isinstance(parent, QListView):
+            return QSize(size.width(), text_row_height)
+        available_width = parent.viewport().width() - self.line_width - 2 * self.line_padding - self.thumbnail_padding
+        if available_width <= 0:
+            return QSize(size.width(), text_row_height)
+        pixmap = index.data(THUMBNAIL_ROLE)
+        if pixmap is not None and not pixmap.isNull() and pixmap.width() > 0:
+            thumb_height = int(pixmap.height() * available_width / pixmap.width())
+            total = text_row_height + 2 * self.thumbnail_padding + thumb_height
+            return QSize(size.width(), total)
+        return QSize(size.width(), text_row_height)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)

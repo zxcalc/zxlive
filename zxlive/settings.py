@@ -50,6 +50,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "dark-mode": "system",
     "auto-save": False,
     "patterns-folder": "patterns/",
+    "thumbnails-show": False,
 }
 
 font_defaults: dict[str, str | int | None] = {
@@ -240,6 +241,14 @@ class DisplaySettings:
     @previews_show.setter
     def previews_show(self, value: bool) -> None:
         settings.setValue("previews-show", value)
+
+    @property
+    def thumbnails_show(self) -> bool:
+        return get_settings_value("thumbnails-show", bool)
+
+    @thumbnails_show.setter
+    def thumbnails_show(self, value: bool) -> None:
+        settings.setValue("thumbnails-show", value)
 
     @property
     def dark_mode(self) -> bool:

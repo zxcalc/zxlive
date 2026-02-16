@@ -117,6 +117,15 @@ class ProofPanel(BasePanel):
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
+
+        self.thumbnails_toggle = QToolButton(self)
+        self.thumbnails_toggle.setText("Thumbnails")
+        self.thumbnails_toggle.setCheckable(True)
+        self.thumbnails_toggle.setChecked(display_setting.thumbnails_show)
+        self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
+        self.thumbnails_toggle.setShortcut("t")
+        self.thumbnails_toggle.toggled.connect(self._toggle_thumbnails)
+        yield ToolbarSection(self.thumbnails_toggle)
     
     def _start_pauliwebs(self) -> None:
         # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication
@@ -134,7 +143,10 @@ class ProofPanel(BasePanel):
         
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_pauliwebs_signal.emit(new_g)
-    
+
+    def _toggle_thumbnails(self, checked: bool) -> None:
+        self.step_view.set_thumbnails_visible(checked)
+
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
         self.rewrites_panel.reset_rewrite_panel_style()
