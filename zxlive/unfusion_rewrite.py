@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, cast
 
-import pyzx
 from pyzx.utils import VertexType, FractionLike
-from pyzx.rewrite import Rewrite, RewriteSimpGraph
+from pyzx.rewrite import RewriteSimpGraph
 from pyzx.graph.base import BaseGraph
 
 from .common import VT, ET, GraphT
@@ -33,7 +32,7 @@ def apply_unfuse_rule(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
     # It's here for compatibility with the rewrite system structure
     # The actual unfusion logic is handled by the UnfusionRewriteAction
     raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
-    return True
+
 
 def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
     """A no-op simplification applier for the unfusion rule."""
@@ -41,10 +40,18 @@ def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
     # It's here for compatibility with the rewrite system structure
     # The actual unfusion logic is handled by the UnfusionRewriteAction
     raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
-    return True
 
-unfusion_rewrite: RewriteSimpGraph[VT, ET] = RewriteSimpGraph(apply_unfuse_rule, unfuse_rule_simp_applier)
-unfusion_rewrite.is_match = match_unfuse_single_vertex
+
+class UnfusionRewrite(RewriteSimpGraph[VT, ET]):
+    def __init__(self) -> None:
+        super().__init__(apply_unfuse_rule, unfuse_rule_simp_applier)
+
+    def is_match(self, graph: GraphT, vertices: list[VT]) -> list[VT]:
+        return match_unfuse_single_vertex(graph, vertices)
+
+
+unfusion_rewrite = UnfusionRewrite()
+
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""
@@ -165,8 +172,9 @@ class UnfusionRewriteAction:
         new_g.remove_vertex(original_vertex)
 
         from .rewrite_data import rules_basic
+        rewrite_name = cast(str, rules_basic['unfuse']['text'])
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                             self.proof_panel.step_view, rules_basic['unfuse']['text'])
+                             self.proof_panel.step_view, rewrite_name)
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
         self.proof_panel.undo_stack.push(cmd, anim_after=anim)
 

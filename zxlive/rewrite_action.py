@@ -5,11 +5,8 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast, Union, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 from concurrent.futures import ThreadPoolExecutor
-
-import pyzx
-from pyzx.rewrite import Rewrite
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
@@ -21,7 +18,7 @@ from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
-from .rewrite_data import (is_rewrite_data, RewriteData, 
+from .rewrite_data import (is_rewrite_data, RewriteData,
                            MatchType, MATCH_SINGLE, MATCH_DOUBLE, MATCH_COMPOUND,
                            refresh_custom_rules, action_groups, rules_basic)
 from .settings import display_setting
@@ -38,8 +35,8 @@ if TYPE_CHECKING:
 @dataclass
 class RewriteAction:
     name: str
-    # matcher: Callable[[GraphT, Callable], list]
-    rule: Rewrite#Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
+    # Rules come from pyzx and custom rule classes with different signatures.
+    rule: Any
     match_type: MatchType
     tooltip_str: str
     picture_path: Optional[str] = field(default=None)
@@ -99,17 +96,17 @@ class RewriteAction:
         while True:
             matches: list[VT | tuple[VT, VT] | list[VT]] = []
             if isinstance(self.rule, CustomRule):
-                matches = [self.rule.is_match(g, verts)] # type: ignore
+                matches = [self.rule.is_match(g, verts)]
             elif self.match_type == MATCH_SINGLE:
-                matches = [v for v in verts if self.rule.is_match(g, v)]  # type: ignore
+                matches = [v for v in verts if self.rule.is_match(g, v)]
             elif self.match_type == MATCH_DOUBLE:
                 matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]
-            elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
+            elif self.match_type == MATCH_COMPOUND:  # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
                 if len(verts) == 0:
-                    matches = [list(g.vertices())] # type: ignore
+                    matches = [list(g.vertices())]
                 else:
-                    matches = [verts.copy()] # type: ignore
+                    matches = [verts.copy()]
             matches_list.extend(matches)
             if not matches:
                 break
@@ -145,7 +142,8 @@ class RewriteAction:
             if self.match_type == MATCH_DOUBLE:
                 v1, v2 = cast(tuple[VT, VT], m)
                 self.rule.apply(g, v1, v2)
-            else: self.rule.apply(g, m)
+            else:
+                self.rule.apply(g, m)
         # rewrite = self.rule(g, matches)
         # assert isinstance(rewrite, tuple) and len(rewrite) == 4
         # etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
@@ -160,28 +158,29 @@ class RewriteAction:
             g = copy.deepcopy(g)
         if self.match_type == MATCH_SINGLE:
             for v in verts:
-                if self.rule.is_match(g, v): # type: ignore
+                if self.rule.is_match(g, v):
                     self.enabled = True
                     return
             self.enabled = False
             return
-        elif self.match_type == MATCH_DOUBLE:
+        if self.match_type == MATCH_DOUBLE:
             for e in edges:
                 s, t = g.edge_st(e)
-                if s == t: continue
-                if self.rule.is_match(g, s, t): # type: ignore
+                if s == t:
+                    continue
+                if self.rule.is_match(g, s, t):
                     self.enabled = True
                     return
             self.enabled = False
             return
-        elif self.match_type == MATCH_COMPOUND:
+        if self.match_type == MATCH_COMPOUND:
             if hasattr(self.rule, 'is_match'):
-                if self.rule.is_match(g, verts): # type: ignore
-                    self.enabled =  True
+                if self.rule.is_match(g, verts):
+                    self.enabled = True
                 else:
-                    self.enabled =  False
+                    self.enabled = False
             else:
-                self.enabled =  True
+                self.enabled = True
             return
 
     @property

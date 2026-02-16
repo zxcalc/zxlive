@@ -566,7 +566,7 @@ class MainWindow(QMainWindow):
         mime = QApplication.clipboard().mimeData()
         if mime is not None and mime.hasFormat(self.CLIPBOARD_MIME):
             try:
-                raw = bytes(mime.data(self.CLIPBOARD_MIME))
+                raw = bytes(mime.data(self.CLIPBOARD_MIME).data())
                 payload = json.loads(raw.decode("utf-8"))
                 graph_json = payload.get("graph_json")
                 if isinstance(graph_json, str):
