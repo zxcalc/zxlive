@@ -44,7 +44,7 @@ def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
     return True
 
 unfusion_rewrite: RewriteSimpGraph[VT, ET] = RewriteSimpGraph(apply_unfuse_rule, unfuse_rule_simp_applier)
-unfusion_rewrite.is_match = match_unfuse_single_vertex
+unfusion_rewrite.is_match = match_unfuse_single_vertex  # type: ignore[attr-defined]
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""
@@ -166,7 +166,7 @@ class UnfusionRewriteAction:
 
         from .rewrite_data import rules_basic
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                             self.proof_panel.step_view, rules_basic['unfuse']['text'])
+                             self.proof_panel.step_view, str(rules_basic['unfuse']['text']))
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
         self.proof_panel.undo_stack.push(cmd, anim_after=anim)
 

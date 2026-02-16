@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPolygonF
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
@@ -285,7 +285,7 @@ class ProofStepView(QListView):
         self.model().dataChanged.emit(model_index, model_index, [])
         self.doItemsLayout()
 
-    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         """Handle mouse clicks on grouped steps to toggle expansion.
 
         Collapsed group: clicking anywhere on the row toggles expansion.

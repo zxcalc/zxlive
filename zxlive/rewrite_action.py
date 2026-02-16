@@ -103,7 +103,7 @@ class RewriteAction:
             elif self.match_type == MATCH_SINGLE:
                 matches = [v for v in verts if self.rule.is_match(g, v)]  # type: ignore
             elif self.match_type == MATCH_DOUBLE:
-                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]
+                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]  # type: ignore[attr-defined]
             elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
                 if len(verts) == 0:
@@ -118,9 +118,9 @@ class RewriteAction:
                 for m in matches:
                     if self.match_type == MATCH_DOUBLE:
                         v1, v2 = cast(tuple[VT, VT], m)
-                        if self.rule.apply(g, v1, v2):
+                        if self.rule.apply(g, v1, v2):  # type: ignore[attr-defined]
                             applied = True
-                    elif self.rule.apply(g, m):
+                    elif self.rule.apply(g, m):  # type: ignore[attr-defined]
                         applied = True
                 # g, rem_verts = self.apply_rewrite(g, matches)
                 # rem_verts_list.extend(rem_verts)
@@ -137,15 +137,15 @@ class RewriteAction:
     # TODO: Narrow down the type of the first return value.
     def apply_rewrite(self, g: GraphT, matches: list) -> tuple[GraphT, list[VT]]:
         if self.returns_new_graph:
-            graph = self.rule(g, matches)
+            graph = self.rule(g, matches)  # type: ignore[call-arg]
             assert isinstance(graph, GraphT)
             return graph, []
 
         for m in matches:
             if self.match_type == MATCH_DOUBLE:
                 v1, v2 = cast(tuple[VT, VT], m)
-                self.rule.apply(g, v1, v2)
-            else: self.rule.apply(g, m)
+                self.rule.apply(g, v1, v2)  # type: ignore[attr-defined]
+            else: self.rule.apply(g, m)  # type: ignore[attr-defined]
         # rewrite = self.rule(g, matches)
         # assert isinstance(rewrite, tuple) and len(rewrite) == 4
         # etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
