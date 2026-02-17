@@ -16,6 +16,8 @@
 from __future__ import annotations
 
 import copy
+import json
+import logging
 import random
 from typing import Callable, Optional, cast
 
@@ -325,6 +327,9 @@ class MainWindow(QMainWindow):
         new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
+        # Save session state before closing tabs for potential restoration on next startup
+        self._save_session_state()
+        
         # We close all the tabs and ask the user if they want to save progress
         while self.active_panel is not None:
             success = self.handle_close_action()
@@ -335,15 +340,10 @@ class MainWindow(QMainWindow):
         # save the shape/size of this window on close
         self.settings.setValue("main_window_geometry", self.saveGeometry())
         
-        # Save session state if the user has enabled "Continue where you left off"
-        self._save_session_state()
-        
         e.accept()
     
     def _save_session_state(self) -> None:
         """Save the current state of all open tabs for restoration on next startup."""
-        import json
-        
         # Skip saving if there are no tabs open
         if self.tab_widget.count() == 0:
             return
@@ -403,10 +403,6 @@ class MainWindow(QMainWindow):
     
     def _restore_session_state(self) -> bool:
         """Restore previously saved tabs. Returns True if any tabs were restored."""
-        import json
-        import logging
-        from .dialogs import FileFormat
-        
         # Check if user wants to restore session
         startup_behavior = get_settings_value("startup-behavior", str, "blank")
         if startup_behavior != "restore":
@@ -447,7 +443,6 @@ class MainWindow(QMainWindow):
                         panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
                         self._new_panel(panel, tab_name)
                     elif tab_type == 'rule':
-                        from .custom_rule import CustomRule
                         rule = CustomRule.from_json(tab_data['rule'])
                         self.new_rule_editor(rule, tab_name)
                     elif tab_type == 'pauliwebs':
