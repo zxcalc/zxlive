@@ -78,7 +78,13 @@ dark_mode_options = {
     'dark': "Dark"
 }
 
+startup_behavior_options = {
+    'blank': "Open a blank instance",
+    'restore': "Continue where you left off"
+}
+
 general_settings: list[SettingsData] = [
+    {"id": "startup-behavior", "label": "On startup", "type": FormInputType.Combo, "data": startup_behavior_options},
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},

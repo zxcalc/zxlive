@@ -50,6 +50,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "dark-mode": "system",
     "auto-save": False,
     "patterns-folder": "patterns/",
+    "startup-behavior": "blank",
 }
 
 font_defaults: dict[str, str | int | None] = {

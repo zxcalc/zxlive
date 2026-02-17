@@ -72,7 +72,9 @@ class ZXLive(QApplication):
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
         parser.process(self)
         if not parser.positionalArguments():
-            self.main_window.open_demo_graph()
+            # Try to restore session state, or open demo graph if not restoring
+            if not self.main_window._restore_session_state():
+                self.main_window.open_demo_graph()
         else:
             for f in parser.positionalArguments():
                 self.main_window.open_file_from_path(f)

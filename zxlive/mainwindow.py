@@ -328,7 +328,138 @@ class MainWindow(QMainWindow):
 
         # save the shape/size of this window on close
         self.settings.setValue("main_window_geometry", self.saveGeometry())
+        
+        # Save session state if the user has enabled "Continue where you left off"
+        self._save_session_state()
+        
         e.accept()
+    
+    def _save_session_state(self) -> None:
+        """Save the current state of all open tabs for restoration on next startup."""
+        import json
+        
+        tabs_state = []
+        for i in range(self.tab_widget.count()):
+            panel = self.tab_widget.widget(i)
+            tab_name = self.tab_widget.tabText(i)
+            
+            if isinstance(panel, GraphEditPanel):
+                tab_data = {
+                    'type': 'graph',
+                    'name': tab_name,
+                    'graph': panel.graph.to_json(),
+                    'file_path': panel.file_path,
+                    'file_type': panel.file_type.value if panel.file_type else None,
+                }
+            elif isinstance(panel, ProofPanel):
+                tab_data = {
+                    'type': 'proof',
+                    'name': tab_name,
+                    'proof': panel.proof_model.to_json(),
+                    'file_path': panel.file_path,
+                    'file_type': panel.file_type.value if panel.file_type else None,
+                }
+            elif isinstance(panel, RulePanel):
+                rule = panel.get_rule()
+                tab_data = {
+                    'type': 'rule',
+                    'name': tab_name,
+                    'rule': rule.to_json(),
+                    'file_path': panel.file_path,
+                    'file_type': panel.file_type.value if panel.file_type else None,
+                }
+            elif isinstance(panel, PauliWebsPanel):
+                # For Pauli webs, we just save the initial graph
+                tab_data = {
+                    'type': 'pauliwebs',
+                    'name': tab_name,
+                    'graph': panel.graph.to_json(),
+                    'file_path': panel.file_path,
+                    'file_type': panel.file_type.value if panel.file_type else None,
+                }
+            else:
+                continue  # Unknown panel type, skip
+            
+            tabs_state.append(tab_data)
+        
+        # Save active tab index
+        active_index = self.tab_widget.currentIndex()
+        session_data = {
+            'tabs': tabs_state,
+            'active_tab': active_index
+        }
+        
+        self.settings.setValue("session_state", json.dumps(session_data))
+    
+    def _restore_session_state(self) -> bool:
+        """Restore previously saved tabs. Returns True if any tabs were restored."""
+        import json
+        from .dialogs import FileFormat
+        
+        # Check if user wants to restore session
+        startup_behavior = get_settings_value("startup-behavior", str, "blank")
+        if startup_behavior != "restore":
+            return False
+        
+        session_json = self.settings.value("session_state")
+        if not session_json:
+            return False
+        
+        try:
+            session_data = json.loads(session_json)
+            tabs_state = session_data.get('tabs', [])
+            active_tab = session_data.get('active_tab', 0)
+            
+            if not tabs_state:
+                return False
+            
+            # Restore each tab
+            for tab_data in tabs_state:
+                tab_type = tab_data.get('type')
+                tab_name = tab_data.get('name', 'Untitled')
+                file_path = tab_data.get('file_path')
+                file_type_value = tab_data.get('file_type')
+                
+                try:
+                    if tab_type == 'graph':
+                        graph = BaseGraph.from_json(tab_data['graph'])
+                        self.new_graph(graph, tab_name)
+                    elif tab_type == 'proof':
+                        from .proof import ProofModel
+                        proof_model = ProofModel.from_json(tab_data['proof'])
+                        # Extract the initial graph from the proof
+                        graph = proof_model.graphs[0] if proof_model.graphs else new_graph()
+                        panel = ProofPanel(graph, self.undo_action, self.redo_action)
+                        # Replace the proof model with the loaded one
+                        panel.step_view.set_model(proof_model)
+                        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
+                        self._new_panel(panel, tab_name)
+                    elif tab_type == 'rule':
+                        from .custom_rule import CustomRule
+                        rule = CustomRule.from_json(tab_data['rule'])
+                        self.new_rule_editor(rule, tab_name)
+                    elif tab_type == 'pauliwebs':
+                        graph = BaseGraph.from_json(tab_data['graph'])
+                        self.new_pauli_webs(graph, tab_name)
+                    
+                    # Restore file path and file type if available
+                    if file_path and self.active_panel:
+                        self.active_panel.file_path = file_path
+                        if file_type_value:
+                            self.active_panel.file_type = FileFormat(file_type_value)
+                except Exception as e:
+                    # If a tab fails to restore, log it but continue with others
+                    print(f"Failed to restore tab '{tab_name}': {e}")
+                    continue
+            
+            # Restore active tab
+            if 0 <= active_tab < self.tab_widget.count():
+                self.tab_widget.setCurrentIndex(active_tab)
+            
+            return True
+        except Exception as e:
+            print(f"Failed to restore session state: {e}")
+            return False
 
     def undo(self, e: QEvent) -> None:
         if self.active_panel is None:
