@@ -308,8 +308,9 @@ class ProofStepView(QListView):
         self.setSpacing(0)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.thumbnails_visible = False
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(not display_setting.thumbnails_show)
+        self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -410,15 +411,19 @@ class ProofStepView(QListView):
 
     def set_thumbnails_visible(self, visible: bool) -> None:
         """Toggle thumbnail previews in the proof step list."""
-        display_setting.thumbnails_show = visible
-        self.setUniformItemSizes(not visible)
+        self.thumbnails_visible = visible
         self.model()._thumbnail_cache.clear()
         self.scheduleDelayedItemsLayout()
         self.viewport().update()
 
+    def showEvent(self, event: object) -> None:  # type: ignore[override]
+        """Force relayout when this tab becomes visible (tab switch)."""
+        super().showEvent(event)  # type: ignore[arg-type]
+        self.scheduleDelayedItemsLayout()
+
     def resizeEvent(self, event: object) -> None:  # type: ignore[override]
         super().resizeEvent(event)  # type: ignore[arg-type]
-        if display_setting.thumbnails_show:
+        if self.thumbnails_visible:
             self.scheduleDelayedItemsLayout()
 
 
@@ -508,8 +513,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
-        # Draw thumbnail preview if enabled
-        if display_setting.thumbnails_show:
+        # Draw thumbnail preview if enabled on this view
+        parent_view = self.parent()
+        if isinstance(parent_view, ProofStepView) and parent_view.thumbnails_visible:
             pixmap = index.data(THUMBNAIL_ROLE)
             if pixmap is not None and not pixmap.isNull():
                 thumb_left = int(option.rect.x()) + self.line_width + 2 * self.line_padding  # type: ignore[attr-defined]
@@ -529,10 +535,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
         text_row_height = size.height() + 2 * self.vert_padding
-        if not display_setting.thumbnails_show:
-            return QSize(size.width(), text_row_height)
         parent = self.parent()
-        if not isinstance(parent, QListView):
+        if not isinstance(parent, ProofStepView) or not parent.thumbnails_visible:
             return QSize(size.width(), text_row_height)
         available_width = parent.viewport().width() - self.line_width - 2 * self.line_padding - self.thumbnail_padding
         if available_width <= 0:

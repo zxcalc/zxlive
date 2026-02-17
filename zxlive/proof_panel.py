@@ -58,8 +58,9 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_added.connect(self._add_dummy_edge)
 
         self.step_view = ProofStepView(self)
-
         self.splitter.addWidget(self.step_view)
+
+        self.thumbnails_toggle.clicked.connect(self._toggle_thumbnails)
 
     @property
     def proof_model(self) -> ProofModel:
@@ -121,10 +122,9 @@ class ProofPanel(BasePanel):
         self.thumbnails_toggle = QToolButton(self)
         self.thumbnails_toggle.setText("Thumbnails")
         self.thumbnails_toggle.setCheckable(True)
-        self.thumbnails_toggle.setChecked(display_setting.thumbnails_show)
+        self.thumbnails_toggle.setChecked(False)
         self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
         self.thumbnails_toggle.setShortcut("t")
-        self.thumbnails_toggle.toggled.connect(self._toggle_thumbnails)
         yield ToolbarSection(self.thumbnails_toggle)
     
     def _start_pauliwebs(self) -> None:
