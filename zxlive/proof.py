@@ -8,9 +8,10 @@ from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QRectF, QSize, Qt)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
+                               QLineEdit, QListView, QMenu, QStyle,
+                               QStyledItemDelegate, QStyleOptionViewItem,
+                               QToolButton, QVBoxLayout, QWidget)
 
 from .common import GraphT
 from .settings import display_setting
@@ -58,6 +59,7 @@ class Rewrite(NamedTuple):
 
 
 THUMBNAIL_ROLE = Qt.ItemDataRole.UserRole + 1
+MAX_THUMBNAIL_HEIGHT = 200  # Maximum thumbnail height in pixels when displayed
 
 
 def render_graph_thumbnail(graph: GraphT) -> QPixmap:
@@ -81,6 +83,12 @@ def render_graph_thumbnail(graph: GraphT) -> QPixmap:
 
     w = max(1, int(rect.width() * scale))
     h = max(1, int(rect.height() * scale))
+
+    # Limit the aspect ratio so that very tall diagrams don't produce
+    # absurdly large pixmaps.  We cap the height at 3x the width.
+    max_h = w * 3
+    if h > max_h:
+        h = max_h
 
     pixmap = QPixmap(w, h)
     if display_setting.dark_mode:
@@ -121,6 +129,9 @@ class ProofModel(QAbstractListModel):
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index - 1] = new_step
         self._thumbnail_cache.pop(index, None)
+        # Notify views so that the delegate re-computes sizeHint / repaints
+        model_index = self.createIndex(index, 0)
+        self.dataChanged.emit(model_index, model_index, [])
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
@@ -281,13 +292,133 @@ class ProofModel(QAbstractListModel):
         return model
 
 
-class ProofStepView(QListView):
-    """A view for displaying the steps in a proof."""
+class ProofStepView(QWidget):
+    """Widget containing the proof step list and a thumbnail toggle button."""
 
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # --- Thumbnail toggle header row ---
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(4, 4, 4, 4)
+
+        title = QLabel("Proof steps", header)
+        font = title.font()
+        font.setBold(True)
+        title.setFont(font)
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+
+        self.thumbnails_toggle = QToolButton(header)
+        self.thumbnails_toggle.setText("Thumbnails")
+        self.thumbnails_toggle.setCheckable(True)
+        self.thumbnails_toggle.setChecked(False)
+        self.thumbnails_toggle.setAutoRaise(True)
+        self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
+        self.thumbnails_toggle.setShortcut("t")
+        self.thumbnails_toggle.clicked.connect(self._toggle_thumbnails)
+        header_layout.addWidget(self.thumbnails_toggle)
+        layout.addWidget(header)
+
+        # Add a subtle separator line
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(line)
+
+        # --- List view ---
+        self._list = _ProofStepListView(self)
+        layout.addWidget(self._list)
+
+    # ---- proxy properties so the rest of the codebase keeps working ----
+    @property
+    def thumbnails_visible(self) -> bool:
+        return self._list.thumbnails_visible
+
+    @thumbnails_visible.setter
+    def thumbnails_visible(self, value: bool) -> None:
+        self._list.thumbnails_visible = value
+
+    def model(self) -> 'ProofModel':
+        return self._list.model()
+
+    def setModel(self, model: 'ProofModel') -> None:
+        self._list.setModel(model)
+
+    def currentIndex(self) -> QModelIndex:
+        return self._list.currentIndex()
+
+    def setCurrentIndex(self, index: QModelIndex) -> None:
+        self._list.setCurrentIndex(index)
+
+    def clearSelection(self) -> None:
+        self._list.clearSelection()
+
+    def selectionModel(self):
+        return self._list.selectionModel()
+
+    def selectedIndexes(self):
+        return self._list.selectedIndexes()
+
+    def update(self, *args, **kwargs) -> None:  # type: ignore[override]
+        self._list.update(*args, **kwargs)
+
+    def edit(self, index: QModelIndex) -> None:  # type: ignore[override]
+        self._list.edit(index)
+
+    def mapToGlobal(self, point: QPoint) -> QPoint:
+        return self._list.mapToGlobal(point)
+
+    def _toggle_thumbnails(self, checked: bool) -> None:
+        self._list.set_thumbnails_visible(checked)
+
+    # ---- delegated methods ----
+    def set_model(self, model: 'ProofModel') -> None:
+        self._list.set_model(model)
+
+    def move_to_step(self, index: int) -> None:
+        self._list.move_to_step(index)
+
+    def set_thumbnails_visible(self, visible: bool) -> None:
+        self.thumbnails_toggle.setChecked(visible)
+        self._list.set_thumbnails_visible(visible)
+
+    def refresh_current_thumbnail(self) -> None:
+        """Invalidate and repaint the thumbnail for the currently selected step."""
+        self._list.refresh_current_thumbnail()
+
+    def show_context_menu(self, position: QPoint) -> None:
+        self._list.show_context_menu(position)
+
+    def rename_proof_step(self, new_name: str, index: int) -> None:
+        self._list.rename_proof_step(new_name, index)
+
+    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        self._list.proof_step_selected(selected, deselected)
+
+    def group_selected_steps(self) -> None:
+        self._list.group_selected_steps()
+
+    def ungroup_selected_step(self) -> None:
+        self._list.ungroup_selected_step()
+
+
+class _ProofStepListView(QListView):
+    """Internal list view for proof steps."""
+
+    def __init__(self, owner: ProofStepView):
+        super().__init__(owner)
+        self._owner = owner
+        self.graph_view = owner.graph_view
+        self.undo_stack = owner.undo_stack
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
@@ -392,7 +523,7 @@ class ProofStepView(QListView):
             raise ValueError("Cannot group the first step")
 
         self.move_to_step(indices[-1] - 1)
-        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
+        cmd = GroupRewriteSteps(self.graph_view, self._owner, indices[0] - 1, indices[-1] - 1)
         self.undo_stack.push(cmd)
 
     def ungroup_selected_step(self) -> None:
@@ -406,7 +537,7 @@ class ProofStepView(QListView):
             raise ValueError("Step is not grouped")
 
         self.move_to_step(index - 1)
-        cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
+        cmd = UngroupRewriteSteps(self.graph_view, self._owner, index - 1)
         self.undo_stack.push(cmd)
 
     def set_thumbnails_visible(self, visible: bool) -> None:
@@ -415,6 +546,16 @@ class ProofStepView(QListView):
         self.model()._thumbnail_cache.clear()
         self.scheduleDelayedItemsLayout()
         self.viewport().update()
+
+    def refresh_current_thumbnail(self) -> None:
+        """Invalidate and repaint the thumbnail for the currently selected step."""
+        if not self.thumbnails_visible:
+            return
+        row = self.currentIndex().row()
+        self.model()._thumbnail_cache.pop(row, None)
+        idx = self.model().createIndex(row, 0)
+        self.model().dataChanged.emit(idx, idx, [])
+        self.scheduleDelayedItemsLayout()
 
     def showEvent(self, event: object) -> None:  # type: ignore[override]
         """Force relayout when this tab becomes visible (tab switch)."""
@@ -515,20 +656,25 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw thumbnail preview if enabled on this view
         parent_view = self.parent()
-        if isinstance(parent_view, ProofStepView) and parent_view.thumbnails_visible:
+        if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
             pixmap = index.data(THUMBNAIL_ROLE)
             if pixmap is not None and not pixmap.isNull():
                 thumb_left = int(option.rect.x()) + self.line_width + 2 * self.line_padding  # type: ignore[attr-defined]
                 thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
                 available_width = int(option.rect.width()) - self.line_width - 2 * self.line_padding - self.thumbnail_padding  # type: ignore[attr-defined]
                 if available_width > 0 and pixmap.width() > 0:
-                    thumb_height = int(pixmap.height() * available_width / pixmap.width())
-                    target = QRect(thumb_left, thumb_top, available_width, thumb_height)
+                    thumb_height = min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
+                    target_rect = QRect(thumb_left, thumb_top, available_width, thumb_height)
                     border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
                     painter.setPen(QPen(border_color, 1))
                     painter.setBrush(Qt.GlobalColor.transparent)
-                    painter.drawRect(target.adjusted(-1, -1, 1, 1))
-                    painter.drawPixmap(target, pixmap)
+                    painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
+                    
+                    # Draw pixmap scaled
+                    scaled = pixmap.scaled(target_rect.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    x_off = (target_rect.width() - scaled.width()) / 2
+                    y_off = (target_rect.height() - scaled.height()) / 2
+                    painter.drawPixmap(int(target_rect.x() + x_off), int(target_rect.y() + y_off), scaled)
 
         painter.restore()
 
@@ -536,14 +682,14 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         size = super().sizeHint(option, index)
         text_row_height = size.height() + 2 * self.vert_padding
         parent = self.parent()
-        if not isinstance(parent, ProofStepView) or not parent.thumbnails_visible:
+        if not isinstance(parent, _ProofStepListView) or not parent.thumbnails_visible:
             return QSize(size.width(), text_row_height)
         available_width = parent.viewport().width() - self.line_width - 2 * self.line_padding - self.thumbnail_padding
         if available_width <= 0:
             return QSize(size.width(), text_row_height)
         pixmap = index.data(THUMBNAIL_ROLE)
         if pixmap is not None and not pixmap.isNull() and pixmap.width() > 0:
-            thumb_height = int(pixmap.height() * available_width / pixmap.width())
+            thumb_height = min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
             total = text_row_height + 2 * self.thumbnail_padding + thumb_height
             return QSize(size.width(), total)
         return QSize(size.width(), text_row_height)
@@ -558,6 +704,6 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
-        assert isinstance(step_view, ProofStepView)
+        assert isinstance(step_view, _ProofStepListView)
         assert isinstance(editor, QLineEdit)
         step_view.rename_proof_step(editor.text(), index.row() - 1)
