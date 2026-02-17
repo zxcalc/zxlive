@@ -233,6 +233,8 @@ class ProofStepView(QListView):
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
         self.expanded_groups: set[int] = set()
+        # Track currently selected sub-step: (step_index, sub_step_index) or None
+        self.selected_sub_step: Optional[tuple[int, int]] = None
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
@@ -271,6 +273,7 @@ class ProofStepView(QListView):
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
         self.expanded_groups.clear()
+        self.selected_sub_step = None
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
@@ -279,21 +282,61 @@ class ProofStepView(QListView):
         """Toggle the expanded/collapsed state of a grouped step."""
         if step_index in self.expanded_groups:
             self.expanded_groups.discard(step_index)
+            # Clear sub-step selection when collapsing
+            if self.selected_sub_step and self.selected_sub_step[0] == step_index:
+                self.selected_sub_step = None
         else:
             self.expanded_groups.add(step_index)
         model_index = self.model().index(step_index + 1, 0)
         self.model().dataChanged.emit(model_index, model_index, [])
         self.doItemsLayout()
 
+    def _sub_step_hit_test(self, step_idx: int, event_pos_y: int, rect_y: int) -> int:
+        """Determine which sub-step (if any) was clicked in an expanded group.
+
+        Returns the 0-based sub-step index, or -1 if the click was not on a sub-step.
+        """
+        delegate = self.itemDelegate()
+        if not isinstance(delegate, ProofStepItemDelegate):
+            return -1
+        step = self.model().steps[step_idx]
+        if step.grouped_rewrites is None:
+            return -1
+        text_h = QFontMetrics(self.font()).height()
+        row_height = text_h + 2 * delegate.vert_padding
+        header_h = row_height  # header occupies first row_height pixels
+        click_y = event_pos_y - rect_y
+        if click_y <= header_h:
+            return -1  # Click is in the header area
+        sub_y = click_y - header_h
+        sub_idx = int(sub_y // row_height)
+        if 0 <= sub_idx < len(step.grouped_rewrites):
+            return sub_idx
+        return -1
+
+    def _navigate_to_sub_step(self, step_idx: int, sub_idx: int) -> None:
+        """Display the graph corresponding to a sub-step within a grouped rewrite."""
+        step = self.model().steps[step_idx]
+        if step.grouped_rewrites is None or sub_idx < 0 or sub_idx >= len(step.grouped_rewrites):
+            return
+        self.selected_sub_step = (step_idx, sub_idx)
+        sub_graph = step.grouped_rewrites[sub_idx].graph.copy()
+        assert isinstance(sub_graph, GraphT)
+        self.graph_view.set_graph(sub_graph)
+        # Trigger repaint so the delegate can highlight the selected sub-step
+        model_index = self.model().index(step_idx + 1, 0)
+        self.model().dataChanged.emit(model_index, model_index, [])
+
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         """Handle mouse clicks on grouped steps to toggle expansion.
 
         Collapsed group: clicking anywhere on the row toggles expansion.
         Expanded group: clicking in the header area (top row) collapses it;
-        clicking in the sub-step area only selects the step.
+        clicking on a sub-step navigates to that sub-step's graph.
         """
         index = self.indexAt(event.pos())
         toggle_idx = -1
+        sub_step_clicked = False
 
         if index.isValid() and index.row() > 0:
             step_idx = index.row() - 1
@@ -303,15 +346,28 @@ class ProofStepView(QListView):
                     delegate = self.itemDelegate()
                     if isinstance(delegate, ProofStepItemDelegate):
                         if step_idx in self.expanded_groups:
-                            # Expanded: only collapse when clicking the header row
+                            # Expanded: check if clicking header or sub-step
                             rect = self.visualRect(index)
-                            text_h = QFontMetrics(self.font()).height()
-                            header_h = text_h + 2 * delegate.vert_padding
-                            if event.pos().y() - rect.y() <= header_h:
+                            sub_idx = self._sub_step_hit_test(
+                                step_idx, int(event.pos().y()), rect.y()
+                            )
+                            if sub_idx >= 0:
+                                # Clicked on a sub-step
+                                sub_step_clicked = True
+                                self._navigate_to_sub_step(step_idx, sub_idx)
+                            else:
+                                # Clicked on the header -> collapse
                                 toggle_idx = step_idx
                         else:
                             # Collapsed: any click on the row toggles
                             toggle_idx = step_idx
+
+        # Clear sub-step selection when clicking on a non-sub-step area
+        if not sub_step_clicked and self.selected_sub_step is not None:
+            old_step_idx = self.selected_sub_step[0]
+            self.selected_sub_step = None
+            old_model_idx = self.model().index(old_step_idx + 1, 0)
+            self.model().dataChanged.emit(old_model_idx, old_model_idx, [])
 
         super().mousePressEvent(event)
 
@@ -361,6 +417,12 @@ class ProofStepView(QListView):
     def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
+        # Clear sub-step selection when a different main step is selected
+        if self.selected_sub_step is not None:
+            old_step_idx = self.selected_sub_step[0]
+            self.selected_sub_step = None
+            old_model_idx = self.model().index(old_step_idx + 1, 0)
+            self.model().dataChanged.emit(old_model_idx, old_model_idx, [])
         step_index = selected.first().topLeft().row()
         self.move_to_step(step_index)
 
@@ -531,7 +593,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
             # Draw expanded sub-tree
             if is_expanded and grouped_rewrites:
-                self._paint_sub_tree(painter, option, grouped_rewrites,
+                self._paint_sub_tree(painter, option, index.row() - 1,
+                                     grouped_rewrites,
                                      row_height, text_height, font, fg, line_clr)
         else:
             # Regular (non-grouped) step text
@@ -553,6 +616,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     # ── Expanded sub-tree painting ──────────────────────────────────────
     def _paint_sub_tree(self, painter: QPainter, option: QStyleOptionViewItem,
+                        step_idx: int,
                         grouped_rewrites: list['Rewrite'], row_height: int,
                         text_height: int, font: QFont,
                         fg: QColor, line_clr: QColor) -> None:
@@ -579,9 +643,33 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             QPointF(sub_tree_x, last_sub_cy)
         )
 
+        # Determine which sub-step is selected (if any)
+        view = self.parent()
+        selected_sub_idx = -1
+        if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
+            sel_step_idx, sel_sub_idx = view.selected_sub_step
+            if step_idx == sel_step_idx:
+                selected_sub_idx = sel_sub_idx
+
         sub_circle_cx = sub_tree_x + self.sub_branch_len
         for i, sub_step in enumerate(grouped_rewrites):
             sub_cy = first_sub_top + i * row_height + row_height / 2
+            is_sub_selected = (i == selected_sub_idx)
+
+            # Draw highlight background for selected sub-step
+            if is_sub_selected:
+                painter.setPen(Qt.GlobalColor.transparent)
+                if display_setting.dark_mode:
+                    painter.setBrush(QColor(50, 90, 140, 120))
+                else:
+                    painter.setBrush(QColor(180, 215, 255, 160))
+                highlight_rect = QRect(
+                    int(sub_tree_x - 4),
+                    int(sub_cy - row_height / 2),
+                    int(option.rect.width() - sub_tree_x + 4),  # type: ignore[attr-defined]
+                    row_height
+                )
+                painter.drawRect(highlight_rect)
 
             # Horizontal branch
             painter.setPen(pen)
@@ -590,12 +678,16 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 QPointF(sub_circle_cx - self.sub_circle_radius, sub_cy)
             )
 
-            # Sub-step circle (steel-blue fill)
+            # Sub-step circle
             painter.setPen(QPen(line_clr, 2))
-            painter.setBrush(QColor(70, 130, 180))
+            if is_sub_selected:
+                painter.setBrush(QColor(30, 100, 200))  # brighter blue when selected
+                r = self.sub_circle_radius + 1
+            else:
+                painter.setBrush(QColor(70, 130, 180))  # default steel-blue
+                r = self.sub_circle_radius
             painter.drawEllipse(
-                QPointF(sub_circle_cx, sub_cy),
-                self.sub_circle_radius, self.sub_circle_radius
+                QPointF(sub_circle_cx, sub_cy), r, r
             )
 
             # Sub-step text
@@ -606,7 +698,10 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 int(option.rect.width() - sub_text_x),  # type: ignore[attr-defined]
                 text_height
             )
-            painter.setFont(font)
+            sub_font = QFont(font)
+            if is_sub_selected:
+                sub_font.setWeight(QFont.Weight.Bold)
+            painter.setFont(sub_font)
             painter.setPen(fg)
             painter.drawText(sub_text_rect, Qt.AlignmentFlag.AlignLeft, sub_step.display_name)
 
