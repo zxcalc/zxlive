@@ -75,6 +75,9 @@ class VItem(QGraphicsPathItem):
 
     _last_pos: Optional[QPointF]
 
+    # Diff highlight state for proof mode: None, "changed", "removed", or "added"
+    _diff_highlight: Optional[str]
+
     class Properties(Enum):
         """Properties of a VItem that can be animated."""
         Position = 0
@@ -96,6 +99,7 @@ class VItem(QGraphicsPathItem):
         self._old_pos = None
         self._dragged_on = None
         self._last_pos = None
+        self._diff_highlight = None
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -161,6 +165,20 @@ class VItem(QGraphicsPathItem):
                 pen.setColor(display_setting.effective_colors["boundary_pressed"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy_pressed"])
+        # Override appearance when diff-highlighted in proof mode.
+        # Tint the fill color and thicken the outline so the change is
+        # impossible to miss, even in large diagrams.
+        if self._diff_highlight is not None:
+            diff_color_key = f"diff_{self._diff_highlight}"
+            diff_color = display_setting.effective_colors[diff_color_key]
+            pen.setColor(diff_color)
+            pen.setWidthF(7 if not self.isSelected() else 8)
+            # Tint the node fill: blend 40% diff color + 60% original color
+            original = brush.color()
+            r = int(original.red() * 0.6 + diff_color.red() * 0.4)
+            g = int(original.green() * 0.6 + diff_color.green() * 0.4)
+            b = int(original.blue() * 0.6 + diff_color.blue() * 0.4)
+            brush = QBrush(QColor(r, g, b))
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)

@@ -33,6 +33,9 @@ class ColorScheme(TypedDict):
     z_pauli_web: QColor
     x_pauli_web: QColor
     y_pauli_web: QColor
+    diff_changed: QColor
+    diff_removed: QColor
+    diff_added: QColor
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
@@ -50,6 +53,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "dark-mode": "system",
     "auto-save": False,
     "patterns-folder": "patterns/",
+    "show-diff-highlights": True,
 }
 
 font_defaults: dict[str, str | int | None] = {
@@ -132,6 +136,9 @@ modern_red_green: ColorScheme = {
     "z_pauli_web": QColor("#ccffcc"),
     "x_pauli_web": QColor("#ff8888"),
     "y_pauli_web": QColor("#6688ff"),
+    "diff_changed": QColor("#FF8C00"),
+    "diff_removed": QColor("#DC143C"),
+    "diff_added": QColor("#32CD32"),
 }
 
 classic_red_green: ColorScheme = {
@@ -242,6 +249,14 @@ class DisplaySettings:
         settings.setValue("previews-show", value)
 
     @property
+    def show_diff_highlights(self) -> bool:
+        return get_settings_value("show-diff-highlights", bool)
+
+    @show_diff_highlights.setter
+    def show_diff_highlights(self, value: bool) -> None:
+        settings.setValue("show-diff-highlights", value)
+
+    @property
     def dark_mode(self) -> bool:
         dark_mode_setting = str(settings.value("dark-mode", "system"))
         if dark_mode_setting == "system":
@@ -286,6 +301,14 @@ class DisplaySettings:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
                     base[k] = QColor("#dbdbdb")
+                elif k in ("diff_changed", "diff_removed", "diff_added"):
+                    # Diff colors need to remain vivid in dark mode, so apply
+                    # a gentler reduction than the standard adjust_for_dark.
+                    c = base[k]
+                    hue = c.hslHue()
+                    sat = int(c.hslSaturation() * 0.7)
+                    lit = int(c.lightness() * 0.8)
+                    base[k] = QColor.fromHsl(hue, sat, lit, c.alpha())
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode

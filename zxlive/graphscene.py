@@ -232,6 +232,109 @@ class GraphScene(QGraphicsScene):
                 ei.reset_color()
                 ei.refresh()
 
+    def highlight_diff(self, diff: GraphDiff, direction: str = "forward") -> None:
+        """Highlight vertices and edges that differ between proof steps.
+
+        Only *semantically meaningful* changes are highlighted.  Cosmetic
+        changes such as repositioning (``changed_pos``), vertex metadata
+        (``changed_vdata``) and edge metadata like curvature
+        (``changed_edata``) are intentionally excluded because they produce
+        visual noise that makes it harder — not easier — to spot the real
+        rewrite.
+
+        Semantic vertex changes:
+            * ``removed_verts`` / ``new_verts`` — structural addition/removal
+            * ``changed_vertex_types`` — spider colour change (Z↔X, etc.)
+            * ``changed_phases`` — phase label change
+
+        Semantic edge changes:
+            * ``removed_edges`` / ``new_edges`` — structural addition/removal
+            * ``changed_edge_types`` — type change (simple↔Hadamard)
+
+        When *direction* is ``"forward"`` the current step is shown and the
+        elements that **will change** in the next step are marked.  When
+        ``"backward"`` the elements that **were introduced or changed** coming
+        from the previous step are marked.
+
+        :param diff: A :class:`GraphDiff` between the current graph and an
+            adjacent step.
+        :param direction: ``"forward"`` or ``"backward"``.
+        """
+        if not display_setting.show_diff_highlights:
+            return
+
+        self.clear_diff_highlights()
+
+        # Only semantically meaningful vertex changes — excludes changed_pos
+        # and changed_vdata which are cosmetic / internal metadata.
+        changed_verts: set[VT] = set()
+        changed_verts.update(diff.changed_vertex_types.keys())
+        changed_verts.update(diff.changed_phases.keys())
+
+        # Only semantically meaningful edge changes — excludes changed_edata
+        # which tracks curvature and other visual metadata.
+        changed_edges: set[ET] = set()
+        changed_edges.update(diff.changed_edge_types.keys())
+
+        if direction == "forward":
+            for v in diff.removed_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "removed"
+                    self.vertex_map[v].refresh()
+
+            for v in changed_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "changed"
+                    self.vertex_map[v].refresh()
+
+            for e in diff.removed_edges:
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "removed"
+                        eitem.refresh()
+
+            for e in changed_edges:
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "changed"
+                        eitem.refresh()
+
+        elif direction == "backward":
+            for v in diff.new_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "added"
+                    self.vertex_map[v].refresh()
+
+            for v in changed_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "changed"
+                    self.vertex_map[v].refresh()
+
+            for (s, t), typ in diff.new_edges:
+                e = (s, t, typ)
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "added"
+                        eitem.refresh()
+
+            for e in changed_edges:
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "changed"
+                        eitem.refresh()
+
+    def clear_diff_highlights(self) -> None:
+        """Remove all diff highlights from vertices and edges."""
+        for vitem in self.vertex_map.values():
+            if vitem._diff_highlight is not None:
+                vitem._diff_highlight = None
+                vitem.refresh()
+        for edge_dict in self.edge_map.values():
+            for eitem in edge_dict.values():
+                if eitem._diff_highlight is not None:
+                    eitem._diff_highlight = None
+                    eitem.refresh()
+
     def add_items(self) -> None:
         """Add QGraphicsItem's for all vertices and edges in the graph"""
         self.vertex_map = {}

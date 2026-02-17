@@ -41,6 +41,9 @@ class EItem(QGraphicsPathItem):
     # Set of animations that are currently running on this vertex
     active_animations: set[EItemAnimation]
 
+    # Diff highlight state for proof mode: None, "changed", "removed", or "added"
+    _diff_highlight: Optional[str]
+
     class Properties(Enum):
         """Properties of an EItem that can be animated."""
         Thickness = 1
@@ -58,6 +61,7 @@ class EItem(QGraphicsPathItem):
         self.curve_distance = curve_distance
         self.index = index
         self.active_animations = set()
+        self._diff_highlight = None
         s_item.adj_items.add(self)
         t_item.adj_items.add(self)
         self.selection_node = QGraphicsEllipseItem(-0.1 * SCALE, -0.1 * SCALE, 0.2 * SCALE, 0.2 * SCALE)
@@ -106,6 +110,11 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setDashPattern([4.0, 2.0])
         pen.setColor(self.color)
+        # Override color and thickness when diff-highlighted in proof mode
+        if self._diff_highlight is not None:
+            color_key = f"diff_{self._diff_highlight}"
+            pen.setColor(display_setting.effective_colors[color_key])
+            pen.setWidthF(self.thickness + 4)
         self.setPen(QPen(pen))
 
         if not self.is_dragging:

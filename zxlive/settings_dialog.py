@@ -83,6 +83,7 @@ general_settings: list[SettingsData] = [
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
+    {"id": "show-diff-highlights", "label": "Highlight proof step differences", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "swap-pauli-web-colors", "label": "Swap Pauli web colors", "type": FormInputType.Bool},
@@ -106,7 +107,9 @@ font_settings: list[SettingsData] = [
 
 def load_font_families() -> None:
     index = next(i for i, d in enumerate(font_settings) if d["id"] == "font/family")
-    font_settings[index]["data"] |= {f: f for f in QFontDatabase.families()}
+    entry = font_settings[index]
+    if "data" in entry:
+        entry["data"] |= {f: f for f in QFontDatabase.families()}
 
 
 tikz_export_settings: list[SettingsData] = [

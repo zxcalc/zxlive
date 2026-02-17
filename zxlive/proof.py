@@ -14,8 +14,6 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
 
 from .common import GraphT
 from .settings import display_setting
-
-
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
@@ -282,6 +280,15 @@ class ProofStepView(QListView):
         self.update(idx)
         g = self.model().get_graph(index)
         self.graph_view.set_graph(g)
+
+        # Highlight the elements that will change in the next step
+        if display_setting.show_diff_highlights and index < len(self.model().steps):
+            from pyzx.graph.diff import GraphDiff
+            next_g = self.model().get_graph(index + 1)
+            diff = GraphDiff(g, next_g)
+            self.graph_view.graph_scene.highlight_diff(diff, "forward")
+        else:
+            self.graph_view.graph_scene.clear_diff_highlights()
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
