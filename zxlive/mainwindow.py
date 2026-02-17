@@ -557,7 +557,7 @@ class MainWindow(QMainWindow):
             return False
         widget = self.tab_widget.widget(i)
         assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean():
+        if not widget.undo_stack.isClean() or widget.file_path is None:
             name = self.tab_widget.tabText(i).replace("*", "")
             button = QMessageBox.StandardButton
             answer = QMessageBox.question(
