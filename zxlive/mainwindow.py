@@ -21,7 +21,7 @@ from typing import Callable, Optional, cast
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream, QUrl)
+                            QSettings, QTextStream, QTimer, QUrl)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
@@ -252,6 +252,12 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
+        
+        # Set up periodic session state saving for crash protection
+        # Auto-save session state every 30 seconds if there are open tabs
+        self.session_save_timer = QTimer(self)
+        self.session_save_timer.timeout.connect(self._save_session_state)
+        self.session_save_timer.start(30000)  # 30 seconds in milliseconds
 
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
