@@ -8,7 +8,9 @@ from enum import IntEnum
 from typing import Final, Optional, TypeVar, Type
 
 from pyzx.graph import EdgeType
+from pyzx.graph.jsonparser import string_to_phase
 from pyzx.graph.multigraph import Multigraph
+from pyzx.utils import VertexType
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
@@ -124,8 +126,9 @@ def to_tikz(g: GraphT) -> str:
 def from_tikz(s: str) -> Optional[GraphT]:
     try:
         s, variable_types = _extract_tikz_metadata(s)
-        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph')
+        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True)
         assert isinstance(g, GraphT)
+        _restore_symbolic_tikz_phases(s, g)
         apply_variable_types(g, variable_types)
         return g
     except Exception as e:
@@ -194,3 +197,50 @@ def _extract_tikz_metadata(s: str) -> tuple[str, dict[str, bool]]:
     except Exception:
         pass
     return tikz, {}
+
+
+def _restore_symbolic_tikz_phases(tikz: str, graph: GraphT) -> None:
+    """Restore symbolic phase labels (e.g. $ff$) that pyzx's TikZ parser rejects."""
+    lines = [line.strip() for line in tikz.strip().splitlines() if line.strip()]
+
+    # Matches lines like:
+    # \node [style=Z phase dot] (9) at (3.00, -1.00) {$ff$};
+    node_pattern = re.compile(
+        r"^\\node\s+\[style=([^\]]+)\]\s+\((\d+)\)\s+at\s+\(([^)]*)\)\s+\{\$?(.*?)\$?\};$"
+    )
+    style_to_type: dict[str, VertexType] = {
+        "z phase dot": VertexType.Z,
+        "x phase dot": VertexType.X,
+        "z dot": VertexType.Z,
+        "x dot": VertexType.X,
+    }
+
+    position_to_vertex: dict[str, VT] = {}
+    next_vertex_id = 0
+    for line in lines:
+        match = node_pattern.match(line)
+        if match is None:
+            continue
+        style = match.group(1).strip().lower()
+        pos = match.group(3).strip()
+        label = match.group(4).strip().replace(r"\ ", "").replace("~", "")
+
+        if pos in position_to_vertex:
+            vertex = position_to_vertex[pos]
+        else:
+            vertex = next_vertex_id
+            position_to_vertex[pos] = vertex
+            next_vertex_id += 1
+
+        if style_to_type.get(style) not in (VertexType.Z, VertexType.X):
+            continue
+        if not any(ch.isalpha() for ch in label):
+            continue
+        if vertex not in graph.vertices():
+            continue
+
+        try:
+            graph.set_phase(vertex, string_to_phase(label, graph))
+        except Exception:
+            # Keep parser default for labels that are not valid symbolic phases.
+            continue
