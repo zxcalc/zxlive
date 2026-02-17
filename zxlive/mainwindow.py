@@ -394,6 +394,7 @@ class MainWindow(QMainWindow):
     def _restore_session_state(self) -> bool:
         """Restore previously saved tabs. Returns True if any tabs were restored."""
         import json
+        import logging
         from .dialogs import FileFormat
         
         # Check if user wants to restore session
@@ -429,8 +430,8 @@ class MainWindow(QMainWindow):
                         proof_model = ProofModel.from_json(tab_data['proof'])
                         # Extract the initial graph from the proof
                         graphs_list = proof_model.graphs()
-                        graph_for_proof: GraphT = graphs_list[0] if graphs_list else new_graph()
-                        panel = ProofPanel(graph_for_proof, self.undo_action, self.redo_action)
+                        initial_graph: GraphT = graphs_list[0] if graphs_list else new_graph()
+                        panel = ProofPanel(initial_graph, self.undo_action, self.redo_action)
                         # Replace the proof model with the loaded one
                         panel.step_view.set_model(proof_model)
                         panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
@@ -440,8 +441,8 @@ class MainWindow(QMainWindow):
                         rule = CustomRule.from_json(tab_data['rule'])
                         self.new_rule_editor(rule, tab_name)
                     elif tab_type == 'pauliwebs':
-                        graph_pauli: GraphT = BaseGraph.from_json(tab_data['graph'])  # type: ignore
-                        self.new_pauli_webs(graph_pauli, tab_name)
+                        pauli_graph: GraphT = BaseGraph.from_json(tab_data['graph'])  # type: ignore
+                        self.new_pauli_webs(pauli_graph, tab_name)
                     
                     # Restore file path and file type if available
                     if file_path and self.active_panel:
@@ -454,7 +455,7 @@ class MainWindow(QMainWindow):
                                     break
                 except Exception as e:
                     # If a tab fails to restore, log it but continue with others
-                    print(f"Failed to restore tab '{tab_name}': {e}")
+                    logging.warning(f"Failed to restore tab '{tab_name}': {e}")
                     continue
             
             # Restore active tab
@@ -463,7 +464,7 @@ class MainWindow(QMainWindow):
             
             return True
         except Exception as e:
-            print(f"Failed to restore session state: {e}")
+            logging.error(f"Failed to restore session state: {e}")
             return False
 
     def undo(self, e: QEvent) -> None:
