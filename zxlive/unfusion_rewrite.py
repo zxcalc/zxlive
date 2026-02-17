@@ -3,9 +3,8 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING
 
-import pyzx
 from pyzx.utils import VertexType, FractionLike
-from pyzx.rewrite import Rewrite, RewriteSimpGraph
+from pyzx.rewrite import RewriteSimpGraph
 from pyzx.graph.base import BaseGraph
 
 from .common import VT, ET, GraphT
@@ -37,14 +36,18 @@ class UnfusionRewrite(RewriteSimpGraph[VT, ET]):
     def __init__(self) -> None:
         def _no_op_applier(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
             raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+
         def _no_op_simp(graph: BaseGraph[VT, ET]) -> bool:
             raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+
         super().__init__(_no_op_applier, _no_op_simp)
 
     def is_match(self, graph: GraphT, vertices: list[VT]) -> bool:  # type: ignore[override]
         return bool(match_unfuse_single_vertex(graph, vertices))
 
+
 unfusion_rewrite: UnfusionRewrite = UnfusionRewrite()
+
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""

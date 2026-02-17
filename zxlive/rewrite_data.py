@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import os
 from typing import Callable, Literal, cast, Optional
 from typing_extensions import TypedDict, NotRequired
@@ -10,7 +9,7 @@ from pyzx import simplify, extract_circuit
 from pyzx.graph import VertexType
 from pyzx.rewrite import Rewrite, RewriteSimpGraph
 
-from .common import ET, GraphT, VT, get_custom_rules_path
+from .common import GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
 from .unfusion_rewrite import unfusion_rewrite
 
@@ -133,10 +132,12 @@ def rewrite_strategy_to_rewrite(strategy: Callable[[GraphT], Optional[int]]) -> 
         simplified = cast(GraphT, subgraph.copy())
         strategy(simplified)
         return CustomRule(subgraph, simplified, "", "").applier(g, matches)
+
     def simp_rule(g: GraphT) -> bool:
         strategy(g)
         return True
     return RewriteSimpGraph(rule, simp_rule)  # type: ignore[arg-type]
+
 
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
@@ -154,7 +155,6 @@ def _extract_circuit(graph: GraphT) -> GraphT:
     graph.auto_detect_io()
     simplify.full_reduce(graph)
     return cast(GraphT, extract_circuit(graph).to_graph())
-
 
 
 simplifications: dict[str, RewriteData] = {
@@ -259,6 +259,7 @@ simplifications: dict[str, RewriteData] = {
 def ocm_rule(_graph: GraphT) -> int:
     return 1
 
+
 rules_basic: dict[str, RewriteData] = {
     'id_simp': {
         "text": "Remove identity",
@@ -301,14 +302,14 @@ rules_basic: dict[str, RewriteData] = {
         "type": MATCH_COMPOUND,
     },
     'copy': {
-        "text": "Copy 0/pi spider through its neighbour", 
+        "text": "Copy 0/pi spider through its neighbour",
         "tooltip": "Copies a single-legged spider with a 0/pi phase through its neighbor",
         "picture": "copy_pi.png",
         "rule": simplify.copy_simp,
         "type": MATCH_SINGLE,
     },
     "pauli": {
-        "text": "Push Pauli", 
+        "text": "Push Pauli",
         "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
         "picture": "push_pauli.png",
         "rule": simplify.push_pauli_rewrite,
@@ -330,7 +331,7 @@ rules_basic: dict[str, RewriteData] = {
         "type": MATCH_COMPOUND,
     },
     "euler": {
-        "text": "Decompose Hadamard", 
+        "text": "Decompose Hadamard",
         "tooltip": "Expands a Hadamard-edge into its component spiders using its Euler decomposition",
         "rule": simplify.euler_expansion_rewrite,
         "type": MATCH_DOUBLE,
@@ -342,7 +343,7 @@ rules_basic: dict[str, RewriteData] = {
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 action_groups = {
-    "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
+    "Basic rules": rules_basic,  # {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},

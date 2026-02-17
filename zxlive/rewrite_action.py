@@ -20,7 +20,7 @@ from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
-from .rewrite_data import (is_rewrite_data, RewriteData, 
+from .rewrite_data import (is_rewrite_data, RewriteData,
                            MatchType, MATCH_SINGLE, MATCH_DOUBLE, MATCH_COMPOUND,
                            refresh_custom_rules, action_groups, rules_basic)
 from .settings import display_setting
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 class RewriteAction:
     name: str
     # matcher: Callable[[GraphT, Callable], list]
-    rule: Rewrite#Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
+    rule: Rewrite  # Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
     match_type: MatchType
     tooltip_str: str
     picture_path: Optional[str] = field(default=None)
@@ -98,18 +98,20 @@ class RewriteAction:
         while True:
             matches: list[VT | tuple[VT, VT] | list[VT]] = []
             if isinstance(self.rule, CustomRule):
-                matches = [self.rule.is_match(g, verts)] # type: ignore
+                matches = [self.rule.is_match(g, verts)]  # type: ignore
             elif self.match_type == MATCH_SINGLE:
                 rule_sv = cast(RewriteSingleVertex, self.rule)
                 matches = [v for v in verts if rule_sv.is_match(g, v)]
             elif self.match_type == MATCH_DOUBLE:
                 rule_dv = cast(RewriteDoubleVertex, self.rule)
-                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and rule_dv.is_match(g, *g.edge_st(e))]
-            elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
+                matches = [g.edge_st(e) for e in edges
+                           if g.edge_st(e)[0] != g.edge_st(e)[1]
+                           and rule_dv.is_match(g, *g.edge_st(e))]
+            elif self.match_type == MATCH_COMPOUND:  # We don't necessarily have a matcher in this case
                 if len(verts) == 0:
-                    matches = [list(g.vertices())] # type: ignore
+                    matches = [list(g.vertices())]  # type: ignore
                 else:
-                    matches = [verts.copy()] # type: ignore
+                    matches = [verts.copy()]  # type: ignore
             matches_list.extend(matches)
             if not matches:
                 break
@@ -141,8 +143,6 @@ class RewriteAction:
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
-
-
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         if self.copy_first:
             g = copy.deepcopy(g)
@@ -158,7 +158,8 @@ class RewriteAction:
             rule_dv = cast(RewriteDoubleVertex, self.rule)
             for e in edges:
                 s, t = g.edge_st(e)
-                if s == t: continue
+                if s == t:
+                    continue
                 if rule_dv.is_match(g, s, t):
                     self.enabled = True
                     return
@@ -166,12 +167,12 @@ class RewriteAction:
             return
         elif self.match_type == MATCH_COMPOUND:
             if hasattr(self.rule, 'is_match'):
-                if self.rule.is_match(g, verts): # type: ignore
-                    self.enabled =  True
+                if self.rule.is_match(g, verts):  # type: ignore
+                    self.enabled = True
                 else:
-                    self.enabled =  False
+                    self.enabled = False
             else:
-                self.enabled =  True
+                self.enabled = True
             return
 
     @property
