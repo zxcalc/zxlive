@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import pyzx
 from pyzx.utils import VertexType, FractionLike
@@ -27,24 +27,24 @@ def match_unfuse_single_vertex(graph: GraphT, vertices: list[VT]) -> list[VT]:
     return []
 
 
-def apply_unfuse_rule(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
-    """Apply the unfusion rule to a single vertex."""
-    # This function should not be called directly for the interactive unfusion
-    # It's here for compatibility with the rewrite system structure
-    # The actual unfusion logic is handled by the UnfusionRewriteAction
-    raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
-    return True
+class UnfusionRewrite(RewriteSimpGraph[VT, ET]):
+    """RewriteSimpGraph subclass with an is_match method for unfusion.
 
-def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
-    """A no-op simplification applier for the unfusion rule."""
-    # This function should not be called directly for the interactive unfusion
-    # It's here for compatibility with the rewrite system structure
-    # The actual unfusion logic is handled by the UnfusionRewriteAction
-    raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
-    return True
+    The actual unfusion logic is handled interactively by UnfusionRewriteAction,
+    so apply/simp just raise NotImplementedError.
+    """
 
-unfusion_rewrite: RewriteSimpGraph[VT, ET] = RewriteSimpGraph(apply_unfuse_rule, unfuse_rule_simp_applier)
-unfusion_rewrite.is_match = match_unfuse_single_vertex
+    def __init__(self) -> None:
+        def _no_op_applier(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
+            raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+        def _no_op_simp(graph: BaseGraph[VT, ET]) -> bool:
+            raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+        super().__init__(_no_op_applier, _no_op_simp)
+
+    def is_match(self, graph: GraphT, vertices: list[VT]) -> bool:  # type: ignore[override]
+        return bool(match_unfuse_single_vertex(graph, vertices))
+
+unfusion_rewrite: UnfusionRewrite = UnfusionRewrite()
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""

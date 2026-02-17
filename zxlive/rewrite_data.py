@@ -133,7 +133,10 @@ def rewrite_strategy_to_rewrite(strategy: Callable[[GraphT], Optional[int]]) -> 
         simplified = cast(GraphT, subgraph.copy())
         strategy(simplified)
         return CustomRule(subgraph, simplified, "", "").applier(g, matches)
-    return RewriteSimpGraph(rule, rule)
+    def simp_rule(g: GraphT) -> bool:
+        strategy(g)
+        return True
+    return RewriteSimpGraph(rule, simp_rule)  # type: ignore[arg-type]
 
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
@@ -256,7 +259,7 @@ simplifications: dict[str, RewriteData] = {
 def ocm_rule(_graph: GraphT) -> int:
     return 1
 
-rules_basic = {
+rules_basic: dict[str, RewriteData] = {
     'id_simp': {
         "text": "Remove identity",
         "tooltip": "Removes a 2-ary phaseless spider",
