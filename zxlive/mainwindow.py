@@ -329,13 +329,14 @@ class MainWindow(QMainWindow):
     def closeEvent(self, e: QCloseEvent) -> None:
         # Save session state before closing tabs for potential restoration on next startup
         self._save_session_state()
-
-        # We close all the tabs and ask the user if they want to save progress
-        while self.active_panel is not None:
-            success = self.handle_close_action()
-            if not success:
-                e.ignore()  # Abort the closing
-                return
+        startup_behavior = get_settings_value("startup-behavior", str, "blank")
+        if startup_behavior != "restore":
+            # We close all the tabs and ask the user if they want to save progress
+            while self.active_panel is not None:
+                success = self.handle_close_action()
+                if not success:
+                    e.ignore()  # Abort the closing
+                    return
 
         # save the shape/size of this window on close
         self.settings.setValue("main_window_geometry", self.saveGeometry())
