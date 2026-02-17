@@ -344,8 +344,9 @@ class MainWindow(QMainWindow):
     
     def _save_session_state(self) -> None:
         """Save the current state of all open tabs for restoration on next startup."""
-        # Skip saving if there are no tabs open
+        # If there are no tabs open, clear any previously saved session state
         if self.tab_widget.count() == 0:
+            self.settings.remove("session_state")
             return
         
         tabs_state = []
