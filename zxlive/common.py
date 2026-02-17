@@ -128,8 +128,9 @@ def from_tikz(s: str) -> Optional[GraphT]:
         s, variable_types = _extract_tikz_metadata(s)
         g = pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True)
         assert isinstance(g, GraphT)
-        _restore_symbolic_tikz_phases(s, g)
         apply_variable_types(g, variable_types)
+        _restore_symbolic_tikz_phases(s, g)
+        normalize_symbolic_phase_types(g)
         return g
     except Exception as e:
         if QApplication.instance() is not None:
@@ -141,28 +142,67 @@ def from_tikz(s: str) -> Optional[GraphT]:
 def copy_variable_types(target: GraphT, source: GraphT, overwrite: bool = False,
                         names: Optional[set[str]] = None) -> None:
     """Copies variable type metadata from source to target graph."""
+    source_types = get_variable_types(source)
     if overwrite:
         existing_vars: set[str] = set()
     else:
         existing_vars = set(target.var_registry.vars())
-    names_to_copy = names if names is not None else set(source.var_registry.vars())
+    names_to_copy = names if names is not None else set(source_types.keys())
     for name in names_to_copy:
         if name in existing_vars:
             continue
-        target.var_registry.set_type(name, source.var_registry.get_type(name, default=False))
+        target.var_registry.set_type(name, source_types.get(name, False))
 
 
 def apply_variable_types(graph: GraphT, variable_types: dict[str, bool]) -> None:
     """Applies variable type metadata to a graph."""
     for name, is_bool in variable_types.items():
-        graph.var_registry.set_type(name, is_bool)
+        graph.var_registry.set_type(name, _coerce_bool(is_bool))
+
+
+def get_variable_types(graph: GraphT) -> dict[str, bool]:
+    """Returns variable type metadata, falling back to symbolic phase vars."""
+    variable_types = {
+        str(name): bool(graph.var_registry.get_type(name, default=False))
+        for name in graph.var_registry.vars()
+    }
+
+    for v in graph.vertices():
+        phase = graph.phase(v)
+        if not hasattr(phase, "free_vars"):
+            continue
+        try:
+            for var in phase.free_vars():
+                name = str(var)
+                inferred = bool(getattr(var, "is_bool", False))
+                if name not in variable_types:
+                    variable_types[name] = inferred
+                else:
+                    variable_types[name] = variable_types[name] or inferred
+        except Exception:
+            continue
+
+    return variable_types
+
+
+def normalize_symbolic_phase_types(graph: GraphT) -> None:
+    """Reparse symbolic phases so Var.is_bool matches graph.var_registry."""
+    for v in graph.vertices():
+        if graph.type(v) not in (VertexType.Z, VertexType.X):
+            continue
+        phase = graph.phase(v)
+        if not hasattr(phase, "free_vars"):
+            continue
+        try:
+            if not phase.free_vars():
+                continue
+            graph.set_phase(v, string_to_phase(str(phase), graph))
+        except Exception:
+            continue
 
 
 def _encode_tikz_metadata(graph: GraphT) -> Optional[str]:
-    variable_types = {
-        name: bool(graph.var_registry.get_type(name, default=False))
-        for name in graph.var_registry.vars()
-    }
+    variable_types = get_variable_types(graph)
     if not variable_types:
         return None
     payload = json.dumps({"variable_types": variable_types}, separators=(",", ":")).encode("utf-8")
@@ -192,11 +232,19 @@ def _extract_tikz_metadata(s: str) -> tuple[str, dict[str, bool]]:
         metadata = json.loads(base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8"))
         variable_types = metadata.get("variable_types", {})
         if isinstance(variable_types, dict):
-            normalized = {str(name): bool(v) for name, v in variable_types.items()}
+            normalized = {str(name): _coerce_bool(v) for name, v in variable_types.items()}
             return tikz, normalized
     except Exception:
         pass
     return tikz, {}
+
+
+def _coerce_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    return bool(value)
 
 
 def _restore_symbolic_tikz_phases(tikz: str, graph: GraphT) -> None:

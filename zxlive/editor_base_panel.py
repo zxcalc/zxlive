@@ -184,14 +184,13 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
-        old_vars = set(self.graph_scene.g.var_registry.vars())
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
-        copy_variable_types(new_g, graph)
+        copy_variable_types(new_g, graph, overwrite=True)
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
-        for name in new_g.var_registry.vars() - old_vars:
+        for name in new_g.var_registry.vars():
             self.variable_viewer.add_item(name)
 
     def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
@@ -394,6 +393,7 @@ class VariableViewer(QScrollArea):
 
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
 
+        self._type_boxes: dict[str, QComboBox] = {}
         for name in self.parent_panel.graph.var_registry.vars():
             self.add_item(name)
 
@@ -413,6 +413,11 @@ class VariableViewer(QScrollArea):
             return super().sizeHint()
 
     def add_item(self, name: str) -> None:
+        if name in self._type_boxes:
+            is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
+            self._type_boxes[name].setCurrentIndex(1 if is_bool else 0)
+            return
+
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
         is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
@@ -423,6 +428,7 @@ class VariableViewer(QScrollArea):
         self._layout.removeItem(item)
         self._layout.addWidget(QLabel(f"<pre>{name}</pre>"), 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
         self._layout.addWidget(combobox, 2 + self._items, 2, Qt.AlignmentFlag.AlignCenter)
+        self._type_boxes[name] = combobox
         self._layout.setRowStretch(2 + self._items, 0)
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 3 + self._items, 2)
         self._layout.setRowStretch(3 + self._items, 1)

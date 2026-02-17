@@ -569,9 +569,10 @@ class ProofPanel(BasePanel):
         if not dummy_vertices:
             return
         dummy_graph = cast(GraphT, graph.subgraph_from_vertices(dummy_vertices))
+        copy_variable_types(dummy_graph, graph, overwrite=True)
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
-        copy_variable_types(new_g, dummy_graph)
+        copy_variable_types(new_g, dummy_graph, overwrite=True)
         cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)

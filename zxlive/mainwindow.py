@@ -32,6 +32,8 @@ from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
 from .common import (GraphT, apply_variable_types, from_tikz, get_data, get_settings_value,
+                     get_variable_types,
+                     normalize_symbolic_phase_types,
                      new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .custom_rule import CustomRule, check_rule
@@ -49,6 +51,14 @@ from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
+
+
+def _parse_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    return bool(value)
 
 
 class MainWindow(QMainWindow):
@@ -572,13 +582,9 @@ class MainWindow(QMainWindow):
         mime.setText(tikz)
 
         if include_internal:
-            variable_types = {
-                name: bool(graph.var_registry.get_type(name, default=False))
-                for name in graph.var_registry.vars()
-            }
             payload = json.dumps({
                 "graph_json": graph.to_json(),
-                "variable_types": variable_types,
+                "variable_types": get_variable_types(graph),
             }).encode("utf-8")
             mime.setData(self.CLIPBOARD_MIME, QByteArray(payload))
         QApplication.clipboard().setMimeData(mime)
@@ -595,7 +601,9 @@ class MainWindow(QMainWindow):
                     assert isinstance(g, GraphT)
                     variable_types = payload.get("variable_types")
                     if isinstance(variable_types, dict):
-                        apply_variable_types(g, {str(name): bool(v) for name, v in variable_types.items()})
+                        normalized = {str(name): _parse_bool(v) for name, v in variable_types.items()}
+                        apply_variable_types(g, normalized)
+                        normalize_symbolic_phase_types(g)
                     g.set_auto_simplify(False)
                     return g
             except Exception:
