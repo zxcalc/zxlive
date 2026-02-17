@@ -71,10 +71,10 @@ class ZXLive(QApplication):
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
         parser.process(self)
-        
+
         # Try to restore session state first
         session_restored = self.main_window._restore_session_state()
-        
+
         # Handle command-line file arguments
         if parser.positionalArguments():
             # Open command-line files as additional tabs

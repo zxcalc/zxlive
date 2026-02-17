@@ -254,7 +254,7 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
-        
+
         # Set up periodic session state saving for crash protection
         # Auto-save session state every 3 minutes if there are open tabs
         self.session_save_timer = QTimer(self)
@@ -329,7 +329,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, e: QCloseEvent) -> None:
         # Save session state before closing tabs for potential restoration on next startup
         self._save_session_state()
-        
+
         # We close all the tabs and ask the user if they want to save progress
         while self.active_panel is not None:
             success = self.handle_close_action()
@@ -339,21 +339,21 @@ class MainWindow(QMainWindow):
 
         # save the shape/size of this window on close
         self.settings.setValue("main_window_geometry", self.saveGeometry())
-        
+
         e.accept()
-    
+
     def _save_session_state(self) -> None:
         """Save the current state of all open tabs for restoration on next startup."""
         # If there are no tabs open, clear any previously saved session state
         if self.tab_widget.count() == 0:
             self.settings.remove("session_state")
             return
-        
+
         tabs_state = []
         for i in range(self.tab_widget.count()):
             panel = self.tab_widget.widget(i)
             tab_name = self.tab_widget.tabText(i)
-            
+
             if isinstance(panel, GraphEditPanel):
                 tab_data = {
                     'type': 'graph',
@@ -390,44 +390,44 @@ class MainWindow(QMainWindow):
                 }
             else:
                 continue  # Unknown panel type, skip
-            
+
             tabs_state.append(tab_data)
-        
+
         # Save active tab index
         active_index = self.tab_widget.currentIndex()
         session_data = {
             'tabs': tabs_state,
             'active_tab': active_index
         }
-        
+
         self.settings.setValue("session_state", json.dumps(session_data))
-    
+
     def _restore_session_state(self) -> bool:
         """Restore previously saved tabs. Returns True if any tabs were restored."""
         # Check if user wants to restore session
         startup_behavior = get_settings_value("startup-behavior", str, "blank")
         if startup_behavior != "restore":
             return False
-        
+
         session_json = self.settings.value("session_state")
         if not session_json:
             return False
-        
+
         try:
             session_data = json.loads(session_json)
             tabs_state = session_data.get('tabs', [])
             active_tab = session_data.get('active_tab', 0)
-            
+
             if not tabs_state:
                 return False
-            
+
             # Restore each tab
             for tab_data in tabs_state:
                 tab_type = tab_data.get('type')
                 tab_name = tab_data.get('name', 'Untitled')
                 file_path = tab_data.get('file_path')
                 file_type_value = tab_data.get('file_type')
-                
+
                 try:
                     if tab_type == 'graph':
                         graph: GraphT = BaseGraph.from_json(tab_data['graph'])  # type: ignore
@@ -449,7 +449,7 @@ class MainWindow(QMainWindow):
                     elif tab_type == 'pauliwebs':
                         pauli_graph: GraphT = BaseGraph.from_json(tab_data['graph'])  # type: ignore
                         self.new_pauli_webs(pauli_graph, tab_name)
-                    
+
                     # Restore file path and file type if available
                     if file_path and self.active_panel:
                         self.active_panel.file_path = file_path
@@ -463,11 +463,11 @@ class MainWindow(QMainWindow):
                     # If a tab fails to restore, log it but continue with others
                     logging.warning(f"Failed to restore tab '{tab_name}': {e}")
                     continue
-            
+
             # Restore active tab
             if 0 <= active_tab < self.tab_widget.count():
                 self.tab_widget.setCurrentIndex(active_tab)
-            
+
             return True
         except Exception as e:
             logging.error(f"Failed to restore session state: {e}")
