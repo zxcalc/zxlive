@@ -1,11 +1,11 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Dict, Union, Any
+from typing import TYPE_CHECKING, Optional, Sequence, Dict, Union, Any
 
 import networkx as nx
 import numpy as np
-import pyzx
+# import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
 from networkx.classes.reportviews import NodeView
@@ -36,7 +36,7 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
         self.last_rewrite_center = None
         self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
         if self.is_rewrite_unfusable:
-            self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
+            self.lhs_graph_without_boundaries_nx: nx.MultiGraph = nx.MultiGraph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
     def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
@@ -104,9 +104,9 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
         def get_adjacent_boundary_vertices(g: nx.MultiGraph, v: VT) -> Sequence[VT]:
             return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
 
-        subgraph_nx_without_boundaries = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
+        subgraph_nx_without_boundaries: nx.MultiGraph = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
         lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
-        lhs_graph_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(lhs_vertices))
+        lhs_graph_nx: nx.MultiGraph = nx.MultiGraph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
                                      node_match=categorical_node_match('type', 1))
         matching = list(graph_matcher.match())[0]
@@ -163,7 +163,7 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
     def is_match(self, graph: GraphT, in_selection: list[VT]) -> list[VT]:
         vertices = [v for v in graph.vertices() if v in in_selection]
         if self.is_rewrite_unfusable:
-            subgraph_nx = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
+            subgraph_nx: nx.MultiGraph = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
             lhs_graph_nx = self.lhs_graph_without_boundaries_nx
         else:
             subgraph_nx, _ = create_subgraph(graph, vertices)
@@ -290,7 +290,7 @@ def filter_matchings_if_symbolic_compatible(matchings: list[Dict], left: nx.Mult
 
 
 def to_networkx(graph: GraphT) -> nx.MultiGraph:
-    G = nx.MultiGraph()
+    G: nx.MultiGraph = nx.MultiGraph()
     v_data = {v: {"type": graph.type(v),
                   "phase": graph.phase(v), }
               for v in graph.vertices()}
@@ -306,7 +306,7 @@ def to_networkx(graph: GraphT) -> nx.MultiGraph:
 def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.MultiGraph, dict[str, int]]:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
-    subgraph_nx = nx.MultiGraph(graph_nx.subgraph(verts))
+    subgraph_nx: nx.MultiGraph = nx.MultiGraph(graph_nx.subgraph(verts))
     boundary_mapping = {}
     i = 0
     for v in verts:
