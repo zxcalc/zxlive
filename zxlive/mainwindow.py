@@ -344,6 +344,10 @@ class MainWindow(QMainWindow):
         """Save the current state of all open tabs for restoration on next startup."""
         import json
         
+        # Skip saving if there are no tabs open
+        if self.tab_widget.count() == 0:
+            return
+        
         tabs_state = []
         for i in range(self.tab_widget.count()):
             panel = self.tab_widget.widget(i)
