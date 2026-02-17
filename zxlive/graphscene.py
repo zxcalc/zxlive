@@ -34,7 +34,6 @@ from .settings import display_setting
 class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
-
     # Signals to handle double-clicking and moving of vertices.
     # Note that we have to set the argument types to `object`,
     # otherwise it doesn't work for some reason...
@@ -73,10 +72,10 @@ class GraphScene(QGraphicsScene):
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # 1. Check if there is an item at the position of the click
         item = self.itemAt(e.scenePos(), self.views()[0].transform())
-        
+
         if item is None:
             self.background_double_clicked.emit()
-        
+
         super().mouseDoubleClickEvent(e)
 
     @property

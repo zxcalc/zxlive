@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
-import pyzx
 from pyzx.utils import VertexType, FractionLike
-from pyzx.rewrite import Rewrite, RewriteSimpGraph
+from pyzx.rewrite import RewriteSimpGraph
 from pyzx.graph.base import BaseGraph
 
 from .common import VT, ET, GraphT

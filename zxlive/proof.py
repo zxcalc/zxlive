@@ -157,9 +157,25 @@ class ProofModel(QAbstractListModel):
         """Change the display name"""
         old_step = self.steps[index]
 
+        # If this is a grouped step whose header contains "→", try to update
+        # the sub-step display names to stay in sync with the header text.
+        grouped = old_step.grouped_rewrites
+        if grouped and "\u2192" in name:
+            # Strip any prefix before the first sub-step name.
+            # The auto-generated format is "Prefix: sub1 → sub2 → ...",
+            # so we split on ": " once to separate the prefix.
+            body = name.split(": ", 1)[-1] if ": " in name else name
+            sub_names = [s.strip() for s in body.split("\u2192")]
+            if len(sub_names) == len(grouped):
+                grouped = [
+                    Rewrite(sub_names[i], rw.rule, rw.graph, rw.grouped_rewrites)
+                    if sub_names[i] != rw.display_name else rw
+                    for i, rw in enumerate(grouped)
+                ]
+
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, grouped)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
@@ -253,6 +269,7 @@ class ProofStepView(QListView):
             pal.setColor(self.viewport().backgroundRole(), QColor(255, 255, 255))
         self.setPalette(pal)
         self.setSpacing(0)
+        self.setMouseTracking(True)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
@@ -314,6 +331,30 @@ class ProofStepView(QListView):
             return sub_idx
         return -1
 
+    def _triangle_hit_test(self, step_idx: int, event_pos_x: int, event_pos_y: int, rect_x: int, rect_y: int) -> bool:
+        """Check if the click was on the collapse/expand triangle."""
+        delegate = self.itemDelegate()
+        if not isinstance(delegate, ProofStepItemDelegate):
+            return False
+        text_h = QFontMetrics(self.font()).height()
+        row_height = text_h + 2 * delegate.vert_padding
+        text_x_base = rect_x + delegate.line_width + 2 * delegate.line_padding
+        tri_size = delegate.triangle_size
+        tri_cy = rect_y + row_height / 2
+        click_x = event_pos_x
+        click_y = event_pos_y
+        # Triangle bounds: roughly text_x_base to text_x_base + tri_size*2
+        # and tri_cy - tri_size to tri_cy + tri_size
+        return (text_x_base <= click_x <= text_x_base + tri_size * 2 and
+                tri_cy - tri_size <= click_y <= tri_cy + tri_size)
+
+    def _get_sub_step_hover(self, step_idx: int, event_pos_y: int, rect_y: int) -> int:
+        """Determine which sub-step the mouse is hovering over in an expanded group.
+
+        Returns the 0-based sub-step index, or -1 if not hovering over a sub-step.
+        """
+        return self._sub_step_hit_test(step_idx, event_pos_y, rect_y)
+
     def _navigate_to_sub_step(self, step_idx: int, sub_idx: int) -> None:
         """Display the graph corresponding to a sub-step within a grouped rewrite."""
         step = self.model().steps[step_idx]
@@ -330,9 +371,8 @@ class ProofStepView(QListView):
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         """Handle mouse clicks on grouped steps to toggle expansion.
 
-        Collapsed group: clicking anywhere on the row toggles expansion.
-        Expanded group: clicking in the header area (top row) collapses it;
-        clicking on a sub-step navigates to that sub-step's graph.
+        Only clicking on the triangle triggers expand/collapse.
+        Clicking on a sub-step navigates to that sub-step's graph.
         """
         index = self.indexAt(event.pos())
         toggle_idx = -1
@@ -345,9 +385,13 @@ class ProofStepView(QListView):
                 if step.grouped_rewrites is not None:
                     delegate = self.itemDelegate()
                     if isinstance(delegate, ProofStepItemDelegate):
-                        if step_idx in self.expanded_groups:
-                            # Expanded: check if clicking header or sub-step
-                            rect = self.visualRect(index)
+                        rect = self.visualRect(index)
+                        # Check if clicking on the triangle
+                        if self._triangle_hit_test(step_idx, int(event.pos().x()), int(event.pos().y()),
+                                                   rect.x(), rect.y()):
+                            toggle_idx = step_idx
+                        elif step_idx in self.expanded_groups:
+                            # Expanded: check if clicking on a sub-step
                             sub_idx = self._sub_step_hit_test(
                                 step_idx, int(event.pos().y()), rect.y()
                             )
@@ -355,12 +399,6 @@ class ProofStepView(QListView):
                                 # Clicked on a sub-step
                                 sub_step_clicked = True
                                 self._navigate_to_sub_step(step_idx, sub_idx)
-                            else:
-                                # Clicked on the header -> collapse
-                                toggle_idx = step_idx
-                        else:
-                            # Collapsed: any click on the row toggles
-                            toggle_idx = step_idx
 
         # Clear sub-step selection when clicking on a non-sub-step area
         if not sub_step_clicked and self.selected_sub_step is not None:
@@ -373,6 +411,66 @@ class ProofStepView(QListView):
 
         if toggle_idx >= 0:
             self.toggle_group_expansion(toggle_idx)
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
+        """Track which sub-step the mouse is hovering over and trigger repaint."""
+        delegate = self.itemDelegate()
+        if not isinstance(delegate, ProofStepItemDelegate):
+            super().mouseMoveEvent(event)
+            return
+
+        old_step = delegate.hover_step_idx
+        old_sub = delegate.hover_sub_idx
+        new_step = -1
+        new_sub = -1
+
+        index = self.indexAt(event.pos())
+        if index.isValid() and index.row() > 0:
+            step_idx = index.row() - 1
+            if step_idx < len(self.model().steps):
+                step = self.model().steps[step_idx]
+                if (step.grouped_rewrites is not None
+                        and step_idx in self.expanded_groups):
+                    rect = self.visualRect(index)
+                    sub_idx = self._sub_step_hit_test(
+                        step_idx, int(event.pos().y()), rect.y()
+                    )
+                    if sub_idx >= 0:
+                        new_step = step_idx
+                        new_sub = sub_idx
+
+        if new_step != old_step or new_sub != old_sub:
+            delegate.hover_step_idx = new_step
+            delegate.hover_sub_idx = new_sub
+            # Repaint the old hovered item
+            if old_step >= 0:
+                old_idx = self.model().index(old_step + 1, 0)
+                self.update(old_idx)
+            # Repaint the new hovered item
+            if new_step >= 0:
+                new_idx = self.model().index(new_step + 1, 0)
+                self.update(new_idx)
+
+        # Change cursor to pointing hand when hovering over a clickable sub-step
+        if new_sub >= 0:
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        else:
+            self.unsetCursor()
+
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: Any) -> None:
+        """Clear sub-step hover state when the mouse leaves the widget."""
+        delegate = self.itemDelegate()
+        if isinstance(delegate, ProofStepItemDelegate):
+            old_step = delegate.hover_step_idx
+            delegate.hover_step_idx = -1
+            delegate.hover_sub_idx = -1
+            if old_step >= 0:
+                old_idx = self.model().index(old_step + 1, 0)
+                self.update(old_idx)
+        self.unsetCursor()
+        super().leaveEvent(event)
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -481,6 +579,10 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     sub_branch_len = 15
     sub_circle_radius = 3
 
+    # Track hover position for sub-steps
+    hover_step_idx: int = -1
+    hover_sub_idx: int = -1
+
     def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> tuple[bool, bool, Optional[list['Rewrite']]]:
         """Return (is_grouped, is_expanded, grouped_rewrites) for a given row."""
         if index.row() == 0:
@@ -509,19 +611,35 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         fg = QColor(224, 224, 224) if display_setting.dark_mode else QColor(0, 0, 0)
         line_clr = QColor(180, 180, 180) if display_setting.dark_mode else QColor(0, 0, 0)
 
+        # Check if a sub-step is selected in this grouped rewrite
+        view = self.parent()
+        has_selected_sub_step = False
+        if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
+            sel_step_idx, _ = view.selected_sub_step
+            if index.row() - 1 == sel_step_idx:
+                has_selected_sub_step = True
+
         # ── Background ──────────────────────────────────────────────────
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
             if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
                 painter.setBrush(QColor(60, 80, 120))
-            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
+            elif has_selected_sub_step:
+                # Lighter background when a sub-step is selected
+                painter.setBrush(QColor(45, 50, 60))
+            elif option.state & QStyle.StateFlag.State_MouseOver and not is_expanded:  # type: ignore[attr-defined]
+                # Only hover highlight if not expanded (sub-steps handle their own hover)
                 painter.setBrush(QColor(50, 60, 80))
             else:
                 painter.setBrush(QColor(35, 39, 46))
         else:
             if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
                 painter.setBrush(QColor(204, 232, 255))
-            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
+            elif has_selected_sub_step:
+                # Lighter background when a sub-step is selected
+                painter.setBrush(QColor(240, 245, 250))
+            elif option.state & QStyle.StateFlag.State_MouseOver and not is_expanded:  # type: ignore[attr-defined]
+                # Only hover highlight if not expanded (sub-steps handle their own hover)
                 painter.setBrush(QColor(229, 243, 255))
             else:
                 painter.setBrush(Qt.GlobalColor.white)
@@ -578,16 +696,19 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.drawPolygon(triangle)
 
             tri_offset = s * 2 + 4
-            header_text = "Grouped Steps" if is_expanded else index.data(Qt.ItemDataRole.DisplayRole)
+            # Always show the actual display name, not hardcoded "Grouped Steps"
+            header_text = index.data(Qt.ItemDataRole.DisplayRole)
             text_rect = QRect(
                 text_x_base + tri_offset,
                 int(option.rect.y() + row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
                 int(option.rect.width() - self.line_width - 2 * self.line_padding - tri_offset),  # type: ignore[attr-defined]
                 text_height
             )
-            bold_font = QFont(font)
-            bold_font.setWeight(QFont.Weight.Bold)
-            painter.setFont(bold_font)
+            # Only make bold if selected, not just because it's grouped
+            draw_font = QFont(font)
+            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+                draw_font.setWeight(QFont.Weight.Bold)
+            painter.setFont(draw_font)
             painter.setPen(fg)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, header_text)
 
@@ -656,13 +777,22 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             sub_cy = first_sub_top + i * row_height + row_height / 2
             is_sub_selected = (i == selected_sub_idx)
 
-            # Draw highlight background for selected sub-step
-            if is_sub_selected:
+            # Check if this sub-step is being hovered (for individual hover effect)
+            is_sub_hovered = (self.hover_step_idx == step_idx and self.hover_sub_idx == i)
+
+            # Draw highlight background for selected or hovered sub-step
+            if is_sub_selected or is_sub_hovered:
                 painter.setPen(Qt.GlobalColor.transparent)
-                if display_setting.dark_mode:
-                    painter.setBrush(QColor(50, 90, 140, 120))
-                else:
-                    painter.setBrush(QColor(180, 215, 255, 160))
+                if is_sub_selected:
+                    if display_setting.dark_mode:
+                        painter.setBrush(QColor(50, 90, 140, 120))
+                    else:
+                        painter.setBrush(QColor(180, 215, 255, 160))
+                elif is_sub_hovered:
+                    if display_setting.dark_mode:
+                        painter.setBrush(QColor(50, 60, 80))
+                    else:
+                        painter.setBrush(QColor(229, 243, 255))
                 highlight_rect = QRect(
                     int(sub_tree_x - 4),
                     int(sub_cy - row_height / 2),
