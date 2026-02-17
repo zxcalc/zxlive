@@ -254,10 +254,10 @@ class MainWindow(QMainWindow):
             self._toggle_sfx)
         
         # Set up periodic session state saving for crash protection
-        # Auto-save session state every 30 seconds if there are open tabs
+        # Auto-save session state every 3 minutes if there are open tabs
         self.session_save_timer = QTimer(self)
         self.session_save_timer.timeout.connect(self._save_session_state)
-        self.session_save_timer.start(30000)  # 30 seconds in milliseconds
+        self.session_save_timer.start(180000)  # 3 minutes in milliseconds
 
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
