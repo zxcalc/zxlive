@@ -183,11 +183,15 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
+        old_variables = self.graph.var_registry.vars()
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
+        new_vars = self.graph.var_registry.vars() - old_variables
+        for nv in new_vars:
+            self.variable_viewer.add_item(nv)
 
     def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
         """Insert a pattern into the current graph view."""
