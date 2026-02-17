@@ -442,6 +442,7 @@ class MainWindow(QMainWindow):
                         panel = ProofPanel(initial_graph, self.undo_action, self.redo_action)
                         # Replace the proof model with the loaded one
                         panel.step_view.set_model(proof_model)
+                        panel.step_view.move_to_step(len(proof_model.steps))  # Move to the end of the proof
                         panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
                         self._new_panel(panel, tab_name)
                     elif tab_type == 'rule':
