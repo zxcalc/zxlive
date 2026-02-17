@@ -15,17 +15,21 @@
 
 """LaTeX expression rendering for dummy node labels.
 
-Uses pylatexenc to convert LaTeX commands to unicode, then applies
-HTML post-processing for superscripts/subscripts for Qt rich text.
+Uses ziamath to convert LaTeX math expressions to SVG, then
+flattens <symbol>/<use> references into inline paths so that
+Qt's SVG Tiny renderer can display them.
 """
 
 from __future__ import annotations
 
+import copy
 import re
+import xml.etree.ElementTree as ET
 
-from pylatexenc.latex2text import LatexNodes2Text
+import ziamath as zm
 
-_l2t = LatexNodes2Text()
+_SVG_NS = "http://www.w3.org/2000/svg"
+ET.register_namespace('', _SVG_NS)
 
 
 def is_latex(text: str) -> bool:
@@ -48,8 +52,8 @@ def is_latex(text: str) -> bool:
 def _preprocess_dirac(text: str) -> str:
     """Expand Dirac notation into standard LaTeX before conversion.
 
-    pylatexenc does not know \\ket, \\bra, \\braket. Rewrite them
-    into \\langle / \\rangle forms that it does handle.
+    ziamath does not know \\ket, \\bra, \\braket. Rewrite them
+    into \\langle / \\rangle forms.
     """
     result = text
     result = re.sub(r'\\ket\s*\{([^}]*)\}', r'|{\1}\\rangle', result)
@@ -58,30 +62,109 @@ def _preprocess_dirac(text: str) -> str:
     return result
 
 
-def latex_to_html(text: str, color: str = "#222222") -> str:
-    """Convert LaTeX math text to HTML for Qt rich text rendering.
+def _ensure_dollar_wrapped(text: str) -> str:
+    """Wrap text in $ delimiters if not already present."""
+    stripped = text.strip()
+    if stripped.startswith('$') and stripped.endswith('$'):
+        return stripped
+    return f'${stripped}$'
 
-    Uses pylatexenc for the heavy lifting (thousands of LaTeX commands
-    covered), then applies HTML post-processing for superscripts and
-    subscripts which pylatexenc leaves as ^ and _ characters.
+
+def _flatten_svg(svg_str: str) -> str:
+    """Inline <symbol>/<use> pairs into <g transform="..."> groups.
+
+    Qt's SVG renderer (SVG Tiny 1.2) rejects both <symbol>/<use>
+    references and nested <svg> elements.  This function resolves
+    every <use> into a <g> with an explicit translate+scale
+    transform that maps the symbol's viewBox into the <use>'s
+    (x, y, width, height) region, then removes the <symbol> defs.
+    """
+    root = ET.fromstring(svg_str)
+
+    symbols: dict[str, ET.Element] = {}
+    for sym in root.findall(f'{{{_SVG_NS}}}symbol'):
+        sid = sym.get('id', '')
+        if sid:
+            symbols[sid] = sym
+
+    for use in list(root.findall(f'{{{_SVG_NS}}}use')):
+        href = use.get('href') or use.get(f'{{{_SVG_NS}}}href') or ''
+        ref_id = href.lstrip('#')
+        sym = symbols.get(ref_id)
+        if sym is None:
+            continue
+
+        ux = float(use.get('x', '0'))
+        uy = float(use.get('y', '0'))
+        uw = float(use.get('width', '0'))
+        uh = float(use.get('height', '0'))
+
+        vb = sym.get('viewBox', '')
+        vb_parts = vb.split()
+        if len(vb_parts) == 4:
+            vb_x, vb_y, vb_w, vb_h = (float(v) for v in vb_parts)
+        else:
+            vb_x, vb_y, vb_w, vb_h = 0.0, 0.0, uw, uh
+
+        sx = uw / vb_w if vb_w else 1.0
+        sy = uh / vb_h if vb_h else 1.0
+
+        tx = ux - vb_x * sx
+        ty = uy - vb_y * sy
+
+        g = ET.SubElement(root, f'{{{_SVG_NS}}}g')
+        g.set('transform', f'translate({tx},{ty}) scale({sx},{sy})')
+
+        fill = use.get('fill')
+        if fill:
+            g.set('fill', fill)
+
+        for child in sym:
+            g.append(copy.deepcopy(child))
+
+        root.remove(use)
+
+    for sym in list(root.findall(f'{{{_SVG_NS}}}symbol')):
+        root.remove(sym)
+
+    return ET.tostring(root, encoding='unicode')
+
+
+def _fallback_svg(text: str, color: str, size: float) -> bytes:
+    """Generate a simple fallback SVG when ziamath fails to parse."""
+    import html
+    escaped = html.escape(text.replace('$', ''))
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'width="{len(escaped) * size * 0.6}" height="{size * 1.4}">'
+        f'<text x="0" y="{size}" '
+        f'font-family="serif" font-size="{size}" '
+        f'fill="{color}">{escaped}</text></svg>'
+    )
+    return svg.encode('utf-8')
+
+
+def latex_to_svg(text: str, color: str = "#222222",
+                 size: float = 24) -> bytes:
+    """Convert LaTeX math text to SVG bytes via ziamath.
+
+    Args:
+        text: LaTeX expression, with or without $ delimiters.
+        color: Hex color string for the rendered text.
+        size: Font size in points.
+
+    Returns:
+        SVG content as bytes suitable for QSvgRenderer / QGraphicsSvgItem.
     """
     result = text.strip()
-    # Strip $ delimiters
-    result = re.sub(r'\$', '', result)
-
-    # Expand Dirac notation before pylatexenc conversion
+    # Users often type $...$ delimiters. ziamath input doesn't need them, and
+    # keeping them can result in literal '$' glyphs appearing in Qt rendering.
+    result = result.replace('$', '')
     result = _preprocess_dirac(result)
 
-    # Let pylatexenc convert LaTeX commands to unicode
-    result = _l2t.latex_to_text(result)
-
-    # Post-process: convert ^ and _ to HTML sup/sub tags
-    result = re.sub(r'\^\s*\{([^}]*)\}', r'<sup>\1</sup>', result)
-    result = re.sub(r'\^(\S)', r'<sup>\1</sup>', result)
-    result = re.sub(r'_\s*\{([^}]*)\}', r'<sub>\1</sub>', result)
-    result = re.sub(r'_(\S)', r'<sub>\1</sub>', result)
-
-    # Strip remaining braces
-    result = result.replace('{', '').replace('}', '')
-
-    return f'<span style="color:{color};">{result.strip()}</span>'
+    try:
+        svg_str: str = zm.Latex(result, size=size, color=color).svg()
+        flat = _flatten_svg(svg_str)
+        return flat.encode('utf-8')
+    except Exception:
+        return _fallback_svg(text, color, size)

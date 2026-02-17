@@ -36,7 +36,7 @@ dependencies = [
     "pyperclip",
     "imageio",
     "packaging",
-    "pylatexenc",
+    "ziamath>=0.13",
 ]
 
 [project.optional-dependencies]
