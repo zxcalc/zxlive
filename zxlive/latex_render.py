@@ -82,10 +82,10 @@ def _flatten_svg(svg_str: str) -> str:
     root = ET.fromstring(svg_str)
 
     symbols: dict[str, ET.Element] = {}
-    for sym in root.findall(f'{{{_SVG_NS}}}symbol'):
-        sid = sym.get('id', '')
+    for symbol_el in root.findall(f'{{{_SVG_NS}}}symbol'):
+        sid = symbol_el.get('id', '')
         if sid:
-            symbols[sid] = sym
+            symbols[sid] = symbol_el
 
     for use in list(root.findall(f'{{{_SVG_NS}}}use')):
         href = use.get('href') or use.get(f'{{{_SVG_NS}}}href') or ''
@@ -124,8 +124,8 @@ def _flatten_svg(svg_str: str) -> str:
 
         root.remove(use)
 
-    for sym in list(root.findall(f'{{{_SVG_NS}}}symbol')):
-        root.remove(sym)
+    for symbol_el in list(root.findall(f'{{{_SVG_NS}}}symbol')):
+        root.remove(symbol_el)
 
     return ET.tostring(root, encoding='unicode')
 
