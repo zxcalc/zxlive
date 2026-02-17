@@ -91,7 +91,7 @@ class ProofPanel(BasePanel):
         self._dummy_icon.setToolTip("Add Dummy Vertex (v)")
         self._dummy_icon.setShortcut("v")
         self._dummy_icon.clicked.connect(self._dummy_node_mode_clicked)
-        
+
         self._dummy_edge_icon = QToolButton(self)
         self._dummy_edge_icon.setCheckable(True)
         self._dummy_edge_icon.setIcon(QIcon(get_data("icons/tikzit-tool-edge.svg")))
@@ -100,7 +100,7 @@ class ProofPanel(BasePanel):
         self._dummy_edge_icon.setShortcut("e")
         self._dummy_edge_icon.clicked.connect(self._dummy_edge_mode_clicked)
         yield ToolbarSection(self.selection, self._dummy_icon, self._dummy_edge_icon, self.magic_wand, exclusive=True)
-        
+
         self.identity_choice = (
             QToolButton(self),
             QToolButton(self)
@@ -110,21 +110,21 @@ class ProofPanel(BasePanel):
         self.identity_choice[0].setChecked(True)
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
-        
+
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
-        
+
         self.pauli_webs = QToolButton(self)
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
-    
+
     def _start_pauliwebs(self) -> None:
         # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication
         if not self.graph_scene.g.is_well_formed():
             show_error_msg("Graph is not well-formed", parent=self)
             return
-        
+
         graph_json = json.loads(self.graph_scene.g.to_json())
         edge_pairs = [tuple(sorted(edge[:2])) for edge in graph_json.get("edges", [])]
         unique_pairs = set(edge_pairs)
@@ -132,7 +132,7 @@ class ProofPanel(BasePanel):
         if has_duplicate_edges:
             show_error_msg("Graph is a multigraph", parent=self)
             return
-        
+
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_pauliwebs_signal.emit(new_g)
 
@@ -181,7 +181,7 @@ class ProofPanel(BasePanel):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
             elif pyzx.rewrite_rules.check_copy(self.graph, v):  # TODO: Should check if copy can be applied between v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif pyzx.rewrite_rules.check_pauli(self.graph, w, v): # Second parameter is the Pauli
+            elif pyzx.rewrite_rules.check_pauli(self.graph, w, v):  # Second parameter is the Pauli
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
@@ -206,7 +206,7 @@ class ProofPanel(BasePanel):
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
             self.undo_stack.push(cmd, anim_after=anim)
-        elif pyzx.rewrite_rules.check_pauli(g, w, v): # Second parameter is the Pauli
+        elif pyzx.rewrite_rules.check_pauli(g, w, v):  # Second parameter is the Pauli
             # Check if we can push a Pauli spider through the other vertex
             pyzx.rewrite_rules.pauli_push(g, w, v)
             # Determine which vertex is the target (the one being pushed through)
