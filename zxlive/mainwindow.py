@@ -422,14 +422,15 @@ class MainWindow(QMainWindow):
                 
                 try:
                     if tab_type == 'graph':
-                        graph = BaseGraph.from_json(tab_data['graph'])
+                        graph: GraphT = BaseGraph.from_json(tab_data['graph'])  # type: ignore
                         self.new_graph(graph, tab_name)
                     elif tab_type == 'proof':
                         from .proof import ProofModel
                         proof_model = ProofModel.from_json(tab_data['proof'])
                         # Extract the initial graph from the proof
-                        graph = proof_model.graphs[0] if proof_model.graphs else new_graph()
-                        panel = ProofPanel(graph, self.undo_action, self.redo_action)
+                        graphs_list = proof_model.graphs()
+                        graph_for_proof: GraphT = graphs_list[0] if graphs_list else new_graph()
+                        panel = ProofPanel(graph_for_proof, self.undo_action, self.redo_action)
                         # Replace the proof model with the loaded one
                         panel.step_view.set_model(proof_model)
                         panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
@@ -439,14 +440,18 @@ class MainWindow(QMainWindow):
                         rule = CustomRule.from_json(tab_data['rule'])
                         self.new_rule_editor(rule, tab_name)
                     elif tab_type == 'pauliwebs':
-                        graph = BaseGraph.from_json(tab_data['graph'])
-                        self.new_pauli_webs(graph, tab_name)
+                        graph_pauli: GraphT = BaseGraph.from_json(tab_data['graph'])  # type: ignore
+                        self.new_pauli_webs(graph_pauli, tab_name)
                     
                     # Restore file path and file type if available
                     if file_path and self.active_panel:
                         self.active_panel.file_path = file_path
                         if file_type_value:
-                            self.active_panel.file_type = FileFormat(file_type_value)
+                            # Find the FileFormat enum by its value
+                            for fmt in FileFormat:
+                                if fmt.value == file_type_value:
+                                    self.active_panel.file_type = fmt
+                                    break
                 except Exception as e:
                     # If a tab fails to restore, log it but continue with others
                     print(f"Failed to restore tab '{tab_name}': {e}")
