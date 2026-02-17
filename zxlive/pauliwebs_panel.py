@@ -25,6 +25,7 @@ from pyzx.web import compute_pauli_webs
 
 PauliWeb: TypeAlias = pauliweb.PauliWeb[int, tuple[int, int]]
 
+
 class PauliWebsPanel(BasePanel):
     """write something here"""
 
@@ -139,7 +140,7 @@ class PauliWebsPanel(BasePanel):
             label = f"{current_type} #{type_counts[current_type]}"
 
             item = QListWidgetItem(label)
-            item.setData(Qt.ItemDataRole.UserRole, i) # Index now matches the new list order
+            item.setData(Qt.ItemDataRole.UserRole, i)  # Index now matches the new list order
             self.web_list.addItem(item)
         if self._pauli_webs:
             self.web_list.setCurrentRow(-1)
@@ -175,7 +176,7 @@ class PauliWebsPanel(BasePanel):
                     new_g.set_edata(edge, "zweb1", True)
 
         self.undo_stack.push(UpdateGraph(self.graph_view, new_g))  # or SetGraph if you don’t want undo entries
-        self.graph_scene.invalidate() # TODO: invalidating the whole scene might be overkill
+        self.graph_scene.invalidate()  # TODO: invalidating the whole scene might be overkill
 
     def _on_web_selection_changed(self) -> None:
         selected_items = self.web_list.selectedItems()
@@ -202,7 +203,7 @@ class PauliWebsPanel(BasePanel):
 
         self.graph_scene.g.set_edata(e, "highlight", True)
 
-        for i,web in enumerate(self._pauli_webs):
+        for i, web in enumerate(self._pauli_webs):
             item = self.web_list.item(i)
             item.setForeground(QBrush())
             item.setFont(QFont())
