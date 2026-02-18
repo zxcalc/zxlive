@@ -25,7 +25,8 @@ from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
 
 
-from .common import SCALE, VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
+from .common import (SCALE, VT, ET, GraphT, ToolType, copy_variable_types,
+                     pos_from_view, OFFSET_X, OFFSET_Y)
 from .vitem import VItem
 from .eitem import EItem, EDragItem
 from .settings import display_setting
@@ -156,6 +157,8 @@ class GraphScene(QGraphicsScene):
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(new_g, GraphT)  # type: ignore
         self.g = new_g
+        # GraphDiff does not track var_registry updates, so sync them manually.
+        copy_variable_types(self.g, new, overwrite=True)
         # g now contains the new graph,
         # but we still need to update the scene
         # However, the new vertices and edges automatically follow the new graph structure

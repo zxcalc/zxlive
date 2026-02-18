@@ -16,12 +16,13 @@
 from __future__ import annotations
 
 import copy
+import json
 import random
 from typing import Callable, Optional, cast
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream, QUrl)
+                            QMimeData, QSettings, QTextStream, QUrl)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
@@ -30,7 +31,9 @@ from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
-from .common import (GraphT, from_tikz, get_data, get_settings_value,
+from .common import (GraphT, apply_variable_types, from_tikz, get_data, get_settings_value,
+                     get_variable_types,
+                     normalize_symbolic_phase_types,
                      new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .custom_rule import CustomRule, check_rule
@@ -50,8 +53,17 @@ from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
 
 
+def _parse_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    return bool(value)
+
+
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
+    CLIPBOARD_MIME = "application/x-zxlive-graph+json"
 
     def __init__(self) -> None:
         super().__init__()
@@ -252,6 +264,7 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
+        QApplication.clipboard().dataChanged.connect(self._on_clipboard_changed)
 
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
@@ -274,7 +287,7 @@ class MainWindow(QMainWindow):
         self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
-        self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
+        self.paste_action.setEnabled(has_active_tab and self._has_pasteable_clipboard_data())
 
         # Undo and redo are always disabled whether on a new tab or closing the last tab.
         self.undo_action.setEnabled(False)
@@ -304,6 +317,19 @@ class MainWindow(QMainWindow):
                 elif alt_shortcut not in action.shortcuts():
                     action.setShortcuts([shortcut, alt_shortcut])  # type: ignore
         return action
+
+    def _has_pasteable_clipboard_data(self) -> bool:
+        if self.copied_graph is not None:
+            return True
+        mime = QApplication.clipboard().mimeData()
+        if mime is None:
+            return False
+        if mime.hasFormat(self.CLIPBOARD_MIME):
+            return True
+        return bool(mime.text().strip())
+
+    def _on_clipboard_changed(self) -> None:
+        self.paste_action.setEnabled(self.active_panel is not None and self._has_pasteable_clipboard_data())
 
     @property
     def active_panel(self) -> Optional[BasePanel]:
@@ -519,12 +545,14 @@ class MainWindow(QMainWindow):
     def cut_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self._copy_graph_to_system_clipboard(self.copied_graph)
         self.paste_action.setEnabled(True)
         self.active_panel.delete_selection()
 
     def copy_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self._copy_graph_to_system_clipboard(self.copied_graph)
         self.paste_action.setEnabled(True)
 
     def copy_graph_to_clipboard(self) -> None:
@@ -532,20 +560,59 @@ class MainWindow(QMainWindow):
         that can be understood by Tikzit."""
         assert self.active_panel is not None
         copied_graph = self.active_panel.copy_selection()
-        tikz = to_tikz(copied_graph)
-        pyperclip.copy(tikz)
+        self._copy_graph_to_system_clipboard(copied_graph, include_internal=False)
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
-        if self.copied_graph is not None:
-            self.active_panel.paste_graph(self.copied_graph)
+        copied_graph = self._read_graph_from_system_clipboard()
+        if copied_graph is None and self.copied_graph is not None:
+            copied_graph = self.copied_graph
+        if copied_graph is not None:
+            self.active_panel.paste_graph(copied_graph)
 
     def paste_graph_from_clipboard(self) -> None:
         assert self.active_panel is not None
-        tikz = pyperclip.paste()
-        copied_graph = from_tikz(tikz)
+        copied_graph = self._read_graph_from_system_clipboard(include_internal=False)
         if copied_graph is not None:
             self.active_panel.paste_graph(copied_graph)
+
+    def _copy_graph_to_system_clipboard(self, graph: GraphT, include_internal: bool = True) -> None:
+        mime = QMimeData()
+        tikz = to_tikz(graph)
+        mime.setText(tikz)
+
+        if include_internal:
+            payload = json.dumps({
+                "graph_json": graph.to_json(),
+                "variable_types": get_variable_types(graph),
+            }).encode("utf-8")
+            mime.setData(self.CLIPBOARD_MIME, QByteArray(payload))
+        QApplication.clipboard().setMimeData(mime)
+
+    def _read_graph_from_system_clipboard(self, include_internal: bool = True) -> Optional[GraphT]:
+        mime = QApplication.clipboard().mimeData()
+        if include_internal and mime is not None and mime.hasFormat(self.CLIPBOARD_MIME):
+            try:
+                raw = bytes(mime.data(self.CLIPBOARD_MIME).data())
+                payload = json.loads(raw.decode("utf-8"))
+                graph_json = payload.get("graph_json")
+                if isinstance(graph_json, str):
+                    g = GraphT.from_json(graph_json)
+                    assert isinstance(g, GraphT)
+                    variable_types = payload.get("variable_types")
+                    if isinstance(variable_types, dict):
+                        normalized = {str(name): _parse_bool(v) for name, v in variable_types.items()}
+                        apply_variable_types(g, normalized)
+                        normalize_symbolic_phase_types(g)
+                    g.set_auto_simplify(False)
+                    return g
+            except Exception:
+                pass
+
+        tikz = QApplication.clipboard().text()
+        if not tikz:
+            tikz = pyperclip.paste()
+        return from_tikz(tikz) if tikz else None
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None

@@ -175,7 +175,7 @@ class PauliWebsPanel(BasePanel):
                 if pauli in ("Z", "Y") and s > t:
                     new_g.set_edata(edge, "zweb1", True)
 
-        self.undo_stack.push(UpdateGraph(self.graph_view, new_g))  # or SetGraph if you don’t want undo entries
+        self.undo_stack.push(UpdateGraph(self.graph_view, new_g))  # or SetGraph if you don't want undo entries
         self.graph_scene.invalidate()  # TODO: invalidating the whole scene might be overkill
 
     def _on_web_selection_changed(self) -> None:

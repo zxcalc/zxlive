@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast, Union, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 from concurrent.futures import ThreadPoolExecutor
 
 from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 class RewriteAction:
     name: str
     # matcher: Callable[[GraphT, Callable], list]
-    rule: Rewrite  # Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
+    rule: Any  # Callable[[GraphT, list], pyzx.rules.RewriteOutputType[VT, ET]] | Callable[[GraphT, list], GraphT]
     match_type: MatchType
     tooltip_str: str
     picture_path: Optional[str] = field(default=None)
@@ -143,6 +143,28 @@ class RewriteAction:
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
+    # TODO: Narrow down the type of the first return value.
+    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[GraphT, list[VT]]:
+        if self.returns_new_graph:
+            graph = self.rule(g, matches)
+            assert isinstance(graph, GraphT)
+            return graph, []
+
+        for m in matches:
+            if self.match_type == MATCH_DOUBLE:
+                v1, v2 = cast(tuple[VT, VT], m)
+                self.rule.apply(g, v1, v2)
+            else:
+                self.rule.apply(g, m)
+        # rewrite = self.rule(g, matches)
+        # assert isinstance(rewrite, tuple) and len(rewrite) == 4
+        # etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
+        # g.remove_edges(rem_edges)
+        # g.remove_vertices(rem_verts)
+        # g.add_edge_table(etab)
+        # return g, rem_verts
+        return g, []
+
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         if self.copy_first:
             g = copy.deepcopy(g)
@@ -165,7 +187,7 @@ class RewriteAction:
                     return
             self.enabled = False
             return
-        elif self.match_type == MATCH_COMPOUND:
+        if self.match_type == MATCH_COMPOUND:
             if hasattr(self.rule, 'is_match'):
                 if self.rule.is_match(g, verts):  # type: ignore
                     self.enabled = True
