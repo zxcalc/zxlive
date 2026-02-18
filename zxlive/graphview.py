@@ -74,6 +74,7 @@ class GraphView(QGraphicsView):
 
     wand_trace_finished = Signal(object)
     merge_triggered = Signal()
+    keyboard_vertices_moved = Signal()
     draw_background_lines = True
 
     def __init__(self, graph_scene: GraphScene) -> None:
@@ -175,6 +176,8 @@ class GraphView(QGraphicsView):
                 elif e.key() == Qt.Key.Key_Right:
                     g.set_position(v, y, x + distance)
                 vitem.set_pos_from_graph()
+            if self.graph_scene.selected_vertices:
+                self.keyboard_vertices_moved.emit()
         else:
             super().keyPressEvent(e)
 

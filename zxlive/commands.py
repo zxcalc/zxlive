@@ -8,7 +8,6 @@ from typing import Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
-from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
@@ -441,7 +440,7 @@ class AddRewriteStep(UpdateGraph):
     The rewrite is inserted after the currently selected step. In particular, it
     replaces all rewrites that were previously after the current selection.
     """
-    step_view: QListView
+    step_view: ProofStepView
     name: str
     diff: Optional[GraphDiff] = None
 
