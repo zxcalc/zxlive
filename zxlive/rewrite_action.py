@@ -8,8 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
-# import pyzx
-from pyzx.rewrite import Rewrite
+from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
@@ -101,9 +100,13 @@ class RewriteAction:
             if isinstance(self.rule, CustomRule):
                 matches = [self.rule.is_match(g, verts)] # type: ignore
             elif self.match_type == MATCH_SINGLE:
-                matches = [v for v in verts if self.rule.is_match(g, v)]  # type: ignore
+                rule_sv = cast(RewriteSingleVertex, self.rule)
+                matches = [v for v in verts if rule_sv.is_match(g, v)]
             elif self.match_type == MATCH_DOUBLE:
-                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]  # type: ignore
+                rule_dv = cast(RewriteDoubleVertex, self.rule)
+                matches = [g.edge_st(e) for e in edges
+                           if g.edge_st(e)[0] != g.edge_st(e)[1]
+                           and rule_dv.is_match(g, *g.edge_st(e))]
             elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
                 if len(verts) == 0:
@@ -117,11 +120,18 @@ class RewriteAction:
                 applied = False
                 for m in matches:
                     if self.match_type == MATCH_DOUBLE:
+                        rule_dv = cast(RewriteDoubleVertex, self.rule)
                         v1, v2 = cast(tuple[VT, VT], m)
-                        if self.rule.apply(g, v1, v2):  # type: ignore
+                        if rule_dv.apply(g, v1, v2):
                             applied = True
-                    elif self.rule.apply(g, m):  # type: ignore
-                        applied = True
+                    elif self.match_type == MATCH_SINGLE:
+                        rule_sv = cast(RewriteSingleVertex, self.rule)
+                        if rule_sv.apply(g, cast(VT, m)):
+                            applied = True
+                    else:
+                        rule_sg = cast(RewriteSimpGraph, self.rule)
+                        if rule_sg.apply(g, cast(list[VT], m)):
+                            applied = True
                 # g, rem_verts = self.apply_rewrite(g, matches)
                 # rem_verts_list.extend(rem_verts)
             except Exception as ex:
@@ -160,18 +170,20 @@ class RewriteAction:
         if self.copy_first:
             g = copy.deepcopy(g)
         if self.match_type == MATCH_SINGLE:
+            rule_sv = cast(RewriteSingleVertex, self.rule)
             for v in verts:
-                if self.rule.is_match(g, v): # type: ignore
+                if rule_sv.is_match(g, v):
                     self.enabled = True
                     return
             self.enabled = False
             return
         elif self.match_type == MATCH_DOUBLE:
+            rule_dv = cast(RewriteDoubleVertex, self.rule)
             for e in edges:
                 s, t = g.edge_st(e)
                 if s == t:
                     continue
-                if self.rule.is_match(g, s, t): # type: ignore
+                if rule_dv.is_match(g, s, t):
                     self.enabled = True
                     return
             self.enabled = False

@@ -1,11 +1,9 @@
-
 import json
 from fractions import Fraction
 from typing import TYPE_CHECKING, Optional, Sequence, Dict, Union, Any
 
 import networkx as nx
 import numpy as np
-# import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
 from networkx.classes.reportviews import NodeView

@@ -10,9 +10,6 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
-# from zxlive.eitem import EItem
-
-# from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut, Qt
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
@@ -83,12 +80,12 @@ class GraphEditPanel(EditorBasePanel):
             return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_derivation_signal.emit(new_g)
-    
+
     def _start_pauliwebs(self) -> None:
         if not self.graph_scene.g.is_well_formed():
             show_error_msg("Graph is not well-formed", parent=self)
             return
-        
+
         graph_json = json.loads(self.graph_scene.g.to_json())
         edge_pairs = [tuple(sorted(edge[:2])) for edge in graph_json.get("edges", [])]
         unique_pairs = set(edge_pairs)
@@ -96,7 +93,7 @@ class GraphEditPanel(EditorBasePanel):
         if has_duplicate_edges:
             show_error_msg("Graph is a multigraph", parent=self)
             return
-        
+
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_pauliwebs_signal.emit(new_g)
 
