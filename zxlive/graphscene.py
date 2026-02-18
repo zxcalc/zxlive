@@ -155,6 +155,12 @@ class GraphScene(QGraphicsScene):
         new_g = diff.apply_diff(self.g)
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(new_g, GraphT)  # type: ignore
+        # Preserve and update variable type information (Boolean vs Parametric)
+        # collected in the diff. Types from the new graph override the old ones.
+        variable_types = getattr(diff, "variable_types", None)
+        if variable_types is not None:
+            for name, is_bool in variable_types.items():
+                new_g.var_registry.set_type(name, is_bool)
         self.g = new_g
         # g now contains the new graph,
         # but we still need to update the scene

@@ -185,6 +185,11 @@ class EditorBasePanel(BasePanel):
     def paste_graph(self, graph: GraphT) -> None:
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
+        # Ensure variable type information (Boolean vs Parametric) from the
+        # pasted graph is preserved in the target graph.
+        source_types = getattr(graph.var_registry, "types", {})
+        for name, is_bool in source_types.items():
+            new_g.var_registry.set_type(name, is_bool)
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
@@ -309,7 +314,6 @@ class EditorBasePanel(BasePanel):
 
     def vert_double_clicked(self, v: VT) -> None:
         graph = self.graph
-        old_variables = graph.var_registry.vars()
         if graph.type(v) == VertexType.BOUNDARY or vertex_is_w(graph.type(v)):
             return None
         if graph.type(v) == VertexType.DUMMY:
@@ -338,11 +342,6 @@ class EditorBasePanel(BasePanel):
             show_error_msg("Invalid Input", error_msg, parent=self)
             return None
         self.undo_stack.push(ChangePhase(self.graph_view, v, new_phase))
-        # For some reason it is important we first push to the stack before we do the following.
-        if len(graph.var_registry.vars()) != len(old_variables):
-            new_vars = graph.var_registry.vars() - old_variables
-            for nv in new_vars:
-                self.variable_viewer.add_item(nv)
 
 
 class VariableViewer(QScrollArea):
@@ -365,6 +364,7 @@ class VariableViewer(QScrollArea):
         self._layout.setColumnMinimumWidth(2, cb.minimumSizeHint().width())
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._items = 0
+        self._item_widgets: list[tuple[QLabel, QComboBox]] = []
 
         vline = QFrame()
         vline.setFrameShape(QFrame.Shape.VLine)
@@ -395,6 +395,8 @@ class VariableViewer(QScrollArea):
         self.setWidget(self._widget)
         self.setWidgetResizable(True)
 
+        self.parent_panel.undo_stack.indexChanged.connect(lambda _: self.refresh())
+
     def minimumSizeHint(self) -> QSize:
         if self._items == 0:
             return QSize(0, 0)
@@ -407,6 +409,54 @@ class VariableViewer(QScrollArea):
         else:
             return super().sizeHint()
 
+    def _get_used_variables(self) -> set[str]:
+        """Return variable names actually referenced in the graph's phases."""
+        from pyzx.symbolic import Poly
+        graph = self.parent_panel.graph
+        used: set[str] = set()
+        for v in graph.vertices():
+            phase = graph.phase(v)
+            if isinstance(phase, Poly):
+                used.update(var.name for var in phase.free_vars())
+        return used
+
+    def _get_displayed_variables(self) -> set[str]:
+        """Return variable names currently shown in the viewer."""
+        names: set[str] = set()
+        for label, _ in self._item_widgets:
+            text = label.text().replace('<pre>', '').replace('</pre>', '')
+            names.add(text)
+        return names
+
+    def refresh(self) -> None:
+        """Sync displayed variables with those actually used in the graph."""
+        used = self._get_used_variables()
+        displayed = self._get_displayed_variables()
+        if used == displayed:
+            return
+        self._clear_items()
+        for name in sorted(used):
+            self.add_item(name)
+
+    def _clear_items(self) -> None:
+        """Remove all variable item widgets from the layout."""
+        spacer = self._layout.itemAtPosition(2 + self._items, 2)
+        if spacer:
+            self._layout.removeItem(spacer)
+        for label, combobox in reversed(self._item_widgets):
+            self._layout.removeWidget(label)
+            label.deleteLater()
+            self._layout.removeWidget(combobox)
+            combobox.deleteLater()
+        self._item_widgets.clear()
+        had_items = self._items > 0
+        self._items = 0
+        self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
+        self._layout.update()
+        self._widget.updateGeometry()
+        if had_items:
+            self.updateGeometry()
+
     def add_item(self, name: str) -> None:
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
@@ -416,12 +466,14 @@ class VariableViewer(QScrollArea):
         item = self._layout.itemAtPosition(2 + self._items, 2)
         assert item is not None  # For mypy
         self._layout.removeItem(item)
-        self._layout.addWidget(QLabel(f"<pre>{name}</pre>"), 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+        label = QLabel(f"<pre>{name}</pre>")
+        self._layout.addWidget(label, 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
         self._layout.addWidget(combobox, 2 + self._items, 2, Qt.AlignmentFlag.AlignCenter)
         self._layout.setRowStretch(2 + self._items, 0)
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 3 + self._items, 2)
         self._layout.setRowStretch(3 + self._items, 1)
         self._layout.update()
+        self._item_widgets.append((label, combobox))
         self._items += 1
         self._widget.updateGeometry()
 
