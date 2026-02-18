@@ -218,7 +218,7 @@ class EItem(QGraphicsPathItem):
 
         # draw webs from outermost to innermost
         for (left, right, color), thickness in zip(webs, thicknesses):
-                self._paint_pauli_web(painter, option, widget, color, thickness, left=left, right=right)
+            self._paint_pauli_web(painter, option, widget, color, thickness, left=left, right=right)
 
         super().paint(painter, option, widget)
 
@@ -233,7 +233,7 @@ class EItem(QGraphicsPathItem):
         old_pen = self.pen()
 
         path = old_path if left and right else (self.half_path_left if left else self.half_path_right)
-        path = path or old_path # fallback if half paths are not defined (self-loops)
+        path = path or old_path  # fallback if half paths are not defined (self-loops)
 
         pen = QPen(old_pen)
         pen.setWidthF(self.thickness * thickness)

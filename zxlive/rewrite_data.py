@@ -157,7 +157,6 @@ def _extract_circuit(graph: GraphT) -> GraphT:
     return cast(GraphT, extract_circuit(graph).to_graph())
 
 
-
 simplifications: dict[str, RewriteData] = {
     'bialg_simp': {
         "text": "bialgebra simp",
@@ -260,7 +259,8 @@ simplifications: dict[str, RewriteData] = {
 def ocm_rule(_graph: GraphT) -> int:
     return 1
 
-rules_basic = {
+
+rules_basic: dict[str, RewriteData] = {
     'id_simp': {
         "text": "Remove identity",
         "tooltip": "Removes a 2-ary phaseless spider",
@@ -302,14 +302,14 @@ rules_basic = {
         "type": MATCH_COMPOUND,
     },
     'copy': {
-        "text": "Copy 0/pi spider through its neighbour", 
+        "text": "Copy 0/pi spider through its neighbour",
         "tooltip": "Copies a single-legged spider with a 0/pi phase through its neighbor",
         "picture": "copy_pi.png",
         "rule": simplify.copy_simp,
         "type": MATCH_SINGLE,
     },
     "pauli": {
-        "text": "Push Pauli", 
+        "text": "Push Pauli",
         "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
         "picture": "push_pauli.png",
         "rule": simplify.push_pauli_rewrite,
@@ -331,7 +331,7 @@ rules_basic = {
         "type": MATCH_COMPOUND,
     },
     "euler": {
-        "text": "Decompose Hadamard", 
+        "text": "Decompose Hadamard",
         "tooltip": "Expands a Hadamard-edge into its component spiders using its Euler decomposition",
         "rule": simplify.euler_expansion_rewrite,
         "type": MATCH_DOUBLE,
@@ -343,7 +343,7 @@ rules_basic = {
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
 action_groups = {
-    "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
+    "Basic rules": rules_basic,  # {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .rewrite_data import RewriteData
 
 
-class CustomRule(RewriteSimpGraph[VT,ET]):
+class CustomRule(RewriteSimpGraph[VT, ET]):
     def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()

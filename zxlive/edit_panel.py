@@ -53,8 +53,6 @@ class GraphEditPanel(EditorBasePanel):
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
 
-
-
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
@@ -72,7 +70,6 @@ class GraphEditPanel(EditorBasePanel):
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
-
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():
