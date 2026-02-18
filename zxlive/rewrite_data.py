@@ -264,7 +264,7 @@ def ocm_rule(_graph: GraphT) -> int:
     return 1
 
 
-rules_basic = {
+rules_basic: dict[str, RewriteData] = {
     'id_simp': {
         "text": "Remove identity",
         "tooltip": "Removes a 2-ary phaseless spider",
