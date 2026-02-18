@@ -48,6 +48,7 @@ class UnfusionRewrite(RewriteSimpGraph[VT, ET]):
 
 unfusion_rewrite: UnfusionRewrite = UnfusionRewrite()
 
+
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""
 
