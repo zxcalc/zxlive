@@ -1,13 +1,15 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Union, overload
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
-                            QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QRectF, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
+                            QItemSelection, QItemSelectionModel, QModelIndex,
+                            QPersistentModelIndex, QPoint, QPointF, QRect,
+                            QRectF, QSize, Qt)
+from PySide6.QtGui import (QBitmap, QColor, QFont, QFontMetrics, QPainter,
+                           QPen, QPixmap, QPolygon, QRegion)
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
                                QLineEdit, QListView, QMenu, QStyle,
                                QStyledItemDelegate, QStyleOptionViewItem,
@@ -362,20 +364,27 @@ class ProofStepView(QWidget):
     def clearSelection(self) -> None:
         self._list.clearSelection()
 
-    def selectionModel(self):
+    def selectionModel(self) -> QItemSelectionModel:
         return self._list.selectionModel()
 
-    def selectedIndexes(self):
+    def selectedIndexes(self) -> list[QModelIndex]:
         return self._list.selectedIndexes()
 
-    def update(self, *args, **kwargs) -> None:  # type: ignore[override]
-        self._list.update(*args, **kwargs)
+    @overload
+    def update(self) -> None: ...
+
+    @overload
+    def update(self, region: QRegion | QBitmap | QPolygon | QRect, /) -> None: ...
+
+    @overload
+    def update(self, x: int, y: int, w: int, h: int, /) -> None: ...
+
+    def update(self, *args: Any) -> None:
+        super().update(*args)
+        self._list.viewport().update()
 
     def edit(self, index: QModelIndex) -> None:  # type: ignore[override]
         self._list.edit(index)
-
-    def mapToGlobal(self, point: QPoint) -> QPoint:
-        return self._list.mapToGlobal(point)
 
     def _toggle_thumbnails(self, checked: bool) -> None:
         self._list.set_thumbnails_visible(checked)
