@@ -6,9 +6,9 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPolygonF
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
+                            QPoint, QPointF, QRect, QRectF, QSize, Qt)
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen, QPolygonF
+from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
@@ -182,6 +182,26 @@ class ProofModel(QAbstractListModel):
         modelIndex = self.createIndex(index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
+    def rename_sub_step(self, step_index: int, sub_index: int, name: str) -> None:
+        """Change the display name of a sub-step"""
+        old_step = self.steps[step_index]
+        grouped = old_step.grouped_rewrites
+        if grouped is None or sub_index >= len(grouped):
+            return
+
+        old_sub_step = grouped[sub_index]
+        new_sub_step = Rewrite(name, old_sub_step.rule, old_sub_step.graph, old_sub_step.grouped_rewrites)
+        
+        new_grouped = list(grouped)
+        new_grouped[sub_index] = new_sub_step
+
+        # Update the main step's grouped rewrites
+        self.steps[step_index] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped)
+        
+        # Rerender
+        modelIndex = self.createIndex(step_index, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
+
     def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
         new_rewrite = Rewrite(
@@ -251,6 +271,7 @@ class ProofStepView(QListView):
         self.expanded_groups: set[int] = set()
         # Track currently selected sub-step: (step_index, sub_step_index) or None
         self.selected_sub_step: Optional[tuple[int, int]] = None
+        self._active_sub_editor: Optional[QLineEdit] = None
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
@@ -499,10 +520,105 @@ class ProofStepView(QListView):
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
+                
+                # Check if we clicked on a sub-step
+                step_idx = index - 1
+                if step_idx in self.expanded_groups:
+                    rect = self.visualRect(selected_indexes[0])
+                    # We need the relative position within the item rect
+                    # mapToGlobal(position) is global, position is local to widget
+                    # position is passed from customContextMenuRequested, which is in widget coords
+                    sub_idx = self._sub_step_hit_test(
+                        step_idx, int(position.y()), rect.y()
+                    )
+                    if sub_idx >= 0:
+                        # If a sub-step is clicked, we probably want to rename the sub-step,
+                        # not the parent group step.
+                        context_menu.removeAction(rename_action)
+                        rename_sub_action = context_menu.addAction("Rename Sub-step")
+                        action_function_map[rename_sub_action] = lambda: self._open_sub_step_editor(step_idx, sub_idx)
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
+
+    def _open_sub_step_editor(self, step_idx: int, sub_idx: int) -> None:
+        """Opens an inline editor for renaming a sub-step."""
+        delegate = self.itemDelegate()
+        if not isinstance(delegate, ProofStepItemDelegate):
+            return
+
+        # Ensure the item is visible
+        model_idx = self.model().index(step_idx + 1, 0)
+        self.scrollTo(model_idx)
+        
+        # Get the visual rect of the main item
+        rect = self.visualRect(model_idx)
+
+        # Calculate sub-step position logic (matching delegate.paint)
+        font = self.font()
+        text_height = QFontMetrics(font).height()
+        row_height = text_height + 2 * delegate.vert_padding
+        
+        main_cx = delegate.line_padding + delegate.line_width / 2
+        sub_tree_x = main_cx + delegate.sub_indent
+        
+        # Calculate vertical position of the sub-step
+        # Header + sub_steps before this one
+        header_height = row_height
+        sub_step_top = rect.y() + header_height + sub_idx * row_height
+        
+        sub_text_x = int(sub_tree_x + delegate.sub_circle_radius + 10)
+        
+        editor_x = sub_text_x
+        # Center vertically in the row
+        editor_y = int(sub_step_top + delegate.vert_padding)
+        editor_w = rect.width() - sub_text_x - 5 # Small padding on right
+        editor_h = text_height
+        
+        editor = QLineEdit(self)
+        step = self.model().steps[step_idx]
+        if step.grouped_rewrites:
+            editor.setText(step.grouped_rewrites[sub_idx].display_name)
+        
+        editor.setGeometry(editor_x, editor_y, editor_w, editor_h)
+        # Style to blend in or look like an editor
+        if display_setting.dark_mode:
+             editor.setStyleSheet("QLineEdit { background-color: #2c313a; color: #e0e0e0; border: 1px solid #4b5362; }")
+        else:
+             editor.setStyleSheet("QLineEdit { background-color: white; color: black; border: 1px solid #ccc; }")
+
+        # Connect signals
+        editor.editingFinished.connect(lambda: self._finish_sub_step_edit(step_idx, sub_idx, editor))
+        
+        editor.show()
+        editor.setFocus()
+        self._active_sub_editor = editor
+
+    def _finish_sub_step_edit(self, step_idx: int, sub_idx: int, editor: QLineEdit) -> None:
+        if not editor.isVisible(): 
+            # Already finished/deleted
+            return
+        new_name = editor.text()
+        self.rename_proof_sub_step(new_name, step_idx, sub_idx)
+        editor.deleteLater()
+        self._active_sub_editor = None
+
+    def _rename_sub_step_dialog(self, step_idx: int, sub_idx: int) -> None:
+        # Kept for compatibility if needed, but implementation redirects or is replaced.
+        # Ideally removed, but for this refactor we can just remove the old method body
+        pass
+
+    def rename_proof_sub_step(self, new_name: str, step_index: int, sub_index: int) -> None:
+        from .commands import UndoableChange
+        step = self.model().steps[step_index]
+        if step.grouped_rewrites is None:
+            return
+        old_name = step.grouped_rewrites[sub_index].display_name
+        cmd = UndoableChange(self.graph_view,
+                             lambda: self.model().rename_sub_step(step_index, sub_index, old_name),
+                             lambda: self.model().rename_sub_step(step_index, sub_index, new_name))
+        self.undo_stack.push(cmd)
 
     def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange
@@ -602,6 +718,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         is_grouped, is_expanded, grouped_rewrites = self._step_info(index)
 
@@ -647,19 +764,31 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # ── Main timeline line ──────────────────────────────────────────
         is_last = index.row() == index.model().rowCount() - 1
-        if is_last:
-            line_h = int(row_height / 2)
-        else:
-            line_h = int(option.rect.height())  # type: ignore[attr-defined]
-        line_rect = QRect(
-            self.line_padding,
-            int(option.rect.y()),  # type: ignore[attr-defined]
-            self.line_width,
-            line_h
-        )
-        painter.setPen(Qt.GlobalColor.transparent)
-        painter.setBrush(line_clr)
-        painter.drawRect(line_rect)
+
+        # Use a Pen with RoundCap for lines to allow smooth overlaps with neighbor
+        # segments and the diverted path.
+        pen = QPen(line_clr, self.line_width)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.GlobalColor.transparent)
+
+        # Draw top half of line (to center of circle)
+        # We always draw this (it connects from the previous step)
+        circle_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
+        main_cx = self.line_padding + self.line_width / 2
+
+        # Draw line from top to center
+        # Start exactly at top edge. RoundCap will extend slightly above/below.
+        # This overlap ensures no gap with the previous item's bottom line.
+        painter.drawLine(QPointF(main_cx, option.rect.y()), QPointF(main_cx, circle_cy))  # type: ignore[attr-defined]
+
+        # Draw bottom half of line (from center of circle to bottom)
+        # Only if NOT expanded (if expanded, the line diverts to the sub-steps)
+        if not is_expanded:
+            bottom_y = option.rect.y() + option.rect.height()  # type: ignore[attr-defined]
+            if not is_last:
+                # Draw from center to bottom
+                painter.drawLine(QPointF(main_cx, circle_cy), QPointF(main_cx, bottom_y))
 
         # ── Main circle ─────────────────────────────────────────────────
         circle_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
@@ -735,7 +864,6 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    # ── Expanded sub-tree painting ──────────────────────────────────────
     def _paint_sub_tree(self, painter: QPainter, option: QStyleOptionViewItem,
                         step_idx: int,
                         grouped_rewrites: list['Rewrite'], row_height: int,
@@ -745,37 +873,38 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         sub_tree_x = main_cx + self.sub_indent
         n = len(grouped_rewrites)
 
-        first_sub_top = option.rect.y() + row_height  # type: ignore[attr-defined]
-        last_sub_cy = first_sub_top + (n - 1) * row_height + row_height / 2
-
-        pen = QPen(line_clr, 2)
-        painter.setPen(pen)
-
-        # Diagonal connector from main circle down to start of sub-tree
         header_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
-        painter.drawLine(
-            QPointF(main_cx, header_cy + self.circle_radius_selected),
-            QPointF(sub_tree_x, first_sub_top)
-        )
+        first_sub_cy = option.rect.y() + row_height + row_height / 2  # type: ignore[attr-defined]
+        last_sub_cy = option.rect.y() + row_height + (n - 1) * row_height + row_height / 2  # type: ignore[attr-defined]
+        bottom_y = option.rect.y() + option.rect.height()  # type: ignore[attr-defined]
 
-        # Sub-tree vertical line
-        painter.drawLine(
-            QPointF(sub_tree_x, first_sub_top),
-            QPointF(sub_tree_x, last_sub_cy)
-        )
+        pen = QPen(line_clr, self.line_width)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.GlobalColor.transparent)
 
-        # Determine which sub-step is selected (if any)
-        view = self.parent()
-        selected_sub_idx = -1
-        if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
-            sel_step_idx, sel_sub_idx = view.selected_sub_step
-            if step_idx == sel_step_idx:
-                selected_sub_idx = sel_sub_idx
+        # Path connecting header -> sub-steps -> next step
+        path = QPainterPath()
+        # Start at the headers circle
+        path.moveTo(main_cx, header_cy)
+        # Line to first sub-step
+        path.lineTo(sub_tree_x, first_sub_cy)
+        # Line down to last sub-step
+        path.lineTo(sub_tree_x, last_sub_cy)
+        # Line back to main axis at the bottom
+        path.lineTo(main_cx, bottom_y)
 
-        sub_circle_cx = sub_tree_x + self.sub_branch_len
+        painter.drawPath(path)
+
         for i, sub_step in enumerate(grouped_rewrites):
-            sub_cy = first_sub_top + i * row_height + row_height / 2
-            is_sub_selected = (i == selected_sub_idx)
+            sub_cy = first_sub_cy + i * row_height
+            is_sub_selected = False
+            # Determine which sub-step is selected (if any)
+            view = self.parent()
+            if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
+                sel_step_idx, sel_sub_idx = view.selected_sub_step
+                if step_idx == sel_step_idx and i == sel_sub_idx:
+                    is_sub_selected = True
 
             # Check if this sub-step is being hovered (for individual hover effect)
             is_sub_hovered = (self.hover_step_idx == step_idx and self.hover_sub_idx == i)
@@ -794,22 +923,15 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                     else:
                         painter.setBrush(QColor(229, 243, 255))
                 highlight_rect = QRect(
-                    int(sub_tree_x - 4),
+                    int(sub_tree_x - 10),
                     int(sub_cy - row_height / 2),
-                    int(option.rect.width() - sub_tree_x + 4),  # type: ignore[attr-defined]
+                    int(option.rect.width() - sub_tree_x + 10),  # type: ignore[attr-defined]
                     row_height
                 )
                 painter.drawRect(highlight_rect)
 
-            # Horizontal branch
-            painter.setPen(pen)
-            painter.drawLine(
-                QPointF(sub_tree_x, sub_cy),
-                QPointF(sub_circle_cx - self.sub_circle_radius, sub_cy)
-            )
-
             # Sub-step circle
-            painter.setPen(QPen(line_clr, 2))
+            painter.setPen(QPen(line_clr, self.line_width))
             if is_sub_selected:
                 painter.setBrush(QColor(30, 100, 200))  # brighter blue when selected
                 r = self.sub_circle_radius + 1
@@ -817,11 +939,11 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(QColor(70, 130, 180))  # default steel-blue
                 r = self.sub_circle_radius
             painter.drawEllipse(
-                QPointF(sub_circle_cx, sub_cy), r, r
+                QPointF(sub_tree_x, sub_cy), r, r
             )
 
             # Sub-step text
-            sub_text_x = int(sub_circle_cx + self.sub_circle_radius + 8)
+            sub_text_x = int(sub_tree_x + self.sub_circle_radius + 10)
             sub_text_rect = QRect(
                 sub_text_x,
                 int(sub_cy - text_height / 2),
