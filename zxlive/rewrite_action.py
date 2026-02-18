@@ -103,11 +103,9 @@ class RewriteAction:
                 rule_sv = cast(RewriteSingleVertex, self.rule)
                 matches = [v for v in verts if rule_sv.is_match(g, v)]
             elif self.match_type == MATCH_DOUBLE:
-                rule_dv = cast(RewriteDoubleVertex, self.rule)
-                matches = [g.edge_st(e) for e in edges
-                           if g.edge_st(e)[0] != g.edge_st(e)[1]
-                           and rule_dv.is_match(g, *g.edge_st(e))]
-            elif self.match_type == MATCH_COMPOUND:  # We don't necessarily have a matcher in this case
+                matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]  # type: ignore[attr-defined]
+            elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
+                # if self.rule.is_match(g, verts):
                 if len(verts) == 0:
                     matches = [list(g.vertices())]  # type: ignore
                 else:
@@ -121,16 +119,10 @@ class RewriteAction:
                     if self.match_type == MATCH_DOUBLE:
                         rule_dv = cast(RewriteDoubleVertex, self.rule)
                         v1, v2 = cast(tuple[VT, VT], m)
-                        if rule_dv.apply(g, v1, v2):
+                        if self.rule.apply(g, v1, v2):  # type: ignore[attr-defined]
                             applied = True
-                    elif self.match_type == MATCH_SINGLE:
-                        rule_sv = cast(RewriteSingleVertex, self.rule)
-                        if rule_sv.apply(g, cast(VT, m)):
-                            applied = True
-                    else:
-                        rule_sg = cast(RewriteSimpGraph, self.rule)
-                        if rule_sg.apply(g, cast(list[VT], m)):
-                            applied = True
+                    elif self.rule.apply(g, m):  # type: ignore[attr-defined]
+                        applied = True
                 # g, rem_verts = self.apply_rewrite(g, matches)
                 # rem_verts_list.extend(rem_verts)
             except Exception as ex:
@@ -142,6 +134,27 @@ class RewriteAction:
         cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
+
+    # TODO: Narrow down the type of the first return value.
+    def apply_rewrite(self, g: GraphT, matches: list) -> tuple[GraphT, list[VT]]:
+        if self.returns_new_graph:
+            graph = self.rule(g, matches)  # type: ignore[call-arg]
+            assert isinstance(graph, GraphT)
+            return graph, []
+
+        for m in matches:
+            if self.match_type == MATCH_DOUBLE:
+                v1, v2 = cast(tuple[VT, VT], m)
+                self.rule.apply(g, v1, v2)  # type: ignore[attr-defined]
+            else: self.rule.apply(g, m)  # type: ignore[attr-defined]
+        # rewrite = self.rule(g, matches)
+        # assert isinstance(rewrite, tuple) and len(rewrite) == 4
+        # etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
+        # g.remove_edges(rem_edges)
+        # g.remove_vertices(rem_verts)
+        # g.add_edge_table(etab)
+        # return g, rem_verts
+        return g, []
 
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:
         if self.copy_first:
