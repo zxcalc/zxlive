@@ -185,6 +185,11 @@ class EditorBasePanel(BasePanel):
     def paste_graph(self, graph: GraphT) -> None:
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
+        # Ensure variable type information (Boolean vs Parametric) from the
+        # pasted graph is preserved in the target graph.
+        source_types = getattr(graph.var_registry, "types", {})
+        for name, is_bool in source_types.items():
+            new_g.var_registry.set_type(name, is_bool)
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
