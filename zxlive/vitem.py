@@ -381,9 +381,9 @@ class VItem(QGraphicsPathItem):
         self.phase_item.setFont(display_setting.font)
 
     def _update_dummy_display(self, text: str) -> None:
-        """Render dummy node label. Detects LaTeX and renders to SVG
-        via ziamath. Plain text uses QGraphicsTextItem. Cached to
-        avoid re-rendering on every refresh() call."""
+        """Render dummy node label. Detects LaTeX and renders to SVG.
+        Plain text uses QGraphicsTextItem. Cached to avoid re-rendering
+        on every refresh() call."""
         if not text:
             if self.dummy_text_item is not None:
                 self.dummy_text_item.setVisible(False)

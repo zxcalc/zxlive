@@ -36,7 +36,7 @@ dependencies = [
     "pyperclip",
     "imageio",
     "packaging",
-    "ziamath>=0.13",
+    "matplotlib>=3.3",
 ]
 
 [project.optional-dependencies]

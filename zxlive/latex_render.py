@@ -15,22 +15,16 @@
 
 """LaTeX expression rendering for dummy node labels.
 
-Uses ziamath to convert LaTeX math expressions to SVG, then
-flattens <symbol>/<use> references into inline paths so that
-Qt's SVG Tiny renderer can display them.
+Uses matplotlib to convert LaTeX math expressions to SVG.
 """
 
 from __future__ import annotations
 
-import copy
 import re
-import xml.etree.ElementTree as ET
-
-import ziamath as zm
-
-_SVG_NS = "http://www.w3.org/2000/svg"
-ET.register_namespace('', _SVG_NS)
-
+from io import BytesIO
+import matplotlib as mpl
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_svg import FigureCanvasSVG
 
 def is_latex(text: str) -> bool:
     """Return True if text contains LaTeX markup.
@@ -48,11 +42,10 @@ def is_latex(text: str) -> bool:
         return True
     return False
 
-
 def _preprocess_dirac(text: str) -> str:
     """Expand Dirac notation into standard LaTeX before conversion.
 
-    ziamath does not know \\ket, \\bra, \\braket. Rewrite them
+    Matplotlib does not know \\ket, \\bra, \\braket by default. Rewrite them
     into \\langle / \\rangle forms.
     """
     result = text
@@ -62,91 +55,25 @@ def _preprocess_dirac(text: str) -> str:
     return result
 
 
-def _ensure_dollar_wrapped(text: str) -> str:
-    """Wrap text in $ delimiters if not already present."""
-    stripped = text.strip()
-    if stripped.startswith('$') and stripped.endswith('$'):
-        return stripped
-    return f'${stripped}$'
-
-
-def _flatten_svg(svg_str: str) -> str:
-    """Inline <symbol>/<use> pairs into <g transform="..."> groups.
-
-    Qt's SVG renderer (SVG Tiny 1.2) rejects both <symbol>/<use>
-    references and nested <svg> elements.  This function resolves
-    every <use> into a <g> with an explicit translate+scale
-    transform that maps the symbol's viewBox into the <use>'s
-    (x, y, width, height) region, then removes the <symbol> defs.
-    """
-    root = ET.fromstring(svg_str)
-
-    symbols: dict[str, ET.Element] = {}
-    for symbol_el in root.findall(f'{{{_SVG_NS}}}symbol'):
-        sid = symbol_el.get('id', '')
-        if sid:
-            symbols[sid] = symbol_el
-
-    for use in list(root.findall(f'{{{_SVG_NS}}}use')):
-        href = use.get('href') or use.get(f'{{{_SVG_NS}}}href') or ''
-        ref_id = href.lstrip('#')
-        sym = symbols.get(ref_id)
-        if sym is None:
-            continue
-
-        ux = float(use.get('x', '0'))
-        uy = float(use.get('y', '0'))
-        uw = float(use.get('width', '0'))
-        uh = float(use.get('height', '0'))
-
-        vb = sym.get('viewBox', '')
-        vb_parts = vb.split()
-        if len(vb_parts) == 4:
-            vb_x, vb_y, vb_w, vb_h = (float(v) for v in vb_parts)
-        else:
-            vb_x, vb_y, vb_w, vb_h = 0.0, 0.0, uw, uh
-
-        sx = uw / vb_w if vb_w else 1.0
-        sy = uh / vb_h if vb_h else 1.0
-
-        tx = ux - vb_x * sx
-        ty = uy - vb_y * sy
-
-        g = ET.SubElement(root, f'{{{_SVG_NS}}}g')
-        g.set('transform', f'translate({tx},{ty}) scale({sx},{sy})')
-
-        fill = use.get('fill')
-        if fill:
-            g.set('fill', fill)
-
-        for child in sym:
-            g.append(copy.deepcopy(child))
-
-        root.remove(use)
-
-    for symbol_el in list(root.findall(f'{{{_SVG_NS}}}symbol')):
-        root.remove(symbol_el)
-
-    return ET.tostring(root, encoding='unicode')
-
-
 def _fallback_svg(text: str, color: str, size: float) -> bytes:
-    """Generate a simple fallback SVG when ziamath fails to parse."""
+    """Generate a simple fallback SVG when rendering fails."""
     import html
     escaped = html.escape(text.replace('$', ''))
+    # Approximate width based on character count
+    width = len(escaped) * size * 0.6
+    height = size * 1.4
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
-        f'width="{len(escaped) * size * 0.6}" height="{size * 1.4}">'
-        f'<text x="0" y="{size}" '
+        f'width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
+        f'<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" '
         f'font-family="serif" font-size="{size}" '
         f'fill="{color}">{escaped}</text></svg>'
     )
     return svg.encode('utf-8')
 
 
-def latex_to_svg(text: str, color: str = "#222222",
-                 size: float = 24) -> bytes:
-    """Convert LaTeX math text to SVG bytes via ziamath.
+def latex_to_svg(text: str, color: str = "#222222", size: float = 24) -> bytes:
+    """Convert LaTeX math text to SVG bytes via matplotlib.
 
     Args:
         text: LaTeX expression, with or without $ delimiters.
@@ -157,14 +84,34 @@ def latex_to_svg(text: str, color: str = "#222222",
         SVG content as bytes suitable for QSvgRenderer / QGraphicsSvgItem.
     """
     result = text.strip()
-    # Users often type $...$ delimiters. ziamath input doesn't need them, and
-    # keeping them can result in literal '$' glyphs appearing in Qt rendering.
-    result = result.replace('$', '')
     result = _preprocess_dirac(result)
 
+    # Matplotlib needs $...$ for math mode in text usually, or we can use mathtext.
+    # To be safe, we wrap if not wrapped.
+    if '$' not in result:
+        result = f"${result}$"
+
     try:
-        svg_str: str = zm.Latex(result, size=size, color=color).svg()
-        flat = _flatten_svg(svg_str)
-        return flat.encode('utf-8')
-    except Exception:
+        # Configure matplotlib to output text as paths (no font dependency)
+        # and use Computer Modern font for LaTeX look.
+        with mpl.rc_context({
+            'svg.fonttype': 'path', 
+            'mathtext.fontset': 'cm',
+            'font.family': 'serif',
+            'text.usetex': False  # Use internal mathtext parser, not external latex
+        }):
+            fig = Figure(figsize=(0.01, 0.01))
+            FigureCanvasSVG(fig)
+            
+            # Add text. We use a figure just to hold the text.
+            # Using fig.text() is generally reliable.
+            text_obj = fig.text(0, 0, result, fontsize=size, color=color)
+            
+            output = BytesIO()
+            # bbox_inches='tight' computes the bounding box of the text
+            fig.savefig(output, format='svg', bbox_inches='tight', pad_inches=0.01, transparent=True)
+            
+            return output.getvalue()
+    except Exception as e:
+        # Fallback if matplotlib fails (e.g. invalid latex)
         return _fallback_svg(text, color, size)
