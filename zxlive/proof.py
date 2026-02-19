@@ -254,7 +254,7 @@ class ProofStepView(QListView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
+        self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -262,6 +262,8 @@ class ProofStepView(QListView):
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
         self._step_preview_cache: dict[tuple[int, int, int], QPixmap] = {}
+        self._previews_visible = bool(display_setting.previews_show)
+        self._preview_hidden_rows: set[int] = set()
         self._connect_model_signals(self.model())
 
     # overriding this method to change the return type and stop mypy from complaining
@@ -272,6 +274,7 @@ class ProofStepView(QListView):
 
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
+        self._preview_hidden_rows.clear()
         self._clear_step_preview_cache()
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
@@ -279,9 +282,36 @@ class ProofStepView(QListView):
         self.setCurrentIndex(model.index(len(model.steps), 0))
 
     def _connect_model_signals(self, model: ProofModel) -> None:
-        model.rowsInserted.connect(lambda *_: self._clear_step_preview_cache())
-        model.rowsRemoved.connect(lambda *_: self._clear_step_preview_cache())
-        model.dataChanged.connect(lambda *_: self._clear_step_preview_cache())
+        model.rowsInserted.connect(self._on_rows_inserted)
+        model.rowsRemoved.connect(self._on_rows_removed)
+        model.dataChanged.connect(self._on_data_changed)
+
+    def _on_rows_inserted(self, _parent: QModelIndex, first: int, last: int) -> None:
+        shift_by = last - first + 1
+        shifted_hidden_rows = set()
+        for row in self._preview_hidden_rows:
+            if row >= first:
+                shifted_hidden_rows.add(row + shift_by)
+            else:
+                shifted_hidden_rows.add(row)
+        self._preview_hidden_rows = shifted_hidden_rows
+        self._clear_step_preview_cache()
+
+    def _on_rows_removed(self, _parent: QModelIndex, first: int, last: int) -> None:
+        removed_count = last - first + 1
+        shifted_hidden_rows = set()
+        for row in self._preview_hidden_rows:
+            if first <= row <= last:
+                continue
+            if row > last:
+                shifted_hidden_rows.add(row - removed_count)
+            else:
+                shifted_hidden_rows.add(row)
+        self._preview_hidden_rows = shifted_hidden_rows
+        self._clear_step_preview_cache()
+
+    def _on_data_changed(self, *_: Any) -> None:
+        self._clear_step_preview_cache()
 
     def _clear_step_preview_cache(self) -> None:
         self._step_preview_cache.clear()
@@ -293,7 +323,33 @@ class ProofStepView(QListView):
         self.doItemsLayout()
 
     def previews_enabled(self) -> bool:
-        return bool(display_setting.previews_show)
+        return self._previews_visible
+
+    def set_previews_enabled(self, visible: bool) -> None:
+        if self._previews_visible == visible:
+            return
+        self._previews_visible = visible
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def preview_visible_for_index(self, index: int) -> bool:
+        if not self._previews_visible:
+            return False
+        return index not in self._preview_hidden_rows
+
+    def set_preview_visibility_for_indexes(self, indexes: list[int], visible: bool) -> None:
+        changed = False
+        for index in indexes:
+            if visible and index in self._preview_hidden_rows:
+                self._preview_hidden_rows.remove(index)
+                changed = True
+            if not visible and index not in self._preview_hidden_rows:
+                self._preview_hidden_rows.add(index)
+                changed = True
+        if not changed:
+            return
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
 
     def preview_size(self) -> QSize:
         available_width = max(80, self.viewport().width() - 2 * ProofStepItemDelegate.line_padding - 28)
@@ -364,14 +420,22 @@ class ProofStepView(QListView):
         toggle_preview_action.setChecked(self.previews_enabled())
         action_function_map[toggle_preview_action] = self.toggle_diagram_previews
 
+        selected_rows = [selected_index.row() for selected_index in selected_indexes]
+        selected_previews_are_visible = all(self.preview_visible_for_index(row) for row in selected_rows)
+        if selected_previews_are_visible:
+            toggle_selected_preview_action = context_menu.addAction("Hide Selected Step Previews")
+            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, False)
+        else:
+            toggle_selected_preview_action = context_menu.addAction("Show Selected Step Previews")
+            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, True)
+
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
 
     def toggle_diagram_previews(self) -> None:
-        display_setting.previews_show = not self.previews_enabled()
-        self._clear_step_preview_cache()
-        self.doItemsLayout()
+        previews_are_visible = self.previews_enabled()
+        self.set_previews_enabled(not previews_are_visible)
 
     def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange
@@ -438,7 +502,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.save()
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
-        show_preview_image = step_view.previews_enabled()
+        show_preview_image = step_view.preview_visible_for_index(index.row())
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
@@ -521,7 +585,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         size = super().sizeHint(option, index)
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
-        if step_view.previews_enabled():
+        if step_view.preview_visible_for_index(index.row()):
             preview_block_height = step_view.preview_size().height() + self.vert_padding
         else:
             preview_block_height = 0
