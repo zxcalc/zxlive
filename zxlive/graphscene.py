@@ -322,6 +322,15 @@ class GraphScene(QGraphicsScene):
         changed_edges: set[ET] = set()
         changed_edges.update(diff.changed_edge_types.keys())
 
+        # Helper: mark a vertex as "changed" only if it has no highlight yet.
+        # Used to flag vertices whose connectivity changes without them being
+        # structurally added/removed themselves (e.g. the fusion survivor, the
+        # source of a redirected edge after any rewrite rule).
+        def _mark_endpoint_changed(v: VT) -> None:
+            if v in self.vertex_map and self.vertex_map[v]._diff_highlight is None:
+                self.vertex_map[v]._diff_highlight = "changed"
+                self.vertex_map[v].refresh()
+
         if direction == "forward":
             for v in diff.removed_verts:
                 if v in self.vertex_map:
@@ -338,12 +347,23 @@ class GraphScene(QGraphicsScene):
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "removed"
                         eitem.refresh()
+                # Mark surviving endpoints of every removed edge as "changed".
+                # This generalises to any rewrite rule: if an edge disappears,
+                # its endpoints (if still present) are structurally affected.
+                s, t, *_ = e
+                for endpoint in (s, t):
+                    if endpoint not in diff.removed_verts:
+                        _mark_endpoint_changed(endpoint)
 
             for e in changed_edges:
                 if e in self.edge_map:
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "changed"
                         eitem.refresh()
+                # Endpoints of type-changed edges are also structurally affected.
+                s, t, *_ = e
+                for endpoint in (s, t):
+                    _mark_endpoint_changed(endpoint)
 
         elif direction == "backward":
             for v in diff.new_verts:
@@ -362,12 +382,20 @@ class GraphScene(QGraphicsScene):
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "added"
                         eitem.refresh()
+                # Mark endpoints of every new edge as "changed" — they gained
+                # a connection regardless of which rewrite rule was applied.
+                for endpoint in (s, t):
+                    if endpoint not in diff.new_verts:
+                        _mark_endpoint_changed(endpoint)
 
             for e in changed_edges:
                 if e in self.edge_map:
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "changed"
                         eitem.refresh()
+                s, t, *_ = e
+                for endpoint in (s, t):
+                    _mark_endpoint_changed(endpoint)
 
     def clear_diff_highlights(self) -> None:
         """Remove all diff highlights from vertices and edges."""

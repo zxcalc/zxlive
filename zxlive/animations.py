@@ -5,7 +5,7 @@ import random
 from typing import Optional, Callable, TYPE_CHECKING
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
-    QParallelAnimationGroup
+    QParallelAnimationGroup, QSequentialAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
 from pyzx.utils import vertex_is_w
 
@@ -277,6 +277,16 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     anim.setEndValue(1.0)
     anim.setEasingCurve(QEasingCurve.Type.OutElastic)
     return anim
+
+
+def pulse(it: VItem, duration: int = 300) -> QAbstractAnimation:
+    """Brief scale pulse to draw attention to a vertex before it transforms."""
+    group = QSequentialAnimationGroup()
+    group.addAnimation(scale(it, target=1.5, duration=duration // 2,
+                             ease=QEasingCurve(QEasingCurve.Type.OutQuad)))
+    group.addAnimation(scale(it, target=1.0, duration=duration // 2,
+                             ease=QEasingCurve(QEasingCurve.Type.InQuad), start=1.5))
+    return group
 
 
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
