@@ -6,13 +6,14 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+                            QPoint, QPointF, QRect, QRectF, QSize, Qt)
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
 from .common import GraphT
+from .graphscene import GraphScene
 from .settings import display_setting
 
 
@@ -260,6 +261,8 @@ class ProofStepView(QListView):
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
+        self._step_preview_cache: dict[tuple[int, int, int], QPixmap] = {}
+        self._connect_model_signals(self.model())
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -269,9 +272,63 @@ class ProofStepView(QListView):
 
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
+        self._clear_step_preview_cache()
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
+        self._connect_model_signals(model)
         self.setCurrentIndex(model.index(len(model.steps), 0))
+
+    def _connect_model_signals(self, model: ProofModel) -> None:
+        model.rowsInserted.connect(lambda *_: self._clear_step_preview_cache())
+        model.rowsRemoved.connect(lambda *_: self._clear_step_preview_cache())
+        model.dataChanged.connect(lambda *_: self._clear_step_preview_cache())
+
+    def _clear_step_preview_cache(self) -> None:
+        self._step_preview_cache.clear()
+        self.viewport().update()
+
+    def resizeEvent(self, event: Any) -> None:
+        super().resizeEvent(event)
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def previews_enabled(self) -> bool:
+        return bool(display_setting.previews_show)
+
+    def preview_size(self) -> QSize:
+        available_width = max(80, self.viewport().width() - 2 * ProofStepItemDelegate.line_padding - 28)
+        thumb_height = max(70, min(220, int(available_width * 0.55)))
+        return QSize(available_width, thumb_height)
+
+    def _render_preview_image(self, index: int, size: QSize) -> QPixmap:
+        graph = self.model().get_graph(index)
+        scene = GraphScene()
+        scene.set_graph(graph)
+        pixmap = QPixmap(size)
+        if display_setting.dark_mode:
+            background_color = QColor(32, 35, 41)
+        else:
+            background_color = QColor(252, 252, 252)
+        pixmap.fill(background_color)
+
+        painter = QPainter(pixmap)
+        source_rect = scene.itemsBoundingRect().adjusted(-25, -25, 25, 25)
+        if source_rect.isNull() or source_rect.width() < 1 or source_rect.height() < 1:
+            source_rect = QRectF(0, 0, 1, 1)
+        scene.render(
+            painter,
+            QRectF(0, 0, size.width(), size.height()),
+            source_rect,
+            Qt.AspectRatioMode.KeepAspectRatio
+        )
+        painter.end()
+        return pixmap
+
+    def preview_image(self, index: int, size: QSize) -> QPixmap:
+        key = (index, size.width(), size.height())
+        if key not in self._step_preview_cache:
+            self._step_preview_cache[key] = self._render_preview_image(index, size)
+        return self._step_preview_cache[key]
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -301,9 +358,20 @@ class ProofStepView(QListView):
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
 
+        context_menu.addSeparator()
+        toggle_preview_action = context_menu.addAction("Show Diagram Previews")
+        toggle_preview_action.setCheckable(True)
+        toggle_preview_action.setChecked(self.previews_enabled())
+        action_function_map[toggle_preview_action] = self.toggle_diagram_previews
+
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
+
+    def toggle_diagram_previews(self) -> None:
+        display_setting.previews_show = not self.previews_enabled()
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
 
     def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange
@@ -354,9 +422,8 @@ class ProofStepView(QListView):
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
-    """This class controls the painting of items in the proof steps list view.
-
-    We paint a "git-style" line with circles to denote individual steps in a proof.
+    """
+    This class controls the painting of items in the proof steps list view.
     """
 
     line_width = 3
@@ -369,6 +436,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        show_preview_image = step_view.previews_enabled()
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
@@ -417,9 +487,19 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        text_y = int(option.rect.y() + option.rect.height() / 2 - text_height / 2)  # type: ignore[attr-defined]
+
+        if show_preview_image:
+            image_size = step_view.preview_size()
+            image_left = int(option.rect.x() + self.line_width + 2 * self.line_padding)  # type: ignore[attr-defined]
+            image_top = int(option.rect.y() + self.vert_padding)  # type: ignore[attr-defined]
+            preview_pixmap = step_view.preview_image(index.row(), image_size)
+            painter.drawPixmap(image_left, image_top, preview_pixmap)
+            text_y = image_top + image_size.height() + self.vert_padding
+
         text_rect = QRect(
             int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            text_y,
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
@@ -439,7 +519,13 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        if step_view.previews_enabled():
+            preview_block_height = step_view.preview_size().height() + self.vert_padding
+        else:
+            preview_block_height = 0
+        return QSize(size.width(), size.height() + 2 * self.vert_padding + preview_block_height)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
