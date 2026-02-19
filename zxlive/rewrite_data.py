@@ -8,8 +8,8 @@ import pyzx
 from pyzx import simplify, extract_circuit
 from pyzx.graph import VertexType
 from pyzx.rewrite import Rewrite, RewriteSimpGraph
-
-from .common import GraphT, VT, get_custom_rules_path
+from pyzx.graph.base import BaseGraph
+from .common import ET, GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
 from .unfusion_rewrite import unfusion_rewrite
 
@@ -124,20 +124,20 @@ def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> li
 #     return rule
 
 def rewrite_strategy_to_rewrite(strategy: Callable[[GraphT], Optional[int]]) -> RewriteSimpGraph:
-    def rule(g: GraphT, matches: list) -> bool:
+    def rule(g: BaseGraph[VT, ET], matches: list) -> bool:
         if set(g.vertices()) == set(matches):
-            strategy(g)
+            strategy(cast(GraphT, g))
             return True
-        subgraph = create_subgraph_with_boundary(g, matches)
+        subgraph = create_subgraph_with_boundary(cast(GraphT, g), matches)
         simplified = cast(GraphT, subgraph.copy())
         strategy(simplified)
-        return CustomRule(subgraph, simplified, "", "").applier(g, matches)
+        return CustomRule(subgraph, simplified, "", "").applier(cast(GraphT, g), matches)
 
-    def simp_rule(g: GraphT) -> bool:
-        strategy(g)
+    def simp(g: BaseGraph[VT, ET]) -> bool:
+        strategy(cast(GraphT, g))
         return True
-    return RewriteSimpGraph(rule, simp_rule)  # type: ignore[arg-type]
 
+    return RewriteSimpGraph(rule, simp)
 
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]

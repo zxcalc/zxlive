@@ -231,6 +231,184 @@ class GraphScene(QGraphicsScene):
                 ei.reset_color()
                 ei.refresh()
 
+    @staticmethod
+    def _phases_semantically_equal(old_phase: object, new_phase: object) -> bool:
+        """Check whether two phase values represent the same rotation.
+
+        ``GraphDiff`` compares phases with Python's ``!=`` operator which
+        is sensitive to representation: ``Fraction(1, 4) != 0.25`` is
+        ``True`` even though both encode the same angle.  This helper
+        converts both values to ``float`` and compares with a small
+        tolerance so that purely representational differences (e.g.
+        ``Fraction`` vs ``float``) do not produce false‑positive
+        highlights.
+
+        For symbolic phases (``Poly`` objects or other non‑numeric types)
+        the function falls back to exact equality, which is the correct
+        behaviour since we cannot numerically evaluate free variables.
+        """
+        try:
+            return abs(float(old_phase) - float(new_phase)) < 1e-12  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            # Symbolic / non-numeric phases — fall back to exact equality
+            return old_phase == new_phase
+
+    def highlight_diff(self, diff: GraphDiff, direction: str = "forward") -> None:
+        """Highlight vertices and edges that differ between proof steps.
+
+        Only *semantically meaningful* changes are highlighted.  Cosmetic
+        changes such as repositioning (``changed_pos``), vertex metadata
+        (``changed_vdata``) and edge metadata like curvature
+        (``changed_edata``) are intentionally excluded because they produce
+        visual noise that makes it harder — not easier — to spot the real
+        rewrite.
+
+        Additionally, phase changes that are purely representational (e.g.
+        ``Fraction(1, 4)`` vs ``0.25``) are filtered out.  This avoids
+        false‑positive highlights that ``GraphDiff`` may report when the
+        internal type of a phase value changes without the numeric value
+        itself changing (a common side‑effect of ``Graph.copy()`` and
+        certain rewrite routines).
+
+        Semantic vertex changes:
+            * ``removed_verts`` / ``new_verts`` — structural addition/removal
+            * ``changed_vertex_types`` — spider colour change (Z↔X, etc.)
+            * ``changed_phases`` — phase label change (only true numeric changes)
+
+        Semantic edge changes:
+            * ``removed_edges`` / ``new_edges`` — structural addition/removal
+            * ``changed_edge_types`` — type change (simple↔Hadamard)
+
+        When *direction* is ``"forward"`` the current step is shown and the
+        elements that **will change** in the next step are marked.  When
+        ``"backward"`` the elements that **were introduced or changed** coming
+        from the previous step are marked.
+
+        :param diff: A :class:`GraphDiff` between the current graph and an
+            adjacent step.
+        :param direction: ``"forward"`` or ``"backward"``.
+        """
+        if not display_setting.show_diff_highlights:
+            return
+
+        self.clear_diff_highlights()
+
+        # Only semantically meaningful vertex changes — excludes changed_pos
+        # and changed_vdata which are cosmetic / internal metadata.
+        changed_verts: set[VT] = set()
+        changed_verts.update(diff.changed_vertex_types.keys())
+
+        # Filter changed_phases: only include vertices whose phase truly
+        # changed in numeric value, not just in Python type/representation.
+        # diff.changed_phases maps vertex -> new_phase.  For existing
+        # vertices we can read the old phase from self.g (the currently
+        # displayed graph).  New vertices (in diff.new_verts) are skipped
+        # here; they are handled separately via the new_verts path below.
+        for v, new_phase in diff.changed_phases.items():
+            if v in diff.new_verts:
+                # New vertex — not a "change", will be handled as addition
+                continue
+            try:
+                old_phase = self.g.phase(v)
+            except KeyError:
+                # Vertex not in current graph (shouldn't happen, but be safe)
+                changed_verts.add(v)
+                continue
+            if not self._phases_semantically_equal(old_phase, new_phase):
+                changed_verts.add(v)
+
+        # Only semantically meaningful edge changes — excludes changed_edata
+        # which tracks curvature and other visual metadata.
+        changed_edges: set[ET] = set()
+        changed_edges.update(diff.changed_edge_types.keys())
+
+        # Helper: mark a vertex as "changed" only if it has no highlight yet.
+        # Used to flag vertices whose connectivity changes without them being
+        # structurally added/removed themselves (e.g. the fusion survivor, the
+        # source of a redirected edge after any rewrite rule).
+        def _mark_endpoint_changed(v: VT) -> None:
+            if v in self.vertex_map and self.vertex_map[v]._diff_highlight is None:
+                self.vertex_map[v]._diff_highlight = "changed"
+                self.vertex_map[v].refresh()
+
+        if direction == "forward":
+            for v in diff.removed_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "removed"
+                    self.vertex_map[v].refresh()
+
+            for v in changed_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "changed"
+                    self.vertex_map[v].refresh()
+
+            for e in diff.removed_edges:
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "removed"
+                        eitem.refresh()
+                # Mark surviving endpoints of every removed edge as "changed".
+                # This generalises to any rewrite rule: if an edge disappears,
+                # its endpoints (if still present) are structurally affected.
+                s, t, *_ = e
+                for endpoint in (s, t):
+                    if endpoint not in diff.removed_verts:
+                        _mark_endpoint_changed(endpoint)
+
+            for e in changed_edges:
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "changed"
+                        eitem.refresh()
+                # Endpoints of type-changed edges are also structurally affected.
+                s, t, *_ = e
+                for endpoint in (s, t):
+                    _mark_endpoint_changed(endpoint)
+
+        elif direction == "backward":
+            for v in diff.new_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "added"
+                    self.vertex_map[v].refresh()
+
+            for v in changed_verts:
+                if v in self.vertex_map:
+                    self.vertex_map[v]._diff_highlight = "changed"
+                    self.vertex_map[v].refresh()
+
+            for (s, t), typ in diff.new_edges:
+                e = (s, t, typ)
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "added"
+                        eitem.refresh()
+                # Mark endpoints of every new edge as "changed" — they gained
+                # a connection regardless of which rewrite rule was applied.
+                for endpoint in (s, t):
+                    if endpoint not in diff.new_verts:
+                        _mark_endpoint_changed(endpoint)
+
+            for e in changed_edges:
+                if e in self.edge_map:
+                    for eitem in self.edge_map[e].values():
+                        eitem._diff_highlight = "changed"
+                        eitem.refresh()
+                s, t, *_ = e
+                for endpoint in (s, t):
+                    _mark_endpoint_changed(endpoint)
+
+    def clear_diff_highlights(self) -> None:
+        """Remove all diff highlights from vertices and edges."""
+        for vitem in self.vertex_map.values():
+            if vitem._diff_highlight is not None:
+                vitem._diff_highlight = None
+                vitem.refresh()
+        for edge_dict in self.edge_map.values():
+            for eitem in edge_dict.values():
+                if eitem._diff_highlight is not None:
+                    eitem._diff_highlight = None
+                    eitem.refresh()
+
     def add_items(self) -> None:
         """Add QGraphicsItem's for all vertices and edges in the graph"""
         self.vertex_map = {}

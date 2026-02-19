@@ -33,11 +33,11 @@ def get_settings_value(arg: str, _type: Type[T], default: T | None = None, setti
     _settings = settings or QSettings("zxlive", "zxlive")
     try:
         val = _settings.value(arg, default)
-        if _type == bool:
+        if _type is bool:
             val = str(val) == "True" or str(val) == "true"
-        if _type == int:
+        if _type is int:
             val = int(str(val))
-        if _type == float:
+        if _type is float:
             val = float(str(val))
         if not isinstance(val, _type):
             if default is not None:

@@ -169,9 +169,17 @@ class UnfusionRewriteAction:
 
         from .rewrite_data import rules_basic
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                             self.proof_panel.step_view, rules_basic['unfuse']['text'])
-        anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
-        self.proof_panel.undo_stack.push(cmd, anim_after=anim)
+                             self.proof_panel.step_view, str(rules_basic['unfuse']['text']))
+        anim_after = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
+
+        # Pulse the original vertex before the graph updates so the user sees
+        # which spider is being transformed, not just the two new ones expanding.
+        anim_before = None
+        if original_vertex in self.proof_panel.graph_scene.vertex_map:
+            src_item = self.proof_panel.graph_scene.vertex_map[original_vertex]
+            anim_before = anims.pulse(src_item)
+
+        self.proof_panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     def _cleanup(self) -> None:
         """Clean up the unfusion mode."""

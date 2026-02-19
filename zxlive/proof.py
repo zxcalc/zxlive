@@ -1,3 +1,4 @@
+import copy
 import json
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
@@ -14,8 +15,6 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
 
 from .common import GraphT
 from .settings import display_setting
-
-
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
@@ -280,8 +279,29 @@ class ProofStepView(QListView):
         self.setCurrentIndex(idx)
         self.selectionModel().blockSignals(False)
         self.update(idx)
-        g = self.model().get_graph(index)
+
+        # Use copy.deepcopy instead of get_graph() — which internally calls
+        # BaseGraph.copy() — because .copy() renumbers vertex IDs to be
+        # consecutive, discarding gaps left by removed vertices.  That
+        # renumbering makes GraphDiff compare the wrong vertices when two
+        # independently-copied graphs have different gap patterns.
+        # deepcopy preserves the original IDs exactly.
+        if index == 0:
+            g = copy.deepcopy(self.model().initial_graph)
+        else:
+            g = copy.deepcopy(self.model().steps[index - 1].graph)
         self.graph_view.set_graph(g)
+
+        # Highlight the elements that will change in the next step
+        if display_setting.show_diff_highlights and index < len(self.model().steps):
+            from pyzx.graph.diff import GraphDiff
+            # Access the stored graph directly — no copy needed since
+            # GraphDiff only reads from it, never modifies it.
+            next_g = self.model().steps[index].graph
+            diff = GraphDiff(g, next_g)
+            self.graph_view.graph_scene.highlight_diff(diff, "forward")
+        else:
+            self.graph_view.graph_scene.clear_diff_highlights()
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
