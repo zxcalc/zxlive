@@ -29,6 +29,7 @@ from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z
 
 from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 from .settings import display_setting
+from .latex_to_html import dummy_text_to_html
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -172,7 +173,7 @@ class VItem(QGraphicsPathItem):
                 self.dummy_text_item = QGraphicsTextItem(self)
                 self.dummy_text_item.setDefaultTextColor(QColor("#222"))
                 self.dummy_text_item.setFont(display_setting.font)
-            self.dummy_text_item.setPlainText(text)
+            self.dummy_text_item.setHtml(dummy_text_to_html(text))
             # Center the text in the node
             rect = self.dummy_text_item.boundingRect()
             self.dummy_text_item.setPos(-rect.width() / 2, -rect.height() / 2 - 0.25 * SCALE)
