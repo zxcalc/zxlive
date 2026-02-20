@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
+from PySide6.QtCore import QFile, QIODevice, QTextStream, QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget, QInputDialog)
+                               QFormLayout, QLabel, QLineEdit, QMessageBox,
+                               QPushButton, QTextEdit, QVBoxLayout, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
@@ -353,23 +353,52 @@ def create_new_rewrite(parent: MainWindow) -> None:
             dialog.accept()
     button_box.accepted.connect(add_rewrite)
     button_box.rejected.connect(dialog.reject)
+    QTimer.singleShot(0, input_field.setFocus)
+    input_field.setCursorPosition(len(input_field.text()))
+
     if not dialog.exec():
         return
 
 
 def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[GraphT]:
-    """Prompt the user for text and return a new graph with the text stored in the vertex's vdata under key 'text'.
-    If the user cancels, return None. Otherwise, return the new graph with the updated vdata.
-    """
+    """Prompt the user for text and return a new graph with updated dummy-node text."""
     if graph.type(v) != VertexType.DUMMY:
         show_error_msg("Invalid Vertex Type", "This function can only be used on dummy vertices.", parent=parent)
         return None
+
     current_text = graph.vdata(v, 'text', '')
-    input_, ok = QInputDialog.getText(parent, "Set Text", "Enter text for dummy node:", text=current_text)
-    if not ok:
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Set Text")
+    layout = QVBoxLayout(dialog)
+
+    input_field = QLineEdit(dialog)
+    input_field.setPlaceholderText("Enter text for dummy node")
+    input_field.setText(current_text)
+    input_field.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    layout.addWidget(input_field)
+
+    katex_docs = QLabel(
+        'Supported syntax follows <a href="https://katex.org/docs/supported.html">KaTeX </a>commands. ',
+        dialog,
+    )
+    katex_docs.setOpenExternalLinks(True)
+    katex_docs.setWordWrap(True)
+    layout.addWidget(katex_docs)
+
+    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    button_box.accepted.connect(dialog.accept)
+    button_box.rejected.connect(dialog.reject)
+    layout.addWidget(button_box)
+
+    QTimer.singleShot(0, input_field.setFocus)
+    input_field.setCursorPosition(len(input_field.text()))
+
+    if not dialog.exec():
         return None
+
     new_g = copy.deepcopy(graph)
-    new_g.set_vdata(v, 'text', input_)
+    new_g.set_vdata(v, 'text', input_field.text())
     return new_g
 
 
