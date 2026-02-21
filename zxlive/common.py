@@ -122,3 +122,36 @@ def from_tikz(s: str) -> Optional[GraphT]:
         from . import dialogs
         dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
         return None
+
+
+
+def graph_variable_names(graph: GraphT) -> set[str]:
+    """Return variable names that are actually used by phases in ``graph``."""
+    names: set[str] = set()
+    for v in graph.vertices():
+        phase = graph.phase(v)
+        free_vars = getattr(phase, "free_vars", None)
+        if callable(free_vars):
+            for var in free_vars():
+                var_name = getattr(var, "name", None)
+                if isinstance(var_name, str):
+                    names.add(var_name)
+                else:
+                    names.add(str(var))
+    return names
+
+
+def merge_graphs_preserving_metadata(target: GraphT, source: GraphT) -> tuple[list[VT], list[ET]]:
+    """Merge ``source`` into ``target`` while preserving per-vertex and variable metadata."""
+    new_verts, new_edges = target.merge(source)
+
+    for src_v, new_v in zip(source.vertices(), new_verts):
+        target.set_vdata_dict(new_v, source.vdata_dict(src_v))
+
+    var_registry_source = getattr(source, "var_registry", None)
+    var_registry_target = getattr(target, "var_registry", None)
+    if var_registry_source is not None and var_registry_target is not None:
+        for name in graph_variable_names(source):
+            var_registry_target.set_type(name, var_registry_source.get_type(name, default=False))
+
+    return new_verts, new_edges
