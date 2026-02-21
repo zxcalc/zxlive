@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Iterator, Optional, Sequence, Type
 
@@ -110,9 +111,10 @@ class BasePanel(QWidget):
         self.graph_scene.clearSelection()
 
     def copy_selection(self) -> GraphT:
-        selection = list(self.graph_scene.selected_vertices)
-        copied_graph = self.graph.subgraph_from_vertices(selection)
-        # Mypy issue: https://github.com/python/mypy/issues/11673
+        selection = set(self.graph_scene.selected_vertices)
+        copied_graph = copy.deepcopy(self.graph)
+        rem_vertices = [v for v in copied_graph.vertices() if v not in selection]
+        copied_graph.remove_vertices(rem_vertices)
         assert isinstance(copied_graph, GraphT)  # type: ignore
         return copied_graph
 

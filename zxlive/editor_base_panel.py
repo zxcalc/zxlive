@@ -22,7 +22,8 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data, pos_from_view, get_settings_value
+from .common import (VT, GraphT, ToolType, get_data, get_settings_value,
+                     graph_variable_names, merge_graphs_preserving_metadata, pos_from_view)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
@@ -183,11 +184,17 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def paste_graph(self, graph: GraphT) -> None:
+        old_variables = graph_variable_names(self.graph_scene.g)
+        pasted_variables = graph_variable_names(graph)
         new_g = copy.deepcopy(self.graph_scene.g)
-        new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
+        new_verts, _new_edges = merge_graphs_preserving_metadata(
+            new_g, graph.translate(0.5, 0.5))
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
+
+        for name in sorted(pasted_variables - old_variables):
+            self.variable_viewer.add_item(name, new_g.var_registry.get_type(name, default=False))
 
     def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
         """Insert a pattern into the current graph view."""
@@ -365,6 +372,7 @@ class VariableViewer(QScrollArea):
         self._layout.setColumnMinimumWidth(2, cb.minimumSizeHint().width())
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._items = 0
+        self._names: set[str] = set()
 
         vline = QFrame()
         vline.setFrameShape(QFrame.Shape.VLine)
@@ -407,10 +415,13 @@ class VariableViewer(QScrollArea):
         else:
             return super().sizeHint()
 
-    def add_item(self, name: str) -> None:
+    def add_item(self, name: str, is_bool: Optional[bool] = None) -> None:
+        if name in self._names:
+            return
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
-        is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
+        if is_bool is None:
+            is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
         combobox.setCurrentIndex(1 if is_bool else 0)
         combobox.currentTextChanged.connect(lambda text: self._text_changed(name, text))
         item = self._layout.itemAtPosition(2 + self._items, 2)
@@ -423,6 +434,7 @@ class VariableViewer(QScrollArea):
         self._layout.setRowStretch(3 + self._items, 1)
         self._layout.update()
         self._items += 1
+        self._names.add(name)
         self._widget.updateGeometry()
 
         if self._items == 1:
