@@ -159,6 +159,10 @@ class EItem(QGraphicsPathItem):
 
         webs: list[tuple[bool, bool, QColor]] = []
 
+        diff_highlight = bool(self.g.edata(self.e, "diff_highlight", False))
+        if diff_highlight:
+            self._paint_pauli_web(painter, option, widget, QColor("#F2E94E"), 3.5, left=True, right=True)
+
         swap = get_settings_value("swap-pauli-web-colors", bool)
         zweb0 = self.g.edata(self.e, "xweb0" if swap else "zweb0")
         zweb1 = self.g.edata(self.e, "xweb1" if swap else "zweb1")
