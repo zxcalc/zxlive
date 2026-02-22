@@ -7,9 +7,10 @@ if TYPE_CHECKING:
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+"""Add QMouseEvent, ..., etc. for expandable groups"""
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen 
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
-                               QStyle, QStyledItemDelegate,
+                               QInputDialog, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
 from .common import GraphT
@@ -153,23 +154,73 @@ class ProofModel(QAbstractListModel):
         assert isinstance(copy, GraphT)
         return copy
 
+    @staticmethod
+    def _parse_grouped_step_names(name: str) -> Optional[list[str]]:
+        prefix = "Grouped Steps:"
+        if not name.startswith(prefix):
+            return None
+        names = [part.strip() for part in name[len(prefix):].split(",")]
+        names = [n for n in names if n]
+        return names
+
+    @staticmethod
+    def _with_display_name(step: Rewrite, name: str) -> Rewrite:
+        return Rewrite(name, step.rule, step.graph, step.grouped_rewrites)
+
     def rename_step(self, index: int, name: str) -> None:
-        """Change the display name"""
+        """Change the display name.
+
+        For grouped rewrites, if the edited text follows
+        `Grouped Steps: a, b, c` with exactly the number of grouped steps,
+        we also rename each grouped child step so that ungrouping preserves
+        those names.
+        """
         old_step = self.steps[index]
+
+        grouped_rewrites = old_step.grouped_rewrites
+        if grouped_rewrites is not None:
+            parsed_names = self._parse_grouped_step_names(name)
+            if parsed_names is not None and len(parsed_names) == len(grouped_rewrites):
+                grouped_rewrites = [
+                    self._with_display_name(step, parsed_names[i])
+                    for i, step in enumerate(grouped_rewrites)
+                ]
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, grouped_rewrites)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
-        modelIndex = self.createIndex(index, 0)
+        modelIndex = self.createIndex(index + 1, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
+
+    def rename_grouped_step(self, index: int, grouped_index: int, name: str) -> None:
+        """Change the display name of one step inside a grouped rewrite."""
+        old_step = self.steps[index]
+        grouped_rewrites = old_step.grouped_rewrites
+        if grouped_rewrites is None:
+            raise ValueError("Step is not grouped")
+        if grouped_index < 0 or grouped_index >= len(grouped_rewrites):
+            raise ValueError("Grouped step index out of range")
+
+        renamed_grouped_step = Rewrite(
+            name,
+            grouped_rewrites[grouped_index].rule,
+            grouped_rewrites[grouped_index].graph,
+            grouped_rewrites[grouped_index].grouped_rewrites,
+        )
+        new_grouped_rewrites = list(grouped_rewrites)
+        new_grouped_rewrites[grouped_index] = renamed_grouped_step
+        self.steps[index] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped_rewrites)
+
+        modelIndex = self.createIndex(index + 1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
         new_rewrite = Rewrite(
-            "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
+            "Grouped Steps: " + ", ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
             self.steps[start_index:end_index + 1]
@@ -253,13 +304,15 @@ class ProofStepView(QListView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
+        # Rows can have variable height when grouped steps are expanded.
+        self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
+        self._expanded_group_rows: set[int] = set()
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -272,6 +325,43 @@ class ProofStepView(QListView):
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
+        self._expanded_group_rows = set()
+
+    def is_group_expanded(self, row: int) -> bool:
+        return row in self._expanded_group_rows
+
+    def toggle_group_expanded(self, row: int) -> None:
+        model_index = self.model().index(row, 0)
+        if row in self._expanded_group_rows:
+            self._expanded_group_rows.remove(row)
+        else:
+            self._expanded_group_rows.add(row)
+        self.doItemsLayout()
+        self.update(model_index)
+        self.viewport().update()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        index = self.indexAt(event.position().toPoint())
+        if not index.isValid():
+            super().mousePressEvent(event)
+            return
+
+        row = index.row()
+        if row > 0:
+            step = self.model().steps[row - 1]
+            if step.grouped_rewrites:
+                row_rect = self.visualRect(index)
+                arrow_rect = QRect(
+                    row_rect.x() + ProofStepItemDelegate.line_width + 2 * ProofStepItemDelegate.line_padding,
+                    row_rect.y(),
+                    24,
+                    ProofStepItemDelegate.header_height,
+                )
+                if arrow_rect.contains(event.position().toPoint()):
+                    self.toggle_group_expanded(row)
+                    return
+
+        super().mousePressEvent(event)
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -300,6 +390,10 @@ class ProofStepView(QListView):
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
+                expand_action = context_menu.addAction(
+                    "Collapse Group" if self.is_group_expanded(index) else "Expand Group"
+                )
+                action_function_map[expand_action] = lambda row=index: self.toggle_group_expanded(row)
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
@@ -312,6 +406,49 @@ class ProofStepView(QListView):
                              lambda: self.model().rename_step(index, old_name),
                              lambda: self.model().rename_step(index, new_name))
         self.undo_stack.push(cmd)
+
+    def rename_grouped_proof_step(self, new_name: str, index: int, grouped_index: int) -> None:
+        from .commands import UndoableChange
+        grouped_rewrites = self.model().steps[index].grouped_rewrites
+        if grouped_rewrites is None:
+            raise ValueError("Step is not grouped")
+        old_name = grouped_rewrites[grouped_index].display_name
+        cmd = UndoableChange(self.graph_view,
+                             lambda: self.model().rename_grouped_step(index, grouped_index, old_name),
+                             lambda: self.model().rename_grouped_step(index, grouped_index, new_name))
+        self.undo_stack.push(cmd)
+
+    def _expanded_child_step_index_at(self, row: int, position: QPoint) -> Optional[int]:
+        if row <= 0 or not self.is_group_expanded(row):
+            return None
+        grouped_rewrites = self.model().steps[row - 1].grouped_rewrites
+        if grouped_rewrites is None:
+            return None
+
+        row_rect = self.visualRect(self.model().index(row, 0))
+        content_top = row_rect.y() + ProofStepItemDelegate.header_height
+        if position.y() < content_top:
+            return None
+
+        child_index = (position.y() - content_top) // ProofStepItemDelegate.child_step_height
+        if child_index < 0 or child_index >= len(grouped_rewrites):
+            return None
+        return int(child_index)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
+        index = self.indexAt(event.position().toPoint())
+        if index.isValid():
+            row = index.row()
+            child_index = self._expanded_child_step_index_at(row, event.position().toPoint())
+            if child_index is not None:
+                grouped_rewrites = self.model().steps[row - 1].grouped_rewrites
+                assert grouped_rewrites is not None
+                old_name = grouped_rewrites[child_index].display_name
+                new_name, ok = QInputDialog.getText(self, "Rename Grouped Step", "Name", text=old_name)
+                if ok and new_name != old_name:
+                    self.rename_grouped_proof_step(new_name, row - 1, child_index)
+                return
+        super().mouseDoubleClickEvent(event)
 
     def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
@@ -366,6 +503,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius = 4
     circle_radius_selected = 6
     circle_outline_width = 3
+    child_step_height = 42
+    header_height = 46
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
@@ -416,10 +555,22 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+
+        grouped_rewrites = None
+        is_expanded_group = False
+        if index.row() > 0:
+            step = step_view.model().steps[index.row() - 1]
+            grouped_rewrites = step.grouped_rewrites
+            is_expanded_group = grouped_rewrites is not None and step_view.is_group_expanded(index.row())
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        text_y = option.rect.y() + option.rect.height() / 2 - text_height / 2
+        if is_expanded_group:
+            text_y = option.rect.y() + self.header_height / 2 - text_height / 2
         text_rect = QRect(
             int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            int(text_y),
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
@@ -433,13 +584,54 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         else:
             painter.setPen(Qt.GlobalColor.black)
             painter.setBrush(Qt.GlobalColor.black)
+
+        if grouped_rewrites is not None:
+            arrow_x = option.rect.x() + self.line_width + 2 * self.line_padding
+            arrow_y = option.rect.y() + self.header_height / 2
+            if step_view.is_group_expanded(index.row()):
+                painter.drawText(QPointF(arrow_x, arrow_y + 5), "▼")
+            else:
+                painter.drawText(QPointF(arrow_x, arrow_y + 5), "▶")
+            text_rect.setX(text_rect.x() + 24)
+
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
+
+        if grouped_rewrites is not None and step_view.is_group_expanded(index.row()):
+            branch_start_x = self.line_padding + self.line_width / 2
+            child_x = branch_start_x + 110
+            content_top = option.rect.y() + self.header_height
+
+            if display_setting.dark_mode:
+                painter.setPen(QPen(QColor(180, 180, 180), self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            else:
+                painter.setPen(QPen(Qt.GlobalColor.black, self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+            painter.drawLine(QPointF(branch_start_x, option.rect.y() + option.rect.height() / 2),
+                             QPointF(branch_start_x, option.rect.bottom()))
+
+            for child_index, child_step in enumerate(grouped_rewrites):
+                y = content_top + self.child_step_height * (child_index + 0.5)
+                path = QPainterPath(QPointF(branch_start_x, y - 8))
+                path.cubicTo(QPointF(branch_start_x + 18, y), QPointF(child_x - 24, y), QPointF(child_x, y))
+                painter.drawPath(path)
+                painter.setBrush(display_setting.effective_colors["z_spider"])
+                painter.drawEllipse(QPointF(child_x, y), self.circle_radius, self.circle_radius)
+                painter.drawText(QRect(int(child_x + 20), int(y - text_height / 2), option.rect.width(), text_height),
+                                 Qt.AlignmentFlag.AlignLeft,
+                                 child_step.display_name)
 
         painter.restore()
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        extra_height = 2 * self.vert_padding
+        if index.row() > 0:
+            grouped_rewrites = step_view.model().steps[index.row() - 1].grouped_rewrites
+            if grouped_rewrites is not None and step_view.is_group_expanded(index.row()):
+                extra_height += self.child_step_height * len(grouped_rewrites)
+        return QSize(size.width(), size.height() + extra_height)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
