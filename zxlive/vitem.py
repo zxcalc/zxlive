@@ -142,25 +142,26 @@ class VItem(QGraphicsPathItem):
             VertexType.DUMMY: "dummy_pressed",
         }
         pen = QPen()
+        diff_highlight = bool(self.g.vdata(self.v, "diff_highlight", False))
         if not self.isSelected():
             color_key = color_map.get(self.ty, "boundary")
             brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
-            pen.setWidthF(3)
-            pen.setColor(display_setting.effective_colors["outline"])
+            pen.setWidthF(5 if diff_highlight else 3)
+            pen.setColor(QColor("#F2E94E") if diff_highlight else display_setting.effective_colors["outline"])
             if self.ty == VertexType.DUMMY:
-                pen.setColor(display_setting.effective_colors["dummy"])
+                pen.setColor(QColor("#F2E94E") if diff_highlight else display_setting.effective_colors["dummy"])
         else:
             color_key = pressed_color_map.get(self.ty, "boundary_pressed")
             brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
             brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-            pen.setWidthF(5)
+            pen.setWidthF(7 if diff_highlight else 5)
             # Use a light outline in dark mode, otherwise use the pressed color
             if display_setting.dark_mode:
-                pen.setColor(QColor("#dbdbdb"))
+                pen.setColor(QColor("#F2E94E") if diff_highlight else QColor("#dbdbdb"))
             else:
-                pen.setColor(display_setting.effective_colors["boundary_pressed"])
+                pen.setColor(QColor("#F2E94E") if diff_highlight else display_setting.effective_colors["boundary_pressed"])
             if self.ty == VertexType.DUMMY:
-                pen.setColor(display_setting.effective_colors["dummy_pressed"])
+                pen.setColor(QColor("#F2E94E") if diff_highlight else display_setting.effective_colors["dummy_pressed"])
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)

@@ -1,4 +1,5 @@
 import json
+from collections import Counter
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
@@ -11,9 +12,93 @@ from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
-
 from .common import GraphT
 from .settings import display_setting
+
+
+def _copy_without_diff_highlight(graph: GraphT) -> GraphT:
+    """Return a copy of ``graph`` with transient diff highlight metadata stripped."""
+    graph_copy = graph.copy()
+    for v in graph_copy.vertices():
+        graph_copy.set_vdata(v, "diff_highlight", None)
+    for e in graph_copy.edges():
+        graph_copy.set_edata(e, "diff_highlight", None)
+    return graph_copy
+
+
+def _vertex_signature(g: GraphT, v: int) -> tuple[str, str, float, float]:
+    return (str(g.type(v)), str(g.phase(v)), round(g.row(v), 6), round(g.qubit(v), 6))
+
+
+def _vertex_position(g: GraphT, v: int) -> tuple[float, float]:
+    return (round(g.row(v), 6), round(g.qubit(v), 6))
+
+
+def _edge_signature(g: GraphT, e: tuple[int, int, Any]) -> tuple[tuple[float, float], tuple[float, float], str]:
+    s, t = g.edge_st(e)
+    p1 = _vertex_position(g, s)
+    p2 = _vertex_position(g, t)
+    if p2 < p1:
+        p1, p2 = p2, p1
+    return (p1, p2, str(g.edge_type(e)))
+
+
+def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[GraphT]) -> None:
+    """Mark nodes/edges in ``current`` that differ in the next rewrite step."""
+    current_vertices = list(current.vertices())
+    current_edges = list(current.edges())
+
+    for v in current_vertices:
+        current.set_vdata(v, "diff_highlight", False)
+    for e in current_edges:
+        current.set_edata(e, "diff_highlight", False)
+
+    if next_graph is None:
+        return
+
+    next_graph = _copy_without_diff_highlight(next_graph)
+
+    highlighted_vertices: set[int] = set()
+    highlighted_edges: set[tuple[int, int, Any]] = set()
+
+    next_vertex_counts = Counter(_vertex_signature(next_graph, v) for v in next_graph.vertices())
+    for v in current_vertices:
+        sig = _vertex_signature(current, v)
+        if next_vertex_counts[sig] > 0:
+            next_vertex_counts[sig] -= 1
+        else:
+            highlighted_vertices.add(v)
+
+    next_edge_counts = Counter(_edge_signature(next_graph, e) for e in next_graph.edges())
+    for e in current_edges:
+        sig = _edge_signature(current, e)
+        if next_edge_counts[sig] > 0:
+            next_edge_counts[sig] -= 1
+        else:
+            highlighted_edges.add(e)
+            s, t = current.edge_st(e)
+            highlighted_vertices.add(s)
+            highlighted_vertices.add(t)
+
+    current_edge_counts = Counter(_edge_signature(current, e) for e in current_edges)
+    current_pos_to_vertices: dict[tuple[float, float], list[int]] = {}
+    for v in current_vertices:
+        current_pos_to_vertices.setdefault(_vertex_position(current, v), []).append(v)
+
+    for e in next_graph.edges():
+        sig = _edge_signature(next_graph, e)
+        if current_edge_counts[sig] > 0:
+            current_edge_counts[sig] -= 1
+            continue
+        p1, p2, _ = sig
+        for pos in (p1, p2):
+            for v in current_pos_to_vertices.get(pos, []):
+                highlighted_vertices.add(v)
+
+    for e in highlighted_edges:
+        current.set_edata(e, "diff_highlight", True)
+    for v in highlighted_vertices:
+        current.set_vdata(v, "diff_highlight", True)
 
 
 class Rewrite(NamedTuple):
@@ -281,6 +366,8 @@ class ProofStepView(QListView):
         self.selectionModel().blockSignals(False)
         self.update(idx)
         g = self.model().get_graph(index)
+        next_graph = self.model().get_graph(index + 1) if index < self.model().rowCount() - 1 else None
+        apply_step_difference_highlighting(g, next_graph)
         self.graph_view.set_graph(g)
 
     def show_context_menu(self, position: QPoint) -> None:
