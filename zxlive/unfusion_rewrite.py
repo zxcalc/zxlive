@@ -34,6 +34,7 @@ def apply_unfuse_rule(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
     raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
     return True
 
+
 def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
     """A no-op simplification applier for the unfusion rule."""
     # This function should not be called directly for the interactive unfusion
@@ -42,8 +43,10 @@ def unfuse_rule_simp_applier(graph: BaseGraph[VT, ET]) -> bool:
     raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
     return True
 
+
 unfusion_rewrite: RewriteSimpGraph[VT, ET] = RewriteSimpGraph(apply_unfuse_rule, unfuse_rule_simp_applier)
 unfusion_rewrite.is_match = match_unfuse_single_vertex  # type: ignore[attr-defined]
+
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""

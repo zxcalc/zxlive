@@ -6,9 +6,9 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QRectF, QSize, Qt)
+                            QPoint, QPointF, QRect, QSize, Qt)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen, QPolygonF
-from PySide6.QtWidgets import (QAbstractItemView, QInputDialog, QLineEdit, QListView, QMenu,
+from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
@@ -191,13 +191,13 @@ class ProofModel(QAbstractListModel):
 
         old_sub_step = grouped[sub_index]
         new_sub_step = Rewrite(name, old_sub_step.rule, old_sub_step.graph, old_sub_step.grouped_rewrites)
-        
+
         new_grouped = list(grouped)
         new_grouped[sub_index] = new_sub_step
 
         # Update the main step's grouped rewrites
         self.steps[step_index] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped)
-        
+
         # Rerender
         modelIndex = self.createIndex(step_index, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
@@ -520,7 +520,7 @@ class ProofStepView(QListView):
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
                 action_function_map[ungroup_action] = self.ungroup_selected_step
-                
+
                 # Check if we clicked on a sub-step
                 step_idx = index - 1
                 if step_idx in self.expanded_groups:
@@ -551,7 +551,7 @@ class ProofStepView(QListView):
         # Ensure the item is visible
         model_idx = self.model().index(step_idx + 1, 0)
         self.scrollTo(model_idx)
-        
+
         # Get the visual rect of the main item
         rect = self.visualRect(model_idx)
 
@@ -559,44 +559,44 @@ class ProofStepView(QListView):
         font = self.font()
         text_height = QFontMetrics(font).height()
         row_height = text_height + 2 * delegate.vert_padding
-        
+
         main_cx = delegate.line_padding + delegate.line_width / 2
         sub_tree_x = main_cx + delegate.sub_indent
-        
+
         # Calculate vertical position of the sub-step
         # Header + sub_steps before this one
         header_height = row_height
         sub_step_top = rect.y() + header_height + sub_idx * row_height
-        
+
         sub_text_x = int(sub_tree_x + delegate.sub_circle_radius + 10)
-        
+
         editor_x = sub_text_x
         # Center vertically in the row
         editor_y = int(sub_step_top + delegate.vert_padding)
-        editor_w = rect.width() - sub_text_x - 5 # Small padding on right
+        editor_w = rect.width() - sub_text_x - 5  # Small padding on right
         editor_h = text_height
-        
+
         editor = QLineEdit(self)
         step = self.model().steps[step_idx]
         if step.grouped_rewrites:
             editor.setText(step.grouped_rewrites[sub_idx].display_name)
-        
+
         editor.setGeometry(editor_x, editor_y, editor_w, editor_h)
         # Style to blend in or look like an editor
         if display_setting.dark_mode:
-             editor.setStyleSheet("QLineEdit { background-color: #2c313a; color: #e0e0e0; border: 1px solid #4b5362; }")
+            editor.setStyleSheet("QLineEdit { background-color: #2c313a; color: #e0e0e0; border: 1px solid #4b5362; }")
         else:
-             editor.setStyleSheet("QLineEdit { background-color: white; color: black; border: 1px solid #ccc; }")
+            editor.setStyleSheet("QLineEdit { background-color: white; color: black; border: 1px solid #ccc; }")
 
         # Connect signals
         editor.editingFinished.connect(lambda: self._finish_sub_step_edit(step_idx, sub_idx, editor))
-        
+
         editor.show()
         editor.setFocus()
         self._active_sub_editor = editor
 
     def _finish_sub_step_edit(self, step_idx: int, sub_idx: int, editor: QLineEdit) -> None:
-        if not editor.isVisible(): 
+        if not editor.isVisible():
             # Already finished/deleted
             return
         new_name = editor.text()

@@ -134,6 +134,7 @@ def rewrite_strategy_to_rewrite(strategy: Callable[[GraphT], Optional[int]]) -> 
         return CustomRule(subgraph, simplified, "", "").applier(g, matches)
     return RewriteSimpGraph(rule, rule)  # type: ignore[arg-type]
 
+
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     subgraph = cast(GraphT, graph.subgraph_from_vertices(verts))

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
-from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
+from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
                             Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
@@ -104,7 +104,7 @@ class RewriteAction:
                 matches = [v for v in verts if rule_sv.is_match(g, v)]
             elif self.match_type == MATCH_DOUBLE:
                 matches = [g.edge_st(e) for e in edges if g.edge_st(e)[0] != g.edge_st(e)[1] and self.rule.is_match(g, *g.edge_st(e))]  # type: ignore[attr-defined]
-            elif self.match_type == MATCH_COMPOUND: # We don't necessarily have a matcher in this case
+            elif self.match_type == MATCH_COMPOUND:  # We don't necessarily have a matcher in this case
                 # if self.rule.is_match(g, verts):
                 if len(verts) == 0:
                     matches = [list(g.vertices())]  # type: ignore
@@ -117,7 +117,6 @@ class RewriteAction:
                 applied = False
                 for m in matches:
                     if self.match_type == MATCH_DOUBLE:
-                        rule_dv = cast(RewriteDoubleVertex, self.rule)
                         v1, v2 = cast(tuple[VT, VT], m)
                         if self.rule.apply(g, v1, v2):  # type: ignore[attr-defined]
                             applied = True
@@ -146,7 +145,8 @@ class RewriteAction:
             if self.match_type == MATCH_DOUBLE:
                 v1, v2 = cast(tuple[VT, VT], m)
                 self.rule.apply(g, v1, v2)  # type: ignore[attr-defined]
-            else: self.rule.apply(g, m)  # type: ignore[attr-defined]
+            else:
+                self.rule.apply(g, m)  # type: ignore[attr-defined]
         # rewrite = self.rule(g, matches)
         # assert isinstance(rewrite, tuple) and len(rewrite) == 4
         # etab, rem_verts, rem_edges, check_isolated_vertices = rewrite
