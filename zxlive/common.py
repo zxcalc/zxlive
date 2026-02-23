@@ -120,7 +120,7 @@ def to_tikz(g: GraphT) -> str:
     payload = _encode_tikz_metadata(g)
     if payload is None:
         return tikz
-    return f"{tikz}\n% zxlive-metadata: {payload}"
+    return f"% zxlive-metadata: {payload}\n{tikz}"
 
 
 def from_tikz(s: str) -> Optional[GraphT]:
