@@ -409,7 +409,9 @@ class VItem(QGraphicsPathItem):
         if is_latex(text):
             if self.dummy_text_item is not None:
                 self.dummy_text_item.setVisible(False)
-            svg_bytes = latex_to_svg(text, color=text_color, size=float(font_size))
+            # Scale LaTeX slightly larger so it matches plain-text visual size
+            latex_size = float(font_size) * 1.4
+            svg_bytes = latex_to_svg(text, color=text_color, size=latex_size)
             renderer = QSvgRenderer(svg_bytes)
             if self.dummy_svg_item is None:
                 self.dummy_svg_item = QGraphicsSvgItem(self)
@@ -425,7 +427,6 @@ class VItem(QGraphicsPathItem):
                 self.dummy_svg_item.setVisible(False)
             if self.dummy_text_item is None:
                 self.dummy_text_item = QGraphicsTextItem(self)
-            assert self.dummy_text_item is not None
             self.dummy_text_item.setFont(display_setting.font)
             self.dummy_text_item.setDefaultTextColor(QColor(text_color))
             self.dummy_text_item.setPlainText(text)

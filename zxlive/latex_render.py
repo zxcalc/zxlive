@@ -26,6 +26,7 @@ import matplotlib as mpl
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_svg import FigureCanvasSVG
 
+
 def is_latex(text: str) -> bool:
     """Return True if text contains LaTeX markup.
 
@@ -42,6 +43,7 @@ def is_latex(text: str) -> bool:
         return True
     return False
 
+
 def _preprocess_dirac(text: str) -> str:
     """Expand Dirac notation into standard LaTeX before conversion.
 
@@ -56,20 +58,43 @@ def _preprocess_dirac(text: str) -> str:
 
 
 def _fallback_svg(text: str, color: str, size: float) -> bytes:
-    """Generate a simple fallback SVG when rendering fails."""
+    """Generate a simple fallback SVG when rendering fails.
+
+    Uses numeric coordinates for text (not percentages) so Qt's QSvgRenderer
+    displays the text correctly.
+    """
     import html
-    escaped = html.escape(text.replace('$', ''))
-    # Approximate width based on character count
-    width = len(escaped) * size * 0.6
+    escaped = html.escape(text.replace('$', '').strip())
+    if not escaped:
+        escaped = " "
+    width = max(len(escaped) * size * 0.6, size)
     height = size * 1.4
+    x = width / 2
+    y = height / 2
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'width="{width}" height="{height}" viewBox="0 0 {width} {height}">'
-        f'<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" '
+        f'<text x="{x}" y="{y}" dominant-baseline="middle" text-anchor="middle" '
         f'font-family="serif" font-size="{size}" '
         f'fill="{color}">{escaped}</text></svg>'
     )
     return svg.encode('utf-8')
+
+
+def _svg_viewbox_empty(svg_bytes: bytes) -> bool:
+    """Return True if the SVG has no or negligible viewBox (e.g. failed render)."""
+    m = re.search(rb'viewBox\s*=\s*["\']([^"\']+)["\']', svg_bytes)
+    if not m:
+        return True
+    parts = m.group(1).strip().split()
+    if len(parts) != 4:
+        return True
+    try:
+        w = float(parts[2])
+        h = float(parts[3])
+        return w < 0.5 or h < 0.5
+    except (ValueError, IndexError):
+        return True
 
 
 def latex_to_svg(text: str, color: str = "#222222", size: float = 24) -> bytes:
@@ -95,23 +120,23 @@ def latex_to_svg(text: str, color: str = "#222222", size: float = 24) -> bytes:
         # Configure matplotlib to output text as paths (no font dependency)
         # and use Computer Modern font for LaTeX look.
         with mpl.rc_context({
-            'svg.fonttype': 'path', 
+            'svg.fonttype': 'path',
             'mathtext.fontset': 'cm',
             'font.family': 'serif',
             'text.usetex': False  # Use internal mathtext parser, not external latex
         }):
-            fig = Figure(figsize=(0.01, 0.01))
+            # Use a larger figure and center text so bbox_inches='tight' does not clip
+            # (e.g. fractions, superscripts like e^{U/2}).
+            fig = Figure(figsize=(6, 2))
             FigureCanvasSVG(fig)
-            
-            # Add text. We use a figure just to hold the text.
-            # Using fig.text() is generally reliable.
-            text_obj = fig.text(0, 0, result, fontsize=size, color=color)
-            
+            fig.text(0.5, 0.5, result, fontsize=size, color=color,
+                     ha='center', va='center')
             output = BytesIO()
-            # bbox_inches='tight' computes the bounding box of the text
-            fig.savefig(output, format='svg', bbox_inches='tight', pad_inches=0.01, transparent=True)
-            
-            return output.getvalue()
-    except Exception as e:
-        # Fallback if matplotlib fails (e.g. invalid latex)
+            fig.savefig(output, format='svg', bbox_inches='tight', pad_inches=0.05, transparent=True)
+            svg_bytes = output.getvalue()
+            # If output is effectively empty (broken mathtext that didn't raise), fallback
+            if _svg_viewbox_empty(svg_bytes):
+                return _fallback_svg(text, color, size)
+            return svg_bytes
+    except Exception:
         return _fallback_svg(text, color, size)
