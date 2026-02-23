@@ -24,7 +24,7 @@ def proof_to_tikz(proof: ProofModel) -> str:
         # Translate graph so that the first vertex starts at 0
         min_x = min(g.row(v) for v in g.vertices())
         g_t = g.translate(-min_x, 0)
-        assert isinstance(g_t, GraphT)
+        assert isinstance(g_t, GraphT)  # type: ignore[misc]
         g = g_t
 
         if i > 0:
@@ -48,4 +48,4 @@ def proof_to_tikz(proof: ProofModel) -> str:
         max_index = max(g.vertices()) + 2 * g.num_inputs() + 2
         idoffset += max_index
 
-    return TIKZ_BASE.format(vertices="\n".join(total_verts), edges="\n".join(total_edges))
+    return TIKZ_BASE.format(vertices="\n".join(total_verts), edges="\n".join(total_edges))  # type: ignore[no-any-return]

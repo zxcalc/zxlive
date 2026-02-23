@@ -5,7 +5,7 @@ import json
 import os
 import re
 from enum import IntEnum
-from typing import Final, Optional, TypeVar, Type
+from typing import Final, Optional, TypeVar, Type, cast
 
 from pyzx.graph import EdgeType
 from pyzx.graph.jsonparser import string_to_phase
@@ -119,15 +119,14 @@ def to_tikz(g: GraphT) -> str:
     tikz = pyzx.tikz.to_tikz(g)  # type: ignore
     payload = _encode_tikz_metadata(g)
     if payload is None:
-        return tikz
-    return f"% zxlive-metadata: {payload}\n{tikz}"
+        return str(tikz)
+    return f"% zxlive-metadata: {payload}\n{str(tikz)}"
 
 
 def from_tikz(s: str) -> Optional[GraphT]:
     try:
         s, variable_types = _extract_tikz_metadata(s)
-        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True)
-        assert isinstance(g, GraphT)
+        g = cast(GraphT, pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True))
         apply_variable_types(g, variable_types)
         _restore_symbolic_tikz_phases(s, g)
         normalize_symbolic_phase_types(g)

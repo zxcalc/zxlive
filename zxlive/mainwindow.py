@@ -596,11 +596,11 @@ class MainWindow(QMainWindow):
                 raw = bytes(mime.data(self.CLIPBOARD_MIME).data())
                 payload = json.loads(raw.decode("utf-8"))
                 graph_json = payload.get("graph_json")
-                if isinstance(graph_json, str):
+                if isinstance(graph_json, str):  # type: ignore
                     g = GraphT.from_json(graph_json)
-                    assert isinstance(g, GraphT)
+                    assert isinstance(g, GraphT)  # type: ignore[misc]
                     variable_types = payload.get("variable_types")
-                    if isinstance(variable_types, dict):
+                    if isinstance(variable_types, dict):  # type: ignore
                         normalized = {str(name): _parse_bool(v) for name, v in variable_types.items()}
                         apply_variable_types(g, normalized)
                         normalize_symbolic_phase_types(g)
@@ -652,7 +652,7 @@ class MainWindow(QMainWindow):
         Replaces the graph in an existing tab if it has the same name."""
 
         # The graph we are given is not a MultiGraph
-        if not isinstance(graph, GraphT):
+        if not isinstance(graph, GraphT):  # type: ignore
             graph = graph.copy(backend='multigraph')
             graph.set_auto_simplify(False)
 
