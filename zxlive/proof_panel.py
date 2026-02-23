@@ -136,7 +136,6 @@ class ProofPanel(BasePanel):
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_pauliwebs_signal.emit(new_g)
 
-
     def _on_keyboard_vertices_moved(self) -> None:
         """Refresh the thumbnail for the current proof step after keyboard-based vertex moves."""
         self.step_view.refresh_current_thumbnail()

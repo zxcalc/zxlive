@@ -316,7 +316,7 @@ class ProofStepView(QWidget):
         font.setBold(True)
         title.setFont(font)
         header_layout.addWidget(title)
-        
+
         header_layout.addStretch()
 
         self.thumbnails_toggle = QToolButton(header)
@@ -374,7 +374,7 @@ class ProofStepView(QWidget):
     def update(self) -> None: ...
 
     @overload
-    def update(self, region: QRegion | QBitmap | QPolygon | QRect, /) -> None: ...
+    def update(self, region: Union[QRegion, QBitmap, QPolygon, QRect], /) -> None: ...
 
     @overload
     def update(self, x: int, y: int, w: int, h: int, /) -> None: ...
@@ -678,7 +678,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                     painter.setPen(QPen(border_color, 1))
                     painter.setBrush(Qt.GlobalColor.transparent)
                     painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
-                    
+
                     # Draw pixmap scaled
                     scaled = pixmap.scaled(target_rect.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                     x_off = (target_rect.width() - scaled.width()) / 2
