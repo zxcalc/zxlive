@@ -1,11 +1,10 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Dict, Union, Any
+from typing import TYPE_CHECKING, Optional, Sequence, Dict, Union, Any
 
 import networkx as nx
 import numpy as np
-import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
 from networkx.classes.reportviews import NodeView
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
     from .rewrite_data import RewriteData
 
 
-class CustomRule(RewriteSimpGraph[VT,ET]):
+class CustomRule(RewriteSimpGraph[VT, ET]):
     def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()

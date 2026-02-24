@@ -67,6 +67,6 @@ class UpdateChecker(QObject):
     def _is_newer_version(self, latest: str) -> bool:
         """Compare versions to determine if an update is available."""
         try:
-            return pkg_version.parse(latest) > pkg_version.parse(self.current_version)  # type: ignore[no-any-return]
+            return pkg_version.parse(latest) > pkg_version.parse(self.current_version)
         except Exception:
             return False

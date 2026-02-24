@@ -10,13 +10,10 @@ from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm
 from pyzx.circuit.qasmparser import QASMParser
-from zxlive.eitem import EItem
-
-from PySide6.QtGui import QGuiApplication, QKeySequence, QShortcut, Qt
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import ET, VT, GraphT, get_settings_value
+from .common import VT, GraphT, get_settings_value
 from .dialogs import create_circuit_dialog, show_error_msg, write_to_file
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene
@@ -56,8 +53,6 @@ class GraphEditPanel(EditorBasePanel):
         self.create_side_bar()
         self.splitter.addWidget(self.sidebar)
 
-
-
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from super()._toolbar_sections()
 
@@ -76,19 +71,18 @@ class GraphEditPanel(EditorBasePanel):
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
 
-
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():
             show_error_msg("Graph is not well-formed", parent=self)
             return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_derivation_signal.emit(new_g)
-    
+
     def _start_pauliwebs(self) -> None:
         if not self.graph_scene.g.is_well_formed():
             show_error_msg("Graph is not well-formed", parent=self)
             return
-        
+
         graph_json = json.loads(self.graph_scene.g.to_json())
         edge_pairs = [tuple(sorted(edge[:2])) for edge in graph_json.get("edges", [])]
         unique_pairs = set(edge_pairs)
@@ -96,7 +90,7 @@ class GraphEditPanel(EditorBasePanel):
         if has_duplicate_edges:
             show_error_msg("Graph is a multigraph", parent=self)
             return
-        
+
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_pauliwebs_signal.emit(new_g)
 

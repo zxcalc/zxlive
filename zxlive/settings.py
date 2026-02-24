@@ -251,7 +251,7 @@ class DisplaySettings:
                 try:
                     # Try Qt 6.5+ ColorScheme API
                     color_scheme = app.styleHints().colorScheme()
-                    return color_scheme == Qt.ColorScheme.Dark  # type: ignore[no-any-return]
+                    return color_scheme == Qt.ColorScheme.Dark
                 except AttributeError:
                     # Fallback for older Qt versions
                     pass

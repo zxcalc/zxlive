@@ -288,7 +288,7 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
 def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:
     anim_before = None
     anim_after = None
-    if self.name == rules_basic['fuse_simp']['text']: #or self.name == operations['fuse_w']['text']:
+    if self.name == rules_basic['fuse_simp']['text']:  # or self.name == operations['fuse_w']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
             if v1 in rem_verts:
