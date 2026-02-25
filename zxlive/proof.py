@@ -114,12 +114,12 @@ class ProofModel(QAbstractListModel):
         """The number of columns"""
         return 1
 
-    def rowCount(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of rows"""
         # This is a quirk of Qt list models: Since they are based on tree models, the
         # user has to specify the index of the parent. In a list, we always expect the
         # parent to be `None` or the empty `QModelIndex()`
-        if not parent or not parent.isValid():
+        if not index or not index.isValid():
             return len(self.steps) + 1
         else:
             return 0
@@ -369,12 +369,7 @@ class ProofStepView(QListView):
         return (text_x_base <= click_x <= text_x_base + tri_size * 2 and
                 tri_cy - tri_size <= click_y <= tri_cy + tri_size)
 
-    def _get_sub_step_hover(self, step_idx: int, event_pos_y: int, rect_y: int) -> int:
-        """Determine which sub-step the mouse is hovering over in an expanded group.
 
-        Returns the 0-based sub-step index, or -1 if not hovering over a sub-step.
-        """
-        return self._sub_step_hit_test(step_idx, event_pos_y, rect_y)
 
     def _navigate_to_sub_step(self, step_idx: int, sub_idx: int) -> None:
         """Display the graph corresponding to a sub-step within a grouped rewrite."""
@@ -433,6 +428,10 @@ class ProofStepView(QListView):
         if toggle_idx >= 0:
             self.toggle_group_expansion(toggle_idx)
 
+    def _repaint_step(self, step_idx: int) -> None:
+        """Trigger repaint for a step row by its 0-based step index."""
+        self.update(self.model().index(step_idx + 1, 0))
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         """Track which sub-step the mouse is hovering over and trigger repaint."""
         delegate = self.itemDelegate()
@@ -442,37 +441,45 @@ class ProofStepView(QListView):
 
         old_step = delegate.hover_step_idx
         old_sub = delegate.hover_sub_idx
+        old_header = delegate.hover_header_step_idx
         new_step = -1
         new_sub = -1
+        new_header = -1
 
         index = self.indexAt(event.pos())
         if index.isValid() and index.row() > 0:
             step_idx = index.row() - 1
             if step_idx < len(self.model().steps):
                 step = self.model().steps[step_idx]
-                if (step.grouped_rewrites is not None
-                        and step_idx in self.expanded_groups):
-                    rect = self.visualRect(index)
-                    sub_idx = self._sub_step_hit_test(
-                        step_idx, int(event.pos().y()), rect.y()
-                    )
-                    if sub_idx >= 0:
-                        new_step = step_idx
-                        new_sub = sub_idx
+                if step.grouped_rewrites is not None:
+                    if step_idx in self.expanded_groups:
+                        rect = self.visualRect(index)
+                        sub_idx = self._sub_step_hit_test(
+                            step_idx, int(event.pos().y()), rect.y()
+                        )
+                        if sub_idx >= 0:
+                            new_step = step_idx
+                            new_sub = sub_idx
+                        else:
+                            new_header = step_idx
+                    else:
+                        new_header = step_idx
 
         if new_step != old_step or new_sub != old_sub:
             delegate.hover_step_idx = new_step
             delegate.hover_sub_idx = new_sub
-            # Repaint the old hovered item
             if old_step >= 0:
-                old_idx = self.model().index(old_step + 1, 0)
-                self.update(old_idx)
-            # Repaint the new hovered item
+                self._repaint_step(old_step)
             if new_step >= 0:
-                new_idx = self.model().index(new_step + 1, 0)
-                self.update(new_idx)
+                self._repaint_step(new_step)
 
-        # Change cursor to pointing hand when hovering over a clickable sub-step
+        if new_header != old_header:
+            delegate.hover_header_step_idx = new_header
+            if old_header >= 0:
+                self._repaint_step(old_header)
+            if new_header >= 0:
+                self._repaint_step(new_header)
+
         if new_sub >= 0:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
         else:
@@ -485,11 +492,14 @@ class ProofStepView(QListView):
         delegate = self.itemDelegate()
         if isinstance(delegate, ProofStepItemDelegate):
             old_step = delegate.hover_step_idx
+            old_header = delegate.hover_header_step_idx
             delegate.hover_step_idx = -1
             delegate.hover_sub_idx = -1
+            delegate.hover_header_step_idx = -1
             if old_step >= 0:
-                old_idx = self.model().index(old_step + 1, 0)
-                self.update(old_idx)
+                self._repaint_step(old_step)
+            if old_header >= 0:
+                self._repaint_step(old_header)
         self.unsetCursor()
         super().leaveEvent(event)
 
@@ -604,10 +614,6 @@ class ProofStepView(QListView):
         editor.deleteLater()
         self._active_sub_editor = None
 
-    def _rename_sub_step_dialog(self, step_idx: int, sub_idx: int) -> None:
-        # Kept for compatibility if needed, but implementation redirects or is replaced.
-        # Ideally removed, but for this refactor we can just remove the old method body
-        pass
 
     def rename_proof_sub_step(self, new_name: str, step_index: int, sub_index: int) -> None:
         from .commands import UndoableChange
@@ -698,6 +704,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     # Track hover position for sub-steps
     hover_step_idx: int = -1
     hover_sub_idx: int = -1
+    # Track hover over group header
+    hover_header_step_idx: int = -1
 
     def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> tuple[bool, bool, Optional[list['Rewrite']]]:
         """Return (is_grouped, is_expanded, grouped_rewrites) for a given row."""
@@ -715,6 +723,25 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         view = self.parent()
         is_expanded = isinstance(view, ProofStepView) and step_idx in view.expanded_groups
         return True, is_expanded, step.grouped_rewrites
+
+    @staticmethod
+    def _bg_color(selected: bool, sub_selected: bool, hovered: bool) -> QColor:
+        """Return the background color for the given state."""
+        if display_setting.dark_mode:
+            if selected:
+                return QColor(60, 80, 120)
+            if sub_selected:
+                return QColor(45, 50, 60)
+            if hovered:
+                return QColor(50, 60, 80)
+            return QColor(35, 39, 46)
+        if selected:
+            return QColor(204, 232, 255)
+        if sub_selected:
+            return QColor(240, 245, 250)
+        if hovered:
+            return QColor(229, 243, 255)
+        return QColor(255, 255, 255)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
@@ -737,30 +764,29 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 has_selected_sub_step = True
 
         # ── Background ──────────────────────────────────────────────────
+        is_selected = bool(option.state & QStyle.StateFlag.State_Selected)  # type: ignore[attr-defined]
+        is_mouse_over = bool(option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore[attr-defined]
+        is_header_hovered = (is_grouped
+                             and index.row() > 0
+                             and self.hover_header_step_idx == index.row() - 1)
+
+        bg = self._bg_color(is_selected, has_selected_sub_step, is_mouse_over)
+        neutral_bg = self._bg_color(False, False, False)
+
         painter.setPen(Qt.GlobalColor.transparent)
-        if display_setting.dark_mode:
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(60, 80, 120))
-            elif has_selected_sub_step:
-                # Lighter background when a sub-step is selected
-                painter.setBrush(QColor(45, 50, 60))
-            elif option.state & QStyle.StateFlag.State_MouseOver and not is_expanded:  # type: ignore[attr-defined]
-                # Only hover highlight if not expanded (sub-steps handle their own hover)
-                painter.setBrush(QColor(50, 60, 80))
-            else:
-                painter.setBrush(QColor(35, 39, 46))
+        if is_expanded:
+            # Fill entire area with neutral, then highlight just the header row
+            painter.setBrush(neutral_bg)
+            painter.drawRect(option.rect)  # type: ignore[attr-defined]
+            if is_selected or has_selected_sub_step or is_header_hovered:
+                header_bg = self._bg_color(is_selected, has_selected_sub_step, is_header_hovered)
+                painter.setBrush(header_bg)
+                painter.drawRect(QRect(
+                    option.rect.x(), option.rect.y(),  # type: ignore[attr-defined]
+                    option.rect.width(), row_height))  # type: ignore[attr-defined]
         else:
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(204, 232, 255))
-            elif has_selected_sub_step:
-                # Lighter background when a sub-step is selected
-                painter.setBrush(QColor(240, 245, 250))
-            elif option.state & QStyle.StateFlag.State_MouseOver and not is_expanded:  # type: ignore[attr-defined]
-                # Only hover highlight if not expanded (sub-steps handle their own hover)
-                painter.setBrush(QColor(229, 243, 255))
-            else:
-                painter.setBrush(Qt.GlobalColor.white)
-        painter.drawRect(option.rect)  # type: ignore[attr-defined]
+            painter.setBrush(bg)
+            painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
         # ── Main timeline line ──────────────────────────────────────────
         is_last = index.row() == index.model().rowCount() - 1
@@ -772,22 +798,26 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setPen(pen)
         painter.setBrush(Qt.GlobalColor.transparent)
 
-        # Draw top half of line (to center of circle)
-        # We always draw this (it connects from the previous step)
         circle_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
         main_cx = self.line_padding + self.line_width / 2
 
         # Draw line from top to center
-        # Start exactly at top edge. RoundCap will extend slightly above/below.
-        # This overlap ensures no gap with the previous item's bottom line.
         painter.drawLine(QPointF(main_cx, option.rect.y()), QPointF(main_cx, circle_cy))  # type: ignore[attr-defined]
+
+        # For expanded groups, draw the sub-tree BEFORE the circle so the
+        # path doesn't draw over the circle.
+        if is_expanded and grouped_rewrites:
+            self._paint_sub_tree(painter, option, index.row() - 1,
+                                 grouped_rewrites,
+                                 row_height, text_height, font, fg, line_clr)
 
         # Draw bottom half of line (from center of circle to bottom)
         # Only if NOT expanded (if expanded, the line diverts to the sub-steps)
         if not is_expanded:
             bottom_y = option.rect.y() + option.rect.height()  # type: ignore[attr-defined]
             if not is_last:
-                # Draw from center to bottom
+                painter.setPen(pen)
+                painter.setBrush(Qt.GlobalColor.transparent)
                 painter.drawLine(QPointF(main_cx, circle_cy), QPointF(main_cx, bottom_y))
 
         # ── Main circle ─────────────────────────────────────────────────
@@ -841,11 +871,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setPen(fg)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, header_text)
 
-            # Draw expanded sub-tree
-            if is_expanded and grouped_rewrites:
-                self._paint_sub_tree(painter, option, index.row() - 1,
-                                     grouped_rewrites,
-                                     row_height, text_height, font, fg, line_clr)
+            # Sub-tree was already drawn above (before the circle) for expanded groups
         else:
             # Regular (non-grouped) step text
             text = index.data(Qt.ItemDataRole.DisplayRole)
@@ -909,26 +935,14 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             # Check if this sub-step is being hovered (for individual hover effect)
             is_sub_hovered = (self.hover_step_idx == step_idx and self.hover_sub_idx == i)
 
-            # Draw highlight background for selected or hovered sub-step
+            # Highlight starts AFTER the branch line (matching ungrouped style)
             if is_sub_selected or is_sub_hovered:
                 painter.setPen(Qt.GlobalColor.transparent)
-                if is_sub_selected:
-                    if display_setting.dark_mode:
-                        painter.setBrush(QColor(50, 90, 140, 120))
-                    else:
-                        painter.setBrush(QColor(180, 215, 255, 160))
-                elif is_sub_hovered:
-                    if display_setting.dark_mode:
-                        painter.setBrush(QColor(50, 60, 80))
-                    else:
-                        painter.setBrush(QColor(229, 243, 255))
-                highlight_rect = QRect(
-                    int(sub_tree_x - 10),
-                    int(sub_cy - row_height / 2),
-                    int(option.rect.width() - sub_tree_x + 10),  # type: ignore[attr-defined]
-                    row_height
-                )
-                painter.drawRect(highlight_rect)
+                painter.setBrush(self._bg_color(is_sub_selected, False, is_sub_hovered))
+                hl_left = int(sub_tree_x + self.sub_circle_radius + 2)
+                painter.drawRect(QRect(
+                    hl_left, int(sub_cy - row_height / 2),
+                    int(option.rect.width() - hl_left), row_height))  # type: ignore[attr-defined]
 
             # Sub-step circle
             painter.setPen(QPen(line_clr, self.line_width))
