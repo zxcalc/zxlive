@@ -391,8 +391,6 @@ class ProofStepView(QListView):
         return (text_x_base <= click_x <= text_x_base + tri_size * 2 and
                 tri_cy - tri_size <= click_y <= tri_cy + tri_size)
 
-
-
     def _navigate_to_sub_step(self, step_idx: int, sub_idx: int) -> None:
         """Display the graph corresponding to a sub-step within a grouped rewrite."""
         step = self.model().steps[step_idx]
@@ -635,7 +633,6 @@ class ProofStepView(QListView):
         self.rename_proof_sub_step(new_name, step_idx, sub_idx)
         editor.deleteLater()
         self._active_sub_editor = None
-
 
     def rename_proof_sub_step(self, new_name: str, step_index: int, sub_index: int) -> None:
         from .commands import UndoableChange
