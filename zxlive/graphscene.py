@@ -157,7 +157,9 @@ class GraphScene(QGraphicsScene):
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(new_g, GraphT)  # type: ignore
         self.g = new_g
-        # GraphDiff does not track var_registry updates, so sync them manually.
+        # Temporary ZXLive-side workaround: GraphDiff/apply_diff does not
+        # currently propagate var_registry type-only updates.
+        # See TODO in common.copy_variable_types for PyZX upstream follow-up.
         copy_variable_types(self.g, new, overwrite=True)
         # g now contains the new graph,
         # but we still need to update the scene
