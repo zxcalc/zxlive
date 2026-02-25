@@ -69,16 +69,35 @@ class ProofModeCommand(QUndoCommand):
         self.command = command
         self.step_view = step_view
         self.proof_step_index = int(step_view.currentIndex().row())
+        self.sub_step = step_view.selected_sub_step
 
     def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
+        if self.sub_step:
+            self.step_view.selectionModel().blockSignals(True)
+            self.step_view.setCurrentIndex(self.step_view.model().index(self.proof_step_index, 0, QModelIndex()))
+            self.step_view.selectionModel().blockSignals(False)
+            self.step_view._navigate_to_sub_step(self.sub_step[0], self.sub_step[1])
+        else:
+            self.step_view.move_to_step(self.proof_step_index)
         self.command.undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
+        if self.sub_step:
+            self.step_view.model().set_sub_graph(self.sub_step[0], self.sub_step[1], self.command.g)
+        else:
+            self.step_view.model().set_graph(self.proof_step_index, self.command.g)
 
     def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
+        if self.sub_step:
+            self.step_view.selectionModel().blockSignals(True)
+            self.step_view.setCurrentIndex(self.step_view.model().index(self.proof_step_index, 0, QModelIndex()))
+            self.step_view.selectionModel().blockSignals(False)
+            self.step_view._navigate_to_sub_step(self.sub_step[0], self.sub_step[1])
+        else:
+            self.step_view.move_to_step(self.proof_step_index)
         self.command.redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
+        if self.sub_step:
+            self.step_view.model().set_sub_graph(self.sub_step[0], self.sub_step[1], self.command.g)
+        else:
+            self.step_view.model().set_graph(self.proof_step_index, self.command.g)
 
 
 @dataclass

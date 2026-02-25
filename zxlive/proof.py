@@ -77,8 +77,30 @@ class ProofModel(QAbstractListModel):
             self.initial_graph = graph
         else:
             old_step = self.steps[index - 1]
-            new_step = Rewrite(old_step.display_name, old_step.rule, graph)
+            new_step = Rewrite(old_step.display_name, old_step.rule, graph, old_step.grouped_rewrites)
             self.steps[index - 1] = new_step
+
+            # Rerender to ensure the model reflects the change immediately
+            modelIndex = self.createIndex(index, 0)
+            self.dataChanged.emit(modelIndex, modelIndex, [])
+
+    def set_sub_graph(self, step_idx: int, sub_idx: int, graph: GraphT) -> None:
+        old_step = self.steps[step_idx]
+        grouped = old_step.grouped_rewrites
+        if grouped is None or sub_idx >= len(grouped):
+            return
+
+        old_sub_step = grouped[sub_idx]
+        new_sub_step = Rewrite(old_sub_step.display_name, old_sub_step.rule, graph, old_sub_step.grouped_rewrites)
+
+        new_grouped = list(grouped)
+        new_grouped[sub_idx] = new_sub_step
+
+        self.steps[step_idx] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped)
+
+        # Rerender
+        modelIndex = self.createIndex(step_idx + 1, 0)
+        self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
@@ -179,7 +201,7 @@ class ProofModel(QAbstractListModel):
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
-        modelIndex = self.createIndex(index, 0)
+        modelIndex = self.createIndex(index + 1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def rename_sub_step(self, step_index: int, sub_index: int, name: str) -> None:
@@ -199,7 +221,7 @@ class ProofModel(QAbstractListModel):
         self.steps[step_index] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped)
 
         # Rerender
-        modelIndex = self.createIndex(step_index, 0)
+        modelIndex = self.createIndex(step_index + 1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def group_steps(self, start_index: int, end_index: int) -> None:
@@ -213,7 +235,7 @@ class ProofModel(QAbstractListModel):
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
         self.add_rewrite(new_rewrite, start_index)
-        modelIndex = self.createIndex(start_index, 0)
+        modelIndex = self.createIndex(start_index + 1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def ungroup_steps(self, index: int) -> None:
@@ -224,7 +246,7 @@ class ProofModel(QAbstractListModel):
         self.pop_rewrite(index)
         for i, step in enumerate(individual_steps):
             self.add_rewrite(step, index + i)
-        self.dataChanged.emit(self.createIndex(index, 0),
+        self.dataChanged.emit(self.createIndex(index + 1, 0),
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
