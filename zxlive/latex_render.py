@@ -22,9 +22,6 @@ from __future__ import annotations
 
 import re
 from io import BytesIO
-import matplotlib as mpl
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_svg import FigureCanvasSVG
 
 
 def is_latex(text: str) -> bool:
@@ -53,6 +50,10 @@ def _preprocess_dirac(text: str) -> str:
     result = text
     result = re.sub(r'\\ket\s*\{([^}]*)\}', r'|{\1}\\rangle', result)
     result = re.sub(r'\\bra\s*\{([^}]*)\}', r'\\langle{\1}|', result)
+    # Two-argument form: \braket{a}{b} -> \langle a | b \rangle
+    result = re.sub(r'\\braket\s*\{([^}]*)\}\s*\{([^}]*)\}',
+                    r'\\langle{\1}|{\2}\\rangle', result)
+    # Single-argument form: \braket{a} -> \langle a \rangle
     result = re.sub(r'\\braket\s*\{([^}]*)\}', r'\\langle{\1}\\rangle', result)
     return result
 
@@ -117,6 +118,10 @@ def latex_to_svg(text: str, color: str = "#222222", size: float = 24) -> bytes:
         result = f"${result}$"
 
     try:
+        import matplotlib as mpl
+        from matplotlib.figure import Figure
+        from matplotlib.backends.backend_svg import FigureCanvasSVG
+
         # Configure matplotlib to output text as paths (no font dependency)
         # and use Computer Modern font for LaTeX look.
         with mpl.rc_context({
