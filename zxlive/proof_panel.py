@@ -138,7 +138,8 @@ class ProofPanel(BasePanel):
 
     def _on_keyboard_vertices_moved(self) -> None:
         """Refresh the thumbnail for the current proof step after keyboard-based vertex moves."""
-        self.step_view.refresh_current_thumbnail()
+        idx = self.step_view.currentIndex().row()
+        self.proof_model.set_graph(idx, copy.deepcopy(self.graph_scene.g))
 
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)

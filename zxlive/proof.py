@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Union, overload
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Union
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -8,8 +8,8 @@ from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QItemSelectionModel, QModelIndex,
                             QPersistentModelIndex, QPoint, QPointF, QRect,
                             QRectF, QSize, Qt)
-from PySide6.QtGui import (QBitmap, QColor, QFont, QFontMetrics, QPainter,
-                           QPen, QPixmap, QPolygon, QRegion)
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter,
+                           QPen, QPixmap)
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
                                QLineEdit, QListView, QMenu, QStyle,
                                QStyledItemDelegate, QStyleOptionViewItem,
@@ -370,20 +370,11 @@ class ProofStepView(QWidget):
     def selectedIndexes(self) -> list[QModelIndex]:
         return self._list.selectedIndexes()
 
-    @overload
-    def update(self) -> None: ...
-
-    @overload
-    def update(self, region: Union[QRegion, QBitmap, QPolygon, QRect], /) -> None: ...
-
-    @overload
-    def update(self, x: int, y: int, w: int, h: int, /) -> None: ...
-
     def update(self, *args: Any) -> None:
         super().update(*args)
         self._list.viewport().update()
 
-    def edit(self, index: QModelIndex) -> None:  # type: ignore[override]
+    def edit(self, index: QModelIndex) -> None:
         self._list.edit(index)
 
     def _toggle_thumbnails(self, checked: bool) -> None:
@@ -452,6 +443,10 @@ class _ProofStepListView(QListView):
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
+        # Never allow horizontal scrolling: items must always fit within the
+        # viewport width. Without this, Qt may assign items a width wider than
+        # the viewport, which causes thumbnail overflow and broken sizeHints.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -575,6 +570,7 @@ class _ProofStepListView(QListView):
         super().resizeEvent(event)  # type: ignore[arg-type]
         if self.thumbnails_visible:
             self.scheduleDelayedItemsLayout()
+            self.viewport().update()
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
@@ -668,18 +664,26 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
             pixmap = index.data(THUMBNAIL_ROLE)
             if pixmap is not None and not pixmap.isNull():
-                thumb_left = int(option.rect.x()) + self.line_width + 2 * self.line_padding  # type: ignore[attr-defined]
+                # Clamp available_width to the actual usable space inside the
+                # viewport, accounting for where this item starts horizontally.
+                # This prevents overflow when the panel is very narrow.
+                viewport_right = parent_view.viewport().width()
+                item_x = int(option.rect.x())  # type: ignore[attr-defined]
+                content_left = item_x + self.line_width + 2 * self.line_padding
+                max_right = viewport_right - self.thumbnail_padding
+                available_width = max(0, max_right - content_left)
                 thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
-                available_width = int(option.rect.width()) - self.line_width - 2 * self.line_padding - self.thumbnail_padding  # type: ignore[attr-defined]
                 if available_width > 0 and pixmap.width() > 0:
                     thumb_height = min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
-                    target_rect = QRect(thumb_left, thumb_top, available_width, thumb_height)
+                    target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
+                    # Clip all drawing to the item rect to guarantee no overflow.
+                    painter.setClipRect(option.rect)  # type: ignore[attr-defined]
                     border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
                     painter.setPen(QPen(border_color, 1))
                     painter.setBrush(Qt.GlobalColor.transparent)
                     painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
 
-                    # Draw pixmap scaled
+                    # Draw pixmap scaled to fit, keeping aspect ratio.
                     scaled = pixmap.scaled(target_rect.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                     x_off = (target_rect.width() - scaled.width()) / 2
                     y_off = (target_rect.height() - scaled.height()) / 2
@@ -687,21 +691,39 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         painter.restore()
 
+    def _compute_thumb_height(self, parent: '_ProofStepListView', pixmap: QPixmap) -> int:
+        """Compute the thumbnail display height for the current viewport width.
+
+        Uses the same formula as paint() so that sizeHint() and the actual
+        rendered content always agree, preventing misalignment on resize.
+        """
+        # Mirror the clamping logic from paint(): usable width runs from
+        # content_left to (viewport_right - thumbnail_padding).  Here we assume
+        # item_x == 0 (typical for QListView with no indent), which is safe
+        # because paint() will also clamp to the same boundary.
+        viewport_right = parent.viewport().width()
+        content_left = self.line_width + 2 * self.line_padding
+        available_width = max(0, viewport_right - self.thumbnail_padding - content_left)
+        if available_width > 0 and not pixmap.isNull() and pixmap.width() > 0:
+            return min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
+        return MAX_THUMBNAIL_HEIGHT
+
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
         text_row_height = size.height() + 2 * self.vert_padding
         parent = self.parent()
         if not isinstance(parent, _ProofStepListView) or not parent.thumbnails_visible:
             return QSize(size.width(), text_row_height)
-        available_width = parent.viewport().width() - self.line_width - 2 * self.line_padding - self.thumbnail_padding
-        if available_width <= 0:
-            return QSize(size.width(), text_row_height)
+        # Compute the thumbnail height that paint() will actually use for the
+        # current viewport width so that the allocated row height always matches
+        # what is painted, preventing gaps or clipping when the panel is narrow.
         pixmap = index.data(THUMBNAIL_ROLE)
-        if pixmap is not None and not pixmap.isNull() and pixmap.width() > 0:
-            thumb_height = min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
-            total = text_row_height + 2 * self.thumbnail_padding + thumb_height
-            return QSize(size.width(), total)
-        return QSize(size.width(), text_row_height)
+        if pixmap is not None and not pixmap.isNull():
+            thumb_height = self._compute_thumb_height(parent, pixmap)
+        else:
+            thumb_height = MAX_THUMBNAIL_HEIGHT
+        total = text_row_height + 2 * self.thumbnail_padding + thumb_height
+        return QSize(size.width(), total)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
