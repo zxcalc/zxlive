@@ -941,24 +941,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         last_sub_cy = option.rect.y() + row_height + (n - 1) * row_height + row_height / 2  # type: ignore[attr-defined]
         bottom_y = option.rect.y() + option.rect.height()  # type: ignore[attr-defined]
 
-        pen = QPen(line_clr, self.line_width)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.GlobalColor.transparent)
-
-        # Path connecting header -> sub-steps -> next step
-        path = QPainterPath()
-        # Start at the headers circle
-        path.moveTo(main_cx, header_cy)
-        # Line to first sub-step
-        path.lineTo(sub_tree_x, first_sub_cy)
-        # Line down to last sub-step
-        path.lineTo(sub_tree_x, last_sub_cy)
-        # Line back to main axis at the bottom
-        path.lineTo(main_cx - 0.3, bottom_y)
-
-        painter.drawPath(path)
-
+        # 1. Draw sub-step highlights first so they sit in the background
         for i, sub_step in enumerate(grouped_rewrites):
             sub_cy = first_sub_cy + i * row_height
             is_sub_selected = False
@@ -979,6 +962,34 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.drawRect(QRect(
                     option.rect.x(), int(sub_cy - row_height / 2),  # type: ignore[attr-defined]
                     option.rect.width(), row_height))  # type: ignore[attr-defined]
+
+        # 2. Draw the path connecting header -> sub-steps -> next step
+        pen = QPen(line_clr, self.line_width)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.GlobalColor.transparent)
+
+        path = QPainterPath()
+        # Start at the headers circle
+        path.moveTo(main_cx, header_cy)
+        # Line to first sub-step
+        path.lineTo(sub_tree_x, first_sub_cy)
+        # Line down to last sub-step
+        path.lineTo(sub_tree_x, last_sub_cy)
+        # Line back to main axis at the bottom
+        path.lineTo(main_cx - 0.3, bottom_y)
+
+        painter.drawPath(path)
+
+        # 3. Draw sub-step circles and text
+        for i, sub_step in enumerate(grouped_rewrites):
+            sub_cy = first_sub_cy + i * row_height
+            is_sub_selected = False
+            view = self.parent()
+            if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
+                sel_step_idx, sel_sub_idx = view.selected_sub_step
+                if step_idx == sel_step_idx and i == sel_sub_idx:
+                    is_sub_selected = True
 
             # Sub-step circle
             painter.setPen(QPen(line_clr, self.line_width))
