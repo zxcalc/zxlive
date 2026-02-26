@@ -5,10 +5,10 @@ if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
-                            QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
-"""Add QMouseEvent, ..., etc. for expandable groups"""
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen 
+                            QEvent, QItemSelection, QModelIndex,
+                            QPersistentModelIndex, QPoint, QPointF, QRect,
+                            QSize, Qt)
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QInputDialog, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
@@ -308,11 +308,18 @@ class ProofStepView(QListView):
         self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
         self._expanded_group_rows: set[int] = set()
+        self._hovered_group_child: Optional[tuple[int, int]] = None
+        self._group_branch_offsets: dict[int, int] = {}
+        self._dragged_group_row: Optional[int] = None
+        self._drag_start_x: int = 0
+        self._drag_start_offset: int = ProofStepItemDelegate.default_child_horizontal_offset
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -326,6 +333,8 @@ class ProofStepView(QListView):
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
         self._expanded_group_rows = set()
+        self._group_branch_offsets = {}
+        self._dragged_group_row = None
 
     def is_group_expanded(self, row: int) -> bool:
         return row in self._expanded_group_rows
@@ -361,7 +370,36 @@ class ProofStepView(QListView):
                     self.toggle_group_expanded(row)
                     return
 
+                if self._is_branch_drag_hit(row, event.position().toPoint()):
+                    self._dragged_group_row = row
+                    self._drag_start_x = event.position().toPoint().x()
+                    self._drag_start_offset = self.get_group_branch_offset(row)
+                    return
+
         super().mousePressEvent(event)
+
+    def get_group_branch_offset(self, row: int) -> int:
+        return self._group_branch_offsets.get(row, ProofStepItemDelegate.default_child_horizontal_offset)
+
+    def _set_group_branch_offset(self, row: int, offset: int) -> None:
+        self._group_branch_offsets[row] = max(70, min(240, offset))
+
+    def _is_branch_drag_hit(self, row: int, position: QPoint) -> bool:
+        if row <= 0 or not self.is_group_expanded(row):
+            return False
+        grouped_rewrites = self.model().steps[row - 1].grouped_rewrites
+        if not grouped_rewrites:
+            return False
+
+        row_rect = self.visualRect(self.model().index(row, 0))
+        content_top = row_rect.y() + ProofStepItemDelegate.header_height
+        content_bottom = int(content_top + ProofStepItemDelegate.child_step_height * len(grouped_rewrites))
+        if position.y() < content_top or position.y() > content_bottom:
+            return False
+
+        branch_start_x = int(ProofStepItemDelegate.line_padding + ProofStepItemDelegate.line_width / 2)
+        child_x = branch_start_x + self.get_group_branch_offset(row)
+        return abs(position.x() - child_x) <= 16
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -450,6 +488,38 @@ class ProofStepView(QListView):
                 return
         super().mouseDoubleClickEvent(event)
 
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self._dragged_group_row is not None and event.buttons() & Qt.MouseButton.LeftButton:
+            delta_x = event.position().toPoint().x() - self._drag_start_x
+            self._set_group_branch_offset(self._dragged_group_row, self._drag_start_offset + delta_x)
+            self.viewport().update()
+            return
+
+        index = self.indexAt(event.position().toPoint())
+        hovered: Optional[tuple[int, int]] = None
+        if index.isValid():
+            row = index.row()
+            child_index = self._expanded_child_step_index_at(row, event.position().toPoint())
+            if child_index is not None:
+                hovered = (row, child_index)
+        if hovered != self._hovered_group_child:
+            self._hovered_group_child = hovered
+            self.viewport().update()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self._dragged_group_row = None
+        super().mouseReleaseEvent(event)
+
+    def leaveEvent(self, event: QEvent) -> None:
+        if self._hovered_group_child is not None:
+            self._hovered_group_child = None
+            self.viewport().update()
+        super().leaveEvent(event)
+
+    def is_group_child_hovered(self, row: int, child_index: int) -> bool:
+        return self._hovered_group_child == (row, child_index)
+
     def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
         if not selected or not deselected:
             return
@@ -505,6 +575,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_outline_width = 3
     child_step_height = 42
     header_height = 46
+    default_child_horizontal_offset = 120
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
@@ -598,7 +669,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         if grouped_rewrites is not None and step_view.is_group_expanded(index.row()):
             branch_start_x = self.line_padding + self.line_width / 2
-            child_x = branch_start_x + 110
+            child_x = branch_start_x + step_view.get_group_branch_offset(index.row())
             content_top = option.rect.y() + self.header_height
 
             if display_setting.dark_mode:
@@ -606,16 +677,45 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             else:
                 painter.setPen(QPen(Qt.GlobalColor.black, self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
 
+            last_child_center = content_top + self.child_step_height * (len(grouped_rewrites) - 0.5)
             painter.drawLine(QPointF(branch_start_x, option.rect.y() + option.rect.height() / 2),
-                             QPointF(branch_start_x, option.rect.bottom()))
+                             QPointF(branch_start_x, last_child_center))
 
             for child_index, child_step in enumerate(grouped_rewrites):
                 y = content_top + self.child_step_height * (child_index + 0.5)
-                path = QPainterPath(QPointF(branch_start_x, y - 8))
-                path.cubicTo(QPointF(branch_start_x + 18, y), QPointF(child_x - 24, y), QPointF(child_x, y))
+                is_hovered_child = step_view.is_group_child_hovered(index.row(), child_index)
+                if is_hovered_child:
+                    hover_color = QColor(130, 30, 30) if display_setting.dark_mode else QColor(255, 230, 230)
+                    painter.setPen(Qt.GlobalColor.transparent)
+                    painter.setBrush(hover_color)
+                    painter.drawRoundedRect(
+                        QRect(
+                            int(branch_start_x + 8),
+                            int(y - self.child_step_height / 2 + 3),
+                            int(option.rect.width() - (branch_start_x + 20)),
+                            int(self.child_step_height - 6),
+                        ),
+                        8,
+                        8,
+                    )
+
+                # Mechanical circuit style: gold wires by default, red on hover
+                branch_color = QColor(255, 72, 72) if is_hovered_child else (QColor(208, 168, 54) if display_setting.dark_mode else QColor(184, 132, 18))
+                painter.setPen(QPen(branch_color, self.line_width + 1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+                path = QPainterPath(QPointF(branch_start_x, y - 12))
+                path.cubicTo(QPointF(branch_start_x + 12, y), QPointF(child_x - 26, y), QPointF(child_x, y))
                 painter.drawPath(path)
-                painter.setBrush(display_setting.effective_colors["z_spider"])
-                painter.drawEllipse(QPointF(child_x, y), self.circle_radius, self.circle_radius)
+
+                node_fill = QColor(255, 110, 110) if is_hovered_child else (QColor(240, 196, 72) if display_setting.dark_mode else QColor(222, 170, 42))
+                painter.setBrush(node_fill)
+                painter.drawEllipse(QPointF(child_x, y), self.circle_radius + 0.5, self.circle_radius + 0.5)
+
+                if is_hovered_child:
+                    painter.setPen(QColor(220, 24, 24))
+                else:
+                    painter.setPen(QColor(246, 214, 116) if display_setting.dark_mode else QColor(76, 52, 0))
+
                 painter.drawText(QRect(int(child_x + 20), int(y - text_height / 2), option.rect.width(), text_height),
                                  Qt.AlignmentFlag.AlignLeft,
                                  child_step.display_name)
