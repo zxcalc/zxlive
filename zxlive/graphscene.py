@@ -313,13 +313,18 @@ class GraphScene(QGraphicsScene):
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "removed"
                         eitem.refresh()
-                # Mark surviving endpoints of every removed edge as "changed".
-                # This generalises to any rewrite rule: if an edge disappears,
-                # its endpoints (if still present) are structurally affected.
+            
+            # Mark surviving endpoints of fusion/identity rules as "changed".
+            # We use a heuristic: if a node connected to a removed node has the
+            # same vertex type, it was likely part of a spider fusion or removal,
+            # so we highlight it as structurally affected. This avoids highlighting
+            # unrelated external neighbors of different types.
+            for e in diff.removed_edges:
                 s, t, *_ = e
-                for endpoint in (s, t):
-                    if endpoint not in diff.removed_verts:
-                        _mark_endpoint_changed(endpoint)
+                if s in diff.removed_verts and t not in diff.removed_verts and self.g.type(s) == self.g.type(t):
+                    _mark_endpoint_changed(t)
+                if t in diff.removed_verts and s not in diff.removed_verts and self.g.type(s) == self.g.type(t):
+                    _mark_endpoint_changed(s)
 
             for e in changed_edges:
                 if e in self.edge_map:
@@ -348,11 +353,15 @@ class GraphScene(QGraphicsScene):
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "added"
                         eitem.refresh()
-                # Mark endpoints of every new edge as "changed" — they gained
-                # a connection regardless of which rewrite rule was applied.
-                for endpoint in (s, t):
-                    if endpoint not in diff.new_verts:
-                        _mark_endpoint_changed(endpoint)
+
+            # Mark endpoints of new edges as "changed" if they are the SAME TYPE
+            # to capture the unfusion survivor explicitly.
+            for (s, t), _ in diff.new_edges:
+                if s in diff.new_verts and t not in diff.new_verts and self.g.type(s) == self.g.type(t):
+                    _mark_endpoint_changed(t)
+                if t in diff.new_verts and s not in diff.new_verts and self.g.type(s) == self.g.type(t):
+                    _mark_endpoint_changed(s)
+
 
             for e in changed_edges:
                 if e in self.edge_map:
