@@ -143,8 +143,10 @@ def _render_math(expr: str) -> str:
     rendered = _replace_sqrt(rendered)
     rendered = _replace_quantum_notation(rendered)
     rendered = _replace_vec(rendered)
+    rendered = _replace_accents(rendered)
     rendered = _replace_commands(rendered)
     rendered = _replace_super_subscripts(rendered)
+    rendered = _cleanup_escaped_commands(rendered)
     return f"<span>{rendered}</span>"
 
 
@@ -195,6 +197,23 @@ def _replace_vec(expr: str) -> str:
 def _apply_vec_accent(text: str) -> str:
     return "".join(ch if ch.isspace() else f"{ch}⃗" for ch in text)
 
+
+def _replace_accents(expr: str) -> str:
+    accent_patterns = {
+        r"\\hat\{([^{}]+)\}": "̂",
+        r"\\bar\{([^{}]+)\}": "̄",
+        r"\\tilde\{([^{}]+)\}": "̃",
+        r"\\dot\{([^{}]+)\}": "̇",
+    }
+
+    def add_combining_mark(mark: str, text: str) -> str:
+        return "".join(ch if ch.isspace() else f"{ch}{mark}" for ch in text)
+
+    for pattern, mark in accent_patterns.items():
+        regex = re.compile(pattern)
+        expr = regex.sub(lambda m: add_combining_mark(mark, m.group(1)), expr)
+    return expr
+
 def _replace_commands(expr: str) -> str:
     for latex in sorted(_LATEX_SYMBOLS, key=len, reverse=True):
         symbol = _LATEX_SYMBOLS[latex]
@@ -205,11 +224,17 @@ def _replace_commands(expr: str) -> str:
 def _replace_super_subscripts(expr: str) -> str:
     sup_braced = re.compile(r"\^\{([^{}]+)\}")
     sub_braced = re.compile(r"_\{([^{}]+)\}")
-    sup_simple = re.compile(r"\^([A-Za-z0-9+\-*/=])")
-    sub_simple = re.compile(r"_([A-Za-z0-9+\-*/=])")
+    # Handle unbraced forms like ^\infty, _\xi, and ^n
+    sup_unbraced = re.compile(r"\^(\\[A-Za-z]+|[^\s<>{}_^])")
+    sub_unbraced = re.compile(r"_(\\[A-Za-z]+|[^\s<>{}_^])")
 
     expr = sup_braced.sub(r"<sup>\1</sup>", expr)
     expr = sub_braced.sub(r"<sub>\1</sub>", expr)
-    expr = sup_simple.sub(r"<sup>\1</sup>", expr)
-    expr = sub_simple.sub(r"<sub>\1</sub>", expr)
+    expr = sup_unbraced.sub(r"<sup>\1</sup>", expr)
+    expr = sub_unbraced.sub(r"<sub>\1</sub>", expr)
     return expr
+
+
+def _cleanup_escaped_commands(expr: str) -> str:
+    # Remove remaining backslashes from unresolved command names for readability.
+    return re.sub(r"\\([A-Za-z]+)", r"\1", expr)

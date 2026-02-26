@@ -35,7 +35,8 @@ dependencies = [
     "shapely",
     "pyperclip",
     "imageio",
-    "packaging"
+    "packaging",
+    "matplotlib"
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,7 @@ doc = [
     "sphinxcontrib-svg2pdfconverter>=1.2.2",
     "myst-parser>=3.0.0"
 ]
+
 
 [project.urls]
 Homepage = "https://github.com/zxcalc/zxlive"

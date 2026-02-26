@@ -4,8 +4,8 @@ import importlib.util
 from pathlib import Path
 
 
-_module_path = Path(__file__).resolve().parents[1] / "zxlive" / "latex_to_html.py"
-_spec = importlib.util.spec_from_file_location("latex_to_html", _module_path)
+_module_path = Path(__file__).resolve().parents[1] / "zxlive" / "latex_rendering.py"
+_spec = importlib.util.spec_from_file_location("latex_rendering", _module_path)
 assert _spec and _spec.loader
 _latex = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_latex)
@@ -59,3 +59,19 @@ def test_quantum_ket_bra_commands_render() -> None:
     assert "⟨ϕ|" in out
     assert "⟨0|1⟩" in out
     assert "|0⟩⟨1|" in out
+
+
+def test_fourier_integral_expression_renders_readably() -> None:
+    out = dummy_text_to_html(r"$f(x) = \int_{-\infty}^\infty \hat{f}(\xi),e^{2 \pi i \xi x} ,d\xi$")
+    assert "f̂" in out
+    assert "ξ" in out
+    assert "<sub>-∞</sub>" in out
+    assert "<sup>∞</sup>" in out
+    assert "<sup>2 π i ξ x</sup>" in out
+
+
+def test_unresolved_commands_are_cleaned_up() -> None:
+    out = dummy_text_to_html(r"$\foo + x_\bar + y^\baz$")
+    assert "\foo" not in out
+    assert "<sub>bar</sub>" in out
+    assert "<sup>baz</sup>" in out

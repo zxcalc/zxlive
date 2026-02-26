@@ -21,7 +21,7 @@ from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
 from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
-from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
+from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsPixmapItem, QGraphicsItem, \
     QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 
 
@@ -29,7 +29,8 @@ from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z
 
 from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
 from .settings import display_setting
-from .latex_to_html import dummy_text_to_html
+from .latex_label import render_latex_text_to_pixmap
+from .resizable_pixmap_item import ResizablePixmapItem
 
 if TYPE_CHECKING:
     from .eitem import EItem
@@ -61,7 +62,9 @@ class VItem(QGraphicsPathItem):
     phase_item: PhaseItem
     adj_items: Set[EItem]  # Connected edges
     graph_scene: GraphScene
-    dummy_text_item: Optional[QGraphicsTextItem] = None  # For dummy node text
+    dummy_text_item: Optional[QGraphicsTextItem] = None  # Plain-text fallback for dummy labels
+    dummy_pixmap_item: Optional[ResizablePixmapItem] = None  # LaTeX-rendered label
+    _dummy_label_last_text: Optional[str] = None
 
     halftone = "1000100010001000"  # QPixmap("images/halftone.png")
 
@@ -93,6 +96,8 @@ class VItem(QGraphicsPathItem):
         self.phase_item = PhaseItem(self)
         self.active_animations = set()
         self.dummy_text_item = None
+        self.dummy_pixmap_item = None
+        self._dummy_label_last_text = None
 
         self._old_pos = None
         self._dragged_on = None
@@ -173,13 +178,35 @@ class VItem(QGraphicsPathItem):
                 self.dummy_text_item = QGraphicsTextItem(self)
                 self.dummy_text_item.setDefaultTextColor(QColor("#222"))
                 self.dummy_text_item.setFont(display_setting.font)
-            self.dummy_text_item.setHtml(dummy_text_to_html(text))
-            # Center the text in the node
-            rect = self.dummy_text_item.boundingRect()
-            self.dummy_text_item.setPos(-rect.width() / 2, -rect.height() / 2 - 0.25 * SCALE)
-            self.dummy_text_item.setVisible(bool(text))
-        elif self.dummy_text_item is not None:
-            self.dummy_text_item.setVisible(False)
+            if self.dummy_pixmap_item is None:
+                self.dummy_pixmap_item = ResizablePixmapItem(self)
+                self.dummy_pixmap_item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+                self.dummy_pixmap_item.setZValue(PHASE_ITEM_Z + 1)
+
+            label_color = QColor("#222")
+            pixmap = render_latex_text_to_pixmap(text, display_setting.font.pointSize(), label_color)
+            if pixmap is not None:
+                self.dummy_pixmap_item.set_source_pixmap(pixmap)
+                if self.dummy_pixmap_item.should_auto_center(text, self._dummy_label_last_text):
+                    pix_rect = self.dummy_pixmap_item.boundingRect()
+                    self.dummy_pixmap_item.setPos(-pix_rect.width() / 2, -pix_rect.height() / 2 - 0.30 * SCALE)
+                    self.dummy_pixmap_item.mark_programmatic_recenter()
+                self.dummy_pixmap_item.setVisible(bool(text))
+                self.dummy_text_item.setVisible(False)
+                self._dummy_label_last_text = text
+            else:
+                # Fallback: plain text only when math renderer is unavailable.
+                self.dummy_text_item.setPlainText(text)
+                rect = self.dummy_text_item.boundingRect()
+                self.dummy_text_item.setPos(-rect.width() / 2, -rect.height() / 2 - 0.30 * SCALE)
+                self.dummy_text_item.setVisible(bool(text))
+                self.dummy_pixmap_item.setVisible(False)
+                self._dummy_label_last_text = text
+        else:
+            if self.dummy_text_item is not None:
+                self.dummy_text_item.setVisible(False)
+            if self.dummy_pixmap_item is not None:
+                self.dummy_pixmap_item.setVisible(False)
 
         if self.phase_item:
             self.phase_item.refresh()
