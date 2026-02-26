@@ -15,9 +15,7 @@
 
 from __future__ import annotations
 from enum import Enum
-import html
 import math
-import re
 
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
@@ -46,73 +44,6 @@ EITEM_Z = -1
 VITEM_UNSELECTED_Z = 0
 VITEM_SELECTED_Z = 1
 PHASE_ITEM_Z = 2
-
-
-LATEX_SYMBOLS = {
-    "\\alpha": "α",
-    "\\beta": "β",
-    "\\gamma": "γ",
-    "\\delta": "δ",
-    "\\epsilon": "ε",
-    "\\theta": "θ",
-    "\\lambda": "λ",
-    "\\mu": "μ",
-    "\\pi": "π",
-    "\\sigma": "σ",
-    "\\phi": "φ",
-    "\\omega": "ω",
-    "\\Gamma": "Γ",
-    "\\Delta": "Δ",
-    "\\Theta": "Θ",
-    "\\Lambda": "Λ",
-    "\\Pi": "Π",
-    "\\Sigma": "Σ",
-    "\\Phi": "Φ",
-    "\\Omega": "Ω",
-    "\\times": "×",
-    "\\cdot": "·",
-    "\\pm": "±",
-    "\\neq": "≠",
-    "\\leq": "≤",
-    "\\geq": "≥",
-    "\\to": "→",
-    "\\rightarrow": "→",
-    "\\leftarrow": "←",
-    "\\infty": "∞",
-    "\\sum": "∑",
-    "\\prod": "∏",
-}
-
-
-def _render_math_fragment(fragment: str) -> str:
-    rendered = html.escape(fragment)
-    for latex_cmd, symbol in LATEX_SYMBOLS.items():
-        rendered = rendered.replace(latex_cmd, symbol)
-
-    rendered = re.sub(r"\\text\{([^{}]*)\}", lambda m: html.escape(m.group(1)), rendered)
-    rendered = re.sub(r"\\frac\{([^{}]+)\}\{([^{}]+)\}",
-                      lambda m: f"(<sup>{m.group(1)}</sup>&frasl;<sub>{m.group(2)}</sub>)",
-                      rendered)
-    rendered = re.sub(r"\^\{([^{}]+)\}", lambda m: f"<sup>{m.group(1)}</sup>", rendered)
-    rendered = re.sub(r"_\{([^{}]+)\}", lambda m: f"<sub>{m.group(1)}</sub>", rendered)
-    rendered = re.sub(r"\^([A-Za-z0-9+\-])", lambda m: f"<sup>{m.group(1)}</sup>", rendered)
-    rendered = re.sub(r"_([A-Za-z0-9+\-])", lambda m: f"<sub>{m.group(1)}</sub>", rendered)
-    rendered = rendered.replace(" ", "&nbsp;")
-    return rendered
-
-
-def render_dummy_text(text: str) -> str:
-    pieces: list[str] = []
-    cursor = 0
-    for match in re.finditer(r"\$\$?(.*?)\$\$?", text):
-        start, end = match.span()
-        if start > cursor:
-            pieces.append(html.escape(text[cursor:start]))
-        pieces.append(f"<span>{_render_math_fragment(match.group(1))}</span>")
-        cursor = end
-    if cursor < len(text):
-        pieces.append(html.escape(text[cursor:]))
-    return "".join(pieces)
 
 
 class DragState(Enum):
@@ -241,7 +172,7 @@ class VItem(QGraphicsPathItem):
                 self.dummy_text_item = QGraphicsTextItem(self)
                 self.dummy_text_item.setDefaultTextColor(QColor("#222"))
                 self.dummy_text_item.setFont(display_setting.font)
-            self.dummy_text_item.setHtml(render_dummy_text(text))
+            self.dummy_text_item.setPlainText(text)
             # Center the text in the node
             rect = self.dummy_text_item.boundingRect()
             self.dummy_text_item.setPos(-rect.width() / 2, -rect.height() / 2 - 0.25 * SCALE)
