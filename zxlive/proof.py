@@ -262,6 +262,7 @@ class ProofStepView(QListView):
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
         self._step_preview_cache: dict[tuple[int, int, int], QPixmap] = {}
+        self._preview_aspect_ratio_cache: dict[int, float] = {}
         self._previews_visible = bool(display_setting.previews_show)
         self._preview_hidden_rows: set[int] = set()
         self._connect_model_signals(self.model())
@@ -315,6 +316,7 @@ class ProofStepView(QListView):
 
     def _clear_step_preview_cache(self) -> None:
         self._step_preview_cache.clear()
+        self._preview_aspect_ratio_cache.clear()
         self.viewport().update()
 
     def resizeEvent(self, event: Any) -> None:
@@ -351,16 +353,50 @@ class ProofStepView(QListView):
         self._clear_step_preview_cache()
         self.doItemsLayout()
 
-    def preview_size(self) -> QSize:
+    def _preview_aspect_ratio(self, index: int) -> float:
+        if index not in self._preview_aspect_ratio_cache:
+            graph = self.model().get_graph(index)
+            scene = GraphScene()
+            scene.set_graph(graph)
+            source_rect = scene.itemsBoundingRect().adjusted(-25, -25, 25, 25)
+            if source_rect.isNull() or source_rect.width() < 1 or source_rect.height() < 1:
+                source_rect = QRectF(0, 0, 1, 1)
+            self._preview_aspect_ratio_cache[index] = source_rect.height() / source_rect.width()
+        return self._preview_aspect_ratio_cache[index]
+
+    def preview_size(self, index: int) -> QSize:
         available_width = max(80, self.viewport().width() - 2 * ProofStepItemDelegate.line_padding - 28)
-        thumb_height = max(70, min(220, int(available_width * 0.55)))
-        return QSize(available_width, thumb_height)
+        min_thumb_height = 70
+        max_thumb_height = 280
+        min_height_width_ratio = 0.3
+        max_height_width_ratio = 1.25
+
+        adaptive_ratio = self._preview_aspect_ratio(index)
+        bounded_ratio = max(min_height_width_ratio, min(max_height_width_ratio, adaptive_ratio))
+
+        thumb_width = available_width
+        thumb_height = int(thumb_width * bounded_ratio)
+
+        if thumb_height > max_thumb_height:
+            thumb_height = max_thumb_height
+            thumb_width = max(80, min(available_width, int(thumb_height / bounded_ratio)))
+        elif thumb_height < min_thumb_height:
+            thumb_height = min_thumb_height
+            thumb_width = max(80, min(available_width, int(thumb_height / bounded_ratio)))
+
+        return QSize(thumb_width, thumb_height)
 
     def _render_preview_image(self, index: int, size: QSize) -> QPixmap:
         graph = self.model().get_graph(index)
         scene = GraphScene()
         scene.set_graph(graph)
-        pixmap = QPixmap(size)
+
+        device_pixel_ratio = max(1.0, self.devicePixelRatioF())
+        render_width = max(1, int(size.width() * device_pixel_ratio))
+        render_height = max(1, int(size.height() * device_pixel_ratio))
+        pixmap = QPixmap(render_width, render_height)
+        pixmap.setDevicePixelRatio(device_pixel_ratio)
+
         if display_setting.dark_mode:
             background_color = QColor(32, 35, 41)
         else:
@@ -368,14 +404,27 @@ class ProofStepView(QListView):
         pixmap.fill(background_color)
 
         painter = QPainter(pixmap)
-        source_rect = scene.itemsBoundingRect().adjusted(-25, -25, 25, 25)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        source_rect = scene.itemsBoundingRect().adjusted(-10, -10, 10, 10)
         if source_rect.isNull() or source_rect.width() < 1 or source_rect.height() < 1:
             source_rect = QRectF(0, 0, 1, 1)
+
+        scale = min(size.width() / source_rect.width(), size.height() / source_rect.height())
+        target_width = source_rect.width() * scale
+        target_height = source_rect.height() * scale
+        target_rect = QRectF(
+            (size.width() - target_width) / 2,
+            (size.height() - target_height) / 2,
+            target_width,
+            target_height,
+        )
+
         scene.render(
             painter,
-            QRectF(0, 0, size.width(), size.height()),
+            target_rect,
             source_rect,
-            Qt.AspectRatioMode.KeepAspectRatio
+            Qt.AspectRatioMode.IgnoreAspectRatio,
         )
         painter.end()
         return pixmap
@@ -554,8 +603,11 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         text_y = int(option.rect.y() + option.rect.height() / 2 - text_height / 2)  # type: ignore[attr-defined]
 
         if show_preview_image:
-            image_size = step_view.preview_size()
-            image_left = int(option.rect.x() + self.line_width + 2 * self.line_padding)  # type: ignore[attr-defined]
+            image_size = step_view.preview_size(index.row())
+            image_available_width = max(80, step_view.viewport().width() - 2 * self.line_padding - 28)
+            image_left = int(
+                option.rect.x() + self.line_width + 2 * self.line_padding + max(0, (image_available_width - image_size.width()) / 2)
+            )  # type: ignore[attr-defined]
             image_top = int(option.rect.y() + self.vert_padding)  # type: ignore[attr-defined]
             preview_pixmap = step_view.preview_image(index.row(), image_size)
             painter.drawPixmap(image_left, image_top, preview_pixmap)
@@ -586,7 +638,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
         if step_view.preview_visible_for_index(index.row()):
-            preview_block_height = step_view.preview_size().height() + self.vert_padding
+            preview_block_height = step_view.preview_size(index.row()).height() + self.vert_padding
         else:
             preview_block_height = 0
         return QSize(size.width(), size.height() + 2 * self.vert_padding + preview_block_height)
