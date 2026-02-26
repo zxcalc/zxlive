@@ -5,7 +5,7 @@ if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
-                            QItemSelection, QItemSelectionModel, QModelIndex,
+                            QItemSelection, QModelIndex,
                             QPersistentModelIndex, QPoint, QPointF, QRect,
                             QRectF, QSize, Qt)
 from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter,
@@ -349,27 +349,6 @@ class ProofStepView(QWidget):
     def thumbnails_visible(self, value: bool) -> None:
         self._list.thumbnails_visible = value
 
-    def model(self) -> 'ProofModel':
-        return self._list.model()
-
-    def setModel(self, model: 'ProofModel') -> None:
-        self._list.setModel(model)
-
-    def currentIndex(self) -> QModelIndex:
-        return self._list.currentIndex()
-
-    def setCurrentIndex(self, index: QModelIndex) -> None:
-        self._list.setCurrentIndex(index)
-
-    def clearSelection(self) -> None:
-        self._list.clearSelection()
-
-    def selectionModel(self) -> QItemSelectionModel:
-        return self._list.selectionModel()
-
-    def selectedIndexes(self) -> list[QModelIndex]:
-        return self._list.selectedIndexes()
-
     def update(self, *args: Any) -> None:
         super().update(*args)
         self._list.viewport().update()
@@ -380,35 +359,12 @@ class ProofStepView(QWidget):
     def _toggle_thumbnails(self, checked: bool) -> None:
         self._list.set_thumbnails_visible(checked)
 
-    # ---- delegated methods ----
-    def set_model(self, model: 'ProofModel') -> None:
-        self._list.set_model(model)
-
-    def move_to_step(self, index: int) -> None:
-        self._list.move_to_step(index)
-
     def set_thumbnails_visible(self, visible: bool) -> None:
         self.thumbnails_toggle.setChecked(visible)
         self._list.set_thumbnails_visible(visible)
 
-    def refresh_current_thumbnail(self) -> None:
-        """Invalidate and repaint the thumbnail for the currently selected step."""
-        self._list.refresh_current_thumbnail()
-
-    def show_context_menu(self, position: QPoint) -> None:
-        self._list.show_context_menu(position)
-
-    def rename_proof_step(self, new_name: str, index: int) -> None:
-        self._list.rename_proof_step(new_name, index)
-
-    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        self._list.proof_step_selected(selected, deselected)
-
-    def group_selected_steps(self) -> None:
-        self._list.group_selected_steps()
-
-    def ungroup_selected_step(self) -> None:
-        self._list.ungroup_selected_step()
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._list, name)
 
 
 class _ProofStepListView(QListView):
@@ -659,7 +615,12 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
-        # Draw thumbnail preview if enabled on this view
+        self._draw_thumbnail(painter, option, index, text_row_height)
+
+        painter.restore()
+
+    def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex], text_row_height: int) -> None:
+        """Draw thumbnail preview if enabled on this view."""
         parent_view = self.parent()
         if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
             pixmap = index.data(THUMBNAIL_ROLE)
@@ -688,8 +649,6 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                     x_off = (target_rect.width() - scaled.width()) / 2
                     y_off = (target_rect.height() - scaled.height()) / 2
                     painter.drawPixmap(int(target_rect.x() + x_off), int(target_rect.y() + y_off), scaled)
-
-        painter.restore()
 
     def _compute_thumb_height(self, parent: '_ProofStepListView', pixmap: QPixmap) -> int:
         """Compute the thumbnail display height for the current viewport width.

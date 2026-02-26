@@ -64,7 +64,7 @@ class ProofPanel(BasePanel):
 
     @property
     def proof_model(self) -> ProofModel:
-        return self.step_view.model()
+        return cast(ProofModel, self.step_view.model())
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         icon_size = QSize(32, 32)
