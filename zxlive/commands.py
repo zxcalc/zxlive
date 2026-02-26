@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Iterable, Optional, Set, Union
+from typing import Any, Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -444,6 +444,7 @@ class AddRewriteStep(UpdateGraph):
     step_view: QListView
     name: str
     diff: Optional[GraphDiff] = None
+    diff_highlight_hint: Optional[dict[str, Any]] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -461,7 +462,7 @@ class AddRewriteStep(UpdateGraph):
         for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
             self._old_steps.append(self.proof_model.pop_rewrite())
 
-        self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
+        self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g, None, self.diff_highlight_hint))
 
         # Select the added step
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())

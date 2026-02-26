@@ -187,7 +187,8 @@ class ProofPanel(BasePanel):
         if pyzx.rewrite_rules.check_fuse(g, v, w):
             pyzx.rewrite_rules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
+            hint = {"vertices": [v, w], "edge_pairs": [(min(v, w), max(v, w))]}
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders", diff_highlight_hint=hint)
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.rewrite_rules.check_copy(g, v):
@@ -212,7 +213,8 @@ class ProofPanel(BasePanel):
         elif pyzx.rewrite_rules.check_bialgebra(g, v, w):
             pyzx.rewrite_rules.bialgebra(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity")
+            hint = {"vertices": [v, w], "edge_pairs": [(min(v, w), max(v, w))]}
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity", diff_highlight_hint=hint)
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
         else:
@@ -356,7 +358,8 @@ class ProofPanel(BasePanel):
         new_g = copy.deepcopy(self.graph)
         pyzx.rewrite_rules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity")
+        hint = {"vertices": [v], "edge_pairs": []}
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity", diff_highlight_hint=hint)
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
@@ -496,7 +499,8 @@ class ProofPanel(BasePanel):
         if ty in (VertexType.Z, VertexType.X):
             new_g = copy.deepcopy(self.graph)
             pyzx.rewrite_rules.color_change(new_g, v)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Color change spider")
+            hint = {"vertices": [v], "edge_pairs": []}
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Color change spider", diff_highlight_hint=hint)
             self.undo_stack.push(cmd)
             return
         if ty == VertexType.H_BOX:

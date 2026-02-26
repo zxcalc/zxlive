@@ -139,7 +139,22 @@ class RewriteAction:
             if not self.repeat_rule_application or not applied:
                 break
 
-        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
+        diff_highlight_hint = None
+        if self.match_type == MATCH_DOUBLE:
+            edge_pairs: list[tuple[int, int]] = []
+            vertices: set[int] = set()
+            for m in matches_list:
+                if not isinstance(m, tuple) or len(m) != 2:
+                    continue
+                a, b = m
+                if not isinstance(a, int) or not isinstance(b, int):
+                    continue
+                vertices.update((a, b))
+                edge_pairs.append((min(a, b), max(a, b)))
+            if edge_pairs:
+                diff_highlight_hint = {"vertices": sorted(vertices), "edge_pairs": edge_pairs}
+
+        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name, diff_highlight_hint=diff_highlight_hint)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 

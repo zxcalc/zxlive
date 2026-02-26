@@ -1,5 +1,5 @@
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
@@ -26,24 +26,58 @@ def _copy_without_diff_highlight(graph: GraphT) -> GraphT:
     return graph_copy
 
 
-def _vertex_signature(g: GraphT, v: int) -> tuple[str, str, float, float]:
-    return (str(g.type(v)), str(g.phase(v)), round(g.row(v), 6), round(g.qubit(v), 6))
+def _vertex_key(g: GraphT, v: int) -> tuple[str, str]:
+    return (str(g.type(v)), str(g.phase(v)))
 
 
-def _vertex_position(g: GraphT, v: int) -> tuple[float, float]:
-    return (round(g.row(v), 6), round(g.qubit(v), 6))
+def _vertex_pos(g: GraphT, v: int) -> tuple[float, float]:
+    return (float(g.row(v)), float(g.qubit(v)))
 
 
-def _edge_signature(g: GraphT, e: tuple[int, int, Any]) -> tuple[tuple[float, float], tuple[float, float], str]:
-    s, t = g.edge_st(e)
-    p1 = _vertex_position(g, s)
-    p2 = _vertex_position(g, t)
-    if p2 < p1:
-        p1, p2 = p2, p1
-    return (p1, p2, str(g.edge_type(e)))
+def _match_vertices(current: GraphT, next_graph: GraphT) -> tuple[dict[int, int], set[int]]:
+    """Match next-graph vertices to current-graph vertices one-to-one.
+
+    Matching is constrained by (type, phase) and prefers nearest position.
+    Returns (next_to_current, matched_current_vertices).
+    """
+    current_by_key: dict[tuple[str, str], list[int]] = defaultdict(list)
+    next_by_key: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for v in current.vertices():
+        current_by_key[_vertex_key(current, v)].append(v)
+    for v in next_graph.vertices():
+        next_by_key[_vertex_key(next_graph, v)].append(v)
+
+    next_to_current: dict[int, int] = {}
+    matched_current: set[int] = set()
+
+    for key in set(current_by_key.keys()) | set(next_by_key.keys()):
+        curr_pool = current_by_key.get(key, [])
+        next_pool = next_by_key.get(key, [])
+        if not curr_pool or not next_pool:
+            continue
+
+        remaining = set(curr_pool)
+        # Greedy nearest-neighbor matching; deterministic by sorted vertex id.
+        for nv in sorted(next_pool):
+            if not remaining:
+                break
+            nr, nq = _vertex_pos(next_graph, nv)
+            best = min(
+                remaining,
+                key=lambda cv: (
+                    (float(current.row(cv)) - nr) ** 2 + (float(current.qubit(cv)) - nq) ** 2,
+                    cv,
+                ),
+            )
+            remaining.remove(best)
+            next_to_current[nv] = best
+            matched_current.add(best)
+
+    return next_to_current, matched_current
 
 
-def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[GraphT]) -> None:
+def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[GraphT],
+                                     highlight_hint: Optional[Dict[str, Any]] = None) -> None:
     """Mark nodes/edges in ``current`` that differ in the next rewrite step."""
     current_vertices = list(current.vertices())
     current_edges = list(current.edges())
@@ -56,44 +90,130 @@ def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[Gra
     if next_graph is None:
         return
 
+    if highlight_hint is not None:
+        for v in highlight_hint.get("vertices", []):
+            if v in current_vertices:
+                current.set_vdata(v, "diff_highlight", True)
+        for s, t in highlight_hint.get("edge_pairs", []):
+            for e in current.edges(s, t):
+                if e in current_edges:
+                    current.set_edata(e, "diff_highlight", True)
+        return
+
     next_graph = _copy_without_diff_highlight(next_graph)
+    clean_current = _copy_without_diff_highlight(current)
 
     highlighted_vertices: set[int] = set()
     highlighted_edges: set[tuple[int, int, Any]] = set()
 
-    next_vertex_counts = Counter(_vertex_signature(next_graph, v) for v in next_graph.vertices())
-    for v in current_vertices:
-        sig = _vertex_signature(current, v)
-        if next_vertex_counts[sig] > 0:
-            next_vertex_counts[sig] -= 1
-        else:
-            highlighted_vertices.add(v)
+    next_to_current, matched_current = _match_vertices(clean_current, next_graph)
+    removed_current = set(current_vertices) - matched_current
+    added_next = set(next_graph.vertices()) - set(next_to_current.keys())
 
-    next_edge_counts = Counter(_edge_signature(next_graph, e) for e in next_graph.edges())
+    # If vertices are created/removed (fuse/unfuse-like rewrites), keep highlights tightly
+    # focused on participating vertices and their direct rewrite edge.
+    if removed_current or added_next:
+        highlighted_vertices.update(removed_current)
+
+        # Removed vertices usually fuse into a nearby incident spider.
+        # Prefer matched neighbors, but fall back to any incident spider (phase/type may change on fusion).
+        for rv in removed_current:
+            partner = None
+            partner_dist = None
+            fallback_partner = None
+            fallback_dist = None
+            for nb_edge in clean_current.incident_edges(rv):
+                s, t = clean_current.edge_st(nb_edge)
+                nb = t if s == rv else s
+                if nb in removed_current:
+                    continue
+
+                # Focus on spider partners for fusion highlighting.
+                nb_ty = str(clean_current.type(nb))
+                if not (nb_ty.endswith('Z') or nb_ty.endswith('X')):
+                    continue
+
+                dr = float(clean_current.row(nb)) - float(clean_current.row(rv))
+                dq = float(clean_current.qubit(nb)) - float(clean_current.qubit(rv))
+                dist = dr * dr + dq * dq
+
+                if fallback_partner is None or dist < fallback_dist or (dist == fallback_dist and nb < fallback_partner):
+                    fallback_partner = nb
+                    fallback_dist = dist
+
+                if nb not in matched_current:
+                    continue
+                if partner is None or dist < partner_dist or (dist == partner_dist and nb < partner):
+                    partner = nb
+                    partner_dist = dist
+
+            if partner is None:
+                partner = fallback_partner
+            if partner is None:
+                continue
+
+            highlighted_vertices.add(partner)
+            for e in clean_current.incident_edges(rv):
+                s, t = clean_current.edge_st(e)
+                if {s, t} == {rv, partner}:
+                    highlighted_edges.add(e)
+
+        # For new vertices in the next step, highlight their nearest mapped source vertex.
+        for nv in added_next:
+            nkey = _vertex_key(next_graph, nv)
+            candidates = [cv for cv in matched_current if _vertex_key(clean_current, cv) == nkey]
+            if not candidates:
+                continue
+            nr, nq = _vertex_pos(next_graph, nv)
+            best = min(
+                candidates,
+                key=lambda cv: (
+                    (float(clean_current.row(cv)) - nr) ** 2 + (float(clean_current.qubit(cv)) - nq) ** 2,
+                    cv,
+                ),
+            )
+            highlighted_vertices.add(best)
+
+        for e in highlighted_edges:
+            current.set_edata(e, "diff_highlight", True)
+        for v in highlighted_vertices:
+            current.set_vdata(v, "diff_highlight", True)
+        return
+
+    # No vertex creation/removal: use mapped edge multiset diff.
+    current_edge_counts = Counter()
     for e in current_edges:
-        sig = _edge_signature(current, e)
-        if next_edge_counts[sig] > 0:
-            next_edge_counts[sig] -= 1
-        else:
-            highlighted_edges.add(e)
-            s, t = current.edge_st(e)
-            highlighted_vertices.add(s)
-            highlighted_vertices.add(t)
+        s, t = clean_current.edge_st(e)
+        key = (tuple(sorted((s, t))), str(clean_current.edge_type(e)))
+        current_edge_counts[key] += 1
 
-    current_edge_counts = Counter(_edge_signature(current, e) for e in current_edges)
-    current_pos_to_vertices: dict[tuple[float, float], list[int]] = {}
-    for v in current_vertices:
-        current_pos_to_vertices.setdefault(_vertex_position(current, v), []).append(v)
-
+    mapped_next_edge_counts = Counter()
     for e in next_graph.edges():
-        sig = _edge_signature(next_graph, e)
-        if current_edge_counts[sig] > 0:
-            current_edge_counts[sig] -= 1
+        ns, nt = next_graph.edge_st(e)
+        ms = next_to_current.get(ns)
+        mt = next_to_current.get(nt)
+        if ms is None or mt is None:
             continue
-        p1, p2, _ = sig
-        for pos in (p1, p2):
-            for v in current_pos_to_vertices.get(pos, []):
-                highlighted_vertices.add(v)
+        et = str(next_graph.edge_type(e))
+        mapped_next_edge_counts[(tuple(sorted((ms, mt))), et)] += 1
+
+    remaining_next_edges = mapped_next_edge_counts.copy()
+    for e in current_edges:
+        s, t = clean_current.edge_st(e)
+        key = (tuple(sorted((s, t))), str(clean_current.edge_type(e)))
+        if remaining_next_edges[key] > 0:
+            remaining_next_edges[key] -= 1
+            continue
+        highlighted_edges.add(e)
+        highlighted_vertices.add(s)
+        highlighted_vertices.add(t)
+
+    for (s_t, _), count in (mapped_next_edge_counts - current_edge_counts).items():
+        if count <= 0:
+            continue
+        s, t = s_t
+        highlighted_vertices.add(s)
+        highlighted_vertices.add(t)
 
     for e in highlighted_edges:
         current.set_edata(e, "diff_highlight", True)
@@ -108,6 +228,7 @@ class Rewrite(NamedTuple):
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
+    diff_highlight_hint: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -115,7 +236,8 @@ class Rewrite(NamedTuple):
             "display_name": self.display_name,
             "rule": self.rule,
             "graph": self.graph.to_dict(),
-            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None
+            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None,
+            "diff_highlight_hint": self.diff_highlight_hint
         }
 
     def to_json(self) -> str:
@@ -138,7 +260,8 @@ class Rewrite(NamedTuple):
             display_name=d.get("display_name", d["rule"]),  # Old proofs may not have display names
             rule=d["rule"],
             graph=graph,
-            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
+            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None,
+            diff_highlight_hint=d.get("diff_highlight_hint")
         )
 
 
@@ -162,7 +285,8 @@ class ProofModel(QAbstractListModel):
             self.initial_graph = graph
         else:
             old_step = self.steps[index - 1]
-            new_step = Rewrite(old_step.display_name, old_step.rule, graph)
+            new_step = Rewrite(old_step.display_name, old_step.rule, graph, old_step.grouped_rewrites,
+                               old_step.diff_highlight_hint)
             self.steps[index - 1] = new_step
 
     def graphs(self) -> list[GraphT]:
@@ -244,7 +368,8 @@ class ProofModel(QAbstractListModel):
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites,
+                                  old_step.diff_highlight_hint)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
@@ -257,7 +382,8 @@ class ProofModel(QAbstractListModel):
             "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
-            self.steps[start_index:end_index + 1]
+            self.steps[start_index:end_index + 1],
+            None
         )
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
@@ -367,7 +493,8 @@ class ProofStepView(QListView):
         self.update(idx)
         g = self.model().get_graph(index)
         next_graph = self.model().get_graph(index + 1) if index < self.model().rowCount() - 1 else None
-        apply_step_difference_highlighting(g, next_graph)
+        hint = self.model().steps[index].diff_highlight_hint if index < len(self.model().steps) else None
+        apply_step_difference_highlighting(g, next_graph, hint)
         self.graph_view.set_graph(g)
 
     def show_context_menu(self, position: QPoint) -> None:
