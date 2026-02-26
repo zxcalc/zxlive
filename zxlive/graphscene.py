@@ -62,6 +62,8 @@ class GraphScene(QGraphicsScene):
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
         self.g: GraphT
+        self._highlighted_verts: set[VT] = set()
+        self._highlighted_edges: set[ET] = set()
 
     def update_background_brush(self) -> None:
         if display_setting.dark_mode:
@@ -96,6 +98,35 @@ class GraphScene(QGraphicsScene):
                 it.setSelected(True)
                 vs.remove(it.v)
         self.selection_changed_custom.emit()
+
+    def set_rewrite_highlight(self, verts: Iterable[VT], edges: Iterable[ET]) -> None:
+        """Set the vertices and edges that should be highlighted as part of a rewrite step."""
+        new_verts = set(verts)
+        new_edges = set(edges)
+
+        # Refresh vertices whose highlight status changed
+        for v in self._highlighted_verts.union(new_verts):
+            if v in self.vertex_map:
+                self.vertex_map[v].refresh()
+
+        # Refresh edges whose highlight status changed
+        for e in self._highlighted_edges.union(new_edges):
+            if e in self.edge_map:
+                for e_item in self.edge_map[e].values():
+                    e_item.refresh()
+
+        self._highlighted_verts = new_verts
+        self._highlighted_edges = new_edges
+
+    def clear_rewrite_highlight(self) -> None:
+        """Clear all rewrite-step highlighting."""
+        self.set_rewrite_highlight(set(), set())
+
+    def is_vertex_highlighted(self, v: VT) -> bool:
+        return v in self._highlighted_verts
+
+    def is_edge_highlighted(self, e: ET) -> bool:
+        return e in self._highlighted_edges
 
     def set_graph(self, g: GraphT) -> None:
         """Set the PyZX graph for the scene.

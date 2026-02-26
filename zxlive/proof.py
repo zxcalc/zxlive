@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
+from pyzx.graph.diff import GraphDiff
 from .common import GraphT
 from .settings import display_setting
 
@@ -282,6 +283,29 @@ class ProofStepView(QListView):
         self.update(idx)
         g = self.model().get_graph(index)
         self.graph_view.set_graph(g)
+
+        # Highlight the differences between this step and the previous one.
+        scene = self.graph_view.graph_scene
+        if index == 0:
+            scene.clear_rewrite_highlight()
+            return
+
+        prev_g = self.model().get_graph(index - 1)
+        diff = GraphDiff(prev_g, g)
+
+        highlight_verts = set(diff.new_verts)
+        highlight_verts.update(diff.changed_vertex_types)
+        highlight_verts.update(diff.changed_phases)
+        highlight_verts.update(diff.changed_vdata)
+        highlight_verts.update(diff.changed_pos)
+
+        highlight_edges: set[tuple[int, int, int]] = set()
+        for (s, t), typ in diff.new_edges:
+            highlight_edges.add((s, t, typ))
+        highlight_edges.update(diff.changed_edata)
+        highlight_edges.update(diff.changed_edge_types)
+
+        scene.set_rewrite_highlight(highlight_verts, highlight_edges)
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()

@@ -161,6 +161,15 @@ class VItem(QGraphicsPathItem):
                 pen.setColor(display_setting.effective_colors["boundary_pressed"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy_pressed"])
+
+        if self.graph_scene.is_vertex_highlighted(self.v):
+            # Emphasize highlighted vertices with a thicker, accent-colored outline.
+            pen.setWidthF(pen.widthF() + 2.0)
+            if display_setting.dark_mode:
+                pen.setColor(QColor("#FFB74D"))
+            else:
+                pen.setColor(QColor("#E65100"))
+
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)
