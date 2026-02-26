@@ -231,28 +231,6 @@ class GraphScene(QGraphicsScene):
                 ei.reset_color()
                 ei.refresh()
 
-    @staticmethod
-    def _phases_semantically_equal(old_phase: object, new_phase: object) -> bool:
-        """Check whether two phase values represent the same rotation.
-
-        ``GraphDiff`` compares phases with Python's ``!=`` operator which
-        is sensitive to representation: ``Fraction(1, 4) != 0.25`` is
-        ``True`` even though both encode the same angle.  This helper
-        converts both values to ``float`` and compares with a small
-        tolerance so that purely representational differences (e.g.
-        ``Fraction`` vs ``float``) do not produce false‑positive
-        highlights.
-
-        For symbolic phases (``Poly`` objects or other non‑numeric types)
-        the function falls back to exact equality, which is the correct
-        behaviour since we cannot numerically evaluate free variables.
-        """
-        try:
-            return abs(float(old_phase) - float(new_phase)) < 1e-12  # type: ignore[arg-type]
-        except (TypeError, ValueError):
-            # Symbolic / non-numeric phases — fall back to exact equality
-            return old_phase == new_phase
-
     def highlight_diff(self, diff: GraphDiff, direction: str = "forward") -> None:
         """Highlight vertices and edges that differ between proof steps.
 
@@ -299,22 +277,10 @@ class GraphScene(QGraphicsScene):
         changed_verts.update(diff.changed_vertex_types.keys())
 
         # Filter changed_phases: only include vertices whose phase truly
-        # changed in numeric value, not just in Python type/representation.
-        # diff.changed_phases maps vertex -> new_phase.  For existing
-        # vertices we can read the old phase from self.g (the currently
-        # displayed graph).  New vertices (in diff.new_verts) are skipped
+        # changed. New vertices (in diff.new_verts) are skipped
         # here; they are handled separately via the new_verts path below.
-        for v, new_phase in diff.changed_phases.items():
-            if v in diff.new_verts:
-                # New vertex — not a "change", will be handled as addition
-                continue
-            try:
-                old_phase = self.g.phase(v)
-            except KeyError:
-                # Vertex not in current graph (shouldn't happen, but be safe)
-                changed_verts.add(v)
-                continue
-            if not self._phases_semantically_equal(old_phase, new_phase):
+        for v in diff.changed_phases:
+            if v not in diff.new_verts:
                 changed_verts.add(v)
 
         # Only semantically meaningful edge changes — excludes changed_edata
