@@ -598,7 +598,7 @@ class ProofStepView(QListView):
         header_height = row_height
         sub_step_top = rect.y() + header_height + sub_idx * row_height
 
-        sub_text_x = int(sub_tree_x + delegate.sub_circle_radius + 10)
+        sub_text_x = int(sub_tree_x + delegate.circle_radius + 10)
 
         editor_x = sub_text_x
         # Center vertically in the row
@@ -718,7 +718,6 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     triangle_size = 5
     sub_indent = 20
     sub_branch_len = 15
-    sub_circle_radius = 3
 
     # Track hover position for sub-steps
     hover_step_idx: int = -1
@@ -937,7 +936,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Line down to last sub-step
         path.lineTo(sub_tree_x, last_sub_cy)
         # Line back to main axis at the bottom
-        path.lineTo(main_cx, bottom_y)
+        path.lineTo(main_cx - 0.3, bottom_y)
 
         painter.drawPath(path)
 
@@ -958,7 +957,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             if is_sub_selected or is_sub_hovered:
                 painter.setPen(Qt.GlobalColor.transparent)
                 painter.setBrush(self._bg_color(is_sub_selected, False, is_sub_hovered))
-                hl_left = int(sub_tree_x + self.sub_circle_radius + 2)
+                hl_left = int(sub_tree_x + self.circle_radius + 2)
                 painter.drawRect(QRect(
                     hl_left, int(sub_cy - row_height / 2),
                     int(option.rect.width() - hl_left), row_height))  # type: ignore[attr-defined]
@@ -966,17 +965,15 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             # Sub-step circle
             painter.setPen(QPen(line_clr, self.line_width))
             if is_sub_selected:
-                painter.setBrush(QColor(30, 100, 200))  # brighter blue when selected
-                r = self.sub_circle_radius + 1
+                painter.setBrush(display_setting.effective_colors["z_spider"])  # brighter blue when selected
+                r = self.circle_radius_selected
             else:
-                painter.setBrush(QColor(70, 130, 180))  # default steel-blue
-                r = self.sub_circle_radius
-            painter.drawEllipse(
-                QPointF(sub_tree_x, sub_cy), r, r
-            )
+                painter.setBrush(display_setting.effective_colors["z_spider"])  # default steel-blue
+                r = self.circle_radius
+            painter.drawEllipse(QPointF(sub_tree_x, sub_cy), r, r)
 
             # Sub-step text
-            sub_text_x = int(sub_tree_x + self.sub_circle_radius + 10)
+            sub_text_x = int(sub_tree_x + self.circle_radius + 10)
             sub_text_rect = QRect(
                 sub_text_x,
                 int(sub_cy - text_height / 2),
