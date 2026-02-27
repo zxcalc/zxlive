@@ -286,8 +286,8 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
 
 
 def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:
-    anim_before = None
-    anim_after = None
+    anim_before: Optional[QAbstractAnimation] = None
+    anim_after: Optional[QAbstractAnimation] = None
     if self.name == rules_basic['fuse_simp']['text']:  # or self.name == operations['fuse_w']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
@@ -341,7 +341,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
             center = (center_row, center_qubit)
         else:
             center = (0, 0)
-        duration = ANIMATION_DURATION / 2
+        duration = ANIMATION_DURATION // 2
         anim_before = morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
                                             panel.graph_scene, center, duration,
                                             QEasingCurve(QEasingCurve.Type.InQuad))
@@ -350,7 +350,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
                                              QEasingCurve(QEasingCurve.Type.OutQuad))
     elif isinstance(self.rule, CustomRule) and self.rule.last_rewrite_center is not None:
         center = self.rule.last_rewrite_center
-        duration = ANIMATION_DURATION / 2
+        duration = ANIMATION_DURATION // 2
         anim_before = morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
                                             panel.graph_scene, center, duration,
                                             QEasingCurve(QEasingCurve.Type.InQuad))
