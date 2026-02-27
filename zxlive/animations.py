@@ -333,6 +333,21 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
             anim_after.addAnimation(strong_comp(panel.graph, g, v2, panel.graph_scene))
             panel.graph.set_row(v2, v2_row)
             panel.graph.set_qubit(v2, v2_qubit)
+    elif self.name == rules_basic['bialgebra_op']['text']:
+        all_matched_verts = [v for m in matches for v in m]
+        if all_matched_verts:
+            center_row = sum(panel.graph.row(v) for v in all_matched_verts) / len(all_matched_verts)
+            center_qubit = sum(panel.graph.qubit(v) for v in all_matched_verts) / len(all_matched_verts)
+            center = (center_row, center_qubit)
+        else:
+            center = (0, 0)
+        duration = ANIMATION_DURATION / 2
+        anim_before = morph_graph_to_center(panel.graph, lambda v: v not in g.graph,
+                                            panel.graph_scene, center, duration,
+                                            QEasingCurve(QEasingCurve.Type.InQuad))
+        anim_after = morph_graph_from_center(g, lambda v: v not in panel.graph.graph,
+                                             panel.graph_scene, center, duration,
+                                             QEasingCurve(QEasingCurve.Type.OutQuad))
     elif isinstance(self.rule, CustomRule) and self.rule.last_rewrite_center is not None:
         center = self.rule.last_rewrite_center
         duration = ANIMATION_DURATION / 2
