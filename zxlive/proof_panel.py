@@ -181,7 +181,17 @@ class ProofPanel(BasePanel):
             anims.back_to_default(self.graph_scene.vertex_map[w])
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
-        g = copy.deepcopy(self.graph)
+        base_g = self.graph_scene.g
+        # Pre-rewrite coordinates of the dragged vertices, used for robust semantic highlighting.
+        try:
+            drag_coords_set: set[tuple[int, int]] = {
+                (int(base_g.qubit(v)), int(base_g.row(v))),
+                (int(base_g.qubit(w)), int(base_g.row(w))),
+            }
+        except Exception:
+            drag_coords_set = set()
+
+        g = copy.deepcopy(base_g)
         if len(list(self.graph.edges(v, w))) == 1 and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
             pyzx.rewrite_rules.color_change(g, w)
         if pyzx.rewrite_rules.check_fuse(g, v, w):
@@ -199,8 +209,10 @@ class ProofPanel(BasePanel):
             # For robust semantic highlighting we store the fused vertex by its
             # (qubit, row) coordinates instead of its transient ID, since the
             # latter may be reindexed during later copies/updates.
-            kept_qubit = int(g.qubit(kept))
-            kept_row = int(g.row(kept))
+            raw_kept_qubit = g.qubit(kept)
+            raw_kept_row = g.row(kept)
+            kept_qubit = int(raw_kept_qubit)
+            kept_row = int(raw_kept_row)
 
             cmd = AddRewriteStep(
                 self.graph_view,
@@ -219,7 +231,14 @@ class ProofPanel(BasePanel):
             # g.remove_edges(rem_edges)
             # g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
+            coord_list = sorted(drag_coords_set) if drag_coords_set else None
+            cmd = AddRewriteStep(
+                self.graph_view,
+                g,
+                self.step_view,
+                "Copy spider through other spider",
+                highlight_coords=coord_list,
+            )
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_pauli(g, w, v):  # Second parameter is the Pauli
             # Check if we can push a Pauli spider through the other vertex
@@ -228,12 +247,20 @@ class ProofPanel(BasePanel):
             # The match is (pauli_vertex, target_vertex)
             target = w
             anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli")
+            coord_list = sorted(drag_coords_set) if drag_coords_set else None
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli", highlight_coords=coord_list)
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_bialgebra(g, v, w):
             pyzx.rewrite_rules.bialgebra(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity")
+            coord_list = sorted(drag_coords_set) if drag_coords_set else None
+            cmd = AddRewriteStep(
+                self.graph_view,
+                g,
+                self.step_view,
+                "Strong complementarity",
+                highlight_coords=coord_list,
+            )
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
         else:
@@ -250,6 +277,26 @@ class ProofPanel(BasePanel):
         elif self._magic_hopf(trace):
             self.play_sound_signal.emit(SFXEnum.THEY_FALL_OFF)
             return
+
+    def _coords_for_vertex_and_neighbors(self, v: VT) -> set[tuple[int, int]]:
+        """Return a small local coordinate set around v for semantic highlighting."""
+        g = self.graph_scene.g
+        coords: set[tuple[int, int]] = set()
+        try:
+            coords.add((int(g.qubit(v)), int(g.row(v))))
+        except Exception:
+            return coords
+        try:
+            for e in g.incident_edges(v):
+                s, t = g.edge_st(e)
+                for u in (s, t):
+                    try:
+                        coords.add((int(g.qubit(u)), int(g.row(u))))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return coords
 
     def _magic_hopf(self, trace: WandTrace) -> bool:
         if not all(isinstance(item, EItem) for item in trace.hit):
@@ -274,7 +321,17 @@ class ProofPanel(BasePanel):
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
+            coords_set: set[tuple[int, int]] = set()
+            coords_set |= self._coords_for_vertex_and_neighbors(source)
+            coords_set |= self._coords_for_vertex_and_neighbors(target)
+            coord_list = sorted(coords_set) if coords_set else None
+            cmd = AddRewriteStep(
+                self.graph_view,
+                new_g,
+                self.step_view,
+                "Remove parallel edges",
+                highlight_coords=coord_list,
+            )
             self.undo_stack.push(cmd)
             return True
         return False
@@ -305,7 +362,10 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity")
+        raw_q = new_g.qubit(v)
+        raw_r = new_g.row(v)
+        coord_list = [(int(raw_q), int(raw_r))]
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity", highlight_coords=coord_list)
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
@@ -374,10 +434,11 @@ class ProofPanel(BasePanel):
         return True
 
     def _remove_id(self, v: VT) -> None:
+        coord_list = sorted(self._coords_for_vertex_and_neighbors(v))
         new_g = copy.deepcopy(self.graph)
         pyzx.rewrite_rules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity", highlight_coords=coord_list)
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
@@ -413,7 +474,8 @@ class ProofPanel(BasePanel):
         """Helper method to apply animation and push the unfuse command to the undo stack.
         """
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
+        coord_list = sorted(self._coords_for_vertex_and_neighbors(v))
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse", highlight_coords=coord_list)
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
