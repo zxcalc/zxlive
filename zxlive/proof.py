@@ -431,7 +431,11 @@ class ProofStepView(QListView):
                 expand_action = context_menu.addAction(
                     "Collapse Group" if self.is_group_expanded(index) else "Expand Group"
                 )
-                action_function_map[expand_action] = lambda row=index: self.toggle_group_expanded(row)
+
+                def toggle_selected_group() -> None:
+                    self.toggle_group_expanded(index)
+
+                action_function_map[expand_action] = toggle_selected_group
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
