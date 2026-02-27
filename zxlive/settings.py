@@ -45,6 +45,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "input-circuit-format": 'openqasm',
     "previews-show": True,
     "sparkle-mode": True,
+    "highlight-rewrites": True,
     'sound-effects': False,
     "matrix/precision": 4,
     "dark-mode": "system",
@@ -240,6 +241,15 @@ class DisplaySettings:
     @previews_show.setter
     def previews_show(self, value: bool) -> None:
         settings.setValue("previews-show", value)
+
+    @property
+    def highlight_rewrites(self) -> bool:
+        """Whether proof-step rewrite highlighting is enabled."""
+        return get_settings_value("highlight-rewrites", bool)
+
+    @highlight_rewrites.setter
+    def highlight_rewrites(self, value: bool) -> None:
+        settings.setValue("highlight-rewrites", value)
 
     @property
     def dark_mode(self) -> bool:

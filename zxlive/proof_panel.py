@@ -197,29 +197,19 @@ class ProofPanel(BasePanel):
         if pyzx.rewrite_rules.check_fuse(g, v, w):
             # Apply the fuse rewrite on a copy of the graph.
             pyzx.rewrite_rules.fuse(g, w, v)
-
-            # Determine which vertex survived the fusion. The fuse rule keeps
-            # its first vertex argument (subject to an internal swap when
-            # row(v) == 0); whichever of (v, w) is still present in the graph
-            # is the fused vertex.
-            kept: VT = v if v in g.vertices() else w
-
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-
-            # For robust semantic highlighting we store the fused vertex by its
-            # (qubit, row) coordinates instead of its transient ID, since the
-            # latter may be reindexed during later copies/updates.
-            raw_kept_qubit = g.qubit(kept)
-            raw_kept_row = g.row(kept)
-            kept_qubit = int(raw_kept_qubit)
-            kept_row = int(raw_kept_row)
+            coord_list = sorted(drag_coords_set) if drag_coords_set else None
+            # Pass match pair so move_to_step highlights only the edge between v and w
+            # (via incident_edges), not all incident edges.
+            match_pair_list = [(v, w)]
 
             cmd = AddRewriteStep(
                 self.graph_view,
                 g,
                 self.step_view,
                 "Fuse spiders",
-                highlight_coords=[(kept_qubit, kept_row)],
+                highlight_coords=coord_list,
+                highlight_match_pairs=match_pair_list,
             )
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)

@@ -90,7 +90,8 @@ class RewriteAction:
                 self.unfusion_action.start_unfusion(verts[0])
             return
 
-        g = copy.deepcopy(panel.graph_scene.g)
+        base_g = panel.graph_scene.g
+        g = copy.deepcopy(base_g)
         verts, edges = panel.parse_selection()
 
         rem_verts_list: list[VT] = []
@@ -106,6 +107,7 @@ class RewriteAction:
             and self.match_type == MATCH_DOUBLE
         )
         highlight_coords: set[tuple[int, int]] | None = None
+        highlight_match_pairs: list[tuple[VT, VT]] | None = None
 
         while True:
             matches: list[VT | tuple[VT, VT] | list[VT]] = []
@@ -134,35 +136,28 @@ class RewriteAction:
                         rule_dv = cast(RewriteDoubleVertex, self.rule)
                         v1, v2 = cast(tuple[VT, VT], m)
                         if is_fuse_rule:
-                            # For Fuse spiders we derive the surviving vertex
-                            # deterministically from the actual rewrite
-                            # application, recording its (qubit, row)
-                            # coordinates so we can later remap onto the final
-                            # rendered graph even if vertex IDs change.
-                            before_vertices = set(g.vertices())
+                            # For Fuse spiders, record BOTH vertices that take
+                            # part in each match using the original graph's
+                            # coordinates. This lets the proof view highlight
+                            # all participating spiders, while edge filtering
+                            # determines which incident edges actually change.
+                            if highlight_coords is None:
+                                highlight_coords = set()
+                            for vv in (v1, v2):
+                                try:
+                                    q0 = int(base_g.qubit(vv))
+                                    r0 = int(base_g.row(vv))
+                                    highlight_coords.add((q0, r0))
+                                except Exception:
+                                    continue
+                            # Store (v1, v2) so move_to_step can find the fusion edge
+                            # via incident_edges(v1) instead of g.edges(v1,v2).
+                            if highlight_match_pairs is None:
+                                highlight_match_pairs = []
+                            highlight_match_pairs.append((v1, v2))
+
                             if rule_dv.apply(g, v1, v2):
                                 applied = True
-                                after_vertices = set(g.vertices())
-                                if v1 in after_vertices and v2 not in after_vertices:
-                                    kept = v1
-                                elif v2 in after_vertices and v1 not in after_vertices:
-                                    kept = v2
-                                else:
-                                    # Unexpected (both remain or both removed);
-                                    # skip semantic highlight for this match.
-                                    continue
-
-                                if highlight_coords is None:
-                                    highlight_coords = set()
-                                try:
-                                    q = int(g.qubit(kept))
-                                    r = int(g.row(kept))
-                                    highlight_coords.add((q, r))
-                                except Exception:
-                                    # If coordinates are unavailable for some
-                                    # reason, fall back to no semantic
-                                    # highlight for this match.
-                                    continue
                         else:
                             if rule_dv.apply(g, v1, v2):
                                 applied = True
@@ -189,6 +184,7 @@ class RewriteAction:
             panel.step_view,
             self.name,
             highlight_coords=coord_list if is_fuse_rule else None,
+            highlight_match_pairs=highlight_match_pairs if is_fuse_rule else None,
         )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)

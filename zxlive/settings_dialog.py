@@ -82,6 +82,7 @@ general_settings: list[SettingsData] = [
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
+    {"id": "highlight-rewrites", "label": "Highlight rewrite steps", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},

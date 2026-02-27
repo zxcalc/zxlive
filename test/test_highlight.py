@@ -103,21 +103,29 @@ def test_rewrite_highlight_set_and_cleared_on_step_change(app: MainWindow, qtbot
     cmd = AddRewriteStep(proof_panel.graph_view, fused_graph, proof_panel.step_view, "Fuse spiders")
     proof_panel.undo_stack.push(cmd)
 
-    # Explicitly move to step 1 to trigger GraphDiff-based highlighting logic for this rewrite.
-    proof_panel.step_view.move_to_step(1)
     scene = proof_panel.graph_scene
 
-    # Vertex 0 is kept by the fuse and its phase changes, so it should be highlighted.
-    assert scene.is_vertex_highlighted(0)
-
-    # Simulate the user selecting the START step (index 0) in the proof step list.
-    # In the current implementation this is what clears rewrite-step highlighting.
+    # "Next change" semantics: on START (index 0) we show the graph at step 0
+    # and highlight what will change in the transition 0 -> 1 (the fuse).
     proof_panel.step_view.move_to_step(0)
+    # Both spiders that will be fused, and the edge between them, should be highlighted.
+    assert scene.is_vertex_highlighted(0)
+    assert scene.is_vertex_highlighted(1)
+    edges_01 = list(scene.g.edges(0, 1))
+    assert len(edges_01) >= 1
+    e = edges_01[0]
+    s, t = scene.g.edge_st(e)
+    edge_01 = (s, t, scene.g.edge_type(e))
+    assert scene.is_edge_highlighted(edge_01)
 
-    # After moving back to START, no vertices should remain highlighted.
-    assert not scene.is_vertex_highlighted(0)
-    assert not scene.is_vertex_highlighted(1)
+    # On the last step (index 1) there is no "next" transition, so no highlight.
+    proof_panel.step_view.move_to_step(1)
     assert not any(scene.is_vertex_highlighted(v) for v in scene.g.vertices())
+
+    # Back to START: again highlight the next change (0 -> 1).
+    proof_panel.step_view.move_to_step(0)
+    assert scene.is_vertex_highlighted(0)
+    assert scene.is_vertex_highlighted(1)
 
     # Now simulate the user using Undo to remove the rewrite step entirely.
     # When the proof returns to the START state via the undo stack, there
