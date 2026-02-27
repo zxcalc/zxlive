@@ -326,7 +326,7 @@ class ProofStepView(QWidget):
         self.thumbnails_toggle.setAutoRaise(True)
         self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
         self.thumbnails_toggle.setShortcut("t")
-        self.thumbnails_toggle.clicked.connect(self._toggle_thumbnails)
+        self.thumbnails_toggle.clicked.connect(self.set_thumbnails_visible)
         header_layout.addWidget(self.thumbnails_toggle)
         layout.addWidget(header)
 
@@ -352,12 +352,6 @@ class ProofStepView(QWidget):
     def update(self, *args: Any) -> None:
         super().update(*args)
         self._list.viewport().update()
-
-    def edit(self, index: QModelIndex) -> None:
-        self._list.edit(index)
-
-    def _toggle_thumbnails(self, checked: bool) -> None:
-        self._list.set_thumbnails_visible(checked)
 
     def set_thumbnails_visible(self, visible: bool) -> None:
         self.thumbnails_toggle.setChecked(visible)
