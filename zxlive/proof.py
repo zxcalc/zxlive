@@ -700,7 +700,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Fill the actual background where the thumbnail will go, in case
         # of transparent rendering edges or anti-aliasing artifacts
         x_off = max(0, (available_width - logical_w) // 2)
-        
+
         # Draw the pixmap horizontally centered
         painter.drawPixmap(content_left + x_off, thumb_top, pixmap)
 
@@ -729,7 +729,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         if cached is not None and not cached.isNull():
             cached_logical_w = int(cached.width() / cached.devicePixelRatio())
             cached_logical_h = int(cached.height() / cached.devicePixelRatio())
-            # We can reuse the cache if the width perfectly matches OR if it's 
+            # We can reuse the cache if the width perfectly matches OR if it's
             # already capped by the height constraint and fits comfortably in the new width
             if cached_logical_w == target_width or (cached_logical_h >= MAX_THUMBNAIL_HEIGHT - 1 and cached_logical_w <= target_width):
                 return cached
