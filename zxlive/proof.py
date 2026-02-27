@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex,
                             QPersistentModelIndex, QPoint, QPointF, QRect,
-                            QRectF, QSize, Qt)
+                            QRectF, QSize, Qt, QTimer)
 from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter,
                            QPen, QPixmap)
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
@@ -446,6 +446,12 @@ class _ProofStepListView(QListView):
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
+        # Debounce thumbnail re-renders on resize: fire layout only after
+        # 150 ms of no further resize events.
+        self._resize_debounce = QTimer(self)
+        self._resize_debounce.setSingleShot(True)
+        self._resize_debounce.setInterval(150)
+        self._resize_debounce.timeout.connect(self._on_resize_settled)
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -563,8 +569,15 @@ class _ProofStepListView(QListView):
     def resizeEvent(self, event: object) -> None:  # type: ignore[override]
         super().resizeEvent(event)  # type: ignore[arg-type]
         if self.thumbnails_visible:
-            self.scheduleDelayedItemsLayout()
-            self.viewport().update()
+            # Debounce: restart the timer so we only re-render when the
+            # user stops dragging (avoids churn on every pixel of movement).
+            self._resize_debounce.start()
+
+    def _on_resize_settled(self) -> None:
+        """Called 150 ms after the last resize event; triggers re-render."""
+        self.model()._thumbnail_cache.clear()
+        self.scheduleDelayedItemsLayout()
+        self.viewport().update()
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
