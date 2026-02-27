@@ -138,28 +138,6 @@ def from_tikz(s: str) -> Optional[GraphT]:
         return None
 
 
-def copy_variable_types(target: GraphT, source: GraphT, overwrite: bool = False,
-                        names: Optional[set[str]] = None) -> None:
-    """Copies variable type metadata from source to target graph.
-
-    TODO(zxcalc/pyzx): remove this workaround once PyZX preserves variable
-    type metadata (var_registry/is_bool) across graph transforms used by
-    ZXLive copy/paste, especially:
-    - subgraph_from_vertices(...)
-    - GraphDiff/apply_diff update paths
-    """
-    source_types = get_variable_types(source)
-    if overwrite:
-        existing_vars: set[str] = set()
-    else:
-        existing_vars = set(target.var_registry.vars())
-    names_to_copy = names if names is not None else set(source_types.keys())
-    for name in names_to_copy:
-        if name in existing_vars:
-            continue
-        target.var_registry.set_type(name, source_types.get(name, False))
-
-
 def apply_variable_types(graph: GraphT, variable_types: dict[str, bool]) -> None:
     """Applies variable type metadata to a graph."""
     for name, is_bool in variable_types.items():

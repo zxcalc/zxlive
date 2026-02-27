@@ -22,7 +22,7 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import (VT, GraphT, ToolType, copy_variable_types, get_data,
+from .common import (VT, GraphT, ToolType, get_data,
                      pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
@@ -186,7 +186,6 @@ class EditorBasePanel(BasePanel):
     def paste_graph(self, graph: GraphT) -> None:
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
-        copy_variable_types(new_g, graph, overwrite=True)
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
