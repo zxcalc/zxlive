@@ -1,5 +1,6 @@
+from __future__ import annotations
 import json
-from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -25,9 +26,9 @@ class Rewrite(NamedTuple):
     display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
+    grouped_rewrites: list['Rewrite'] | None = None  # Optional field to store the grouped rewrites
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
         return {
             "display_name": self.display_name,
@@ -41,7 +42,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str, Dict[str, Any]]) -> "Rewrite":
+    def from_json(json_str: str | dict[str, Any]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -64,8 +65,30 @@ THUMBNAIL_ROLE = Qt.ItemDataRole.UserRole + 1
 MAX_THUMBNAIL_HEIGHT = 200  # Maximum thumbnail height in pixels when displayed
 
 
-def render_graph_thumbnail(graph: GraphT) -> QPixmap:
-    """Render a graph to a QPixmap thumbnail using an off-screen GraphScene."""
+def render_graph_thumbnail(
+    graph: GraphT,
+    target_width: int = 0,
+    target_height: int = 0,
+    device_pixel_ratio: float = 1.0,
+) -> QPixmap:
+    """Render a graph to a QPixmap thumbnail at exactly the requested display size.
+
+    Instead of rendering at an arbitrary large resolution and then letting Qt
+    scale the result down (which can introduce blurriness), we compute the
+    scene's natural aspect ratio and render directly into a pixmap whose
+    *physical* pixel dimensions match what will actually be displayed on screen
+    (i.e. ``target_* * device_pixel_ratio``).  The returned pixmap has its
+    ``devicePixelRatio`` set accordingly so Qt renders it without any further
+    scaling.
+
+    Args:
+        graph: the graph to render.
+        target_width: desired display width in logical pixels.  0 means
+            unconstrained (uses ``target_height`` or falls back to 400 px).
+        target_height: desired display height in logical pixels.  0 means
+            unconstrained (uses ``target_width`` or falls back to 400 px).
+        device_pixel_ratio: the screen's DPR (e.g. 2.0 on HiDPI displays).
+    """
     from .graphscene import GraphScene
 
     scene = GraphScene()
@@ -78,21 +101,38 @@ def render_graph_thumbnail(graph: GraphT) -> QPixmap:
     padding = 20.0
     rect.adjust(-padding, -padding, padding, padding)
 
-    max_dim = 600.0
-    scale = min(max_dim / rect.width(), max_dim / rect.height())
-    if scale > 2.0:
-        scale = 2.0
+    aspect = rect.width() / rect.height() if rect.height() > 0 else 1.0
 
-    w = max(1, int(rect.width() * scale))
-    h = max(1, int(rect.height() * scale))
+    # Determine the logical display size we are aiming for.
+    if target_width > 0 and target_height > 0:
+        h_fit = target_width / aspect
+        if h_fit <= target_height:
+            disp_w = float(target_width)
+            disp_h = h_fit
+        else:
+            disp_h = float(target_height)
+            disp_w = target_height * aspect
+    elif target_width > 0:
+        disp_w = float(target_width)
+        disp_h = target_width / aspect
+    elif target_height > 0:
+        disp_h = float(target_height)
+        disp_w = target_height * aspect
+    else:
+        # No hint: pick a reasonable default.
+        disp_w = 400.0
+        disp_h = 400.0 / aspect
 
-    # Limit the aspect ratio so that very tall diagrams don't produce
-    # absurdly large pixmaps.  We cap the height at 3x the width.
-    max_h = w * 3
-    if h > max_h:
-        h = max_h
+    disp_w = max(1, int(disp_w))
+    disp_h = max(1, int(disp_h))
 
-    pixmap = QPixmap(w, h)
+    # Physical pixel dimensions for the backing store.
+    dpr = max(1.0, device_pixel_ratio)
+    phys_w = max(1, int(disp_w * dpr))
+    phys_h = max(1, int(disp_h * dpr))
+
+    pixmap = QPixmap(phys_w, phys_h)
+    pixmap.setDevicePixelRatio(dpr)
     if display_setting.dark_mode:
         pixmap.fill(QColor(30, 30, 30))
     else:
@@ -100,7 +140,8 @@ def render_graph_thumbnail(graph: GraphT) -> QPixmap:
 
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    scene.render(painter, QRectF(0, 0, w, h), rect)
+    # Render the scene into the full physical pixmap area.
+    scene.render(painter, QRectF(0, 0, phys_w, phys_h), rect)
     painter.end()
 
     scene.clear()
@@ -138,7 +179,7 @@ class ProofModel(QAbstractListModel):
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
-    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
 
         if index.row() >= len(self.steps) + 1 or index.column() >= 1:
@@ -154,11 +195,14 @@ class ProofModel(QAbstractListModel):
         elif role == THUMBNAIL_ROLE:
             row = index.row()
             if row not in self._thumbnail_cache:
+                # Thumbnails are rendered on demand without target-size hints
+                # here because the model has no view knowledge.  The view-aware
+                # rendering path goes through ProofModel.render_thumbnail_for_view.
                 graph = self.get_graph(row)
                 self._thumbnail_cache[row] = render_graph_thumbnail(graph)
             return self._thumbnail_cache.get(row)
 
-    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         if index.row() == 0:
             return super().flags(index)
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
@@ -171,11 +215,11 @@ class ProofModel(QAbstractListModel):
         """
         return None
 
-    def columnCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def columnCount(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         """The number of columns"""
         return 1
 
-    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+    def rowCount(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         """The number of rows"""
         # This is a quirk of Qt list models: Since they are based on tree models, the
         # user has to specify the index of the parent. In a list, we always expect the
@@ -185,7 +229,7 @@ class ProofModel(QAbstractListModel):
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
+    def add_rewrite(self, rewrite: Rewrite, position: int | None = None) -> None:
         """Adds a rewrite step to the model."""
         if position is None:
             position = len(self.steps)
@@ -194,7 +238,7 @@ class ProofModel(QAbstractListModel):
         self.endInsertRows()
         self.invalidate_thumbnails(position + 1)
 
-    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: int | None = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
@@ -261,7 +305,7 @@ class ProofModel(QAbstractListModel):
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -276,7 +320,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str, Dict[str, Any]]) -> "ProofModel":
+    def from_json(json_str: str | dict[str, Any]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -538,7 +582,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> None:
         painter.save()
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_row_height = text_height + 2 * self.vert_padding
@@ -613,36 +657,92 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex], text_row_height: int) -> None:
+    def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex, text_row_height: int) -> None:
         """Draw thumbnail preview if enabled on this view."""
         parent_view = self.parent()
-        if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
-            pixmap = index.data(THUMBNAIL_ROLE)
-            if pixmap is not None and not pixmap.isNull():
-                # Clamp available_width to the actual usable space inside the
-                # viewport, accounting for where this item starts horizontally.
-                # This prevents overflow when the panel is very narrow.
-                viewport_right = parent_view.viewport().width()
-                item_x = int(option.rect.x())  # type: ignore[attr-defined]
-                content_left = item_x + self.line_width + 2 * self.line_padding
-                max_right = viewport_right - self.thumbnail_padding
-                available_width = max(0, max_right - content_left)
-                thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
-                if available_width > 0 and pixmap.width() > 0:
-                    thumb_height = min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
-                    target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
-                    # Clip all drawing to the item rect to guarantee no overflow.
-                    painter.setClipRect(option.rect)  # type: ignore[attr-defined]
-                    border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
-                    painter.setPen(QPen(border_color, 1))
-                    painter.setBrush(Qt.GlobalColor.transparent)
-                    painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
+        if not isinstance(parent_view, _ProofStepListView) or not parent_view.thumbnails_visible:
+            return
 
-                    # Draw pixmap scaled to fit, keeping aspect ratio.
-                    scaled = pixmap.scaled(target_rect.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                    x_off = (target_rect.width() - scaled.width()) / 2
-                    y_off = (target_rect.height() - scaled.height()) / 2
-                    painter.drawPixmap(int(target_rect.x() + x_off), int(target_rect.y() + y_off), scaled)
+        # Compute the display rectangle we want to fill.
+        viewport_right = parent_view.viewport().width()
+        item_x = int(option.rect.x())  # type: ignore[attr-defined]
+        content_left = item_x + self.line_width + 2 * self.line_padding
+        max_right = viewport_right - self.thumbnail_padding
+        available_width = max(0, max_right - content_left)
+        if available_width <= 0:
+            return
+
+        thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
+
+        # Retrieve (or regenerate at the correct size) the thumbnail.
+        pixmap = self._get_thumbnail_for_width(parent_view, index, available_width)
+        if pixmap is None or pixmap.isNull():
+            return
+
+        # pixmap is already rendered at the right logical size; compute the
+        # actual display height and center it inside the available width slot.
+        logical_w = int(pixmap.width() / pixmap.devicePixelRatio())
+        logical_h = int(pixmap.height() / pixmap.devicePixelRatio())
+        thumb_height = min(logical_h, MAX_THUMBNAIL_HEIGHT)
+
+        # The bounding box stretches across available width
+        target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
+
+        # Clip all drawing to the item rect to guarantee no overflow.
+        painter.setClipRect(option.rect)  # type: ignore[attr-defined]
+        border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
+        painter.setPen(QPen(border_color, 1))
+
+        # Draw transparent outline matching available slot (like the old view)
+        painter.setBrush(Qt.GlobalColor.transparent)
+        painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
+
+        # Fill the actual background where the thumbnail will go, in case
+        # of transparent rendering edges or anti-aliasing artifacts
+        x_off = max(0, (available_width - logical_w) // 2)
+        
+        # Draw the pixmap horizontally centered
+        painter.drawPixmap(content_left + x_off, thumb_top, pixmap)
+
+    def _available_thumb_width(self, parent: '_ProofStepListView') -> int:
+        """Return the usable logical display width for a thumbnail."""
+        viewport_right = parent.viewport().width()
+        content_left = self.line_width + 2 * self.line_padding
+        return max(0, viewport_right - self.thumbnail_padding - content_left)
+
+    def _get_thumbnail_for_width(
+        self,
+        parent: '_ProofStepListView',
+        index: QModelIndex | QPersistentModelIndex,
+        target_width: int,
+    ) -> QPixmap | None:
+        """Return a thumbnail rendered at *target_width* logical pixels.
+
+        If the cached thumbnail already has the right logical width it is
+        returned as-is; otherwise we re-render at the new size and update
+        the cache.
+        """
+        model = parent.model()
+        row = index.row()
+        dpr = parent.devicePixelRatio()
+        cached = model._thumbnail_cache.get(row)
+        if cached is not None and not cached.isNull():
+            cached_logical_w = int(cached.width() / cached.devicePixelRatio())
+            cached_logical_h = int(cached.height() / cached.devicePixelRatio())
+            # We can reuse the cache if the width perfectly matches OR if it's 
+            # already capped by the height constraint and fits comfortably in the new width
+            if cached_logical_w == target_width or (cached_logical_h >= MAX_THUMBNAIL_HEIGHT - 1 and cached_logical_w <= target_width):
+                return cached
+        # (Re-)render at the correct size.
+        graph = model.get_graph(row)
+        pixmap = render_graph_thumbnail(
+            graph,
+            target_width=target_width,
+            target_height=MAX_THUMBNAIL_HEIGHT,
+            device_pixel_ratio=dpr,
+        )
+        model._thumbnail_cache[row] = pixmap
+        return pixmap
 
     def _compute_thumb_height(self, parent: '_ProofStepListView', pixmap: QPixmap) -> int:
         """Compute the thumbnail display height for the current viewport width.
@@ -650,43 +750,37 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         Uses the same formula as paint() so that sizeHint() and the actual
         rendered content always agree, preventing misalignment on resize.
         """
-        # Mirror the clamping logic from paint(): usable width runs from
-        # content_left to (viewport_right - thumbnail_padding).  Here we assume
-        # item_x == 0 (typical for QListView with no indent), which is safe
-        # because paint() will also clamp to the same boundary.
-        viewport_right = parent.viewport().width()
-        content_left = self.line_width + 2 * self.line_padding
-        available_width = max(0, viewport_right - self.thumbnail_padding - content_left)
-        if available_width > 0 and not pixmap.isNull() and pixmap.width() > 0:
-            return min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
-        return MAX_THUMBNAIL_HEIGHT
+        if pixmap.isNull():
+            return MAX_THUMBNAIL_HEIGHT
+        logical_h = int(pixmap.height() / pixmap.devicePixelRatio())
+        return min(logical_h, MAX_THUMBNAIL_HEIGHT)
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         size = super().sizeHint(option, index)
         text_row_height = size.height() + 2 * self.vert_padding
         parent = self.parent()
         if not isinstance(parent, _ProofStepListView) or not parent.thumbnails_visible:
             return QSize(size.width(), text_row_height)
-        # Compute the thumbnail height that paint() will actually use for the
-        # current viewport width so that the allocated row height always matches
-        # what is painted, preventing gaps or clipping when the panel is narrow.
-        pixmap = index.data(THUMBNAIL_ROLE)
-        if pixmap is not None and not pixmap.isNull():
-            thumb_height = self._compute_thumb_height(parent, pixmap)
+        # Ask for (or create) the thumbnail at the correct width so that
+        # sizeHint and paint() always agree on the row height.
+        target_width = self._available_thumb_width(parent)
+        if target_width > 0:
+            pixmap = self._get_thumbnail_for_width(parent, index, target_width)
+            thumb_height = self._compute_thumb_height(parent, pixmap) if pixmap else MAX_THUMBNAIL_HEIGHT
         else:
-            thumb_height = MAX_THUMBNAIL_HEIGHT
+            thumb_height = 0
         total = text_row_height + 2 * self.thumbnail_padding + thumb_height
         return QSize(size.width(), total)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QLineEdit:
         return QLineEdit(parent)
 
-    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def setEditorData(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
         assert isinstance(editor, QLineEdit)
         value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
         editor.setText(str(value))
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex | QPersistentModelIndex) -> None:
         step_view = self.parent()
         assert isinstance(step_view, _ProofStepListView)
         assert isinstance(editor, QLineEdit)
