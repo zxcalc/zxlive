@@ -1,6 +1,6 @@
 import json
 from collections import Counter, defaultdict
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
+from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional, Union, Dict, cast
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
@@ -18,7 +18,7 @@ from .settings import display_setting
 
 def _copy_without_diff_highlight(graph: GraphT) -> GraphT:
     """Return a copy of ``graph`` with transient diff highlight metadata stripped."""
-    graph_copy = graph.copy()
+    graph_copy = cast(GraphT, graph.copy())
     for v in graph_copy.vertices():
         graph_copy.set_vdata(v, "diff_highlight", None)
     for e in graph_copy.edges():
@@ -32,6 +32,10 @@ def _vertex_key(g: GraphT, v: int) -> tuple[str, str]:
 
 def _vertex_pos(g: GraphT, v: int) -> tuple[float, float]:
     return (float(g.row(v)), float(g.qubit(v)))
+
+
+def _ordered_vertex_pair(v1: int, v2: int) -> tuple[int, int]:
+    return (v1, v2) if v1 <= v2 else (v2, v1)
 
 
 def _match_vertices(current: GraphT, next_graph: GraphT) -> tuple[dict[int, int], set[int]]:
@@ -76,8 +80,11 @@ def _match_vertices(current: GraphT, next_graph: GraphT) -> tuple[dict[int, int]
     return next_to_current, matched_current
 
 
-def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[GraphT],
-                                     highlight_hint: Optional[Dict[str, Any]] = None) -> None:
+def apply_step_difference_highlighting(
+    current: GraphT,
+    next_graph: Optional[GraphT],
+    highlight_hint: Optional[Dict[str, Any]] = None,
+) -> None:
     """Mark nodes/edges in ``current`` that differ in the next rewrite step."""
     current_vertices = list(current.vertices())
     current_edges = list(current.edges())
@@ -119,9 +126,9 @@ def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[Gra
         # Prefer matched neighbors, but fall back to any incident spider (phase/type may change on fusion).
         for rv in removed_current:
             partner = None
-            partner_dist = None
+            partner_dist = float("inf")
             fallback_partner = None
-            fallback_dist = None
+            fallback_dist = float("inf")
             for nb_edge in clean_current.incident_edges(rv):
                 s, t = clean_current.edge_st(nb_edge)
                 nb = t if s == rv else s
@@ -181,13 +188,13 @@ def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[Gra
         return
 
     # No vertex creation/removal: use mapped edge multiset diff.
-    current_edge_counts = Counter()
+    current_edge_counts: Counter[tuple[tuple[int, int], str]] = Counter()
     for e in current_edges:
         s, t = clean_current.edge_st(e)
-        key = (tuple(sorted((s, t))), str(clean_current.edge_type(e)))
+        key = (_ordered_vertex_pair(s, t), str(clean_current.edge_type(e)))
         current_edge_counts[key] += 1
 
-    mapped_next_edge_counts = Counter()
+    mapped_next_edge_counts: Counter[tuple[tuple[int, int], str]] = Counter()
     for e in next_graph.edges():
         ns, nt = next_graph.edge_st(e)
         ms = next_to_current.get(ns)
@@ -195,12 +202,12 @@ def apply_step_difference_highlighting(current: GraphT, next_graph: Optional[Gra
         if ms is None or mt is None:
             continue
         et = str(next_graph.edge_type(e))
-        mapped_next_edge_counts[(tuple(sorted((ms, mt))), et)] += 1
+        mapped_next_edge_counts[(_ordered_vertex_pair(ms, mt), et)] += 1
 
     remaining_next_edges = mapped_next_edge_counts.copy()
     for e in current_edges:
         s, t = clean_current.edge_st(e)
-        key = (tuple(sorted((s, t))), str(clean_current.edge_type(e)))
+        key = (_ordered_vertex_pair(s, t), str(clean_current.edge_type(e)))
         if remaining_next_edges[key] > 0:
             remaining_next_edges[key] -= 1
             continue
@@ -307,9 +314,10 @@ class ProofModel(QAbstractListModel):
             return QFont("monospace", 12)
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
+        base_flags = cast(Qt.ItemFlag, super().flags(index))
         if index.row() == 0:
-            return super().flags(index)
-        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
+            return base_flags
+        return cast(Qt.ItemFlag, base_flags | Qt.ItemFlag.ItemIsEditable)
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -368,8 +376,9 @@ class ProofModel(QAbstractListModel):
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites,
-                                  old_step.diff_highlight_hint)
+        self.steps[index] = Rewrite(
+            name, old_step.rule, old_step.graph, old_step.grouped_rewrites, old_step.diff_highlight_hint
+        )
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
@@ -502,18 +511,21 @@ class ProofStepView(QListView):
         if not selected_indexes:
             return
         context_menu = QMenu(self)
-        action_function_map = {}
+        action_function_map: dict[QAction, Callable[[], None]] = {}
 
         index = selected_indexes[0].row()
         if len(selected_indexes) > 1:
             group_action = context_menu.addAction("Group Steps")
-            action_function_map[group_action] = self.group_selected_steps
+            if group_action is not None:
+                action_function_map[group_action] = self.group_selected_steps
         elif index != 0:
             rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+            if rename_action is not None:
+                action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
             if self.model().steps[index - 1].grouped_rewrites is not None:
                 ungroup_action = context_menu.addAction("Ungroup Steps")
-                action_function_map[ungroup_action] = self.ungroup_selected_step
+                if ungroup_action is not None:
+                    action_function_map[ungroup_action] = self.ungroup_selected_step
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
