@@ -466,6 +466,11 @@ class AddRewriteStep(UpdateGraph):
 
     _old_selected: int | None = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
+    # When rewriting from inside a grouped sub-step, stores the tail sub-steps
+    # that were dropped from the group (for undo restoration).
+    _old_group_tail: list[Rewrite] | None = field(default=None, init=False)
+    # The original Rewrite object for the group step (before truncation).
+    _old_group_rewrite: Rewrite | None = field(default=None, init=False)
 
     @property
     def proof_model(self) -> ProofModel:
@@ -474,15 +479,62 @@ class AddRewriteStep(UpdateGraph):
         return model
 
     def redo(self) -> None:
-        # Remove steps from the proof model until we're at the currently selected step
         self._old_selected = int(self.step_view.currentIndex().row())
         self._old_steps = []
-        for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
-            self._old_steps.append(self.proof_model.pop_rewrite())
+        self._old_group_tail = None
+        self._old_group_rewrite = None
+
+        # Check whether the user is rewriting from inside a grouped sub-step.
+        step_view = self.step_view
+        sub_step: tuple[int, int] | None = (
+            step_view.selected_sub_step  # type: ignore[union-attr]
+            if isinstance(step_view, ProofStepView) else None
+        )
+
+        if sub_step is not None:
+            group_step_idx, sub_idx = sub_step  # 0-based indices into proof_model.steps
+
+            # 1. Pop all main steps that come AFTER the grouped step (rightmost first).
+            steps_after_group = self.proof_model.rowCount() - 1 - (group_step_idx + 1)
+            for _ in range(steps_after_group):
+                self._old_steps.append(self.proof_model.pop_rewrite())
+
+            # 2. Truncate the grouped step: keep only sub-steps 0..sub_idx (inclusive).
+            old_group = self.proof_model.steps[group_step_idx]
+            assert old_group.grouped_rewrites is not None
+            self._old_group_rewrite = old_group
+
+            kept = old_group.grouped_rewrites[:sub_idx + 1]
+            self._old_group_tail = old_group.grouped_rewrites[sub_idx + 1:]
+
+            if len(kept) == 1:
+                # Ungroup: replace the grouped step with the single sub-step.
+                self.proof_model.pop_rewrite(group_step_idx)
+                self.proof_model.add_rewrite(kept[0], group_step_idx)
+            else:
+                # Update the group in-place with the truncated sub-steps.
+                new_group = Rewrite(
+                    old_group.display_name,
+                    old_group.rule,
+                    kept[-1].graph,
+                    kept,
+                )
+                self.proof_model.steps[group_step_idx] = new_group
+                model_index = self.proof_model.createIndex(group_step_idx + 1, 0)
+                self.proof_model.dataChanged.emit(model_index, model_index, [])
+
+            # Clear the sub-step selection since we are moving outside the group.
+            if isinstance(step_view, ProofStepView):
+                step_view.selected_sub_step = None
+
+        else:
+            # Normal case: remove all steps after the currently selected step.
+            for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
+                self._old_steps.append(self.proof_model.pop_rewrite())
 
         self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
 
-        # Select the added step
+        # Select the added step.
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
@@ -490,16 +542,28 @@ class AddRewriteStep(UpdateGraph):
         super().redo()
 
     def undo(self) -> None:
-        # Undo the rewrite
+        # Remove the newly added rewrite.
         self.step_view.selectionModel().blockSignals(True)
         self.proof_model.pop_rewrite()
         self.step_view.selectionModel().blockSignals(False)
 
-        # Add back steps that were previously removed
+        if self._old_group_rewrite is not None:
+            # We had truncated (and possibly ungrouped) a group step.
+            # The group is at group_step_idx == _old_selected - 1.
+            assert self._old_selected is not None
+            group_step_idx = self._old_selected - 1
+
+            # Remove the current (truncated/ungrouped) step at that position.
+            self.proof_model.pop_rewrite(group_step_idx)
+
+            # Restore the original grouped step.
+            self.proof_model.add_rewrite(self._old_group_rewrite, group_step_idx)
+
+        # Restore main steps after the group (they were popped LIFO, restore in reverse).
         for rewrite, graph in reversed(self._old_steps):
             self.proof_model.add_rewrite(rewrite)
 
-        # Select the previously selected step
+        # Restore the previously selected step.
         assert self._old_selected is not None
         idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
