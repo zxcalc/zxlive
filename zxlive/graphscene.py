@@ -104,19 +104,28 @@ class GraphScene(QGraphicsScene):
         new_verts = set(verts)
         new_edges = set(edges)
 
+        # Capture old highlight sets so we can refresh anything whose
+        # highlight status may have changed.
+        old_verts = self._highlighted_verts
+        old_edges = self._highlighted_edges
+
+        # Update internal highlight state *before* refreshing items so that
+        # VItem.refresh / EItem.refresh see the new highlight flags.
+        self._highlighted_verts = new_verts
+        self._highlighted_edges = new_edges
+
         # Refresh vertices whose highlight status changed
-        for v in self._highlighted_verts.union(new_verts):
+        for v in old_verts.union(new_verts):
             if v in self.vertex_map:
                 self.vertex_map[v].refresh()
 
         # Refresh edges whose highlight status changed
-        for e in self._highlighted_edges.union(new_edges):
+        for e in old_edges.union(new_edges):
             if e in self.edge_map:
                 for e_item in self.edge_map[e].values():
                     e_item.refresh()
 
-        self._highlighted_verts = new_verts
-        self._highlighted_edges = new_edges
+        self.update()
 
     def clear_rewrite_highlight(self) -> None:
         """Clear all rewrite-step highlighting."""

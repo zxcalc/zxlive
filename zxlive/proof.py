@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyleOptionViewItem, QWidget)
 
 from pyzx.graph.diff import GraphDiff
-from .common import GraphT
+from .common import GraphT, ET
 from .settings import display_setting
 
 
@@ -24,6 +24,18 @@ class Rewrite(NamedTuple):
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
+    # Optional semantic highlight information for this step. When present,
+    # this is preferred over GraphDiff-based highlighting.
+    #
+    # - highlight_verts / highlight_edges:
+    #     Legacy ID-based highlighting (vertex/edge IDs).
+    # - highlight_coords:
+    #     Coordinate-based highlighting using (qubit, row) pairs. This is
+    #     robust against internal vertex ID reindexing.
+    #
+    highlight_verts: Optional[list[int]] = None
+    highlight_edges: Optional[list[ET]] = None
+    highlight_coords: Optional[list[tuple[int, int]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -31,7 +43,10 @@ class Rewrite(NamedTuple):
             "display_name": self.display_name,
             "rule": self.rule,
             "graph": self.graph.to_dict(),
-            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None
+            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None,
+            "highlight_verts": self.highlight_verts,
+            "highlight_edges": self.highlight_edges,
+            "highlight_coords": self.highlight_coords,
         }
 
     def to_json(self) -> str:
@@ -50,11 +65,19 @@ class Rewrite(NamedTuple):
         assert isinstance(graph, GraphT)
         graph.set_auto_simplify(False)
 
+        coords = d.get("highlight_coords")
+        if coords is not None:
+            # Stored as lists in JSON; convert to tuples for internal use.
+            coords = [tuple(c) for c in coords]
+
         return Rewrite(
             display_name=d.get("display_name", d["rule"]),  # Old proofs may not have display names
             rule=d["rule"],
             graph=graph,
-            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
+            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None,
+            highlight_verts=d.get("highlight_verts"),
+            highlight_edges=d.get("highlight_edges"),
+            highlight_coords=coords,
         )
 
 
@@ -78,7 +101,15 @@ class ProofModel(QAbstractListModel):
             self.initial_graph = graph
         else:
             old_step = self.steps[index - 1]
-            new_step = Rewrite(old_step.display_name, old_step.rule, graph)
+            new_step = Rewrite(
+                old_step.display_name,
+                old_step.rule,
+                graph,
+                old_step.grouped_rewrites,
+                old_step.highlight_verts,
+                old_step.highlight_edges,
+                old_step.highlight_coords,
+            )
             self.steps[index - 1] = new_step
 
     def graphs(self) -> list[GraphT]:
@@ -173,7 +204,7 @@ class ProofModel(QAbstractListModel):
             "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
-            self.steps[start_index:end_index + 1]
+            self.steps[start_index:end_index + 1],
         )
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
@@ -290,20 +321,86 @@ class ProofStepView(QListView):
             scene.clear_rewrite_highlight()
             return
 
-        prev_g = self.model().get_graph(index - 1)
-        diff = GraphDiff(prev_g, g)
+        rewrite_meta = self.model().steps[index - 1]
 
+        # 1) Coordinate-based semantic highlight (preferred when present).
+        #    This maps stored (qubit, row) pairs onto the *current* graph's
+        #    vertices and then highlights those vertices and their incident
+        #    edges. This is robust to any internal vertex ID reindexing that
+        #    might occur between rewrite application and rendering.
+        highlight_coords = getattr(rewrite_meta, "highlight_coords", None)
+        if highlight_coords:
+            coord_set = {(int(q), int(r)) for (q, r) in highlight_coords}
+            highlight_verts: set[int] = set()
+            for v in g.vertices():
+                try:
+                    q = int(g.qubit(v))
+                    r = int(g.row(v))
+                except Exception:
+                    continue
+                if (q, r) in coord_set:
+                    highlight_verts.add(v)
+
+            highlight_edges: set[ET] = set()
+            for v in highlight_verts:
+                for e in g.incident_edges(v):
+                    highlight_edges.add(e)
+
+            scene = self.graph_view.graph_scene
+            scene.set_rewrite_highlight(highlight_verts, highlight_edges)
+            return
+
+        prev_g = self.model().get_graph(index - 1)
+
+        # 2) Legacy: If this step carries explicit ID-based semantic highlight
+        #    information, prefer it over GraphDiff-based highlighting.
+        if rewrite_meta.highlight_verts is not None:
+            highlight_verts = set(rewrite_meta.highlight_verts)
+            highlight_edges: set[ET] = set(rewrite_meta.highlight_edges or [])
+
+            scene = self.graph_view.graph_scene
+            scene.set_rewrite_highlight(highlight_verts, highlight_edges)
+            return
+
+        diff = GraphDiff(prev_g, g)
+        try:
+            total_prev_v = len(list(prev_g.vertices()))
+            total_new_v = len(list(g.vertices()))
+            total_prev_e = len(list(prev_g.edges()))
+            total_new_e = len(list(g.edges()))
+        except Exception:
+            total_prev_v = total_new_v = total_prev_e = total_new_e = -1
+
+        # Determine which vertices to highlight.
+        #
+        # We deliberately treat *structural/semantic* changes as highlight-worthy
+        # and ignore pure layout/metadata differences:
+        #   - Include: new vertices, vertex-type changes, phase changes
+        #   - Exclude: position-only changes, generic vdata changes
         highlight_verts = set(diff.new_verts)
         highlight_verts.update(diff.changed_vertex_types)
         highlight_verts.update(diff.changed_phases)
-        highlight_verts.update(diff.changed_vdata)
-        highlight_verts.update(diff.changed_pos)
 
-        highlight_edges: set[tuple[int, int, int]] = set()
+        # Determine which edges to highlight.
+        #
+        # Edges are highlighted only if they are incident to a highlighted
+        # vertex. This prevents backend re-indexing or global edge churn from
+        # lighting up unrelated parts of the graph.
+        highlight_edges: set[ET] = set()
+
         for (s, t), typ in diff.new_edges:
-            highlight_edges.add((s, t, typ))
-        highlight_edges.update(diff.changed_edata)
-        highlight_edges.update(diff.changed_edge_types)
+            if s in highlight_verts or t in highlight_verts:
+                highlight_edges.add((s, t, typ))
+
+        for e in diff.changed_edata:
+            s, t = g.edge_st(e)
+            if s in highlight_verts or t in highlight_verts:
+                highlight_edges.add(e)
+
+        for e in diff.changed_edge_types:
+            s, t = g.edge_st(e)
+            if s in highlight_verts or t in highlight_verts:
+                highlight_edges.add(e)
 
         scene.set_rewrite_highlight(highlight_verts, highlight_edges)
 

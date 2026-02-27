@@ -185,9 +185,30 @@ class ProofPanel(BasePanel):
         if len(list(self.graph.edges(v, w))) == 1 and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
             pyzx.rewrite_rules.color_change(g, w)
         if pyzx.rewrite_rules.check_fuse(g, v, w):
+            # Apply the fuse rewrite on a copy of the graph.
             pyzx.rewrite_rules.fuse(g, w, v)
+
+            # Determine which vertex survived the fusion. The fuse rule keeps
+            # its first vertex argument (subject to an internal swap when
+            # row(v) == 0); whichever of (v, w) is still present in the graph
+            # is the fused vertex.
+            kept: VT = v if v in g.vertices() else w
+
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
+
+            # For robust semantic highlighting we store the fused vertex by its
+            # (qubit, row) coordinates instead of its transient ID, since the
+            # latter may be reindexed during later copies/updates.
+            kept_qubit = int(g.qubit(kept))
+            kept_row = int(g.row(kept))
+
+            cmd = AddRewriteStep(
+                self.graph_view,
+                g,
+                self.step_view,
+                "Fuse spiders",
+                highlight_coords=[(kept_qubit, kept_row)],
+            )
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.rewrite_rules.check_copy(g, v):

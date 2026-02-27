@@ -444,6 +444,16 @@ class AddRewriteStep(UpdateGraph):
     step_view: QListView
     name: str
     diff: Optional[GraphDiff] = None
+    # Optional semantic highlight information for this rewrite step.
+    #
+    # - highlight_verts / highlight_edges:
+    #     Legacy ID-based highlighting (vertex/edge IDs).
+    # - highlight_coords:
+    #     Coordinate-based highlighting using (qubit, row) pairs. This is
+    #     robust against internal vertex ID reindexing.
+    highlight_verts: Optional[set[VT]] = None
+    highlight_edges: Optional[set[ET]] = None
+    highlight_coords: Optional[list[tuple[int, int]]] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -461,14 +471,18 @@ class AddRewriteStep(UpdateGraph):
         for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
             self._old_steps.append(self.proof_model.pop_rewrite())
 
-        self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
+        hv_list = sorted(self.highlight_verts) if self.highlight_verts else None
+        he_list = sorted(self.highlight_edges) if self.highlight_edges else None
+        hc_list = list(self.highlight_coords) if self.highlight_coords else None
+        self.proof_model.add_rewrite(
+            Rewrite(self.name, self.name, self.new_g, None, hv_list, he_list, hc_list)
+        )
 
-        # Select the added step
-        idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
+        # Move to the added step so that the graph view and rewrite-step
+        # highlighting are updated consistently.
+        new_index = self.proof_model.rowCount()
         super().redo()
+        self.step_view.move_to_step(new_index - 1)
 
     def undo(self) -> None:
         # Undo the rewrite
@@ -476,17 +490,18 @@ class AddRewriteStep(UpdateGraph):
         self.proof_model.pop_rewrite()
         self.step_view.selectionModel().blockSignals(False)
 
-        # Add back steps that were previously removed
+        # Add back steps that were previously removed.
         for rewrite, graph in reversed(self._old_steps):
             self.proof_model.add_rewrite(rewrite)
 
-        # Select the previously selected step
-        assert self._old_selected is not None
-        idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
+        # First restore the underlying graph to its previous state.
         super().undo()
+
+        # Then move the proof view back to the previously selected step so that
+        # the graph view and rewrite-step highlighting are updated consistently
+        # (including clearing highlights at START).
+        assert self._old_selected is not None
+        self.step_view.move_to_step(self._old_selected)
 
 
 @dataclass

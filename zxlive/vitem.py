@@ -122,6 +122,7 @@ class VItem(QGraphicsPathItem):
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
+        highlighted = self.graph_scene.is_vertex_highlighted(self.v)
         self.update_shape()
         color_map = {
             VertexType.Z: "z_spider",
@@ -429,19 +430,30 @@ class VItemAnimation(QVariantAnimation):
     @property
     def it(self) -> VItem:
         if self._it is None and self.scene is not None and self.v is not None:
-            self._it = self.scene.vertex_map[self.v]
-        assert self._it is not None
+            self._it = self.scene.vertex_map.get(self.v)
+        if self._it is None:
+            raise RuntimeError(f"VItemAnimation: missing target item for vertex {self.v}")
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        try:
+            target = self.it
+        except RuntimeError:
+            # Target item disappeared (e.g., due to rewrite removing the vertex)
+            # while the animation was still referenced. Abort cleanly instead
+            # of propagating errors.
+            self.stop()
+            return
+
+        if state == QAbstractAnimation.State.Running and self not in target.active_animations:
             # Stop all animations that target the same property
-            for anim in self.it.active_animations.copy():
+            for anim in target.active_animations.copy():
                 if anim.prop == self.prop:
                     anim.stop()
-            self.it.active_animations.add(self)
+            target.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
-            self.it.active_animations.remove(self)
+            # Use discard to avoid KeyError if we're not in the set anymore.
+            target.active_animations.discard(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
             #   Note that we cannot just remove ourselves from the set since the garbage
@@ -453,15 +465,24 @@ class VItemAnimation(QVariantAnimation):
         if self.state() != QAbstractAnimation.State.Running:
             return
 
+        try:
+            target = self.it
+        except RuntimeError:
+            # Target item disappeared (e.g., due to rewrite removing the vertex)
+            # while the animation was still running. Abort the animation
+            # silently to avoid crashing the application.
+            self.stop()
+            return
+
         if self.prop == VItem.Properties.Position:
-            self.it.setPos(value)
+            target.setPos(value)
         elif self.prop == VItem.Properties.Scale:
-            self.it.setScale(value)
+            target.setScale(value)
         elif self.prop == VItem.Properties.Rect:
-            self.it.setPath(value)
+            target.setPath(value)
 
         if self.refresh:
-            self.it.refresh()
+            target.refresh()
 
 
 class PhaseItem(QGraphicsTextItem):

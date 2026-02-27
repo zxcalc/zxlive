@@ -95,6 +95,18 @@ class RewriteAction:
 
         rem_verts_list: list[VT] = []
         matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
+
+        # For semantic highlighting: when applying the Fuse spiders rule via the
+        # rewrite tree, we want to track *exactly* which physical node survives
+        # each fusion. We therefore record its (qubit, row) coordinates instead
+        # of its transient integer ID, since IDs may be shuffled later in the
+        # pipeline while coordinates remain stable.
+        is_fuse_rule = (
+            self.name == rules_basic["fuse_simp"]["text"]
+            and self.match_type == MATCH_DOUBLE
+        )
+        highlight_coords: set[tuple[int, int]] | None = None
+
         while True:
             matches: list[VT | tuple[VT, VT] | list[VT]] = []
             if isinstance(self.rule, CustomRule):
@@ -121,8 +133,39 @@ class RewriteAction:
                     if self.match_type == MATCH_DOUBLE:
                         rule_dv = cast(RewriteDoubleVertex, self.rule)
                         v1, v2 = cast(tuple[VT, VT], m)
-                        if rule_dv.apply(g, v1, v2):
-                            applied = True
+                        if is_fuse_rule:
+                            # For Fuse spiders we derive the surviving vertex
+                            # deterministically from the actual rewrite
+                            # application, recording its (qubit, row)
+                            # coordinates so we can later remap onto the final
+                            # rendered graph even if vertex IDs change.
+                            before_vertices = set(g.vertices())
+                            if rule_dv.apply(g, v1, v2):
+                                applied = True
+                                after_vertices = set(g.vertices())
+                                if v1 in after_vertices and v2 not in after_vertices:
+                                    kept = v1
+                                elif v2 in after_vertices and v1 not in after_vertices:
+                                    kept = v2
+                                else:
+                                    # Unexpected (both remain or both removed);
+                                    # skip semantic highlight for this match.
+                                    continue
+
+                                if highlight_coords is None:
+                                    highlight_coords = set()
+                                try:
+                                    q = int(g.qubit(kept))
+                                    r = int(g.row(kept))
+                                    highlight_coords.add((q, r))
+                                except Exception:
+                                    # If coordinates are unavailable for some
+                                    # reason, fall back to no semantic
+                                    # highlight for this match.
+                                    continue
+                        else:
+                            if rule_dv.apply(g, v1, v2):
+                                applied = True
                     elif self.match_type == MATCH_SINGLE:
                         rule_sv = cast(RewriteSingleVertex, self.rule)
                         if rule_sv.apply(g, cast(VT, m)):
@@ -139,7 +182,14 @@ class RewriteAction:
             if not self.repeat_rule_application or not applied:
                 break
 
-        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
+        coord_list = sorted(highlight_coords) if highlight_coords else None
+        cmd = AddRewriteStep(
+            panel.graph_view,
+            g,
+            panel.step_view,
+            self.name,
+            highlight_coords=coord_list if is_fuse_rule else None,
+        )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
