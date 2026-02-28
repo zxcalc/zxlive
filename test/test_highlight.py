@@ -55,6 +55,7 @@ from zxlive.common import GraphT, new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
+from zxlive.settings import display_setting
 
 
 def make_two_spider_graph() -> tuple[GraphT, GraphT]:
@@ -99,8 +100,14 @@ def test_rewrite_highlight_set_and_cleared_on_step_change(app: MainWindow, qtbot
     assert isinstance(app.active_panel, ProofPanel)
     proof_panel: ProofPanel = app.active_panel
 
-    # Add a Fuse spiders rewrite as a new proof step using the same mechanism as the UI.
-    cmd = AddRewriteStep(proof_panel.graph_view, fused_graph, proof_panel.step_view, "Fuse spiders")
+    # Ensure rewrite highlighting is on so the test is independent of user settings.
+    display_setting.highlight_rewrites = True
+
+    # Add a Fuse spiders rewrite with match pair so step 0 highlights the fused vertices/edge.
+    cmd = AddRewriteStep(
+        proof_panel.graph_view, fused_graph, proof_panel.step_view, "Fuse spiders",
+        highlight_match_pairs=[(0, 1)],
+    )
     proof_panel.undo_stack.push(cmd)
 
     scene = proof_panel.graph_scene

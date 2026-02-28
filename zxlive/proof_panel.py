@@ -182,74 +182,41 @@ class ProofPanel(BasePanel):
 
     def _vertex_dropped_onto(self, v: VT, w: VT) -> None:
         base_g = self.graph_scene.g
-        # Pre-rewrite coordinates of the dragged vertices, used for robust semantic highlighting.
-        try:
-            drag_coords_set: set[tuple[int, int]] = {
-                (int(base_g.qubit(v)), int(base_g.row(v))),
-                (int(base_g.qubit(w)), int(base_g.row(w))),
-            }
-        except Exception:
-            drag_coords_set = set()
-
         g = copy.deepcopy(base_g)
         if len(list(self.graph.edges(v, w))) == 1 and self.graph.edge_type(self.graph.edge(v, w)) == EdgeType.HADAMARD:
             pyzx.rewrite_rules.color_change(g, w)
         if pyzx.rewrite_rules.check_fuse(g, v, w):
-            # Apply the fuse rewrite on a copy of the graph.
             pyzx.rewrite_rules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            coord_list = sorted(drag_coords_set) if drag_coords_set else None
-            # Pass match pair so move_to_step highlights only the edge between v and w
-            # (via incident_edges), not all incident edges.
-            match_pair_list = [(v, w)]
-
             cmd = AddRewriteStep(
-                self.graph_view,
-                g,
-                self.step_view,
-                "Fuse spiders",
-                highlight_coords=coord_list,
-                highlight_match_pairs=match_pair_list,
+                self.graph_view, g, self.step_view, "Fuse spiders",
+                highlight_match_pairs=[(v, w)],
             )
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.rewrite_rules.check_copy(g, v):
             pyzx.rewrite_rules.copy(g, v)
-            # copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
-            # etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
-            # g.add_edge_table(etab)
-            # g.remove_edges(rem_edges)
-            # g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            coord_list = sorted(drag_coords_set) if drag_coords_set else None
             cmd = AddRewriteStep(
-                self.graph_view,
-                g,
-                self.step_view,
-                "Copy spider through other spider",
-                highlight_coords=coord_list,
+                self.graph_view, g, self.step_view, "Copy spider through other spider",
+                highlight_verts=[v, w],
             )
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_pauli(g, w, v):  # Second parameter is the Pauli
-            # Check if we can push a Pauli spider through the other vertex
             pyzx.rewrite_rules.pauli_push(g, w, v)
-            # Determine which vertex is the target (the one being pushed through)
-            # The match is (pauli_vertex, target_vertex)
             target = w
             anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
-            coord_list = sorted(drag_coords_set) if drag_coords_set else None
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli", highlight_coords=coord_list)
+            cmd = AddRewriteStep(
+                self.graph_view, g, self.step_view, "Push Pauli",
+                highlight_verts=[v, w],
+            )
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_bialgebra(g, v, w):
             pyzx.rewrite_rules.bialgebra(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            coord_list = sorted(drag_coords_set) if drag_coords_set else None
             cmd = AddRewriteStep(
-                self.graph_view,
-                g,
-                self.step_view,
-                "Strong complementarity",
-                highlight_coords=coord_list,
+                self.graph_view, g, self.step_view, "Strong complementarity",
+                highlight_verts=[v, w],
             )
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
@@ -267,35 +234,6 @@ class ProofPanel(BasePanel):
         elif self._magic_hopf(trace):
             self.play_sound_signal.emit(SFXEnum.THEY_FALL_OFF)
             return
-
-    def _coords_for_vertex_and_neighbors(self, v: VT) -> set[tuple[int, int]]:
-        """Return a small local coordinate set around v for semantic highlighting."""
-        return self._coords_for_vertices_in_graph(self.graph_scene.g, [v])
-
-    def _coords_for_vertices_in_graph(
-        self, g: GraphT, vertices: list[VT]
-    ) -> set[tuple[int, int]]:
-        """Return coordinate set for given vertices and their neighbors in graph g.
-        Use the graph that will be displayed when the step is selected (e.g. new_g
-        after a rewrite), so coords map correctly to vertices in that graph.
-        """
-        coords: set[tuple[int, int]] = set()
-        for v in vertices:
-            try:
-                coords.add((int(g.qubit(v)), int(g.row(v))))
-            except Exception:
-                continue
-            try:
-                for e in g.incident_edges(v):
-                    s, t = g.edge_st(e)
-                    for u in (s, t):
-                        try:
-                            coords.add((int(g.qubit(u)), int(g.row(u))))
-                        except Exception:
-                            pass
-            except Exception:
-                pass
-        return coords
 
     def _magic_hopf(self, trace: WandTrace) -> bool:
         if not all(isinstance(item, EItem) for item in trace.hit):
@@ -320,17 +258,7 @@ class ProofPanel(BasePanel):
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
-            coords_set: set[tuple[int, int]] = set()
-            coords_set |= self._coords_for_vertex_and_neighbors(source)
-            coords_set |= self._coords_for_vertex_and_neighbors(target)
-            coord_list = sorted(coords_set) if coords_set else None
-            cmd = AddRewriteStep(
-                self.graph_view,
-                new_g,
-                self.step_view,
-                "Remove parallel edges",
-                highlight_coords=coord_list,
-            )
+            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
             self.undo_stack.push(cmd)
             return True
         return False
@@ -361,17 +289,11 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        raw_q = new_g.qubit(v)
-        raw_r = new_g.row(v)
-        coord_list = [(int(raw_q), int(raw_r))]
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity", highlight_coords=coord_list)
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity")
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
     def _magic_slice(self, trace: WandTrace) -> bool:
-        # #region agent log
-        print(f"[MAGIC_WAND DEBUG] _magic_slice called with trace containing {len(trace.hit)} items")
-        # #endregion
         def cross(a: QPointF, b: QPointF) -> float:
             return float(a.y() * b.x() - a.x() * b.y())
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
@@ -382,10 +304,7 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX, VertexType.W_OUTPUT):
             return False
 
-        # #region agent log
         is_identity = pyzx.rewrite_rules.check_remove_id(self.graph, vertex)
-        print(f"[MAGIC_WAND DEBUG] Vertex {vertex} - is_identity: {is_identity}, shift pressed: {trace.shift}, type: {self.graph.type(vertex)}, phase: {self.graph.phase(vertex) if self.graph.type(vertex) != VertexType.Z_BOX else 'Z_BOX'}, degree: {len(list(self.graph.neighbors(vertex)))}")
-        # #endregion
         if not trace.shift and is_identity:
             self._remove_id(vertex)
             return True
@@ -436,21 +355,17 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
             self._unfuse_w(vertex, left, mouse_dir)
         else:
-            # #region agent log
-            print(f"[MAGIC_WAND DEBUG] Calling _unfuse for vertex {vertex} with {len(left)} left edges and {len(right)} right edges")
-            # #endregion
             self._unfuse(vertex, left, right, mouse_dir, phase)
         return True
 
     def _remove_id(self, v: VT) -> None:
-        # #region agent log
-        print(f"[MAGIC_WAND DEBUG] _remove_id called for vertex {v}")
-        # #endregion
-        coord_list = sorted(self._coords_for_vertex_and_neighbors(v))
         new_g = copy.deepcopy(self.graph)
         pyzx.rewrite_rules.remove_id(new_g, v)
         anim = anims.remove_id(self.graph_scene.vertex_map[v])
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove identity", highlight_coords=coord_list)
+        cmd = AddRewriteStep(
+            self.graph_view, new_g, self.step_view, "Remove identity",
+            highlight_verts=[v],
+        )
         self.undo_stack.push(cmd, anim_before=anim)
 
         s = random.choice([
@@ -485,49 +400,13 @@ class ProofPanel(BasePanel):
     def _finalize_unfuse(
         self, v: VT, new_g: GraphT, extra_vertices: Optional[list[VT]] = None
     ) -> None:
-        """Helper to apply animation and push the unfuse command to the undo stack.
-        Uses coords from new_g (the graph we display when this step is selected)
-        so highlighting maps to the correct vertices after the rewrite.
-        """
-        # #region agent log
-        import json, time
-        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location":"proof_panel.py:_finalize_unfuse:entry","message":"_finalize_unfuse called","data":{"v":v,"extra_vertices":extra_vertices,"old_graph_verts":list(self.graph.vertices()),"new_graph_verts":list(new_g.vertices())},"timestamp":int(time.time()*1000),"hypothesisId":"A"}) + '\n')
-        # #endregion
+        """Apply animation and push the unfuse command to the undo stack."""
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
         verts = [v] + (extra_vertices or [])
-        # #region agent log
-        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location":"proof_panel.py:_finalize_unfuse:verts","message":"verts to highlight","data":{"verts":verts},"timestamp":int(time.time()*1000),"hypothesisId":"A"}) + '\n')
-        # #endregion
-        # For unfuse, only highlight the split vertices themselves, not their neighbors
-        coord_list = []
-        for v_id in verts:
-            try:
-                q = int(new_g.qubit(v_id))
-                r = int(new_g.row(v_id))
-                coord_list.append((q, r))
-                # #region agent log
-                print(f"[MAGIC_WAND DEBUG] Vertex {v_id} is at coordinate ({q}, {r})")
-                # #endregion
-            except Exception as e:
-                # #region agent log
-                print(f"[MAGIC_WAND DEBUG] Failed to get coords for vertex {v_id}: {e}")
-                # #endregion
-                pass
-        coord_list = sorted(set(coord_list))
-        # #region agent log
-        print(f"[MAGIC_WAND DEBUG] _finalize_unfuse computed coord_list: {coord_list} for verts: {verts}")
-        print(f"[MAGIC_WAND DEBUG] Vertices in new_g at these coordinates:")
-        for coord in coord_list:
-            verts_at_coord = [v for v in new_g.vertices() if (int(new_g.qubit(v)), int(new_g.row(v))) == coord]
-            print(f"  {coord} -> vertices: {verts_at_coord}")
-        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location":"proof_panel.py:_finalize_unfuse:coords","message":"coord_list computed","data":{"coord_list":coord_list,"graph_used":"new_g"},"timestamp":int(time.time()*1000),"hypothesisId":"C"}) + '\n')
-        # #endregion
-        # For unfuse, pass the exact vertex IDs to avoid ambiguity with coordinate mapping
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse", 
-                           highlight_coords=coord_list, highlight_unfuse_verts=verts)
+        cmd = AddRewriteStep(
+            self.graph_view, new_g, self.step_view, "unfuse",
+            highlight_verts=verts,
+        )
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
@@ -562,11 +441,6 @@ class ProofPanel(BasePanel):
 
         # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
         self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items, skip_edge_type=EdgeType.W_IO)
-        # #region agent log
-        import json, time
-        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location":"proof_panel.py:_unfuse_w:call_finalize","message":"calling _finalize_unfuse for W unfuse","data":{"v":v,"left_vert":left_vert,"left_vert_i":left_vert_i},"timestamp":int(time.time()*1000),"hypothesisId":"A"}) + '\n')
-        # #endregion
         self._finalize_unfuse(v, new_g, extra_vertices=[left_vert, left_vert_i])
 
     def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
@@ -627,11 +501,6 @@ class ProofPanel(BasePanel):
             new_g.set_phase(first, old_phase - phase)
             new_g.set_phase(second, phase)
 
-        # #region agent log
-        import json, time
-        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
-            f.write(json.dumps({"location":"proof_panel.py:_unfuse:call_finalize","message":"calling _finalize_unfuse for regular unfuse","data":{"v":v,"left_vert":left_vert,"old_v_coords":[float(self.graph.qubit(v)),float(self.graph.row(v))],"new_v_coords":[float(new_g.qubit(v)),float(new_g.row(v))],"new_left_coords":[float(new_g.qubit(left_vert)),float(new_g.row(left_vert))],"timestamp":int(time.time()*1000),"hypothesisId":"A"}}) + '\n')
-        # #endregion
         self._finalize_unfuse(v, new_g, extra_vertices=[left_vert])
 
     def _vert_double_clicked(self, v: VT) -> None:
@@ -641,7 +510,10 @@ class ProofPanel(BasePanel):
         if ty in (VertexType.Z, VertexType.X):
             new_g = copy.deepcopy(self.graph)
             pyzx.rewrite_rules.color_change(new_g, v)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Color change spider")
+            cmd = AddRewriteStep(
+                self.graph_view, new_g, self.step_view, "Color change spider",
+                highlight_verts=[v],
+            )
             self.undo_stack.push(cmd)
             return
         if ty == VertexType.H_BOX:
@@ -649,7 +521,10 @@ class ProofPanel(BasePanel):
             if not pyzx.rewrite_rules.check_hadamard(new_g, v):
                 return
             pyzx.rewrite_rules.replace_hadamard(new_g, v)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn Hadamard into edge")
+            cmd = AddRewriteStep(
+                self.graph_view, new_g, self.step_view, "Turn Hadamard into edge",
+                highlight_verts=[v],
+            )
             self.undo_stack.push(cmd)
             return
         if ty == VertexType.DUMMY:
@@ -663,8 +538,12 @@ class ProofPanel(BasePanel):
         """When an edge is double clicked, we change it to an H-box if it is a Hadamard edge."""
         new_g = copy.deepcopy(self.graph)
         if new_g.edge_type(e) == EdgeType.HADAMARD:
+            s, t = new_g.edge_st(e)
             pyzx.rewrite_rules.had_edge_to_hbox(new_g, *new_g.edge_st(e))
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Turn edge into Hadamard")
+            cmd = AddRewriteStep(
+                self.graph_view, new_g, self.step_view, "Turn edge into Hadamard",
+                highlight_verts=[s, t],
+            )
             self.undo_stack.push(cmd)
 
     def _dummy_node_mode_clicked(self) -> None:

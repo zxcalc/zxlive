@@ -97,16 +97,10 @@ class RewriteAction:
         rem_verts_list: list[VT] = []
         matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
 
-        # For semantic highlighting: when applying the Fuse spiders rule via the
-        # rewrite tree, we want to track *exactly* which physical node survives
-        # each fusion. We therefore record its (qubit, row) coordinates instead
-        # of its transient integer ID, since IDs may be shuffled later in the
-        # pipeline while coordinates remain stable.
         is_fuse_rule = (
             self.name == rules_basic["fuse_simp"]["text"]
             and self.match_type == MATCH_DOUBLE
         )
-        highlight_coords: set[tuple[int, int]] | None = None
         highlight_match_pairs: list[tuple[VT, VT]] | None = None
 
         while True:
@@ -136,22 +130,6 @@ class RewriteAction:
                         rule_dv = cast(RewriteDoubleVertex, self.rule)
                         v1, v2 = cast(tuple[VT, VT], m)
                         if is_fuse_rule:
-                            # For Fuse spiders, record BOTH vertices that take
-                            # part in each match using the original graph's
-                            # coordinates. This lets the proof view highlight
-                            # all participating spiders, while edge filtering
-                            # determines which incident edges actually change.
-                            if highlight_coords is None:
-                                highlight_coords = set()
-                            for vv in (v1, v2):
-                                try:
-                                    q0 = int(base_g.qubit(vv))
-                                    r0 = int(base_g.row(vv))
-                                    highlight_coords.add((q0, r0))
-                                except Exception:
-                                    continue
-                            # Store (v1, v2) so move_to_step can find the fusion edge
-                            # via incident_edges(v1) instead of g.edges(v1,v2).
                             if highlight_match_pairs is None:
                                 highlight_match_pairs = []
                             highlight_match_pairs.append((v1, v2))
@@ -177,13 +155,11 @@ class RewriteAction:
             if not self.repeat_rule_application or not applied:
                 break
 
-        coord_list = sorted(highlight_coords) if highlight_coords else None
         cmd = AddRewriteStep(
             panel.graph_view,
             g,
             panel.step_view,
             self.name,
-            highlight_coords=coord_list if is_fuse_rule else None,
             highlight_match_pairs=highlight_match_pairs if is_fuse_rule else None,
         )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)

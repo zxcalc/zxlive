@@ -12,9 +12,18 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
-from pyzx.graph.diff import GraphDiff
 from .common import GraphT, ET
 from .settings import display_setting
+
+
+def _edges_between(g: GraphT, v1: int, v2: int) -> set[ET]:
+    """Return the set of edges between v1 and v2 in g."""
+    out: set[ET] = set()
+    for e in g.incident_edges(v1):
+        s, t = g.edge_st(e)
+        if (s == v1 and t == v2) or (s == v2 and t == v1):
+            out.add(e)
+    return out
 
 
 class Rewrite(NamedTuple):
@@ -24,25 +33,11 @@ class Rewrite(NamedTuple):
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
-    # Optional semantic highlight information for this step. When present,
-    # this is preferred over GraphDiff-based highlighting.
-    #
-    # - highlight_verts / highlight_edges:
-    #     Legacy ID-based highlighting (vertex/edge IDs).
-    # - highlight_coords:
-    #     Coordinate-based highlighting using (qubit, row) pairs. This is
-    #     robust against internal vertex ID reindexing.
-    # - highlight_match_pairs:
-    #     For MATCH_DOUBLE (e.g. Spider Fusion): [(v1, v2), ...] in the graph
-    #     at step i; used for forward highlighting (only the edge between v1,v2).
-    # - highlight_unfuse_verts:
-    #     For unfuse operations: exact vertex IDs to highlight in the current graph
-    #
-    highlight_verts: Optional[list[int]] = None
-    highlight_edges: Optional[list[ET]] = None
-    highlight_coords: Optional[list[tuple[int, int]]] = None
+    # Optional semantic highlight for forward highlighting:
+    # - highlight_match_pairs: For MATCH_DOUBLE (e.g. Spider Fusion) [(v1, v2), ...].
+    # - highlight_verts: Vertex IDs to highlight (unfuse, color change, strong comp, remove id, etc.).
     highlight_match_pairs: Optional[list[tuple[int, int]]] = None
-    highlight_unfuse_verts: Optional[list[int]] = None
+    highlight_verts: Optional[list[int]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -51,11 +46,8 @@ class Rewrite(NamedTuple):
             "rule": self.rule,
             "graph": self.graph.to_dict(),
             "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None,
-            "highlight_verts": self.highlight_verts,
-            "highlight_edges": self.highlight_edges,
-            "highlight_coords": self.highlight_coords,
             "highlight_match_pairs": self.highlight_match_pairs,
-            "highlight_unfuse_verts": self.highlight_unfuse_verts,
+            "highlight_verts": self.highlight_verts,
         }
 
     def to_json(self) -> str:
@@ -74,25 +66,19 @@ class Rewrite(NamedTuple):
         assert isinstance(graph, GraphT)
         graph.set_auto_simplify(False)
 
-        coords = d.get("highlight_coords")
-        if coords is not None:
-            # Stored as lists in JSON; convert to tuples for internal use.
-            coords = [tuple(c) for c in coords]
-
         pairs = d.get("highlight_match_pairs")
         if pairs is not None:
             pairs = [tuple(p) for p in pairs]
+        # Backward compat: old proofs may have highlight_unfuse_verts
+        highlight_verts = d.get("highlight_verts") or d.get("highlight_unfuse_verts")
 
         return Rewrite(
             display_name=d.get("display_name", d["rule"]),  # Old proofs may not have display names
             rule=d["rule"],
             graph=graph,
             grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None,
-            highlight_verts=d.get("highlight_verts"),
-            highlight_edges=d.get("highlight_edges"),
-            highlight_coords=coords,
             highlight_match_pairs=pairs,
-            highlight_unfuse_verts=d.get("highlight_unfuse_verts"),
+            highlight_verts=highlight_verts,
         )
 
 
@@ -121,10 +107,8 @@ class ProofModel(QAbstractListModel):
                 old_step.rule,
                 graph,
                 old_step.grouped_rewrites,
-                old_step.highlight_verts,
-                old_step.highlight_edges,
-                old_step.highlight_coords,
                 old_step.highlight_match_pairs,
+                old_step.highlight_verts,
             )
             self.steps[index - 1] = new_step
 
@@ -209,8 +193,7 @@ class ProofModel(QAbstractListModel):
         # since Rewrite inherits NamedTuple and is hence immutable
         self.steps[index] = Rewrite(
             name, old_step.rule, old_step.graph, old_step.grouped_rewrites,
-            old_step.highlight_verts, old_step.highlight_edges, old_step.highlight_coords,
-            old_step.highlight_match_pairs,
+            old_step.highlight_match_pairs, old_step.highlight_verts,
         )
 
         # Rerender the proof step otherwise it will display the old name until
@@ -225,7 +208,7 @@ class ProofModel(QAbstractListModel):
             "Grouped",
             self.get_graph(end_index + 1),
             self.steps[start_index:end_index + 1],
-            None, None, None, None,
+            None, None,
         )
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
@@ -355,237 +338,39 @@ class ProofStepView(QListView):
         g_next = self.model().get_graph(index + 1)
 
         # 1) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
-        #    Use the rule's match (v1, v2) to highlight only those vertices and
-        #    the single edge between them. Find the edge via incident_edges(v1).
         highlight_match_pairs = getattr(rewrite_meta, "highlight_match_pairs", None)
         if highlight_match_pairs:
-            highlight_verts = set()
-            highlight_edges = set()
+            current_verts = set(g_current.vertices())
+            verts_set: set[int] = set()
+            edges_set: set[ET] = set()
             for match in highlight_match_pairs:
                 if isinstance(match, tuple) and len(match) == 2:
-                    v1, v2 = match
-                    v1, v2 = int(v1), int(v2)
-                    if v1 not in list(g_current.vertices()) or v2 not in list(g_current.vertices()):
+                    v1, v2 = int(match[0]), int(match[1])
+                    if v1 not in current_verts or v2 not in current_verts:
                         continue
-                    highlight_verts.add(v1)
-                    highlight_verts.add(v2)
-                    for e in g_current.incident_edges(v1):
-                        s, t = g_current.edge_st(e)
-                        if (s == v1 and t == v2) or (s == v2 and t == v1):
-                            highlight_edges.add(e)
-            # --- DEBUG: log data sent to UI (match_pairs branch) ---
-            print("\n=== GUI HIGHLIGHT DEBUG (match_pairs branch) ===")
-            print("1. highlight_match_pairs (raw):", highlight_match_pairs)
-            print("2. highlight_verts:", highlight_verts)
-            print("3. highlight_edges:", highlight_edges)
-            print("4. Each edge in highlight_edges -> edge_st(e):")
-            for e in highlight_edges:
-                print("   ", repr(e), "->", g_current.edge_st(e))
-            print("5. All incident edges of each vertex in highlight_verts:")
-            for v in highlight_verts:
-                inc = g_current.incident_edges(v)
-                print("   incident_edges({}) (n={}):".format(v, len(inc)))
-                for e in inc:
-                    print("     ", repr(e), "->", g_current.edge_st(e))
-            print("================================================\n")
-            # --- END DEBUG ---
-            scene.set_rewrite_highlight(highlight_verts, highlight_edges)
+                    verts_set.add(v1)
+                    verts_set.add(v2)
+                    edges_set |= _edges_between(g_current, v1, v2)
+            scene.set_rewrite_highlight(verts_set, edges_set)
             return
 
-        # 2) Unfuse-specific highlighting. highlight_unfuse_verts contains the two
-        # vertex IDs in the *next* graph (after split). In the *current* graph,
-        # when viewing the step before unfuse only one exists; when viewing after, both exist.
-        highlight_unfuse_verts = getattr(rewrite_meta, "highlight_unfuse_verts", None)
-        if highlight_unfuse_verts and rewrite_meta.rule and "unfuse" in rewrite_meta.rule.lower():
+        # 2) Vertex-based highlighting (unfuse, color change, strong comp, remove identity, etc.).
+        highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
+        if highlight_verts_list:
             current_verts = set(g_current.vertices())
-            highlight_verts = {v for v in highlight_unfuse_verts if v in current_verts}
-            highlight_edges: set[ET] = set()
-            # If both split vertices exist (viewing step after unfuse), highlight edge between them
-            if len(highlight_verts) >= 2:
-                vert_list = list(highlight_verts)
-                for i in range(len(vert_list)):
-                    v1 = vert_list[i]
-                    for j in range(i + 1, len(vert_list)):
-                        v2 = vert_list[j]
-                        for e in g_current.incident_edges(v1):
-                            s, t = g_current.edge_st(e)
-                            if (s == v1 and t == v2) or (s == v2 and t == v1):
-                                highlight_edges.add(e)
-            scene.set_rewrite_highlight(highlight_verts, highlight_edges)
-            return
-
-        # 3) Coordinate-based semantic highlight (when no match pairs or unfuse verts).
-        #    This maps stored (qubit, row) pairs onto the *current* graph's
-        #    vertices and then highlights those vertices and their incident
-        #    edges. This is robust to any internal vertex ID reindexing that
-        #    might occur between rewrite application and rendering.
-        highlight_coords = getattr(rewrite_meta, "highlight_coords", None)
-        if highlight_coords:
-            coord_set = {(int(q), int(r)) for (q, r) in highlight_coords}
-
-            # Build a mapping from (qubit,row) -> set[vertex] for both the
-            # current and next graphs so we can reason about structure in a
-            # coordinate-stable way.
-            def _coord_map(graph: GraphT) -> dict[tuple[int, int], set[int]]:
-                mapping: dict[tuple[int, int], set[int]] = {}
-                for v in graph.vertices():
-                    try:
-                        cq = int(graph.qubit(v))
-                        cr = int(graph.row(v))
-                    except Exception:
-                        continue
-                    mapping.setdefault((cq, cr), set()).add(v)
-                return mapping
-
-            coord_to_vs_current = _coord_map(g_current)
-            
-            # #region agent log
-            print(f"[COORD_MAP DEBUG] Coordinate to vertex mapping for g_current:")
-            for coord, verts in sorted(coord_to_vs_current.items()):
-                print(f"  {coord} -> {verts}")
-            print(f"[COORD_MAP DEBUG] Looking for coordinates: {coord_set}")
-            # #endregion
-
-            # Vertices to highlight: all vertices in the current graph whose
-            # coordinates fall inside the semantic focus region.
-            highlight_verts: set[int] = set()
-            for c in coord_set:
-                verts_at_coord = coord_to_vs_current.get(c, set())
-                # #region agent log
-                print(f"[COORD_MAP DEBUG] Coord {c} maps to vertices: {verts_at_coord}")
-                # #endregion
-                highlight_verts.update(verts_at_coord)
-
-            # Edges to highlight depend on the rewrite:
-            # - For Fuse spiders, we only highlight edges whose endpoints are
-            #   both among the highlighted vertices (i.e., the fusion edge(s)).
-            # - For other rewrites using coordinate metadata, we fall back to
-            #   structural edge changes near the focus region.
-            rule_name = (rewrite_meta.rule or "").lower()
-            # Treat as fuse when we have exactly two vertices (the two spiders being
-            # fused) or when rule name clearly indicates fuse; then only highlight
-            # the edge between those two, not all incident edges.
-            is_fuse_like = (
-                len(highlight_verts) == 2
-                or ("fuse" in rule_name and "spider" in rule_name)
-            )
-
-            highlight_edges: set[ET] = set()
-
-            # DEBUG: why did we take fuse vs generic branch?
-            print("[DEBUG coords] rule_name=%r is_fuse_like=%s len(highlight_verts)=%s"
-                  % (rewrite_meta.rule, is_fuse_like, len(highlight_verts)))
-
-            if is_fuse_like:
-                # Only the edge(s) between the matched pair. Use incident_edges(v1)
-                # so we get the same edge object as the scene's edge_map (avoids
-                # any g.edges(v1,v2) return-value mismatch).
-                vert_list = list(highlight_verts)
-                for i in range(len(vert_list)):
-                    for j in range(i + 1, len(vert_list)):
-                        v1, v2 = vert_list[i], vert_list[j]
-                        for e in g_current.incident_edges(v1):
-                            s, t = g_current.edge_st(e)
-                            if (s == v1 and t == v2) or (s == v2 and t == v1):
-                                highlight_edges.add(e)
+            verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}
+            edges_set: set[ET] = set()
+            if len(verts_set) == 2:
+                s = sorted(verts_set)
+                edges_set = _edges_between(g_current, s[0], s[1])
             else:
-                # Generic path: only edges that are structurally changed between
-                # g_current and g_next in the focus region.
-                # #region agent log
-                print(f"[PROOF_DEBUG else branch] rule_name='{rule_name}', entering generic edge highlighting")
-                # #endregion
-                
-                # Original generic path for non-unfuse operations
-                def _edge_signatures_near_coords(graph: GraphT) -> set[tuple[tuple[int, int], tuple[int, int], Any]]:
-                    sigs: set[tuple[tuple[int, int], tuple[int, int], Any]] = set()
-                    for e in graph.edges():
-                        s, t = graph.edge_st(e)
-                        try:
-                            cs = (int(graph.qubit(s)), int(graph.row(s)))
-                            ct = (int(graph.qubit(t)), int(graph.row(t)))
-                        except Exception:
-                            continue
-                        # Only care about edges that touch the focus region.
-                        if cs not in coord_set and ct not in coord_set:
-                            continue
-                        et = graph.edge_type(e)
-                        if cs <= ct:
-                            sig = (cs, ct, et)
-                        else:
-                            sig = (ct, cs, et)
-                        sigs.add(sig)
-                    return sigs
-
-                sigs_next = _edge_signatures_near_coords(g_next)
-
-                seen_edges: set[ET] = set()
-                for v in highlight_verts:
+                for v in verts_set:
                     for e in g_current.incident_edges(v):
-                        if e in seen_edges:
-                            continue
-                        seen_edges.add(e)
-                        s, t = g_current.edge_st(e)
-                        try:
-                            cs = (int(g_current.qubit(s)), int(g_current.row(s)))
-                            ct = (int(g_current.qubit(t)), int(g_current.row(t)))
-                        except Exception:
-                            continue
-                        if cs not in coord_set and ct not in coord_set:
-                            continue
-                        et = g_current.edge_type(e)
-                        if cs <= ct:
-                            sig_cur = (cs, ct, et)
-                        else:
-                            sig_cur = (ct, cs, et)
-                        # Only highlight edges that are structurally changed
-                        # between g_current and g_next.
-                        if sig_cur not in sigs_next:
-                            highlight_edges.add(e)
-
-            # --- DEBUG: log data sent to UI (coords branch) ---
-            print("\n=== GUI HIGHLIGHT DEBUG (coords branch) ===")
-            print("1. highlight_coords / coord_set:", coord_set)
-            print("2. highlight_verts:", highlight_verts)
-            print("3. highlight_edges:", highlight_edges)
-            print("4. Each edge in highlight_edges -> edge_st(e):")
-            for e in highlight_edges:
-                print("   ", repr(e), "->", g_current.edge_st(e))
-            print("5. All incident edges of each vertex in highlight_verts:")
-            for v in highlight_verts:
-                inc = g_current.incident_edges(v)
-                print("   incident_edges({}) (n={}):".format(v, len(inc)))
-                for e in inc:
-                    print("     ", repr(e), "->", g_current.edge_st(e))
-            print("============================================\n")
-            # --- END DEBUG ---
-            scene.set_rewrite_highlight(highlight_verts, highlight_edges)
+                        edges_set.add(e)
+            scene.set_rewrite_highlight(verts_set, edges_set)
             return
 
-        # 3) Fallback: structural diff-based highlighting for steps that do
-        #    not carry explicit semantic metadata.
-        diff = GraphDiff(g_current, g_next)
-
-        # Vertices: include those whose type or phase changes, as well as
-        # vertices that are about to be removed.
-        highlight_verts = set(diff.removed_verts)
-        highlight_verts.update(diff.changed_vertex_types)
-        highlight_verts.update(diff.changed_phases)
-
-        # Edges: only those that are structurally or semantically changed
-        # (created, removed, or with changed data/type). New edges only exist
-        # in the next graph so they cannot be highlighted on the current one.
-        highlight_edges: set[ET] = set()
-
-        for e in diff.removed_edges:
-            highlight_edges.add(e)
-
-        for e in diff.changed_edata:
-            highlight_edges.add(e)
-
-        for e in diff.changed_edge_types:
-            highlight_edges.add(e)
-
-        scene.set_rewrite_highlight(highlight_verts, highlight_edges)
+        scene.clear_rewrite_highlight()
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()

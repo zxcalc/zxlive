@@ -9,7 +9,6 @@ from typing import Callable, Iterable, Optional, Set, Union
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
-from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
@@ -443,21 +442,8 @@ class AddRewriteStep(UpdateGraph):
     """
     step_view: QListView
     name: str
-    diff: Optional[GraphDiff] = None
-    # Optional semantic highlight information for this rewrite step.
-    #
-    # - highlight_verts / highlight_edges:
-    #     Legacy ID-based highlighting (vertex/edge IDs).
-    # - highlight_coords:
-    #     Coordinate-based highlighting using (qubit, row) pairs. This is
-    #     robust against internal vertex ID reindexing.
-    # - highlight_match_pairs: For MATCH_DOUBLE, [(v1, v2), ...] in the graph at step i.
-    # - highlight_unfuse_verts: For unfuse operations, exact vertex IDs to highlight
-    highlight_verts: Optional[set[VT]] = None
-    highlight_edges: Optional[set[ET]] = None
-    highlight_coords: Optional[list[tuple[int, int]]] = None
     highlight_match_pairs: Optional[list[tuple[int, int]]] = None
-    highlight_unfuse_verts: Optional[list[int]] = None
+    highlight_verts: Optional[list[int]] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -475,13 +461,10 @@ class AddRewriteStep(UpdateGraph):
         for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
             self._old_steps.append(self.proof_model.pop_rewrite())
 
-        hv_list = sorted(self.highlight_verts) if self.highlight_verts else None
-        he_list = sorted(self.highlight_edges) if self.highlight_edges else None
-        hc_list = list(self.highlight_coords) if self.highlight_coords else None
         hp_list = list(self.highlight_match_pairs) if self.highlight_match_pairs else None
-        hu_list = list(self.highlight_unfuse_verts) if self.highlight_unfuse_verts else None
+        hv_list = list(self.highlight_verts) if self.highlight_verts else None
         self.proof_model.add_rewrite(
-            Rewrite(self.name, self.name, self.new_g, None, hv_list, he_list, hc_list, hp_list, hu_list)
+            Rewrite(self.name, self.name, self.new_g, None, hp_list, hv_list)
         )
 
         # Move to the added step so that the graph view and rewrite-step
