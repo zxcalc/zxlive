@@ -140,8 +140,8 @@ def main() -> None:
     zxl = ZXLive()
     if sys.platform == "darwin":  # 'darwin' is macOS
         if dark_mode_setting == "dark":
-            zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Dark)  # type: ignore[attr-defined]
         elif dark_mode_setting == "light":
-            zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)
+            zxl.styleHints().setColorScheme(Qt.ColorScheme.Light)  # type: ignore[attr-defined]
         # For "system", don't set the color scheme to let Qt auto-detect
     zxl.exec_()

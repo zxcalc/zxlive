@@ -357,15 +357,16 @@ class ProofStepView(QListView):
         highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
         if highlight_verts_list:
             verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}
-            edges_set: set[ET] = set()
+            edges_highlight: set[ET]
             if len(verts_set) == 2:
                 s = sorted(verts_set)
-                edges_set = _edges_between(g_current, s[0], s[1])
+                edges_highlight = _edges_between(g_current, s[0], s[1])
             else:
+                edges_highlight = set()
                 for v in verts_set:
                     for e in g_current.incident_edges(v):
-                        edges_set.add(e)
-            scene.set_rewrite_highlight(verts_set, edges_set)
+                        edges_highlight.add(e)
+            scene.set_rewrite_highlight(verts_set, edges_highlight)
             return
 
         scene.clear_rewrite_highlight()

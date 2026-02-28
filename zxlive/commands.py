@@ -440,7 +440,7 @@ class AddRewriteStep(UpdateGraph):
     The rewrite is inserted after the currently selected step. In particular, it
     replaces all rewrites that were previously after the current selection.
     """
-    step_view: QListView
+    step_view: ProofStepView
     name: str
     highlight_match_pairs: Optional[list[tuple[int, int]]] = None
     highlight_verts: Optional[list[int]] = None
