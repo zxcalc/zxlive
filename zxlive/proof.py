@@ -406,6 +406,37 @@ class ProofStepView(QListView):
         model_index = self.model().index(step_idx + 1, 0)
         self.model().dataChanged.emit(model_index, model_index, [])
 
+    def _click_target_for_pos(self, event: QMouseEvent) -> tuple[int, bool, int]:
+        """Classify a mouse-press into (toggle_idx, sub_step_clicked, step_idx).
+
+        toggle_idx      – step index whose triangle was clicked, or -1
+        sub_step_clicked – True when a sub-step row was clicked
+        step_idx        – the step row the click landed on (only meaningful
+                          when toggle_idx >= 0 or sub_step_clicked is True)
+        """
+        index = self.indexAt(event.pos())
+        if not index.isValid() or index.row() <= 0:
+            return -1, False, -1
+        step_idx = index.row() - 1
+        if step_idx >= len(self.model().steps):
+            return -1, False, -1
+        step = self.model().steps[step_idx]
+        if step.grouped_rewrites is None:
+            return -1, False, -1
+        delegate = self.itemDelegate()
+        if not isinstance(delegate, ProofStepItemDelegate):
+            return -1, False, -1
+        rect = self.visualRect(index)
+        if self._triangle_hit_test(step_idx, int(event.pos().x()), int(event.pos().y()),
+                                   rect.x(), rect.y()):
+            return step_idx, False, step_idx   # triangle clicked → toggle
+        if step_idx in self.expanded_groups:
+            sub_idx = self._sub_step_hit_test(step_idx, int(event.pos().y()), rect.y())
+            if sub_idx >= 0:
+                self._navigate_to_sub_step(step_idx, sub_idx)
+                return -1, True, step_idx      # sub-step clicked
+        return -1, False, -1
+
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         """Handle mouse clicks on grouped steps to toggle expansion.
 
@@ -413,34 +444,12 @@ class ProofStepView(QListView):
         Clicking on a sub-step navigates to that sub-step's graph.
         """
         index = self.indexAt(event.pos())
-        toggle_idx = -1
-        sub_step_clicked = False
         # Save old sub-step selection; if the user clicks a sub-step in a
         # different group we need to repaint the old group's row to clear
         # its stale highlight.
         old_sub_step = self.selected_sub_step
 
-        if index.isValid() and index.row() > 0:
-            step_idx = index.row() - 1
-            if step_idx < len(self.model().steps):
-                step = self.model().steps[step_idx]
-                if step.grouped_rewrites is not None:
-                    delegate = self.itemDelegate()
-                    if isinstance(delegate, ProofStepItemDelegate):
-                        rect = self.visualRect(index)
-                        # Check if clicking on the triangle
-                        if self._triangle_hit_test(step_idx, int(event.pos().x()), int(event.pos().y()),
-                                                   rect.x(), rect.y()):
-                            toggle_idx = step_idx
-                        elif step_idx in self.expanded_groups:
-                            # Expanded: check if clicking on a sub-step
-                            sub_idx = self._sub_step_hit_test(
-                                step_idx, int(event.pos().y()), rect.y()
-                            )
-                            if sub_idx >= 0:
-                                # Clicked on a sub-step
-                                sub_step_clicked = True
-                                self._navigate_to_sub_step(step_idx, sub_idx)
+        toggle_idx, sub_step_clicked, step_idx = self._click_target_for_pos(event)
 
         # Clear sub-step selection when clicking on a non-sub-step area
         if not sub_step_clicked and self.selected_sub_step is not None:
@@ -471,6 +480,28 @@ class ProofStepView(QListView):
         """Trigger repaint for a step row by its 0-based step index."""
         self.update(self.model().index(step_idx + 1, 0))
 
+    def _hover_target_for_pos(self, pos: Any) -> tuple[int, int, int]:
+        """Return (new_step, new_sub, new_header) for the given mouse position.
+
+        Each value is -1 when not applicable.
+        """
+        index = self.indexAt(pos)
+        if not index.isValid() or index.row() <= 0:
+            return -1, -1, -1
+        step_idx = index.row() - 1
+        if step_idx >= len(self.model().steps):
+            return -1, -1, -1
+        step = self.model().steps[step_idx]
+        if step.grouped_rewrites is None:
+            return -1, -1, -1
+        if step_idx not in self.expanded_groups:
+            return -1, -1, step_idx
+        rect = self.visualRect(index)
+        sub_idx = self._sub_step_hit_test(step_idx, int(pos.y()), rect.y())
+        if sub_idx >= 0:
+            return step_idx, sub_idx, -1
+        return -1, -1, step_idx
+
     def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         """Track which sub-step the mouse is hovering over and trigger repaint."""
         delegate = self.itemDelegate()
@@ -481,28 +512,7 @@ class ProofStepView(QListView):
         old_step = delegate.hover_step_idx
         old_sub = delegate.hover_sub_idx
         old_header = delegate.hover_header_step_idx
-        new_step = -1
-        new_sub = -1
-        new_header = -1
-
-        index = self.indexAt(event.pos())
-        if index.isValid() and index.row() > 0:
-            step_idx = index.row() - 1
-            if step_idx < len(self.model().steps):
-                step = self.model().steps[step_idx]
-                if step.grouped_rewrites is not None:
-                    if step_idx in self.expanded_groups:
-                        rect = self.visualRect(index)
-                        sub_idx = self._sub_step_hit_test(
-                            step_idx, int(event.pos().y()), rect.y()
-                        )
-                        if sub_idx >= 0:
-                            new_step = step_idx
-                            new_sub = sub_idx
-                        else:
-                            new_header = step_idx
-                    else:
-                        new_header = step_idx
+        new_step, new_sub, new_header = self._hover_target_for_pos(event.pos())
 
         if new_step != old_step or new_sub != old_sub:
             delegate.hover_step_idx = new_step
