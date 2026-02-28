@@ -335,12 +335,11 @@ class ProofStepView(QListView):
             return
         # There is a rewrite taking graph index -> index + 1.
         rewrite_meta = self.model().steps[index]
-        g_next = self.model().get_graph(index + 1)
+        current_verts = set(g_current.vertices())
 
         # 1) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
         highlight_match_pairs = getattr(rewrite_meta, "highlight_match_pairs", None)
         if highlight_match_pairs:
-            current_verts = set(g_current.vertices())
             verts_set: set[int] = set()
             edges_set: set[ET] = set()
             for match in highlight_match_pairs:
@@ -357,7 +356,6 @@ class ProofStepView(QListView):
         # 2) Vertex-based highlighting (unfuse, color change, strong comp, remove identity, etc.).
         highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
         if highlight_verts_list:
-            current_verts = set(g_current.vertices())
             verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}
             edges_set: set[ET] = set()
             if len(verts_set) == 2:
