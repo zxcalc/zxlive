@@ -286,7 +286,8 @@ class ProofPanel(BasePanel):
         new_g.remove_edge(item.e)
 
         anim = anims.add_id(v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity")
+        hint = {"edge_pairs": [(s, t)]}
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Add identity", diff_highlight_hint=hint)
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 

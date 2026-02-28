@@ -12,7 +12,7 @@ from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
-from .common import GraphT
+from .common import GraphT, get_settings_value
 from .settings import display_setting
 
 
@@ -95,6 +95,9 @@ def apply_step_difference_highlighting(
         current.set_edata(e, "diff_highlight", False)
 
     if next_graph is None:
+        return
+
+    if not get_settings_value("highlight-differences", bool):
         return
 
     if highlight_hint is not None:
