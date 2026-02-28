@@ -270,22 +270,31 @@ class ProofPanel(BasePanel):
 
     def _coords_for_vertex_and_neighbors(self, v: VT) -> set[tuple[int, int]]:
         """Return a small local coordinate set around v for semantic highlighting."""
-        g = self.graph_scene.g
+        return self._coords_for_vertices_in_graph(self.graph_scene.g, [v])
+
+    def _coords_for_vertices_in_graph(
+        self, g: GraphT, vertices: list[VT]
+    ) -> set[tuple[int, int]]:
+        """Return coordinate set for given vertices and their neighbors in graph g.
+        Use the graph that will be displayed when the step is selected (e.g. new_g
+        after a rewrite), so coords map correctly to vertices in that graph.
+        """
         coords: set[tuple[int, int]] = set()
-        try:
-            coords.add((int(g.qubit(v)), int(g.row(v))))
-        except Exception:
-            return coords
-        try:
-            for e in g.incident_edges(v):
-                s, t = g.edge_st(e)
-                for u in (s, t):
-                    try:
-                        coords.add((int(g.qubit(u)), int(g.row(u))))
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+        for v in vertices:
+            try:
+                coords.add((int(g.qubit(v)), int(g.row(v))))
+            except Exception:
+                continue
+            try:
+                for e in g.incident_edges(v):
+                    s, t = g.edge_st(e)
+                    for u in (s, t):
+                        try:
+                            coords.add((int(g.qubit(u)), int(g.row(u))))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
         return coords
 
     def _magic_hopf(self, trace: WandTrace) -> bool:
@@ -360,6 +369,9 @@ class ProofPanel(BasePanel):
         return True
 
     def _magic_slice(self, trace: WandTrace) -> bool:
+        # #region agent log
+        print(f"[MAGIC_WAND DEBUG] _magic_slice called with trace containing {len(trace.hit)} items")
+        # #endregion
         def cross(a: QPointF, b: QPointF) -> float:
             return float(a.y() * b.x() - a.x() * b.y())
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
@@ -370,7 +382,11 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX, VertexType.W_OUTPUT):
             return False
 
-        if not trace.shift and pyzx.rewrite_rules.check_remove_id(self.graph, vertex):
+        # #region agent log
+        is_identity = pyzx.rewrite_rules.check_remove_id(self.graph, vertex)
+        print(f"[MAGIC_WAND DEBUG] Vertex {vertex} - is_identity: {is_identity}, shift pressed: {trace.shift}, type: {self.graph.type(vertex)}, phase: {self.graph.phase(vertex) if self.graph.type(vertex) != VertexType.Z_BOX else 'Z_BOX'}, degree: {len(list(self.graph.neighbors(vertex)))}")
+        # #endregion
+        if not trace.shift and is_identity:
             self._remove_id(vertex)
             return True
 
@@ -420,10 +436,16 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
             self._unfuse_w(vertex, left, mouse_dir)
         else:
+            # #region agent log
+            print(f"[MAGIC_WAND DEBUG] Calling _unfuse for vertex {vertex} with {len(left)} left edges and {len(right)} right edges")
+            # #endregion
             self._unfuse(vertex, left, right, mouse_dir, phase)
         return True
 
     def _remove_id(self, v: VT) -> None:
+        # #region agent log
+        print(f"[MAGIC_WAND DEBUG] _remove_id called for vertex {v}")
+        # #endregion
         coord_list = sorted(self._coords_for_vertex_and_neighbors(v))
         new_g = copy.deepcopy(self.graph)
         pyzx.rewrite_rules.remove_id(new_g, v)
@@ -460,12 +482,52 @@ class ProofPanel(BasePanel):
                 new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge))
                 new_g.remove_edge(edge)
 
-    def _finalize_unfuse(self, v: VT, new_g: GraphT) -> None:
-        """Helper method to apply animation and push the unfuse command to the undo stack.
+    def _finalize_unfuse(
+        self, v: VT, new_g: GraphT, extra_vertices: Optional[list[VT]] = None
+    ) -> None:
+        """Helper to apply animation and push the unfuse command to the undo stack.
+        Uses coords from new_g (the graph we display when this step is selected)
+        so highlighting maps to the correct vertices after the rewrite.
         """
+        # #region agent log
+        import json, time
+        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps({"location":"proof_panel.py:_finalize_unfuse:entry","message":"_finalize_unfuse called","data":{"v":v,"extra_vertices":extra_vertices,"old_graph_verts":list(self.graph.vertices()),"new_graph_verts":list(new_g.vertices())},"timestamp":int(time.time()*1000),"hypothesisId":"A"}) + '\n')
+        # #endregion
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        coord_list = sorted(self._coords_for_vertex_and_neighbors(v))
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse", highlight_coords=coord_list)
+        verts = [v] + (extra_vertices or [])
+        # #region agent log
+        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps({"location":"proof_panel.py:_finalize_unfuse:verts","message":"verts to highlight","data":{"verts":verts},"timestamp":int(time.time()*1000),"hypothesisId":"A"}) + '\n')
+        # #endregion
+        # For unfuse, only highlight the split vertices themselves, not their neighbors
+        coord_list = []
+        for v_id in verts:
+            try:
+                q = int(new_g.qubit(v_id))
+                r = int(new_g.row(v_id))
+                coord_list.append((q, r))
+                # #region agent log
+                print(f"[MAGIC_WAND DEBUG] Vertex {v_id} is at coordinate ({q}, {r})")
+                # #endregion
+            except Exception as e:
+                # #region agent log
+                print(f"[MAGIC_WAND DEBUG] Failed to get coords for vertex {v_id}: {e}")
+                # #endregion
+                pass
+        coord_list = sorted(set(coord_list))
+        # #region agent log
+        print(f"[MAGIC_WAND DEBUG] _finalize_unfuse computed coord_list: {coord_list} for verts: {verts}")
+        print(f"[MAGIC_WAND DEBUG] Vertices in new_g at these coordinates:")
+        for coord in coord_list:
+            verts_at_coord = [v for v in new_g.vertices() if (int(new_g.qubit(v)), int(new_g.row(v))) == coord]
+            print(f"  {coord} -> vertices: {verts_at_coord}")
+        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps({"location":"proof_panel.py:_finalize_unfuse:coords","message":"coord_list computed","data":{"coord_list":coord_list,"graph_used":"new_g"},"timestamp":int(time.time()*1000),"hypothesisId":"C"}) + '\n')
+        # #endregion
+        # For unfuse, pass the exact vertex IDs to avoid ambiguity with coordinate mapping
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse", 
+                           highlight_coords=coord_list, highlight_unfuse_verts=verts)
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
@@ -500,7 +562,12 @@ class ProofPanel(BasePanel):
 
         # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
         self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items, skip_edge_type=EdgeType.W_IO)
-        self._finalize_unfuse(v, new_g)
+        # #region agent log
+        import json, time
+        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps({"location":"proof_panel.py:_unfuse_w:call_finalize","message":"calling _finalize_unfuse for W unfuse","data":{"v":v,"left_vert":left_vert,"left_vert_i":left_vert_i},"timestamp":int(time.time()*1000),"hypothesisId":"A"}) + '\n')
+        # #endregion
+        self._finalize_unfuse(v, new_g, extra_vertices=[left_vert, left_vert_i])
 
     def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
         def snap_vector(v: QVector2D) -> None:
@@ -560,7 +627,12 @@ class ProofPanel(BasePanel):
             new_g.set_phase(first, old_phase - phase)
             new_g.set_phase(second, phase)
 
-        self._finalize_unfuse(v, new_g)
+        # #region agent log
+        import json, time
+        with open('/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log', 'a') as f:
+            f.write(json.dumps({"location":"proof_panel.py:_unfuse:call_finalize","message":"calling _finalize_unfuse for regular unfuse","data":{"v":v,"left_vert":left_vert,"old_v_coords":[float(self.graph.qubit(v)),float(self.graph.row(v))],"new_v_coords":[float(new_g.qubit(v)),float(new_g.row(v))],"new_left_coords":[float(new_g.qubit(left_vert)),float(new_g.row(left_vert))],"timestamp":int(time.time()*1000),"hypothesisId":"A"}}) + '\n')
+        # #endregion
+        self._finalize_unfuse(v, new_g, extra_vertices=[left_vert])
 
     def _vert_double_clicked(self, v: VT) -> None:
         ty = self.graph.type(v)

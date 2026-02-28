@@ -452,10 +452,12 @@ class AddRewriteStep(UpdateGraph):
     #     Coordinate-based highlighting using (qubit, row) pairs. This is
     #     robust against internal vertex ID reindexing.
     # - highlight_match_pairs: For MATCH_DOUBLE, [(v1, v2), ...] in the graph at step i.
+    # - highlight_unfuse_verts: For unfuse operations, exact vertex IDs to highlight
     highlight_verts: Optional[set[VT]] = None
     highlight_edges: Optional[set[ET]] = None
     highlight_coords: Optional[list[tuple[int, int]]] = None
     highlight_match_pairs: Optional[list[tuple[int, int]]] = None
+    highlight_unfuse_verts: Optional[list[int]] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -477,8 +479,9 @@ class AddRewriteStep(UpdateGraph):
         he_list = sorted(self.highlight_edges) if self.highlight_edges else None
         hc_list = list(self.highlight_coords) if self.highlight_coords else None
         hp_list = list(self.highlight_match_pairs) if self.highlight_match_pairs else None
+        hu_list = list(self.highlight_unfuse_verts) if self.highlight_unfuse_verts else None
         self.proof_model.add_rewrite(
-            Rewrite(self.name, self.name, self.new_g, None, hv_list, he_list, hc_list, hp_list)
+            Rewrite(self.name, self.name, self.new_g, None, hv_list, he_list, hc_list, hp_list, hu_list)
         )
 
         # Move to the added step so that the graph view and rewrite-step
