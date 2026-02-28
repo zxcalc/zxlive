@@ -169,7 +169,8 @@ class UnfusionRewriteAction:
 
         from .rewrite_data import rules_basic
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                             self.proof_panel.step_view, str(rules_basic['unfuse']['text']))
+                             self.proof_panel.step_view, str(rules_basic['unfuse']['text']),
+                             matched_vertices=[node1, node2])
         anim_after = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
 
         # Pulse the original vertex before the graph updates so the user sees

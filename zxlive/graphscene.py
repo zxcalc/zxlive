@@ -231,7 +231,8 @@ class GraphScene(QGraphicsScene):
                 ei.reset_color()
                 ei.refresh()
 
-    def highlight_diff(self, diff: GraphDiff, direction: str = "forward") -> None:
+    def highlight_diff(self, diff: GraphDiff, direction: str = "forward",
+                       matched_vertices: Optional[list[VT]] = None) -> None:
         """Highlight vertices and edges that differ between proof steps.
 
         Only *semantically meaningful* changes are highlighted.  Cosmetic
@@ -265,6 +266,7 @@ class GraphScene(QGraphicsScene):
         :param diff: A :class:`GraphDiff` between the current graph and an
             adjacent step.
         :param direction: ``"forward"`` or ``"backward"``.
+        :param matched_vertices: Optional list of vertices that were explicitly matched by the rule.
         """
         if not display_setting.show_diff_highlights:
             return
@@ -310,24 +312,18 @@ class GraphScene(QGraphicsScene):
 
             for e in diff.removed_edges:
                 s, t, *_ = e
-                if s == t:
+                if s == t:  # Ignore self-loops
                     continue
                 if e in self.edge_map:
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "removed"
                         eitem.refresh()
             
-            # Mark surviving endpoints of fusion/identity rules as "changed".
-            # We use a heuristic: if a node connected to a removed node has the
-            # same vertex type, it was likely part of a spider fusion or removal,
-            # so we highlight it as structurally affected. This avoids highlighting
-            # unrelated external neighbors of different types.
-            for e in diff.removed_edges:
-                s, t, *_ = e
-                if s in diff.removed_verts and t not in diff.removed_verts and self.g.type(s) == self.g.type(t):
-                    _mark_endpoint_changed(t)
-                if t in diff.removed_verts and s not in diff.removed_verts and self.g.type(s) == self.g.type(t):
-                    _mark_endpoint_changed(s)
+            # Highlight surviving matched vertices explicitly
+            if matched_vertices:
+                for v in matched_vertices:
+                    if v not in diff.removed_verts:
+                        _mark_endpoint_changed(v)
 
             for e in changed_edges:
                 if e in self.edge_map:
@@ -359,14 +355,12 @@ class GraphScene(QGraphicsScene):
                         eitem._diff_highlight = "added"
                         eitem.refresh()
 
-            # Mark endpoints of new edges as "changed" if they are the SAME TYPE
-            # to capture the unfusion survivor explicitly.
-            for (s, t), _ in diff.new_edges:
-                if s in diff.new_verts and t not in diff.new_verts and self.g.type(s) == self.g.type(t):
-                    _mark_endpoint_changed(t)
-                if t in diff.new_verts and s not in diff.new_verts and self.g.type(s) == self.g.type(t):
-                    _mark_endpoint_changed(s)
-
+            # Highlight surviving matched vertices explicitly
+            # (In reverse, the `matched_vertices` might refer to surviving node)
+            if matched_vertices:
+                for v in matched_vertices:
+                    if v not in diff.new_verts:
+                        _mark_endpoint_changed(v)
 
             for e in changed_edges:
                 if e in self.edge_map:

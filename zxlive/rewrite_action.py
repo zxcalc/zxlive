@@ -139,7 +139,15 @@ class RewriteAction:
             if not self.repeat_rule_application or not applied:
                 break
 
-        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
+        all_matched_verts: list[VT] = []
+        for m in matches_list:
+            if isinstance(m, tuple):
+                all_matched_verts.extend(m)
+            elif not isinstance(m, list):
+                all_matched_verts.append(m)
+
+        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name,
+                             matched_vertices=all_matched_verts or None)
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
-from .common import GraphT
+from .common import GraphT, VT, ET
 from .settings import display_setting
 
 
@@ -23,6 +23,7 @@ class Rewrite(NamedTuple):
     display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
+    matched_vertices: Optional[list[VT]] = None  # The vertices that were matched/clicked for this rule
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
 
     def to_dict(self) -> Dict[str, Any]:
@@ -31,6 +32,7 @@ class Rewrite(NamedTuple):
             "display_name": self.display_name,
             "rule": self.rule,
             "graph": self.graph.to_dict(),
+            "matched_vertices": self.matched_vertices,
             "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None
         }
 
@@ -51,9 +53,10 @@ class Rewrite(NamedTuple):
         graph.set_auto_simplify(False)
 
         return Rewrite(
-            display_name=d.get("display_name", d["rule"]),  # Old proofs may not have display names
+            display_name=d.get("display_name", d["rule"]),
             rule=d["rule"],
             graph=graph,
+            matched_vertices=d.get("matched_vertices"),
             grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
         )
 
@@ -299,9 +302,11 @@ class ProofStepView(QListView):
             from pyzx.graph.diff import GraphDiff
             # Access the stored graph directly — no copy needed since
             # GraphDiff only reads from it, never modifies it.
-            next_g = self.model().steps[index].graph
+            step = self.model().steps[index]
+            next_g = step.graph
             diff = GraphDiff(g, next_g)
-            self.graph_view.graph_scene.highlight_diff(diff, "forward")
+            self.graph_view.graph_scene.highlight_diff(diff, "forward",
+                                                       matched_vertices=step.matched_vertices)
         else:
             self.graph_view.graph_scene.clear_diff_highlights()
 

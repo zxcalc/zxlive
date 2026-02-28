@@ -187,7 +187,8 @@ class ProofPanel(BasePanel):
         if pyzx.rewrite_rules.check_fuse(g, v, w):
             pyzx.rewrite_rules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders",
+                                 matched_vertices=[v, w])
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.rewrite_rules.check_copy(g, v):
@@ -198,7 +199,8 @@ class ProofPanel(BasePanel):
             # g.remove_edges(rem_edges)
             # g.remove_vertices(rem_verts)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider",
+                                 matched_vertices=[v, w])
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_pauli(g, w, v):  # Second parameter is the Pauli
             # Check if we can push a Pauli spider through the other vertex
@@ -207,12 +209,14 @@ class ProofPanel(BasePanel):
             # The match is (pauli_vertex, target_vertex)
             target = w
             anim = anims.strong_comp(self.graph, g, target, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Push Pauli",
+                                 matched_vertices=[v, w])
             self.undo_stack.push(cmd, anim_after=anim)
         elif pyzx.rewrite_rules.check_bialgebra(g, v, w):
             pyzx.rewrite_rules.bialgebra(g, w, v)
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity")
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Strong complementarity",
+                                 matched_vertices=[v, w])
             self.play_sound_signal.emit(SFXEnum.BOOM_BOOM_BOOM)
             self.undo_stack.push(cmd, anim_after=anim)
         else:
@@ -388,11 +392,12 @@ class ProofPanel(BasePanel):
                 new_g.add_edge((neighbor, left_vert), self.graph.edge_type(edge))
                 new_g.remove_edge(edge)
 
-    def _finalize_unfuse(self, v: VT, new_g: GraphT) -> None:
+    def _finalize_unfuse(self, v: VT, left_vert: VT, new_g: GraphT) -> None:
         """Helper method to apply animation and push the unfuse command to the undo stack.
         """
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse",
+                             matched_vertices=[v, left_vert])
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
@@ -427,7 +432,7 @@ class ProofPanel(BasePanel):
 
         # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
         self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items, skip_edge_type=EdgeType.W_IO)
-        self._finalize_unfuse(v, new_g)
+        self._finalize_unfuse(v, left_vert, new_g)
 
     def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
         def snap_vector(v: QVector2D) -> None:
@@ -487,7 +492,7 @@ class ProofPanel(BasePanel):
             new_g.set_phase(first, old_phase - phase)
             new_g.set_phase(second, phase)
 
-        self._finalize_unfuse(v, new_g)
+        self._finalize_unfuse(v, left_vert, new_g)
 
     def _vert_double_clicked(self, v: VT) -> None:
         ty = self.graph.type(v)
