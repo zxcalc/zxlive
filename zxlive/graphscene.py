@@ -309,6 +309,9 @@ class GraphScene(QGraphicsScene):
                     self.vertex_map[v].refresh()
 
             for e in diff.removed_edges:
+                s, t, *_ = e
+                if s == t:
+                    continue
                 if e in self.edge_map:
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "removed"
@@ -348,6 +351,8 @@ class GraphScene(QGraphicsScene):
                     self.vertex_map[v].refresh()
 
             for (s, t), typ in diff.new_edges:
+                if s == t:
+                    continue
                 e = (s, t, typ)
                 if e in self.edge_map:
                     for eitem in self.edge_map[e].values():
