@@ -227,7 +227,7 @@ def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = 
             show_error_msg("Unable to determine file format.", parent=parent)
             return None
 
-    # Add file extension if it's not already there
+    # Add file extension if missing
     if file_path.split(".")[-1].lower() != selected_format.extension:
         file_path += "." + selected_format.extension
 

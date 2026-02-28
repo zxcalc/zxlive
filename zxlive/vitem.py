@@ -21,6 +21,8 @@ from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
 from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtSvgWidgets import QGraphicsSvgItem
 from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
     QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
 
@@ -60,7 +62,12 @@ class VItem(QGraphicsPathItem):
     phase_item: PhaseItem
     adj_items: Set[EItem]  # Connected edges
     graph_scene: GraphScene
-    dummy_text_item: Optional[QGraphicsTextItem] = None  # For dummy node text
+    dummy_text_item: Optional[QGraphicsTextItem] = None
+    dummy_svg_item: Optional[QGraphicsSvgItem] = None
+    _dummy_svg_renderer: Optional[QSvgRenderer] = None
+    _cached_dummy_text: str = ""
+    _cached_dark_mode: bool = False
+    _cached_font_key: str = ""
 
     halftone = "1000100010001000"  # QPixmap("images/halftone.png")
 
@@ -88,10 +95,15 @@ class VItem(QGraphicsPathItem):
         self.graph_scene = graph_scene
         self.v = v
         self.setPos(*pos_to_view(self.g.row(v), self.g.qubit(v)))
-        self.adj_items: Set[EItem] = set()
+        self.adj_items = set()
         self.phase_item = PhaseItem(self)
         self.active_animations = set()
         self.dummy_text_item = None
+        self.dummy_svg_item = None
+        self._dummy_svg_renderer = None
+        self._cached_dummy_text = ""
+        self._cached_dark_mode = False
+        self._cached_font_key = ""
 
         self._old_pos = None
         self._dragged_on = None
@@ -165,20 +177,11 @@ class VItem(QGraphicsPathItem):
         self.setBrush(brush)
         self.setPen(pen)
 
-        # Render dummy node text if applicable
+        # Render dummy node text (plain or LaTeX)
         if self.ty == VertexType.DUMMY:
-            text = self.g.vdata(self.v, 'text', '')
-            if self.dummy_text_item is None:
-                self.dummy_text_item = QGraphicsTextItem(self)
-                self.dummy_text_item.setDefaultTextColor(QColor("#222"))
-                self.dummy_text_item.setFont(display_setting.font)
-            self.dummy_text_item.setPlainText(text)
-            # Center the text in the node
-            rect = self.dummy_text_item.boundingRect()
-            self.dummy_text_item.setPos(-rect.width() / 2, -rect.height() / 2 - 0.25 * SCALE)
-            self.dummy_text_item.setVisible(bool(text))
-        elif self.dummy_text_item is not None:
-            self.dummy_text_item.setVisible(False)
+            self._update_dummy_display(self.g.vdata(self.v, 'text', ''))
+        else:
+            self.remove_dummy_label()
 
         if self.phase_item:
             self.phase_item.refresh()
@@ -373,8 +376,76 @@ class VItem(QGraphicsPathItem):
         else:
             e.ignore()
 
+    def remove_dummy_label(self) -> None:
+        """Hides the dummy label items and clears their cache."""
+        if self.dummy_text_item is not None:
+            self.dummy_text_item.setVisible(False)
+        if self.dummy_svg_item is not None:
+            self.dummy_svg_item.setVisible(False)
+        self._cached_dummy_text = ""
+        self._cached_dark_mode = False
+        self._cached_font_key = ""
+
     def update_font(self) -> None:
         self.phase_item.setFont(display_setting.font)
+        # Clear dummy-label cache so changed font triggers re-render
+        self._cached_dummy_text = ""
+        self._cached_font_key = ""
+        if self.ty == VertexType.DUMMY:
+            self._update_dummy_display(self.g.vdata(self.v, 'text', ''))
+
+    def _update_dummy_display(self, text: str) -> None:
+        """Render dummy node label. Detects LaTeX and renders to SVG.
+        Plain text uses QGraphicsTextItem. Cached to avoid re-rendering
+        on every refresh() call."""
+        if not text:
+            self.remove_dummy_label()
+            return
+
+        dark = display_setting.dark_mode
+        font_key = display_setting.font.toString()
+        if (text == self._cached_dummy_text
+                and dark == self._cached_dark_mode
+                and font_key == self._cached_font_key):
+            return
+
+        self._cached_dummy_text = text
+        self._cached_dark_mode = dark
+        self._cached_font_key = font_key
+        text_color = "#e0e0e0" if dark else "#222222"
+
+        from .latex_render import is_latex, latex_to_svg
+
+        if is_latex(text):
+            if self.dummy_text_item is not None:
+                self.dummy_text_item.setVisible(False)
+            # Scale LaTeX slightly larger so it matches plain-text visual size
+            latex_size = float(display_setting.font.pointSize()) * 1.4
+            svg_bytes = latex_to_svg(text, color=text_color, size=latex_size)
+            renderer = QSvgRenderer(svg_bytes)
+            if self.dummy_svg_item is None:
+                self.dummy_svg_item = QGraphicsSvgItem(self)
+            self.dummy_svg_item.setSharedRenderer(renderer)
+            # Keep a reference so the renderer is not garbage-collected
+            self._dummy_svg_renderer = renderer
+            rect = renderer.viewBoxF()
+            active_item: QGraphicsItem = self.dummy_svg_item
+        else:
+            if self.dummy_svg_item is not None:
+                self.dummy_svg_item.setVisible(False)
+            if self.dummy_text_item is None:
+                self.dummy_text_item = QGraphicsTextItem(self)
+            self.dummy_text_item.setFont(display_setting.font)
+            self.dummy_text_item.setDefaultTextColor(QColor(text_color))
+            self.dummy_text_item.setPlainText(text)
+            rect = self.dummy_text_item.boundingRect()
+            active_item = self.dummy_text_item
+
+        # Place label so its bottom edge sits above the node with a small gap
+        node_top = -0.06 * SCALE  # top of the dummy ellipse
+        gap = 2.0
+        active_item.setPos(-rect.width() / 2, node_top - gap - rect.height())
+        active_item.setVisible(True)
 
     def boundingRect(self) -> 'QRectF':
         # Ensure the bounding rect includes the outline (pen width) and antialiasing
