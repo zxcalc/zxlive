@@ -16,12 +16,14 @@
 from __future__ import annotations
 
 import copy
+import json
+import logging
 import random
 from typing import Callable, Optional, cast
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream, QUrl)
+                            QSettings, QTextStream, QTimer, QUrl)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
@@ -253,6 +255,12 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
 
+        # Set up periodic session state saving for crash protection
+        # Auto-save session state every minute if there are open tabs
+        self.session_save_timer = QTimer(self)
+        self.session_save_timer.timeout.connect(self._save_session_state)
+        self.session_save_timer.start(60000)  # 1 minute in milliseconds
+
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
         self.new_graph(graph)
@@ -319,16 +327,140 @@ class MainWindow(QMainWindow):
         new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
-        # We close all the tabs and ask the user if they want to save progress
-        while self.active_panel is not None:
-            success = self.handle_close_action()
-            if not success:
-                e.ignore()  # Abort the closing
-                return
+        # Save session state before closing tabs for potential restoration on next startup
+        self._save_session_state()
+        startup_behavior = get_settings_value("startup-behavior", str, "restore")
+        if startup_behavior != "restore":
+            # We close all the tabs and ask the user if they want to save progress
+            while self.active_panel is not None:
+                success = self.handle_close_action()
+                if not success:
+                    e.ignore()  # Abort the closing
+                    return
+        # Note: In "restore" mode we intentionally skip the save-to-file prompts
+        # because the full in-memory state is preserved in the session.  If the
+        # user later switches the setting to "blank", any work not explicitly
+        # saved to disk will be lost since the session won't be restored.
 
         # save the shape/size of this window on close
         self.settings.setValue("main_window_geometry", self.saveGeometry())
+
         e.accept()
+
+    def _save_session_state(self) -> None:
+        """Save the current state of all open tabs for restoration on next startup."""
+        try:
+            # If there are no tabs open, clear any previously saved session state
+            if self.tab_widget.count() == 0:
+                self.settings.remove("session_state")
+                return
+
+            tabs_state = []
+            for i in range(self.tab_widget.count()):
+                panel = self.tab_widget.widget(i)
+                assert isinstance(panel, BasePanel)
+                tab_name = self.tab_widget.tabText(i)
+
+                tab_data: dict = {
+                    'name': tab_name,
+                    'file_path': panel.file_path,
+                    'file_type': panel.file_type.value if panel.file_type else None,
+                }
+                if isinstance(panel, GraphEditPanel):
+                    tab_data.update({'type': 'graph', 'data': panel.graph.to_json()})
+                elif isinstance(panel, ProofPanel):
+                    tab_data.update({'type': 'proof', 'data': panel.proof_model.to_json()})
+                elif isinstance(panel, RulePanel):
+                    tab_data.update({'type': 'rule', 'data': panel.get_rule().to_json()})
+                elif isinstance(panel, PauliWebsPanel):
+                    tab_data.update({'type': 'pauliwebs', 'data': panel.graph.to_json()})
+                else:
+                    continue  # Unknown panel type, skip
+
+                tabs_state.append(tab_data)
+
+            # Save active tab index
+            active_index = self.tab_widget.currentIndex()
+            session_data = {
+                'tabs': tabs_state,
+                'active_tab': active_index
+            }
+
+            self.settings.setValue("session_state", json.dumps(session_data))
+        except Exception as e:
+            logging.warning(f"Failed to save session state: {e}")
+
+    def _restore_session_state(self) -> bool:
+        """Restore previously saved tabs. Returns True if any tabs were restored."""
+        # Check if user wants to restore session
+        startup_behavior = get_settings_value("startup-behavior", str, "restore")
+        if startup_behavior != "restore":
+            return False
+
+        session_json = self.settings.value("session_state")
+        if not session_json:
+            return False
+
+        try:
+            session_data = json.loads(session_json)
+            tabs_state = session_data.get('tabs', [])
+            active_tab = session_data.get('active_tab', 0)
+
+            if not tabs_state:
+                return False
+
+            # Restore each tab
+            for tab_data in tabs_state:
+                tab_type = tab_data.get('type')
+                tab_name = tab_data.get('name', 'Untitled')
+                file_path = tab_data.get('file_path')
+                file_type_value = tab_data.get('file_type')
+
+                try:
+                    if tab_type == 'graph':
+                        graph: GraphT = BaseGraph.from_json(tab_data['data'])  # type: ignore
+                        self.new_graph(graph, tab_name)
+                    elif tab_type == 'proof':
+                        from .proof import ProofModel
+                        proof_model = ProofModel.from_json(tab_data['data'])
+                        # Extract the initial graph from the proof
+                        graphs_list = proof_model.graphs()
+                        initial_graph: GraphT = graphs_list[0] if graphs_list else new_graph()
+                        panel = ProofPanel(initial_graph, self.undo_action, self.redo_action)
+                        # Replace the proof model with the loaded one
+                        panel.step_view.set_model(proof_model)
+                        panel.step_view.move_to_step(len(proof_model.steps))  # Move to the end of the proof
+                        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
+                        self._new_panel(panel, tab_name)
+                    elif tab_type == 'rule':
+                        rule = CustomRule.from_json(tab_data['data'])
+                        self.new_rule_editor(rule, tab_name)
+                    elif tab_type == 'pauliwebs':
+                        pauli_graph: GraphT = BaseGraph.from_json(tab_data['data'])  # type: ignore
+                        self.new_pauli_webs(pauli_graph, tab_name)
+
+                    # Restore file path and file type if available
+                    if file_path and self.active_panel:
+                        self.active_panel.file_path = file_path
+                        if file_type_value:
+                            # Find the FileFormat enum by its value
+                            for fmt in FileFormat:
+                                if fmt.value == file_type_value:
+                                    self.active_panel.file_type = fmt
+                                    break
+                except Exception as e:
+                    # If a tab fails to restore, log it but continue with others
+                    logging.warning(f"Failed to restore tab '{tab_name}': {e}")
+                    continue
+
+            # Restore active tab
+            if 0 <= active_tab < self.tab_widget.count():
+                self.tab_widget.setCurrentIndex(active_tab)
+
+            return True
+        except Exception as e:
+            logging.error(f"Failed to restore session state: {e}")
+            return False
 
     def undo(self, e: QEvent) -> None:
         if self.active_panel is None:
@@ -412,7 +544,7 @@ class MainWindow(QMainWindow):
             return False
         widget = self.tab_widget.widget(i)
         assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean():
+        if not widget.undo_stack.isClean() or widget.file_path is None:
             name = self.tab_widget.tabText(i).replace("*", "")
             button = QMessageBox.StandardButton
             answer = QMessageBox.question(

@@ -227,7 +227,7 @@ def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = 
             show_error_msg("Unable to determine file format.", parent=parent)
             return None
 
-    # Add file extension if it's not already there
+    # Add file extension if missing
     if file_path.split(".")[-1].lower() != selected_format.extension:
         file_path += "." + selected_format.extension
 
@@ -365,7 +365,10 @@ def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[
         show_error_msg("Invalid Vertex Type", "This function can only be used on dummy vertices.", parent=parent)
         return None
     current_text = graph.vdata(v, 'text', '')
-    input_, ok = QInputDialog.getText(parent, "Set Text", "Enter text for dummy node:", text=current_text)
+    input_, ok = QInputDialog.getText(
+        parent, "Set Text",
+        "Enter text (LaTeX supported, e.g. $\\alpha$, x^2, \\frac{1}{2}):",
+        text=current_text)
     if not ok:
         return None
     new_g = copy.deepcopy(graph)
