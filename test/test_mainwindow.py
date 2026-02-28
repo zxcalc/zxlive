@@ -27,7 +27,11 @@ from zxlive.settings_dialog import SettingsDialog
 
 
 @pytest.fixture
-def app(qtbot: QtBot) -> MainWindow:
+def app(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> MainWindow:
+    # Suppress the "save changes?" dialog that would otherwise block tests
+    # when closing unsaved tabs (e.g. the demo graph which has no file path).
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.No)
     mw = MainWindow()
     mw.open_demo_graph()
     qtbot.addWidget(mw)
