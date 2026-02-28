@@ -81,6 +81,9 @@ class ProofModel(QAbstractListModel):
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index - 1] = new_step
 
+        model_index = self.createIndex(index, 0)
+        self.dataChanged.emit(model_index, model_index, [])
+
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
