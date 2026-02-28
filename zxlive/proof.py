@@ -64,8 +64,15 @@ THUMBNAIL_ROLE = Qt.ItemDataRole.UserRole + 1
 MAX_THUMBNAIL_HEIGHT = 200  # Maximum thumbnail height in pixels when displayed
 
 
-def render_graph_thumbnail(graph: GraphT) -> QPixmap:
-    """Render a graph to a QPixmap thumbnail using an off-screen GraphScene."""
+def render_graph_thumbnail(graph: GraphT, device_pixel_ratio: float = 1.0) -> QPixmap:
+    """Render a graph to a QPixmap thumbnail using an off-screen GraphScene.
+
+    Args:
+        graph: the graph to render.
+        device_pixel_ratio: the screen's DPR (e.g. 2.0 on HiDPI displays).
+            The pixmap is rendered at DPR times the logical size so that
+            it appears crisp on high-resolution screens.
+    """
     from .graphscene import GraphScene
 
     scene = GraphScene()
@@ -78,7 +85,9 @@ def render_graph_thumbnail(graph: GraphT) -> QPixmap:
     padding = 20.0
     rect.adjust(-padding, -padding, padding, padding)
 
-    max_dim = 600.0
+    # Render at a higher maximum resolution so that thumbnails remain crisp on
+    # modern HiDPI (Retina) displays when dynamically scaled down by QPainter.
+    max_dim = 1500.0
     scale = min(max_dim / rect.width(), max_dim / rect.height())
     if scale > 2.0:
         scale = 2.0
@@ -92,7 +101,13 @@ def render_graph_thumbnail(graph: GraphT) -> QPixmap:
     if h > max_h:
         h = max_h
 
-    pixmap = QPixmap(w, h)
+    # Render at physical resolution for HiDPI crispness.
+    dpr = max(1.0, device_pixel_ratio)
+    phys_w = max(1, int(w * dpr))
+    phys_h = max(1, int(h * dpr))
+
+    pixmap = QPixmap(phys_w, phys_h)
+    pixmap.setDevicePixelRatio(dpr)
     if display_setting.dark_mode:
         pixmap.fill(QColor(30, 30, 30))
     else:
@@ -100,7 +115,7 @@ def render_graph_thumbnail(graph: GraphT) -> QPixmap:
 
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    scene.render(painter, QRectF(0, 0, w, h), rect)
+    scene.render(painter, QRectF(0, 0, phys_w, phys_h), rect)
     painter.end()
 
     scene.clear()
@@ -617,7 +632,15 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         """Draw thumbnail preview if enabled on this view."""
         parent_view = self.parent()
         if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
+            screen_dpr = parent_view.devicePixelRatio()
+            model = parent_view.model()
+            row = index.row()
             pixmap = index.data(THUMBNAIL_ROLE)
+            # Re-render if cached pixmap was made at a different DPR.
+            if pixmap is not None and not pixmap.isNull() and pixmap.devicePixelRatio() != screen_dpr:
+                graph = model.get_graph(row)
+                pixmap = render_graph_thumbnail(graph, screen_dpr)
+                model._thumbnail_cache[row] = pixmap
             if pixmap is not None and not pixmap.isNull():
                 # Clamp available_width to the actual usable space inside the
                 # viewport, accounting for where this item starts horizontally.
@@ -628,8 +651,12 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 max_right = viewport_right - self.thumbnail_padding
                 available_width = max(0, max_right - content_left)
                 thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
-                if available_width > 0 and pixmap.width() > 0:
-                    thumb_height = min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
+                # Use logical dimensions (physical / DPR) for layout.
+                dpr = pixmap.devicePixelRatio()
+                logical_w = pixmap.width() / dpr
+                logical_h = pixmap.height() / dpr
+                if available_width > 0 and logical_w > 0:
+                    thumb_height = min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
                     target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
                     # Clip all drawing to the item rect to guarantee no overflow.
                     painter.setClipRect(option.rect)  # type: ignore[attr-defined]
@@ -638,11 +665,18 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                     painter.setBrush(Qt.GlobalColor.transparent)
                     painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
 
-                    # Draw pixmap scaled to fit, keeping aspect ratio.
-                    scaled = pixmap.scaled(target_rect.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                    x_off = (target_rect.width() - scaled.width()) / 2
-                    y_off = (target_rect.height() - scaled.height()) / 2
-                    painter.drawPixmap(int(target_rect.x() + x_off), int(target_rect.y() + y_off), scaled)
+                    # Let QPainter natively scale the pixmap dynamically during paint.
+                    # This avoids QPixmap.scaled() which drops resolution on High-DPI screens.
+                    scale = min(target_rect.width() / logical_w, target_rect.height() / logical_h)
+                    draw_w = logical_w * scale
+                    draw_h = logical_h * scale
+
+                    x_off = (target_rect.width() - draw_w) / 2
+                    y_off = (target_rect.height() - draw_h) / 2
+
+                    draw_rect = QRectF(target_rect.x() + x_off, target_rect.y() + y_off, draw_w, draw_h)
+                    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                    painter.drawPixmap(draw_rect, pixmap, QRectF(pixmap.rect()))
 
     def _compute_thumb_height(self, parent: '_ProofStepListView', pixmap: QPixmap) -> int:
         """Compute the thumbnail display height for the current viewport width.
@@ -657,8 +691,12 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         viewport_right = parent.viewport().width()
         content_left = self.line_width + 2 * self.line_padding
         available_width = max(0, viewport_right - self.thumbnail_padding - content_left)
-        if available_width > 0 and not pixmap.isNull() and pixmap.width() > 0:
-            return min(int(pixmap.height() * available_width / pixmap.width()), MAX_THUMBNAIL_HEIGHT)
+        # Use logical dimensions for consistent layout.
+        dpr = pixmap.devicePixelRatio()
+        logical_w = pixmap.width() / dpr
+        logical_h = pixmap.height() / dpr
+        if available_width > 0 and not pixmap.isNull() and logical_w > 0:
+            return min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
         return MAX_THUMBNAIL_HEIGHT
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
