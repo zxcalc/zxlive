@@ -104,6 +104,7 @@ class VItem(QGraphicsPathItem):
         self._cached_dummy_text = ""
         self._cached_dark_mode = False
         self._cached_font_key = ""
+        self._last_type: Optional[VertexType] = None
 
         self._old_pos = None
         self._dragged_on = None
@@ -139,7 +140,14 @@ class VItem(QGraphicsPathItem):
             edges.  Pass False when the caller refreshes edges separately
             (e.g. ``GraphScene._update_graph_inner`` which deduplicates
             edge refreshes across multiple dirty vertices)."""
-        self.update_shape()
+        # Only rebuild the path when the vertex type has changed; the shape
+        # geometry depends solely on the type.
+        ty = self.ty
+        if ty != self._last_type:
+            self.setPath(self._make_shape_path())
+            self._last_type = ty
+        # Rotation depends on position (for W_OUTPUT), so always update it.
+        self.set_vitem_rotation()
         color_map = {
             VertexType.Z: "z_spider",
             VertexType.Z_BOX: "z_spider",
@@ -200,7 +208,7 @@ class VItem(QGraphicsPathItem):
                 e_item.refresh()
 
     def _make_shape_path(self) -> QPainterPath:
-        """Helper to create the path for both drawing and hit-testing."""
+        """Create the QPainterPath for drawing and hit-testing."""
         path = QPainterPath()
         if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -215,14 +223,6 @@ class VItem(QGraphicsPathItem):
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         return path
-
-    def update_shape(self) -> None:
-        pen = QPen()
-        pen.setWidthF(3)
-        pen.setColor(display_setting.effective_colors["outline"])
-        self.setPen(pen)
-        self.setPath(self._make_shape_path())
-        self.set_vitem_rotation()
 
     def shape(self) -> QPainterPath:
         return self._make_shape_path()
