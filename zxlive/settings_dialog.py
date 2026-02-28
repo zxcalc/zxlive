@@ -343,6 +343,7 @@ class SettingsDialog(QDialog):
         if isinstance(app, QApplication):
             app.setFont(display_setting.font)
         self.main_window.update_font()
+        self.main_window.refresh_rewrite_highlight()
 
     def cancel(self) -> None:
         self.reject()
