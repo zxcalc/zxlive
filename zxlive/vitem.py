@@ -132,8 +132,13 @@ class VItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
-    def refresh(self) -> None:
-        """Call this method whenever a vertex moves or its data changes"""
+    def refresh(self, cascade_edges: bool = True) -> None:
+        """Call this method whenever a vertex moves or its data changes.
+
+        :param cascade_edges: If True (default), also refresh all adjacent
+            edges.  Pass False when the caller refreshes edges separately
+            (e.g. ``GraphScene._update_graph_inner`` which deduplicates
+            edge refreshes across multiple dirty vertices)."""
         self.update_shape()
         color_map = {
             VertexType.Z: "z_spider",
@@ -188,10 +193,11 @@ class VItem(QGraphicsPathItem):
         if self.ty == VertexType.W_INPUT:
             w_out = get_w_partner_vitem(self)
             if w_out:
-                w_out.refresh()
+                w_out.refresh(cascade_edges=cascade_edges)
 
-        for e_item in self.adj_items:
-            e_item.refresh()
+        if cascade_edges:
+            for e_item in self.adj_items:
+                e_item.refresh()
 
     def _make_shape_path(self) -> QPainterPath:
         """Helper to create the path for both drawing and hit-testing."""
@@ -264,9 +270,9 @@ class VItem(QGraphicsPathItem):
         # Note that the position and selected values are already updated when
         # this event fires.
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
-            # If we're being animated, the animation will decide for itself whether we
-            # should be refreshed or not
-            if not self.is_animated:
+            # Skip refresh when the scene is performing a bulk graph update
+            # (it will refresh all affected items in a single pass afterwards).
+            if not self.is_animated and not self.graph_scene._bulk_updating:
                 self.refresh()
 
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
