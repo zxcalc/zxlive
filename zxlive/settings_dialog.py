@@ -353,3 +353,4 @@ class SettingsDialog(QDialog):
 def open_settings_dialog(parent: MainWindow) -> None:
     dialog = SettingsDialog(parent)
     dialog.exec()
+    

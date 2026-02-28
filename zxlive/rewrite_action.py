@@ -509,3 +509,4 @@ class RewriteActionTreeView(QTreeView):
                     self.expand(index)
         self.clicked.connect(model.do_rewrite)
         self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
+        

@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
 
 from .common import GraphT
 from .settings import display_setting
+
+
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
