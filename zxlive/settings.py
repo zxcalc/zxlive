@@ -137,9 +137,9 @@ modern_red_green: ColorScheme = {
     "z_pauli_web": QColor("#ccffcc"),
     "x_pauli_web": QColor("#ff8888"),
     "y_pauli_web": QColor("#6688ff"),
-    "diff_changed": QColor("#FF8C00"),
-    "diff_removed": QColor("#DC143C"),
-    "diff_added": QColor("#32CD32"),
+    "diff_changed": QColor("#D97706"),
+    "diff_removed": QColor("#E11D48"),
+    "diff_added": QColor("#2563EB"),
 }
 
 classic_red_green: ColorScheme = {
@@ -165,6 +165,9 @@ white_gray: ColorScheme = {
     "x_spider_pressed": QColor("#a0a0a0"),
     "hadamard": QColor("#ffffff"),
     "hadamard_pressed": QColor("#dddddd"),
+    "diff_changed": QColor("#D97706"),
+    "diff_removed": QColor("#E11D48"),
+    "diff_added": QColor("#2563EB"),
 }
 
 gidney: ColorScheme = {

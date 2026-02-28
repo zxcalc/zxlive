@@ -181,16 +181,17 @@ class VItem(QGraphicsPathItem):
         # Tint the fill color and thicken the outline so the change is
         # impossible to miss, even in large diagrams.
         if self._diff_highlight is not None:
-            diff_color_key = f"diff_{self._diff_highlight}"
-            diff_color = display_setting.effective_colors[diff_color_key]
+            diff_color = display_setting.effective_colors[f"diff_{self._diff_highlight}"]
             pen.setColor(diff_color)
             pen.setWidthF(7 if not self.isSelected() else 8)
-            # Tint the node fill: blend 40% diff color + 60% original color
-            original = brush.color()
-            r = int(original.red() * 0.6 + diff_color.red() * 0.4)
-            g = int(original.green() * 0.6 + diff_color.green() * 0.4)
-            b = int(original.blue() * 0.6 + diff_color.blue() * 0.4)
-            brush = QBrush(QColor(r, g, b))
+            # Tint the fill in HSL space: keep the original hue/saturation,
+            # shift lightness 30% toward the diff color's lightness.
+            orig = brush.color()
+            orig_h, orig_s, orig_l, orig_a = orig.hslHue(), orig.hslSaturation(), orig.lightness(), orig.alpha()
+            diff_l = diff_color.lightness()
+            tint_l = int(orig_l * 0.7 + diff_l * 0.3)
+            tint_h = orig_h if orig_h >= 0 else diff_color.hslHue()
+            brush = QBrush(QColor.fromHsl(tint_h, orig_s, max(30, min(220, tint_l)), orig_a))
         self.prepareGeometryChange()
         self.setBrush(brush)
         self.setPen(pen)
