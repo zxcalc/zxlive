@@ -26,7 +26,7 @@ class Rewrite(NamedTuple):
     display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
+    grouped_rewrites: list['Rewrite'] | None = None  # Optional field to store the grouped rewrites
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
