@@ -57,10 +57,6 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "startup-behavior": "restore",
 }
 
-}
-
-}
-
 font_defaults: dict[str, str | int | None] = {
     "font/size": 11,
     "font/family": "Arial",
