@@ -404,6 +404,7 @@ class _ProofStepListView(QListView):
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        self._pending_thumbnails: set[int] = set()
         # Set background color for dark mode (panel background)
         if display_setting.dark_mode:
             self.setStyleSheet("background-color: #23272e;")
@@ -660,14 +661,10 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 # Use QTimer to delay rendering.
                 from PySide6.QtCore import QTimer
                 
-                # Check if we already scheduled this row
-                if not hasattr(parent_view, '_pending_thumbnails'):
-                    parent_view._pending_thumbnails = set()
-                
                 if row not in parent_view._pending_thumbnails:
                     parent_view._pending_thumbnails.add(row)
                     
-                    def render_task(r=row, dpr=screen_dpr):
+                    def render_task(r: int = row, dpr: float = screen_dpr) -> None:
                         parent_view._pending_thumbnails.discard(r)
                         try:
                             graph = model.get_graph(r)
