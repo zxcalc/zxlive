@@ -6,7 +6,6 @@ from typing import Final, Optional, TypeVar, Type, cast
 
 from pyzx.graph import EdgeType
 from pyzx.graph.multigraph import Multigraph
-from pyzx.utils import VertexType
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings

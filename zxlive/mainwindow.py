@@ -54,7 +54,7 @@ from .tikz import proof_to_tikz
 
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
-    CLIPBOARD_MIME = "application/x-zxlive-graph+json"
+    CLIPBOARD_MIME = "application/vnd.zxlive-graph+json"
 
     def __init__(self) -> None:
         super().__init__()
@@ -613,7 +613,7 @@ class MainWindow(QMainWindow):
             show_error_msg("Could not write to file", parent=self)
             return False
         out = QTextStream(file)
-        out << data
+        _ = out << data
         file.close()
         self.active_panel.undo_stack.setClean()
         if random.random() < 0.1:
@@ -703,7 +703,6 @@ class MainWindow(QMainWindow):
         mime.setText(tikz)
 
         if include_internal:
-            # PyZX graph.to_json() includes variable_types (var_registry.types).
             payload = json.dumps({"graph_json": graph.to_json()}).encode("utf-8")
             mime.setData(self.CLIPBOARD_MIME, QByteArray(payload))
         QApplication.clipboard().setMimeData(mime)
