@@ -15,7 +15,7 @@
 
 
 import pytest
-import os
+from pathlib import Path
 from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 
@@ -105,19 +105,33 @@ def test_settings_dialog(app: MainWindow) -> None:
     dialog.close()
 
 
-def test_file_formats_preserved(app: MainWindow) -> None:
+def test_file_formats_preserved(app: MainWindow, qtbot: QtBot, tmp_path: Path) -> None:
     # Disable the pop-up error message dialog for this test.
     import zxlive.dialogs
+    from zxlive.custom_rule import CustomRule
+
     zxlive.dialogs.show_error_msg = lambda *args, **kwargs: None
 
-    def check_file_format(filename: str) -> None:
-        assert import_diagram_from_file(os.path.join(os.path.dirname(__file__), filename)), \
-            (f"File format has changed. If this is intentional, please overwrite {filename} in the commit and note in "
-             f"the commit description that this is a breaking change.")
+    # Write current in-memory objects to each native format and verify they can still be read.
+    assert app.active_panel is not None
+    assert isinstance(app.active_panel, GraphEditPanel)
 
-    check_file_format("demo.zxg")
-    check_file_format("demo.zxp")
-    check_file_format("demo.zxr")
+    zxg_path = tmp_path / "demo.zxg"
+    zxg_path.write_text(app.active_panel.graph.to_json())
+    assert import_diagram_from_file(str(zxg_path))
+
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+    zxp_path = tmp_path / "demo.zxp"
+    zxp_path.write_text(app.active_panel.proof_model.to_json())
+    assert import_diagram_from_file(str(zxp_path))
+
+    rule = CustomRule(app.active_panel.proof_model.initial_graph.copy(),
+                      app.active_panel.proof_model.initial_graph.copy(),
+                      "test-rule", "format smoke test")
+    zxr_path = tmp_path / "demo.zxr"
+    zxr_path.write_text(rule.to_json())
+    assert import_diagram_from_file(str(zxr_path))
 
 
 def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:

@@ -268,6 +268,7 @@ class ProofStepView(QListView):
         self._preview_aspect_ratio_cache: dict[int, float] = {}
         self._previews_visible = bool(display_setting.previews_show)
         self._preview_hidden_rows: set[int] = set()
+        self._connected_model: Optional[ProofModel] = None
         self._connect_model_signals(self.model())
 
     # overriding this method to change the return type and stop mypy from complaining
@@ -286,9 +287,17 @@ class ProofStepView(QListView):
         self.setCurrentIndex(model.index(len(model.steps), 0))
 
     def _connect_model_signals(self, model: ProofModel) -> None:
+        if self._connected_model is not None:
+            self._disconnect_model_signals(self._connected_model)
         model.rowsInserted.connect(self._on_rows_inserted)
         model.rowsRemoved.connect(self._on_rows_removed)
         model.dataChanged.connect(self._on_data_changed)
+        self._connected_model = model
+
+    def _disconnect_model_signals(self, model: ProofModel) -> None:
+        model.rowsInserted.disconnect(self._on_rows_inserted)
+        model.rowsRemoved.disconnect(self._on_rows_removed)
+        model.dataChanged.disconnect(self._on_data_changed)
 
     def _on_rows_inserted(self, _parent: QModelIndex, first: int, last: int) -> None:
         shift_by = last - first + 1
@@ -323,6 +332,7 @@ class ProofStepView(QListView):
         self.viewport().update()
 
     def resizeEvent(self, event: Any) -> None:
+        """Clear preview caches and relayout items when the view is resized."""
         super().resizeEvent(event)
         self._clear_step_preview_cache()
         self.doItemsLayout()
@@ -331,6 +341,7 @@ class ProofStepView(QListView):
         return self._previews_visible
 
     def set_previews_enabled(self, visible: bool) -> None:
+        """Enable or disable diagram previews for all proof steps."""
         if self._previews_visible == visible:
             return
         self._previews_visible = visible
@@ -368,6 +379,7 @@ class ProofStepView(QListView):
         return self._preview_aspect_ratio_cache[index]
 
     def preview_size(self, index: int) -> QSize:
+        """Return an adaptive preview thumbnail size for a proof-step index."""
         available_width = max(80, self.viewport().width() - 2 * ProofStepItemDelegate.line_padding - 28)
         min_thumb_height = 70
         max_thumb_height = 280
