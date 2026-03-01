@@ -660,10 +660,10 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 # the delegate continues without drawing one.
                 # Use QTimer to delay rendering.
                 from PySide6.QtCore import QTimer
-                
+
                 if row not in parent_view._pending_thumbnails:
                     parent_view._pending_thumbnails.add(row)
-                    
+
                     def render_task(r: int = row, dpr: float = screen_dpr) -> None:
                         parent_view._pending_thumbnails.discard(r)
                         try:
@@ -673,8 +673,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                             idx = model.index(r, 0)
                             model.dataChanged.emit(idx, idx, [])
                         except Exception:
-                            pass # Graph might be deleted in between
-                    
+                            pass  # Graph might be deleted in between
+
                     QTimer.singleShot(0, render_task)
 
             if pixmap is not None and not pixmap.isNull():
