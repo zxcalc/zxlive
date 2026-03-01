@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional, Set, Union, List, Dict, Tuple
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -104,7 +104,7 @@ class ProofModeCommand(QUndoCommand):
 class SetGraph(BaseCommand):
     """Replaces the current graph with an entirely new graph."""
     new_g: GraphT
-    old_g: GraphT | None = field(default=None, init=False)
+    old_g: Optional[GraphT] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self.old_g is not None
@@ -120,8 +120,8 @@ class UpdateGraph(BaseCommand):
     """Updates the current graph with a modified one.
     It will try to reuse existing QGraphicsItem's as much as possible."""
     new_g: GraphT
-    old_g: GraphT | None = field(default=None, init=False)
-    old_selected: set[VT] | None = field(default=None, init=False)
+    old_g: Optional[GraphT] = field(default=None, init=False)
+    old_selected: Optional[Set[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self.old_g is not None and self.old_selected is not None
@@ -140,14 +140,14 @@ class UpdateGraph(BaseCommand):
 @dataclass
 class ChangeNodeType(BaseCommand):
     """Changes the color of a set of spiders."""
-    vs: list[VT] | set[VT]
+    vs: Union[List[VT], Set[VT]]
     vty: VertexType
 
     WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
-    _old_vtys: list[VertexType] | None = field(default=None, init=False)
-    _old_w_info: dict[VT, WInfo] | None = field(default=None, init=False)
-    _new_w_inputs: list[VT] | None = field(default=None, init=False)
+    _old_vtys: Optional[List[VertexType]] = field(default=None, init=False)
+    _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
+    _new_w_inputs: Optional[List[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -212,7 +212,7 @@ class ChangeEdgeColor(BaseCommand):
     es: Iterable[ET]
     ety: EdgeType
 
-    _old_etys: list[EdgeType] | None = field(default=None, init=False)
+    _old_etys: Optional[List[EdgeType]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_etys is not None
@@ -234,7 +234,7 @@ class AddNode(BaseCommand):
     y: float
     vty: VertexType
 
-    _added_vert: VT | None = field(default=None, init=False)
+    _added_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._added_vert is not None
@@ -256,10 +256,10 @@ class AddNodeSnapped(BaseCommand):
     vty: VertexType
     e: ET
 
-    added_vert: VT | None = field(default=None, init=False)
-    s: VT | None = field(default=None, init=False)
-    t: VT | None = field(default=None, init=False)
-    _et: EdgeType | None = field(default=None, init=False)
+    added_vert: Optional[VT] = field(default=None, init=False)
+    s: Optional[VT] = field(default=None, init=False)
+    t: Optional[VT] = field(default=None, init=False)
+    _et: Optional[EdgeType] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self.added_vert is not None
@@ -297,8 +297,8 @@ class AddWNode(BaseCommand):
     x: float
     y: float
 
-    _added_input_vert: VT | None = field(default=None, init=False)
-    _added_output_vert: VT | None = field(default=None, init=False)
+    _added_input_vert: Optional[VT] = field(default=None, init=False)
+    _added_output_vert: Optional[VT] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._added_input_vert is not None
@@ -335,7 +335,7 @@ class AddEdge(BaseCommand):
 @dataclass
 class AddEdges(BaseCommand):
     """Adds multiple edges of the same type to a graph."""
-    pairs: list[tuple[VT, VT]]
+    pairs: List[Tuple[VT, VT]]
     ety: EdgeType
 
     def undo(self) -> None:
@@ -352,9 +352,9 @@ class AddEdges(BaseCommand):
 @dataclass
 class MoveNode(BaseCommand):
     """Updates the location of a collection of nodes."""
-    vs: list[tuple[VT, float, float]]
+    vs: List[Tuple[VT, float, float]]
 
-    _old_positions: list[tuple[float, float]] | None = field(default=None, init=False)
+    _old_positions: Optional[List[Tuple[float, float]]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_positions is not None
@@ -395,9 +395,9 @@ class ChangeEdgeCurve(BaseCommand):
 @dataclass
 class MergeNodes(BaseCommand):
     """Merges groups of vertices that are at the same position."""
-    vertices_to_merge: list[VT]
+    vertices_to_merge: List[VT]
 
-    _old_g: GraphT | None = field(default=None, init=False)
+    _old_g: Optional[GraphT] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_g is not None
@@ -431,9 +431,9 @@ class MergeNodes(BaseCommand):
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
-    new_phase: Fraction | Poly | complex
+    new_phase: Union[Fraction, Poly, complex]
 
-    _old_phase: Fraction | Poly | complex | None = field(default=None, init=False)
+    _old_phase: Optional[Union[Fraction, Poly, complex]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_phase is not None
@@ -462,15 +462,15 @@ class AddRewriteStep(UpdateGraph):
     """
     step_view: QListView
     name: str
-    diff: GraphDiff | None = None
+    diff: Optional[GraphDiff] = None
 
-    _old_selected: int | None = field(default=None, init=False)
-    _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
+    _old_selected: Optional[int] = field(default=None, init=False)
+    _old_steps: List[Tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
     # When rewriting from inside a grouped sub-step, stores the tail sub-steps
     # that were dropped from the group (for undo restoration).
-    _old_group_tail: list[Rewrite] | None = field(default=None, init=False)
+    _old_group_tail: Optional[List[Rewrite]] = field(default=None, init=False)
     # The original Rewrite object for the group step (before truncation).
-    _old_group_rewrite: Rewrite | None = field(default=None, init=False)
+    _old_group_rewrite: Optional[Rewrite] = field(default=None, init=False)
 
     @property
     def proof_model(self) -> ProofModel:
@@ -486,7 +486,7 @@ class AddRewriteStep(UpdateGraph):
 
         # Check whether the user is rewriting from inside a grouped sub-step.
         step_view = self.step_view
-        sub_step: tuple[int, int] | None = (
+        sub_step: Optional[Tuple[int, int]] = (
             step_view.selected_sub_step  # type: ignore[union-attr]
             if isinstance(step_view, ProofStepView) else None
         )

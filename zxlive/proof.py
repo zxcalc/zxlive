@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict, List, Tuple, Set
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -24,9 +24,9 @@ class Rewrite(NamedTuple):
     display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: list[Rewrite] | None = None  # Optional field to store the grouped rewrites
+    grouped_rewrites: Optional[List['Rewrite']] = None  # Optional field to store the grouped rewrites
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
         return {
             "display_name": self.display_name,
@@ -40,7 +40,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: str | dict[str, Any]) -> Rewrite:
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -67,7 +67,7 @@ class ProofModel(QAbstractListModel):
     """
 
     initial_graph: GraphT
-    steps: list[Rewrite]
+    steps: List['Rewrite']
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
@@ -104,10 +104,10 @@ class ProofModel(QAbstractListModel):
         modelIndex = self.createIndex(step_idx + 1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
-    def graphs(self) -> list[GraphT]:
+    def graphs(self) -> List[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
 
         if index.row() >= len(self.steps) + 1 or index.column() >= 1:
@@ -121,7 +121,7 @@ class ProofModel(QAbstractListModel):
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
 
-    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
+    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
             return super().flags(index)
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
@@ -134,11 +134,11 @@ class ProofModel(QAbstractListModel):
         """
         return None
 
-    def columnCount(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def columnCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of columns"""
         return 1
 
-    def rowCount(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of rows"""
         # This is a quirk of Qt list models: Since they are based on tree models, the
         # user has to specify the index of the parent. In a list, we always expect the
@@ -148,7 +148,7 @@ class ProofModel(QAbstractListModel):
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite, position: int | None = None) -> None:
+    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
         if position is None:
             position = len(self.steps)
@@ -156,7 +156,7 @@ class ProofModel(QAbstractListModel):
         self.steps.insert(position, rewrite)
         self.endInsertRows()
 
-    def pop_rewrite(self, position: int | None = None) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: Optional[int] = None) -> Tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
@@ -252,7 +252,7 @@ class ProofModel(QAbstractListModel):
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -267,7 +267,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: str | dict[str, Any]) -> ProofModel:
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -288,14 +288,14 @@ class ProofModel(QAbstractListModel):
 class ProofStepView(QListView):
     """A view for displaying the steps in a proof."""
 
-    def __init__(self, parent: ProofPanel):
+    def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
-        self.expanded_groups: set[int] = set()
+        self.expanded_groups: Set[int] = set()
         # Track currently selected sub-step: (step_index, sub_step_index) or None
-        self.selected_sub_step: tuple[int, int] | None = None
-        self._active_sub_editor: QLineEdit | None = None
+        self.selected_sub_step: Optional[Tuple[int, int]] = None
+        self._active_sub_editor: Optional[QLineEdit] = None
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
@@ -406,7 +406,7 @@ class ProofStepView(QListView):
         model_index = self.model().index(step_idx + 1, 0)
         self.model().dataChanged.emit(model_index, model_index, [])
 
-    def _click_target_for_pos(self, event: QMouseEvent) -> tuple[int, bool, int]:
+    def _click_target_for_pos(self, event: QMouseEvent) -> Tuple[int, bool, int]:
         """Classify a mouse-press into (toggle_idx, sub_step_clicked, step_idx).
 
         toggle_idx      – step index whose triangle was clicked, or -1
@@ -480,7 +480,7 @@ class ProofStepView(QListView):
         """Trigger repaint for a step row by its 0-based step index."""
         self.update(self.model().index(step_idx + 1, 0))
 
-    def _hover_target_for_pos(self, pos: Any) -> tuple[int, int, int]:
+    def _hover_target_for_pos(self, pos: Any) -> Tuple[int, int, int]:
         """Return (new_step, new_sub, new_header) for the given mouse position.
 
         Each value is -1 when not applicable.
@@ -754,7 +754,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     # Track hover over group header
     hover_header_step_idx: int = -1
 
-    def _step_info(self, index: QModelIndex | QPersistentModelIndex) -> tuple[bool, bool, list[Rewrite] | None]:
+    def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Tuple[bool, bool, Optional[List['Rewrite']]]:
         """Return (is_grouped, is_expanded, grouped_rewrites) for a given row."""
         if index.row() == 0:
             return False, False, None
@@ -790,7 +790,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             return QColor(229, 243, 255)
         return QColor(255, 255, 255)
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
@@ -939,7 +939,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def _paint_sub_tree(self, painter: QPainter, option: QStyleOptionViewItem,
                         step_idx: int,
-                        grouped_rewrites: list[Rewrite], row_height: int,
+                        grouped_rewrites: List['Rewrite'], row_height: int,
                         text_height: int, font: QFont,
                         fg: QColor, line_clr: QColor) -> None:
         main_cx = self.line_padding + self.line_width / 2
@@ -1026,7 +1026,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setPen(fg)
             painter.drawText(sub_text_rect, Qt.AlignmentFlag.AlignLeft, sub_step.display_name)
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         single_row = text_height + 2 * self.vert_padding
@@ -1038,15 +1038,15 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         return QSize(size.width(), total)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QLineEdit:
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
+    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
         value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
         editor.setText(str(value))
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex | QPersistentModelIndex) -> None:
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
         assert isinstance(editor, QLineEdit)
