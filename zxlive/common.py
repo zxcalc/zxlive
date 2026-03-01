@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import base64
-import json
 import os
-import re
 from enum import IntEnum
 from typing import Final, Optional, TypeVar, Type, cast
 
 from pyzx.graph import EdgeType
-from pyzx.graph.jsonparser import string_to_phase
 from pyzx.graph.multigraph import Multigraph
 from pyzx.utils import VertexType
 from typing_extensions import TypeAlias
@@ -116,122 +112,18 @@ def view_to_length(width: float, height: float) -> tuple[float, float]:
 
 
 def to_tikz(g: GraphT) -> str:
-    tikz = pyzx.tikz.to_tikz(g)  # type: ignore
-    payload = _encode_tikz_metadata(g)
-    if payload is None:
-        return str(tikz)
-    return f"% zxlive-metadata: {payload}\n{str(tikz)}"
+    """Export graph to TikZ; PyZX includes variable type metadata when present."""
+    return pyzx.tikz.to_tikz(g)  # type: ignore
 
 
 def from_tikz(s: str) -> Optional[GraphT]:
+    """Import graph from TikZ; PyZX handles metadata and symbolic phases."""
     try:
-        s, variable_types = _extract_tikz_metadata(s)
         g = cast(GraphT, pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True))
-        apply_variable_types(g, variable_types)
-        _restore_symbolic_tikz_phases(s, g)
-        g.rebind_variables_to_registry()
+        g.set_auto_simplify(False)
         return g
     except Exception as e:
         if QApplication.instance() is not None:
             from . import dialogs
             dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
         return None
-
-
-def apply_variable_types(graph: GraphT, variable_types: dict[str, bool]) -> None:
-    """Applies variable type metadata to a graph."""
-    for name, is_bool in variable_types.items():
-        graph.var_registry.set_type(name, bool(is_bool))
-
-
-def get_variable_types(graph: GraphT) -> dict[str, bool]:
-    """Returns variable type metadata."""
-    return {
-        str(name): bool(graph.var_registry.get_type(name, default=False))
-        for name in graph.var_registry.vars()
-    }
-
-
-def _encode_tikz_metadata(graph: GraphT) -> Optional[str]:
-    variable_types = get_variable_types(graph)
-    if not variable_types:
-        return None
-    payload = json.dumps({"variable_types": variable_types}, separators=(",", ":")).encode("utf-8")
-    return base64.urlsafe_b64encode(payload).decode("ascii")
-
-
-_TIKZ_METADATA_RE = re.compile(r"^\s*%\s*zxlive-metadata:\s*(\S+)\s*$")
-
-
-def _extract_tikz_metadata(s: str) -> tuple[str, dict[str, bool]]:
-    match: Optional[re.Match[str]] = None
-    line_index = -1
-    lines = s.splitlines()
-    for i, line in enumerate(lines):
-        m = _TIKZ_METADATA_RE.match(line)
-        if m is not None:
-            match = m
-            line_index = i
-            break
-    if match is None:
-        return s, {}
-
-    payload = match.group(1)
-    del lines[line_index]
-    tikz = "\n".join(lines)
-    try:
-        metadata = json.loads(base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8"))
-        variable_types = metadata.get("variable_types", {})
-        if isinstance(variable_types, dict):
-            normalized = {str(name): bool(v) for name, v in variable_types.items()}
-            return tikz, normalized
-    except Exception:
-        pass
-    return tikz, {}
-
-
-def _restore_symbolic_tikz_phases(tikz: str, graph: GraphT) -> None:
-    """Restore symbolic phase labels (e.g. $ff$) that pyzx's TikZ parser rejects."""
-    lines = [line.strip() for line in tikz.strip().splitlines() if line.strip()]
-
-    # Matches lines like:
-    # \node [style=Z phase dot] (9) at (3.00, -1.00) {$ff$};
-    node_pattern = re.compile(
-        r"^\\node\s+\[style=([^\]]+)\]\s+\((\d+)\)\s+at\s+\(([^)]*)\)\s+\{\$?(.*?)\$?\};$"
-    )
-    style_to_type: dict[str, VertexType] = {
-        "z phase dot": VertexType.Z,
-        "x phase dot": VertexType.X,
-        "z dot": VertexType.Z,
-        "x dot": VertexType.X,
-    }
-
-    position_to_vertex: dict[str, VT] = {}
-    next_vertex_id = 0
-    for line in lines:
-        match = node_pattern.match(line)
-        if match is None:
-            continue
-        style = match.group(1).strip().lower()
-        pos = match.group(3).strip()
-        label = match.group(4).strip().replace(r"\ ", "").replace("~", "")
-
-        if pos in position_to_vertex:
-            vertex = position_to_vertex[pos]
-        else:
-            vertex = next_vertex_id
-            position_to_vertex[pos] = vertex
-            next_vertex_id += 1
-
-        if style_to_type.get(style) not in (VertexType.Z, VertexType.X):
-            continue
-        if not any(ch.isalpha() for ch in label):
-            continue
-        if vertex not in graph.vertices():
-            continue
-
-        try:
-            graph.set_phase(vertex, string_to_phase(label, graph))
-        except Exception:
-            # Keep parser default for labels that are not valid symbolic phases.
-            continue
