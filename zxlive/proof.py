@@ -8,7 +8,7 @@ from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QEvent, QItemSelection, QModelIndex,
                             QPersistentModelIndex, QPoint, QPointF, QRect,
                             QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPen
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QInputDialog, QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
@@ -601,19 +601,35 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
+        # Resolve grouped-row state early (used by line/circle/text layout).
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        grouped_rewrites = None
+        is_expanded_group = False
+        if index.row() > 0:
+            step = step_view.model().steps[index.row() - 1]
+            grouped_rewrites = step.grouped_rewrites
+            is_expanded_group = grouped_rewrites is not None and step_view.is_group_expanded(index.row())
+
+        node_center_y = option.rect.y() + (self.header_height / 2 if is_expanded_group else option.rect.height() / 2)
+
         # Draw line
         is_last = index.row() == index.model().rowCount() - 1
-        line_rect = QRect(
-            self.line_padding,
-            int(option.rect.y()),  # type: ignore[attr-defined]
-            self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
-        )
-        if display_setting.dark_mode:
-            painter.setBrush(QColor(180, 180, 180))
+        line_color = QColor(180, 180, 180) if display_setting.dark_mode else QColor(0, 0, 0)
+        branch_start_x = self.line_padding + self.line_width / 2
+        painter.setPen(QPen(line_color, self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+
+        if is_expanded_group and grouped_rewrites is not None:
+            exit_y = option.rect.bottom() - 2
+
+            # Main timeline above the grouped node.
+            painter.drawLine(QPointF(branch_start_x, option.rect.y() - 1), QPointF(branch_start_x, node_center_y))
+            # Main timeline below where the grouped branch reconnects.
+            if not is_last:
+                painter.drawLine(QPointF(branch_start_x, exit_y), QPointF(branch_start_x, option.rect.bottom() + 1))
         else:
-            painter.setBrush(Qt.GlobalColor.black)
-        painter.drawRect(line_rect)
+            line_end_y = option.rect.bottom() if not is_last else option.rect.y() + option.rect.height() / 2
+            painter.drawLine(QPointF(branch_start_x, option.rect.y() - 1), QPointF(branch_start_x, line_end_y))
 
         # Draw circle
         if display_setting.dark_mode:
@@ -623,7 +639,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setBrush(display_setting.effective_colors["z_spider"])
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
+            QPointF(self.line_padding + self.line_width / 2, node_center_y),
             circle_radius,
             circle_radius
         )
@@ -664,62 +680,58 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             arrow_x = option.rect.x() + self.line_width + 2 * self.line_padding
             arrow_y = option.rect.y() + self.header_height / 2
             if step_view.is_group_expanded(index.row()):
-                painter.drawText(QPointF(arrow_x, arrow_y + 5), "▼")
+                painter.drawText(QPointF(arrow_x, arrow_y + 5), "▽")
             else:
-                painter.drawText(QPointF(arrow_x, arrow_y + 5), "▶")
+                painter.drawText(QPointF(arrow_x, arrow_y + 5), "▷")
             text_rect.setX(text_rect.x() + 24)
 
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
         if grouped_rewrites is not None and step_view.is_group_expanded(index.row()):
-            branch_start_x = self.line_padding + self.line_width / 2
             child_x = branch_start_x + step_view.get_group_branch_offset(index.row())
             content_top = option.rect.y() + self.header_height
+            first_child_y = content_top + self.child_step_height * 0.5
+            last_child_y = content_top + self.child_step_height * (len(grouped_rewrites) - 0.5)
+            exit_y = option.rect.bottom() - 2
+            bend_start_y = last_child_y
 
-            if display_setting.dark_mode:
-                painter.setPen(QPen(QColor(180, 180, 180), self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-            else:
-                painter.setPen(QPen(Qt.GlobalColor.black, self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            wire_color = QColor(195, 195, 195) if display_setting.dark_mode else QColor(0, 0, 0)
+            mint_node = QColor(181, 232, 191)
+            painter.setPen(QPen(wire_color, self.line_width, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
 
-            last_child_center = content_top + self.child_step_height * (len(grouped_rewrites) - 0.5)
-            painter.drawLine(QPointF(branch_start_x, option.rect.y() + option.rect.height() / 2),
-                             QPointF(branch_start_x, last_child_center))
+            # Entry wire from grouped step node to child trunk.
+            painter.drawLine(QPointF(branch_start_x, node_center_y),
+                             QPointF(child_x, first_child_y))
+            # Vertical child trunk.
+            painter.drawLine(QPointF(child_x, first_child_y), QPointF(child_x, bend_start_y))
+            # Exit wire starts exactly at the last child node center and returns to main line.
+            painter.drawLine(QPointF(child_x, bend_start_y),
+                             QPointF(branch_start_x, exit_y + 1))
 
             for child_index, child_step in enumerate(grouped_rewrites):
                 y = content_top + self.child_step_height * (child_index + 0.5)
                 is_hovered_child = step_view.is_group_child_hovered(index.row(), child_index)
                 if is_hovered_child:
-                    hover_color = QColor(130, 30, 30) if display_setting.dark_mode else QColor(255, 230, 230)
                     painter.setPen(Qt.GlobalColor.transparent)
-                    painter.setBrush(hover_color)
+                    painter.setBrush(QColor(255, 226, 226))
                     painter.drawRoundedRect(
                         QRect(
-                            int(branch_start_x + 8),
-                            int(y - self.child_step_height / 2 + 3),
-                            int(option.rect.width() - (branch_start_x + 20)),
-                            int(self.child_step_height - 6),
+                            int(child_x + 10),
+                            int(y - self.child_step_height / 2 + 4),
+                            int(option.rect.width() - (child_x + 22)),
+                            int(self.child_step_height - 8),
                         ),
-                        8,
-                        8,
+                        7,
+                        7,
                     )
 
-                # Mechanical circuit style: gold wires by default, red on hover
-                branch_color = QColor(255, 72, 72) if is_hovered_child else (QColor(208, 168, 54) if display_setting.dark_mode else QColor(184, 132, 18))
-                painter.setPen(QPen(branch_color, self.line_width + 1, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-
-                path = QPainterPath(QPointF(branch_start_x, y - 12))
-                path.cubicTo(QPointF(branch_start_x + 12, y), QPointF(child_x - 26, y), QPointF(child_x, y))
-                painter.drawPath(path)
-
-                node_fill = QColor(255, 110, 110) if is_hovered_child else (QColor(240, 196, 72) if display_setting.dark_mode else QColor(222, 170, 42))
-                painter.setBrush(node_fill)
-                painter.drawEllipse(QPointF(child_x, y), self.circle_radius + 0.5, self.circle_radius + 0.5)
-
-                if is_hovered_child:
-                    painter.setPen(QColor(220, 24, 24))
-                else:
-                    painter.setPen(QColor(246, 214, 116) if display_setting.dark_mode else QColor(76, 52, 0))
-
+                painter.setPen(QPen(QColor(220, 36, 36) if is_hovered_child else wire_color,
+                                    self.line_width,
+                                    Qt.PenStyle.SolidLine,
+                                    Qt.PenCapStyle.RoundCap))
+                painter.setBrush(QColor(255, 150, 150) if is_hovered_child else mint_node)
+                painter.drawEllipse(QPointF(child_x, y), self.circle_radius + 1, self.circle_radius + 1)
+                painter.setPen(QColor(200, 20, 20) if is_hovered_child else (QColor(224, 224, 224) if display_setting.dark_mode else Qt.GlobalColor.black))
                 painter.drawText(QRect(int(child_x + 20), int(y - text_height / 2), option.rect.width(), text_height),
                                  Qt.AlignmentFlag.AlignLeft,
                                  child_step.display_name)
