@@ -1,6 +1,5 @@
-from __future__ import annotations
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -26,7 +25,7 @@ class Rewrite(NamedTuple):
     display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: list['Rewrite'] | None = None  # Optional field to store the grouped rewrites
+    grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
 
     def to_dict(self) -> dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -42,7 +41,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: str | dict[str, Any]) -> "Rewrite":
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -131,13 +130,13 @@ class ProofModel(QAbstractListModel):
     """
 
     initial_graph: GraphT
-    steps: list[Rewrite]
+    steps: list['Rewrite']
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
         self.initial_graph = start_graph
         self.steps = []
-        self._thumbnail_cache: dict[int, QPixmap] = {}
+        self._thumbnail_cache: Dict[int, QPixmap] = {}
 
     def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
@@ -154,7 +153,7 @@ class ProofModel(QAbstractListModel):
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
-    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
 
         if index.row() >= len(self.steps) + 1 or index.column() >= 1:
@@ -174,7 +173,7 @@ class ProofModel(QAbstractListModel):
                 self._thumbnail_cache[row] = render_graph_thumbnail(graph)
             return self._thumbnail_cache.get(row)
 
-    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
+    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
             return super().flags(index)
         return super().flags(index) | Qt.ItemFlag.ItemIsEditable
@@ -187,11 +186,11 @@ class ProofModel(QAbstractListModel):
         """
         return None
 
-    def columnCount(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def columnCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of columns"""
         return 1
 
-    def rowCount(self, index: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         """The number of rows"""
         # This is a quirk of Qt list models: Since they are based on tree models, the
         # user has to specify the index of the parent. In a list, we always expect the
@@ -201,7 +200,7 @@ class ProofModel(QAbstractListModel):
         else:
             return 0
 
-    def add_rewrite(self, rewrite: Rewrite, position: int | None = None) -> None:
+    def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
         if position is None:
             position = len(self.steps)
@@ -210,7 +209,7 @@ class ProofModel(QAbstractListModel):
         self.endInsertRows()
         self.invalidate_thumbnails(position + 1)
 
-    def pop_rewrite(self, position: int | None = None) -> tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
@@ -277,7 +276,7 @@ class ProofModel(QAbstractListModel):
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -292,7 +291,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: str | dict[str, Any]) -> "ProofModel":
+    def from_json(json_str: Union[str, Dict[str, Any]]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -554,7 +553,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_row_height = text_height + 2 * self.vert_padding
@@ -629,7 +628,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex, text_row_height: int) -> None:
+    def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex], text_row_height: int) -> None:
         """Draw thumbnail preview if enabled on this view."""
         parent_view = self.parent()
         if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
@@ -700,7 +699,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             return min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
         return MAX_THUMBNAIL_HEIGHT
 
-    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
         text_row_height = size.height() + 2 * self.vert_padding
         parent = self.parent()
@@ -717,15 +716,15 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         total = text_row_height + 2 * self.thumbnail_padding + thumb_height
         return QSize(size.width(), total)
 
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QLineEdit:
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
 
-    def setEditorData(self, editor: QWidget, index: QModelIndex | QPersistentModelIndex) -> None:
+    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
         value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
         editor.setText(str(value))
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: QModelIndex | QPersistentModelIndex) -> None:
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
         assert isinstance(step_view, _ProofStepListView)
         assert isinstance(editor, QLineEdit)
