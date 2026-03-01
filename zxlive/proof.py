@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
                                QStyledItemDelegate, QStyleOptionViewItem,
                                QToolButton, QVBoxLayout, QWidget)
 
-from .common import GraphT
+from .common import GraphT, get_settings_value
 from .settings import display_setting
 
 
@@ -27,7 +27,7 @@ class Rewrite(NamedTuple):
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
         return {
             "display_name": self.display_name,
@@ -87,7 +87,7 @@ def render_graph_thumbnail(graph: GraphT, device_pixel_ratio: float = 1.0) -> QP
 
     # Render at a higher maximum resolution so that thumbnails remain crisp on
     # modern HiDPI (Retina) displays when dynamically scaled down by QPainter.
-    max_dim = 1500.0
+    max_dim = 800.0
     scale = min(max_dim / rect.width(), max_dim / rect.height())
     if scale > 2.0:
         scale = 2.0
@@ -130,13 +130,14 @@ class ProofModel(QAbstractListModel):
     """
 
     initial_graph: GraphT
-    steps: list['Rewrite']
+    steps: list[Rewrite]
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
+        import collections
         self.initial_graph = start_graph
         self.steps = []
-        self._thumbnail_cache: Dict[int, QPixmap] = {}
+        self._thumbnail_cache: collections.OrderedDict[int, QPixmap] = collections.OrderedDict()
 
     def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
@@ -145,7 +146,7 @@ class ProofModel(QAbstractListModel):
             old_step = self.steps[index - 1]
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index - 1] = new_step
-        self._thumbnail_cache.pop(index, None)
+        self.invalidate_thumbnail(index)
         # Notify views so that the delegate re-computes sizeHint / repaints
         model_index = self.createIndex(index, 0)
         self.dataChanged.emit(model_index, model_index, [])
@@ -169,9 +170,11 @@ class ProofModel(QAbstractListModel):
         elif role == THUMBNAIL_ROLE:
             row = index.row()
             if row not in self._thumbnail_cache:
-                graph = self.get_graph(row)
-                self._thumbnail_cache[row] = render_graph_thumbnail(graph)
-            return self._thumbnail_cache.get(row)
+                return None
+            # Move accessed item to end for LRU
+            pixmap = self._thumbnail_cache.pop(row)
+            self._thumbnail_cache[row] = pixmap
+            return pixmap
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
@@ -236,6 +239,19 @@ class ProofModel(QAbstractListModel):
         keys = [k for k in self._thumbnail_cache if k >= from_row]
         for k in keys:
             del self._thumbnail_cache[k]
+
+    def invalidate_thumbnail(self, row: int) -> None:
+        """Remove a specific cached thumbnail."""
+        self._thumbnail_cache.pop(row, None)
+
+    def set_thumbnail(self, row: int, pixmap: QPixmap) -> None:
+        """Set the cached thumbnail for a specific row, preserving an LRU bound."""
+        if row in self._thumbnail_cache:
+            self._thumbnail_cache.pop(row)
+        self._thumbnail_cache[row] = pixmap
+        # Limit cache size to 50 thumbnails max
+        while len(self._thumbnail_cache) > 50:
+            self._thumbnail_cache.popitem(last=False)
 
     def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""
@@ -337,7 +353,8 @@ class ProofStepView(QWidget):
         self.thumbnails_toggle = QToolButton(header)
         self.thumbnails_toggle.setText("Thumbnails")
         self.thumbnails_toggle.setCheckable(True)
-        self.thumbnails_toggle.setChecked(False)
+        show_thumbnails = get_settings_value("proof/show-thumbnails", bool)
+        self.thumbnails_toggle.setChecked(show_thumbnails)
         self.thumbnails_toggle.setAutoRaise(True)
         self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
         self.thumbnails_toggle.setShortcut("t")
@@ -404,7 +421,7 @@ class _ProofStepListView(QListView):
         self.setSpacing(0)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.thumbnails_visible = False
+        self.thumbnails_visible = owner.thumbnails_toggle.isChecked()
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
@@ -512,7 +529,7 @@ class _ProofStepListView(QListView):
     def set_thumbnails_visible(self, visible: bool) -> None:
         """Toggle thumbnail previews in the proof step list."""
         self.thumbnails_visible = visible
-        self.model()._thumbnail_cache.clear()
+        self.model().invalidate_thumbnails()
         self.scheduleDelayedItemsLayout()
         self.viewport().update()
 
@@ -521,7 +538,7 @@ class _ProofStepListView(QListView):
         if not self.thumbnails_visible:
             return
         row = self.currentIndex().row()
-        self.model()._thumbnail_cache.pop(row, None)
+        self.model().invalidate_thumbnail(row)
         idx = self.model().createIndex(row, 0)
         self.model().dataChanged.emit(idx, idx, [])
         self.scheduleDelayedItemsLayout()
@@ -636,11 +653,33 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             model = parent_view.model()
             row = index.row()
             pixmap = index.data(THUMBNAIL_ROLE)
-            # Re-render if cached pixmap was made at a different DPR.
-            if pixmap is not None and not pixmap.isNull() and pixmap.devicePixelRatio() != screen_dpr:
-                graph = model.get_graph(row)
-                pixmap = render_graph_thumbnail(graph, screen_dpr)
-                model._thumbnail_cache[row] = pixmap
+            if pixmap is None or pixmap.isNull() or pixmap.devicePixelRatio() != screen_dpr:
+                # To prevent freezing the UI, we do not render the graph asynchronously here if
+                # there's lots of rows. We instead ask the model to do it, and in the meantime
+                # the delegate continues without drawing one.
+                # Use QTimer to delay rendering.
+                from PySide6.QtCore import QTimer
+                
+                # Check if we already scheduled this row
+                if not hasattr(parent_view, '_pending_thumbnails'):
+                    parent_view._pending_thumbnails = set()
+                
+                if row not in parent_view._pending_thumbnails:
+                    parent_view._pending_thumbnails.add(row)
+                    
+                    def render_task(r=row, dpr=screen_dpr):
+                        parent_view._pending_thumbnails.discard(r)
+                        try:
+                            graph = model.get_graph(r)
+                            new_pixmap = render_graph_thumbnail(graph, dpr)
+                            model.set_thumbnail(r, new_pixmap)
+                            idx = model.index(r, 0)
+                            model.dataChanged.emit(idx, idx, [])
+                        except Exception:
+                            pass # Graph might be deleted in between
+                    
+                    QTimer.singleShot(0, render_task)
+
             if pixmap is not None and not pixmap.isNull():
                 # Clamp available_width to the actual usable space inside the
                 # viewport, accounting for where this item starts horizontally.

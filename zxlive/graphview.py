@@ -163,7 +163,8 @@ class GraphView(QGraphicsView):
                 # Merge vertices at the same position
                 self.merge_triggered.emit()
                 return
-            for v in self.graph_scene.selected_vertices:
+            selected = list(self.graph_scene.selected_vertices)
+            for v in selected:
                 vitem = self.graph_scene.vertex_map[v]
                 x = g.row(v)
                 y = g.qubit(v)
@@ -176,7 +177,7 @@ class GraphView(QGraphicsView):
                 elif e.key() == Qt.Key.Key_Right:
                     g.set_position(v, y, x + distance)
                 vitem.set_pos_from_graph()
-            if self.graph_scene.selected_vertices:
+            if selected:
                 self.keyboard_vertices_moved.emit()
         else:
             super().keyPressEvent(e)
