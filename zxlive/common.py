@@ -129,7 +129,7 @@ def from_tikz(s: str) -> Optional[GraphT]:
         g = cast(GraphT, pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True))
         apply_variable_types(g, variable_types)
         _restore_symbolic_tikz_phases(s, g)
-        normalize_symbolic_phase_types(g)
+        g.rebind_variables_to_registry()
         return g
     except Exception as e:
         if QApplication.instance() is not None:
@@ -150,14 +150,6 @@ def get_variable_types(graph: GraphT) -> dict[str, bool]:
         str(name): bool(graph.var_registry.get_type(name, default=False))
         for name in graph.var_registry.vars()
     }
-
-
-def normalize_symbolic_phase_types(graph: GraphT) -> None:
-    """Ensure phase variables are consistent with the graph's var_registry."""
-    # Prefer the library helper if it's available.
-    rebind = getattr(graph, "rebind_variables_to_registry", None)
-    if callable(rebind):
-        rebind()
 
 
 def _encode_tikz_metadata(graph: GraphT) -> Optional[str]:

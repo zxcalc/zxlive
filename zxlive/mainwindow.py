@@ -33,7 +33,6 @@ from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
 from .common import (GraphT, from_tikz, get_data, get_settings_value,
-                     normalize_symbolic_phase_types,
                      new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .custom_rule import CustomRule, check_rule
@@ -719,7 +718,7 @@ class MainWindow(QMainWindow):
                 if isinstance(graph_json, str):  # type: ignore
                     g = GraphT.from_json(graph_json)
                     assert isinstance(g, GraphT)  # type: ignore[misc]
-                    normalize_symbolic_phase_types(g)
+                    g.rebind_variables_to_registry()
                     g.set_auto_simplify(False)
                     return g
             except Exception:
