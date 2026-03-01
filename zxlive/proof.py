@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict, List, Tuple, Set
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -24,7 +24,7 @@ class Rewrite(NamedTuple):
     display_name: str  # Name of proof displayed to user
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
-    grouped_rewrites: Optional[List['Rewrite']] = None  # Optional field to store the grouped rewrites
+    grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -67,7 +67,7 @@ class ProofModel(QAbstractListModel):
     """
 
     initial_graph: GraphT
-    steps: List['Rewrite']
+    steps: list['Rewrite']
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
@@ -104,7 +104,7 @@ class ProofModel(QAbstractListModel):
         modelIndex = self.createIndex(step_idx + 1, 0)
         self.dataChanged.emit(modelIndex, modelIndex, [])
 
-    def graphs(self) -> List[GraphT]:
+    def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
 
     def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -156,7 +156,7 @@ class ProofModel(QAbstractListModel):
         self.steps.insert(position, rewrite)
         self.endInsertRows()
 
-    def pop_rewrite(self, position: Optional[int] = None) -> Tuple[Rewrite, GraphT]:
+    def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
 
         Returns the rewrite and the graph that previously resulted from this rewrite.
@@ -292,9 +292,9 @@ class ProofStepView(QListView):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
-        self.expanded_groups: Set[int] = set()
+        self.expanded_groups: set[int] = set()
         # Track currently selected sub-step: (step_index, sub_step_index) or None
-        self.selected_sub_step: Optional[Tuple[int, int]] = None
+        self.selected_sub_step: Optional[tuple[int, int]] = None
         self._active_sub_editor: Optional[QLineEdit] = None
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
@@ -406,7 +406,7 @@ class ProofStepView(QListView):
         model_index = self.model().index(step_idx + 1, 0)
         self.model().dataChanged.emit(model_index, model_index, [])
 
-    def _click_target_for_pos(self, event: QMouseEvent) -> Tuple[int, bool, int]:
+    def _click_target_for_pos(self, event: QMouseEvent) -> tuple[int, bool, int]:
         """Classify a mouse-press into (toggle_idx, sub_step_clicked, step_idx).
 
         toggle_idx      – step index whose triangle was clicked, or -1
@@ -480,7 +480,7 @@ class ProofStepView(QListView):
         """Trigger repaint for a step row by its 0-based step index."""
         self.update(self.model().index(step_idx + 1, 0))
 
-    def _hover_target_for_pos(self, pos: Any) -> Tuple[int, int, int]:
+    def _hover_target_for_pos(self, pos: Any) -> tuple[int, int, int]:
         """Return (new_step, new_sub, new_header) for the given mouse position.
 
         Each value is -1 when not applicable.
@@ -754,7 +754,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     # Track hover over group header
     hover_header_step_idx: int = -1
 
-    def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Tuple[bool, bool, Optional[List['Rewrite']]]:
+    def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> tuple[bool, bool, Optional[list['Rewrite']]]:
         """Return (is_grouped, is_expanded, grouped_rewrites) for a given row."""
         if index.row() == 0:
             return False, False, None
@@ -939,7 +939,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def _paint_sub_tree(self, painter: QPainter, option: QStyleOptionViewItem,
                         step_idx: int,
-                        grouped_rewrites: List['Rewrite'], row_height: int,
+                        grouped_rewrites: list['Rewrite'], row_height: int,
                         text_height: int, font: QFont,
                         fg: QColor, line_clr: QColor) -> None:
         main_cx = self.line_padding + self.line_width / 2

@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Iterable, Optional, Set, Union, List, Dict, Tuple
+from typing import Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -140,14 +140,14 @@ class UpdateGraph(BaseCommand):
 @dataclass
 class ChangeNodeType(BaseCommand):
     """Changes the color of a set of spiders."""
-    vs: Union[List[VT], Set[VT]]
+    vs: list[VT] | set[VT]
     vty: VertexType
 
     WInfo = namedtuple('WInfo', ['partner', 'partner_type', 'partner_pos', 'neighbors'])
 
-    _old_vtys: Optional[List[VertexType]] = field(default=None, init=False)
-    _old_w_info: Optional[Dict[VT, WInfo]] = field(default=None, init=False)
-    _new_w_inputs: Optional[List[VT]] = field(default=None, init=False)
+    _old_vtys: Optional[list[VertexType]] = field(default=None, init=False)
+    _old_w_info: Optional[dict[VT, WInfo]] = field(default=None, init=False)
+    _new_w_inputs: Optional[list[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_vtys is not None
@@ -212,7 +212,7 @@ class ChangeEdgeColor(BaseCommand):
     es: Iterable[ET]
     ety: EdgeType
 
-    _old_etys: Optional[List[EdgeType]] = field(default=None, init=False)
+    _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_etys is not None
@@ -335,7 +335,7 @@ class AddEdge(BaseCommand):
 @dataclass
 class AddEdges(BaseCommand):
     """Adds multiple edges of the same type to a graph."""
-    pairs: List[Tuple[VT, VT]]
+    pairs: list[tuple[VT, VT]]
     ety: EdgeType
 
     def undo(self) -> None:
@@ -352,9 +352,9 @@ class AddEdges(BaseCommand):
 @dataclass
 class MoveNode(BaseCommand):
     """Updates the location of a collection of nodes."""
-    vs: List[Tuple[VT, float, float]]
+    vs: list[tuple[VT, float, float]]
 
-    _old_positions: Optional[List[Tuple[float, float]]] = field(default=None, init=False)
+    _old_positions: Optional[list[tuple[float, float]]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_positions is not None
@@ -395,7 +395,7 @@ class ChangeEdgeCurve(BaseCommand):
 @dataclass
 class MergeNodes(BaseCommand):
     """Merges groups of vertices that are at the same position."""
-    vertices_to_merge: List[VT]
+    vertices_to_merge: list[VT]
 
     _old_g: Optional[GraphT] = field(default=None, init=False)
 
@@ -465,10 +465,10 @@ class AddRewriteStep(UpdateGraph):
     diff: Optional[GraphDiff] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
-    _old_steps: List[Tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
+    _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
     # When rewriting from inside a grouped sub-step, stores the tail sub-steps
     # that were dropped from the group (for undo restoration).
-    _old_group_tail: Optional[List[Rewrite]] = field(default=None, init=False)
+    _old_group_tail: Optional[list[Rewrite]] = field(default=None, init=False)
     # The original Rewrite object for the group step (before truncation).
     _old_group_rewrite: Optional[Rewrite] = field(default=None, init=False)
 
@@ -486,7 +486,7 @@ class AddRewriteStep(UpdateGraph):
 
         # Check whether the user is rewriting from inside a grouped sub-step.
         step_view = self.step_view
-        sub_step: Optional[Tuple[int, int]] = (
+        sub_step: Optional[tuple[int, int]] = (
             step_view.selected_sub_step  # type: ignore[union-attr]
             if isinstance(step_view, ProofStepView) else None
         )
