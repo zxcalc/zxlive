@@ -33,6 +33,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
         self.name = name
         self.description = description
         self.last_rewrite_center = None
+        self.last_rewrite_verts: Optional[list[VT]] = None
         self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
         if self.is_rewrite_unfusable:
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
@@ -96,6 +97,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
             etab[(v1, v2)][data['type'] - 1] += 1
 
         graph.add_edge_table(etab)
+        self.last_rewrite_verts = list(vertex_map.values())
         graph.remove_vertices(vertices_to_remove)
         return True
 

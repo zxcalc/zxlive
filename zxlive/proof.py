@@ -36,8 +36,10 @@ class Rewrite(NamedTuple):
     # Optional semantic highlight for forward highlighting:
     # - highlight_match_pairs: For MATCH_DOUBLE (e.g. Spider Fusion) [(v1, v2), ...].
     # - highlight_verts: Vertex IDs to highlight (unfuse, color change, strong comp, remove id, etc.).
+    # - highlight_edge_pairs: Edge-only (e.g. Add identity) [(v1, v2), ...] - highlight edges between pairs only.
     highlight_match_pairs: Optional[list[tuple[int, int]]] = None
     highlight_verts: Optional[list[int]] = None
+    highlight_edge_pairs: Optional[list[tuple[int, int]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -48,6 +50,7 @@ class Rewrite(NamedTuple):
             "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None,
             "highlight_match_pairs": self.highlight_match_pairs,
             "highlight_verts": self.highlight_verts,
+            "highlight_edge_pairs": self.highlight_edge_pairs,
         }
 
     def to_json(self) -> str:
@@ -69,6 +72,9 @@ class Rewrite(NamedTuple):
         pairs = d.get("highlight_match_pairs")
         if pairs is not None:
             pairs = [tuple(p) for p in pairs]
+        edge_pairs = d.get("highlight_edge_pairs")
+        if edge_pairs is not None:
+            edge_pairs = [tuple(p) for p in edge_pairs]
         # Backward compat: old proofs may have highlight_unfuse_verts
         highlight_verts = d.get("highlight_verts") or d.get("highlight_unfuse_verts")
 
@@ -79,6 +85,7 @@ class Rewrite(NamedTuple):
             grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None,
             highlight_match_pairs=pairs,
             highlight_verts=highlight_verts,
+            highlight_edge_pairs=edge_pairs,
         )
 
 
@@ -109,6 +116,7 @@ class ProofModel(QAbstractListModel):
                 old_step.grouped_rewrites,
                 old_step.highlight_match_pairs,
                 old_step.highlight_verts,
+                old_step.highlight_edge_pairs,
             )
             self.steps[index - 1] = new_step
 
@@ -194,6 +202,7 @@ class ProofModel(QAbstractListModel):
         self.steps[index] = Rewrite(
             name, old_step.rule, old_step.graph, old_step.grouped_rewrites,
             old_step.highlight_match_pairs, old_step.highlight_verts,
+            old_step.highlight_edge_pairs,
         )
 
         # Rerender the proof step otherwise it will display the old name until
@@ -208,7 +217,7 @@ class ProofModel(QAbstractListModel):
             "Grouped",
             self.get_graph(end_index + 1),
             self.steps[start_index:end_index + 1],
-            None, None,
+            None, None, None,
         )
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
@@ -329,7 +338,7 @@ class ProofStepView(QListView):
             scene.clear_rewrite_highlight()
             return
 
-        # Last proof step: no "next" transition to highlight.
+        # Last proof step: no "next" transition to highlight (forward-looking).
         if index >= num_steps:
             scene.clear_rewrite_highlight()
             return
@@ -337,7 +346,20 @@ class ProofStepView(QListView):
         rewrite_meta = self.model().steps[index]
         current_verts = set(g_current.vertices())
 
-        # 1) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
+        # 1) Edge-only highlighting (e.g. Add identity - the edge the magic wand acts on).
+        highlight_edge_pairs = getattr(rewrite_meta, "highlight_edge_pairs", None)
+        if highlight_edge_pairs:
+            edges_set: set[ET] = set()
+            for pair in highlight_edge_pairs:
+                if isinstance(pair, tuple) and len(pair) == 2:
+                    v1, v2 = int(pair[0]), int(pair[1])
+                    if v1 in current_verts and v2 in current_verts:
+                        edges_set |= _edges_between(g_current, v1, v2)
+            if edges_set:
+                scene.set_rewrite_highlight(set(), edges_set)
+                return
+
+        # 2) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
         highlight_match_pairs = getattr(rewrite_meta, "highlight_match_pairs", None)
         if highlight_match_pairs:
             verts_set: set[int] = set()
@@ -353,7 +375,7 @@ class ProofStepView(QListView):
             scene.set_rewrite_highlight(verts_set, edges_set)
             return
 
-        # 2) Vertex-based highlighting (unfuse, color change, strong comp, remove identity, etc.).
+        # 3) Vertex-based highlighting (unfuse, color change, strong comp, remove identity, etc.).
         highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
         if highlight_verts_list:
             verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}

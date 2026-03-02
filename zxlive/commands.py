@@ -442,6 +442,7 @@ class AddRewriteStep(UpdateGraph):
     name: str
     highlight_match_pairs: Optional[list[tuple[int, int]]] = None
     highlight_verts: Optional[list[int]] = None
+    highlight_edge_pairs: Optional[list[tuple[int, int]]] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -461,8 +462,9 @@ class AddRewriteStep(UpdateGraph):
 
         hp_list = list(self.highlight_match_pairs) if self.highlight_match_pairs else None
         hv_list = list(self.highlight_verts) if self.highlight_verts else None
+        he_list = list(self.highlight_edge_pairs) if self.highlight_edge_pairs else None
         self.proof_model.add_rewrite(
-            Rewrite(self.name, self.name, self.new_g, None, hp_list, hv_list)
+            Rewrite(self.name, self.name, self.new_g, None, hp_list, hv_list, he_list)
         )
 
         # Move to the added step so that the graph view and rewrite-step

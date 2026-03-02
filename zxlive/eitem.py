@@ -110,10 +110,7 @@ class EItem(QGraphicsPathItem):
         if self.graph_scene.is_edge_highlighted(self.e):
             # Emphasize highlighted edges with a thicker, accent-colored pen.
             pen.setWidthF(self.thickness + 2.0)
-            if display_setting.dark_mode:
-                pen.setColor(QColor("#FFC107"))
-            else:
-                pen.setColor(QColor("#FF9800"))
+            pen.setColor(display_setting.effective_colors["rewrite_highlight_edge"])
 
         self.setPen(QPen(pen))
 

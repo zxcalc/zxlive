@@ -165,10 +165,7 @@ class VItem(QGraphicsPathItem):
         if self.graph_scene.is_vertex_highlighted(self.v):
             # Emphasize highlighted vertices with a thicker, accent-colored outline.
             pen.setWidthF(pen.widthF() + 2.0)
-            if display_setting.dark_mode:
-                pen.setColor(QColor("#FFB74D"))
-            else:
-                pen.setColor(QColor("#E65100"))
+            pen.setColor(display_setting.effective_colors["rewrite_highlight_vertex"])
 
         self.prepareGeometryChange()
         self.setBrush(brush)

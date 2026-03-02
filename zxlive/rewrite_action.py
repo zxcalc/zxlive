@@ -156,7 +156,11 @@ class RewriteAction:
                 break
 
         highlight_verts = None
-        if self.match_type == MATCH_COMPOUND and matches_list:
+        if isinstance(self.rule, CustomRule):
+            last_verts = getattr(self.rule, 'last_rewrite_verts', None)
+            if last_verts:
+                highlight_verts = list(last_verts)
+        if highlight_verts is None and self.match_type == MATCH_COMPOUND and matches_list:
             all_v: set[VT] = set()
             for m in matches_list:
                 if isinstance(m, list):
