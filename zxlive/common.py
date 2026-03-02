@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import os
 from enum import IntEnum
-from typing import Final, Optional, TypeVar, Type
+from typing import Final, Optional, TypeVar, Type, cast
 
 from pyzx.graph import EdgeType
 from pyzx.graph.multigraph import Multigraph
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
 
 import pyzx
 
@@ -110,15 +111,18 @@ def view_to_length(width: float, height: float) -> tuple[float, float]:
 
 
 def to_tikz(g: GraphT) -> str:
+    """Export graph to TikZ; PyZX includes variable type metadata when present."""
     return pyzx.tikz.to_tikz(g)  # type: ignore
 
 
 def from_tikz(s: str) -> Optional[GraphT]:
+    """Import graph from TikZ; PyZX handles metadata and symbolic phases."""
     try:
-        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph')
-        assert isinstance(g, GraphT)
+        g = cast(GraphT, pyzx.tikz.tikz_to_graph(s, backend='multigraph', ignore_invalid_phases=True))
+        g.set_auto_simplify(False)
         return g
     except Exception as e:
-        from . import dialogs
-        dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
+        if QApplication.instance() is not None:
+            from . import dialogs
+            dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
         return None
