@@ -17,13 +17,11 @@ from .settings import display_setting
 
 
 def _edges_between(g: GraphT, v1: int, v2: int) -> set[ET]:
-    """Return the set of edges between v1 and v2 in g."""
-    out: set[ET] = set()
-    for e in g.incident_edges(v1):
-        s, t = g.edge_st(e)
-        if (s == v1 and t == v2) or (s == v2 and t == v1):
-            out.add(e)
-    return out
+    """Return the set of edges between v1 and v2 in g.
+
+    Thin wrapper around ``g.edges(v1, v2)`` to make intent explicit.
+    """
+    return set(g.edges(v1, v2))
 
 
 class Rewrite(NamedTuple):
