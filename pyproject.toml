@@ -35,7 +35,8 @@ dependencies = [
     "shapely",
     "pyperclip",
     "imageio",
-    "packaging"
+    "packaging",
+    "matplotlib>=3.3",
 ]
 
 [project.optional-dependencies]
