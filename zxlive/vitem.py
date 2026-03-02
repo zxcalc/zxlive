@@ -122,7 +122,6 @@ class VItem(QGraphicsPathItem):
 
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
-        highlighted = self.graph_scene.is_vertex_highlighted(self.v)
         self.update_shape()
         color_map = {
             VertexType.Z: "z_spider",
