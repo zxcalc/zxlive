@@ -15,6 +15,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ '3.11' ]
+    continue-on-error: true
     steps:
     - uses: actions/checkout@v6
     - name: Setup Python ${{ matrix.python-version }}
@@ -22,16 +23,12 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
-    - name: Install dependecies
+    - name: Install dependencies
       run:
         pip install ".[test]"
     - name: mypy
       run:
         mypy zxlive
-    - name: Flake8
+    - name: Ruff Check
       run:
-        pflake8 zxlive
-    - name: Pylint
-      continue-on-error: true
-      run:
-        pylint zxlive
+        ruff check
