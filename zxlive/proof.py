@@ -347,14 +347,14 @@ class ProofStepView(QListView):
         # 1) Edge-only highlighting (e.g. Add identity - the edge the magic wand acts on).
         highlight_edge_pairs = getattr(rewrite_meta, "highlight_edge_pairs", None)
         if highlight_edge_pairs:
-            edges_set: set[ET] = set()
+            edges_only_set: set[ET] = set()
             for pair in highlight_edge_pairs:
                 if isinstance(pair, tuple) and len(pair) == 2:
                     v1, v2 = int(pair[0]), int(pair[1])
                     if v1 in current_verts and v2 in current_verts:
-                        edges_set |= _edges_between(g_current, v1, v2)
-            if edges_set:
-                scene.set_rewrite_highlight(set(), edges_set)
+                        edges_only_set |= _edges_between(g_current, v1, v2)
+            if edges_only_set:
+                scene.set_rewrite_highlight(set(), edges_only_set)
                 return
 
         # 2) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
