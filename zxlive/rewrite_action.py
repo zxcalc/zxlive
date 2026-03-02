@@ -155,12 +155,22 @@ class RewriteAction:
             if not self.repeat_rule_application or not applied:
                 break
 
+        highlight_verts = None
+        if self.match_type == MATCH_COMPOUND and matches_list:
+            all_v: set[VT] = set()
+            for m in matches_list:
+                if isinstance(m, list):
+                    all_v.update(m)
+            if all_v:
+                highlight_verts = list(all_v)
+
         cmd = AddRewriteStep(
             panel.graph_view,
             g,
             panel.step_view,
             self.name,
             highlight_match_pairs=highlight_match_pairs if is_fuse_rule else None,
+            highlight_verts=highlight_verts,
         )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
