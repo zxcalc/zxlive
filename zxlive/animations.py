@@ -303,13 +303,25 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         for v in rem_verts:
             anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
     elif self.name == rules_basic['copy']['text'] or self.name == rules_basic['pauli']['text']:
+        # For Push Pauli (MATCH_DOUBLE), matches contains (v1, v2) pairs and we animate
+        # the interaction between them. For Copy (MATCH_SINGLE), matches is a list
+        # of plain vertex IDs; in that case we skip the special animation entirely to
+        # avoid indexing errors while still applying the rewrite and highlights.
         anim_before = QParallelAnimationGroup()
         for m in matches:
-            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
-                                          panel.graph_scene.vertex_map[m[1]]))
+            if isinstance(m, tuple) and len(m) == 2:
+                v1, v2 = m
+                anim_before.addAnimation(
+                    fuse(panel.graph_scene.vertex_map[v1],
+                         panel.graph_scene.vertex_map[v2])
+                )
         anim_after = QParallelAnimationGroup()
         for m in matches:
-            anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
+            if isinstance(m, tuple) and len(m) == 2:
+                _, v2 = m
+                anim_after.addAnimation(
+                    strong_comp(panel.graph, g, v2, panel.graph_scene)
+                )
     elif self.name == rules_basic['bialgebra']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:

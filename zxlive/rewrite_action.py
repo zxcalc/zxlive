@@ -156,10 +156,12 @@ class RewriteAction:
                 break
 
         highlight_verts = None
+        # 1) Custom rules: use the vertices recorded after applying the rule.
         if isinstance(self.rule, CustomRule):
             last_verts = getattr(self.rule, 'last_rewrite_verts', None)
             if last_verts:
                 highlight_verts = list(last_verts)
+        # 2) Compound (MATCH_COMPOUND) rules: highlight all matched vertices.
         if highlight_verts is None and self.match_type == MATCH_COMPOUND and matches_list:
             all_v: set[VT] = set()
             for m in matches_list:
@@ -167,6 +169,23 @@ class RewriteAction:
                     all_v.update(m)
             if all_v:
                 highlight_verts = list(all_v)
+        # 3) Strong complementarity (bialgebra): highlight all spiders involved in
+        #    the MATCH_DOUBLE pairs so that the vertex-based branch shows all of
+        #    them and their incident edges.
+        if (
+            highlight_verts is None
+            and self.match_type == MATCH_DOUBLE
+            and self.name == rules_basic["bialgebra"]["text"]
+            and matches_list
+        ):
+            involved: set[VT] = set()
+            for m in matches_list:
+                if isinstance(m, tuple) and len(m) == 2:
+                    v1, v2 = cast(tuple[VT, VT], m)
+                    involved.add(v1)
+                    involved.add(v2)
+            if involved:
+                highlight_verts = list(involved)
 
         cmd = AddRewriteStep(
             panel.graph_view,
