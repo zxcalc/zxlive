@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
-from .common import GraphT, VT, ET
+from .common import GraphT, VT
 from .settings import display_setting
 
 
@@ -163,7 +163,7 @@ class ProofModel(QAbstractListModel):
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
+        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.matched_vertices, old_step.grouped_rewrites)
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
@@ -176,7 +176,7 @@ class ProofModel(QAbstractListModel):
             "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
-            self.steps[start_index:end_index + 1]
+            grouped_rewrites=self.steps[start_index:end_index + 1]
         )
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]

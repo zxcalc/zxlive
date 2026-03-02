@@ -318,7 +318,7 @@ class GraphScene(QGraphicsScene):
                     for eitem in self.edge_map[e].values():
                         eitem._diff_highlight = "removed"
                         eitem.refresh()
-            
+
             # Highlight surviving matched vertices explicitly
             if matched_vertices:
                 for v in matched_vertices:
