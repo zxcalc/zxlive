@@ -104,6 +104,7 @@ class VItem(QGraphicsPathItem):
         self._cached_dummy_text = ""
         self._cached_dark_mode = False
         self._cached_font_key = ""
+        self._last_type: Optional[VertexType] = None
 
         self._old_pos = None
         self._dragged_on = None
@@ -132,9 +133,21 @@ class VItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
-    def refresh(self) -> None:
-        """Call this method whenever a vertex moves or its data changes"""
-        self.update_shape()
+    def refresh(self, cascade_edges: bool = True) -> None:
+        """Call this method whenever a vertex moves or its data changes.
+
+        :param cascade_edges: If True (default), also refresh all adjacent
+            edges.  Pass False when the caller refreshes edges separately
+            (e.g. ``GraphScene._update_graph_inner`` which deduplicates
+            edge refreshes across multiple dirty vertices)."""
+        # Only rebuild the path when the vertex type has changed; the shape
+        # geometry depends solely on the type.
+        ty = self.ty
+        if ty != self._last_type:
+            self.setPath(self._make_shape_path())
+            self._last_type = ty
+        # Rotation depends on position (for W_OUTPUT), so always update it.
+        self.set_vitem_rotation()
         color_map = {
             VertexType.Z: "z_spider",
             VertexType.Z_BOX: "z_spider",
@@ -188,13 +201,14 @@ class VItem(QGraphicsPathItem):
         if self.ty == VertexType.W_INPUT:
             w_out = get_w_partner_vitem(self)
             if w_out:
-                w_out.refresh()
+                w_out.refresh(cascade_edges=cascade_edges)
 
-        for e_item in self.adj_items:
-            e_item.refresh()
+        if cascade_edges:
+            for e_item in self.adj_items:
+                e_item.refresh()
 
     def _make_shape_path(self) -> QPainterPath:
-        """Helper to create the path for both drawing and hit-testing."""
+        """Create the QPainterPath for drawing and hit-testing."""
         path = QPainterPath()
         if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
@@ -209,14 +223,6 @@ class VItem(QGraphicsPathItem):
         else:
             path.addEllipse(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         return path
-
-    def update_shape(self) -> None:
-        pen = QPen()
-        pen.setWidthF(3)
-        pen.setColor(display_setting.effective_colors["outline"])
-        self.setPen(pen)
-        self.setPath(self._make_shape_path())
-        self.set_vitem_rotation()
 
     def shape(self) -> QPainterPath:
         return self._make_shape_path()
@@ -264,9 +270,9 @@ class VItem(QGraphicsPathItem):
         # Note that the position and selected values are already updated when
         # this event fires.
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
-            # If we're being animated, the animation will decide for itself whether we
-            # should be refreshed or not
-            if not self.is_animated:
+            # Skip refresh when the scene is performing a bulk graph update
+            # (it will refresh all affected items in a single pass afterwards).
+            if not self.is_animated and not self.graph_scene._bulk_updating:
                 self.refresh()
 
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:

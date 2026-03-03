@@ -106,7 +106,7 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setDashPattern([4.0, 2.0])
         pen.setColor(self.color)
-        self.setPen(QPen(pen))
+        self.setPen(pen)
 
         if not self.is_dragging:
             self.curve_distance = self.g.edata(self.e, f"curve_{self.index}", self.curve_distance)

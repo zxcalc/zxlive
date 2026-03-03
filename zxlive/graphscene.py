@@ -62,6 +62,9 @@ class GraphScene(QGraphicsScene):
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
         self.g: GraphT
+        # True while update_graph is running; suppresses per-item refresh
+        # cascades in VItem.itemChange so that refreshes can be deduplicated.
+        self._bulk_updating: bool = False
 
     def update_background_brush(self) -> None:
         if display_setting.dark_mode:
@@ -91,10 +94,9 @@ class GraphScene(QGraphicsScene):
         """Selects the given collection of vertices."""
         self.clearSelection()
         vs = set(vs)
-        for it in self.items():
-            if isinstance(it, VItem) and it.v in vs:
-                it.setSelected(True)
-                vs.remove(it.v)
+        for v in vs:
+            if v in self.vertex_map:
+                self.vertex_map[v].setSelected(True)
         self.selection_changed_custom.emit()
 
     def set_graph(self, g: GraphT) -> None:
@@ -120,6 +122,25 @@ class GraphScene(QGraphicsScene):
 
         :param new: The new graph to update to.
         :param select_new: If True, add all new vertices to the selection set."""
+
+        self._bulk_updating = True
+        views = self.views()
+        for view in views:
+            view.setUpdatesEnabled(False)
+        try:
+            self._update_graph_inner(new, select_new)
+        finally:
+            self._bulk_updating = False
+            for view in views:
+                view.setUpdatesEnabled(True)
+
+    def _update_graph_inner(self, new: GraphT, select_new: bool) -> None:
+        """Inner implementation of update_graph.
+
+        Runs with ``_bulk_updating=True`` and view updates disabled so that:
+        - VItem.itemChange does not cascade refresh() on every setPos/setSelected
+        - Qt defers all repaints until the outer method re-enables updates
+        """
 
         selected_vertices = set(self.selected_vertices)
 
@@ -183,30 +204,50 @@ class GraphScene(QGraphicsScene):
         for v in diff.new_verts:
             self.vertex_map[v].set_vitem_rotation()
 
+        # Collect all vertices/edges that need a visual refresh into sets
+        # so each item is refreshed exactly once, regardless of how many diff
+        # categories it appears in (e.g. a vertex whose type, phase, AND
+        # position all changed still gets a single refresh() call).
+        dirty_vertices: set[VT] = set()
+        dirty_edges: set[ET] = set()
+
         for v in diff.changed_vertex_types:
-            self.vertex_map[v].refresh()
-
+            dirty_vertices.add(v)
         for v in diff.changed_phases:
-            self.vertex_map[v].refresh()
-
+            dirty_vertices.add(v)
         for v in diff.changed_vdata:
-            self.vertex_map[v].refresh()
-
-        for e in diff.changed_edata:
-            for i in self.edge_map[e]:
-                self.edge_map[e][i].refresh()
+            dirty_vertices.add(v)
 
         for v in diff.changed_pos:
             v_item = self.vertex_map[v]
             for anim in v_item.active_animations.copy():
                 anim.stop()
             v_item.set_pos_from_graph()
-            v_item.set_vitem_rotation()
+            dirty_vertices.add(v)
 
         for e in diff.changed_edge_types:
             for i in self.edge_map[e]:
                 self.edge_map[e][i].reset_color()
-                self.edge_map[e][i].refresh()
+                dirty_edges.add(e)
+
+        for e in diff.changed_edata:
+            dirty_edges.add(e)
+
+        # Edges adjacent to dirty vertices must also be refreshed (their
+        # geometry depends on endpoint positions/types).
+        for v in dirty_vertices:
+            v_item = self.vertex_map[v]
+            for e_item in v_item.adj_items:
+                dirty_edges.add(e_item.e)
+
+        for v in dirty_vertices:
+            if v in self.vertex_map:
+                self.vertex_map[v].refresh(cascade_edges=False)
+
+        for e in dirty_edges:
+            if e in self.edge_map:
+                for i in self.edge_map[e]:
+                    self.edge_map[e][i].refresh()
 
         self.select_vertices(selected_vertices)
 
