@@ -79,6 +79,32 @@ class Rewrite(NamedTuple):
         )
 
 
+import json as _json  # agent log
+import time as _time  # agent log
+
+
+# region agent log
+def _agent_debug_log_move_to_step(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    """Minimal NDJSON logger for debug mode (proof.move_to_step)."""
+    try:
+        ts = int(_time.time() * 1000)
+        payload = {
+            "id": f"log_{ts}",
+            "timestamp": ts,
+            "location": location,
+            "message": message,
+            "data": data,
+            "runId": "proof_move_to_step",
+            "hypothesisId": hypothesis_id,
+        }
+        with open("/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log", "a") as f:
+            f.write(_json.dumps(payload) + "\n")
+    except Exception:
+        # Logging must never break the app.
+        pass
+# endregion
+
+
 class ProofModel(QAbstractListModel):
     """List model capturing the individual steps in a proof.
 
@@ -336,6 +362,22 @@ class ProofStepView(QListView):
         rewrite_meta = self.model().steps[index]
         current_verts = set(g_current.vertices())
 
+        # region agent log
+        _agent_debug_log_move_to_step(
+            "H_move_step",
+            "proof.py:ProofStepView.move_to_step:entry",
+            "Entered move_to_step",
+            {
+                "index": index,
+                "rule": getattr(rewrite_meta, "rule", None),
+                "highlight_edge_pairs": getattr(rewrite_meta, "highlight_edge_pairs", None),
+                "highlight_match_pairs": getattr(rewrite_meta, "highlight_match_pairs", None),
+                "highlight_verts": getattr(rewrite_meta, "highlight_verts", None),
+                "current_verts_len": len(current_verts),
+            },
+        )
+        # endregion
+
         # 1) Edge-only highlighting (e.g. Add identity - the edge the magic wand acts on).
         highlight_edge_pairs = getattr(rewrite_meta, "highlight_edge_pairs", None)
         if highlight_edge_pairs:
@@ -377,7 +419,9 @@ class ProofStepView(QListView):
                 edges_highlight = set()
                 for v in verts_set:
                     for e in g_current.incident_edges(v):
-                        edges_highlight.add(e)
+                        s, t = g_current.edge_st(e)
+                        if s in verts_set and t in verts_set:
+                            edges_highlight.add(e)
             scene.set_rewrite_highlight(verts_set, edges_highlight)
             return
 

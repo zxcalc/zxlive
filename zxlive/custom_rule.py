@@ -120,7 +120,13 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
             etab[(v1, v2)][data['type'] - 1] += 1
 
         graph.add_edge_table(etab)
-        self.last_rewrite_verts = list(vertex_map.values())
+        # Prefer non-boundary RHS vertices so highlight is limited to the gadget region;
+        # fall back to all mapped vertices if there are no non-boundary (e.g. degenerate rule).
+        non_boundary = [
+            vertex_map[v] for v in self.rhs_graph_nx.nodes()
+            if self.rhs_graph_nx.nodes()[v].get('type') != VertexType.BOUNDARY
+        ]
+        self.last_rewrite_verts = non_boundary if non_boundary else list(vertex_map.values())
         graph.remove_vertices(vertices_to_remove)
         return True
 
