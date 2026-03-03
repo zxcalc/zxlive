@@ -137,6 +137,8 @@ class VItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def refresh(self) -> None:
         """Call this method whenever a vertex moves or its data changes"""
         self.update_shape()
@@ -299,7 +301,9 @@ class VItem(QGraphicsPathItem):
             return
         self._old_pos = self.pos()
 
-    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
         super().mouseMoveEvent(e)
         if self.is_animated:
             e.ignore()
@@ -342,7 +346,9 @@ class VItem(QGraphicsPathItem):
                 self._dragged_on = None
         e.ignore()
 
-    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)

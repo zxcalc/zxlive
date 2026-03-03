@@ -138,6 +138,8 @@ class BasePanel(QWidget):
     def update_font(self) -> None:
         self.graph_view.update_font()
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def show_matrix(self) -> None:
         """Show the matrix of the current graph in a dialog."""
         import pyperclip

@@ -298,7 +298,9 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
-    def _magic_slice(self, trace: WandTrace) -> bool:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def _magic_slice(self, trace: WandTrace) -> bool:  # noqa: PLR0912
         def cross(a: QPointF, b: QPointF) -> float:
             return float(a.y() * b.x() - a.x() * b.y())
         filtered = [item for item in trace.hit if isinstance(item, VItem)]

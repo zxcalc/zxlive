@@ -125,8 +125,10 @@ def create_circuit_dialog(explanation: str, example: str, parent: QWidget) -> Op
     return s if success else None
 
 
+# TODO: Fix code complexity
+# noqa: complexipy
 def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter, parent: Optional[QWidget] = None) -> \
-        Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
+        Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:  # noqa: PLR0912
     """Imports a diagram from a given file path.
 
     Returns the imported graph or `None` if the import failed."""

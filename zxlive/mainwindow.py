@@ -422,7 +422,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.warning(f"Failed to save session state: {e}")
 
-    def _restore_session_state(self) -> bool:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def _restore_session_state(self) -> bool:  # noqa: PLR0912
         """Restore previously saved tabs. Returns True if any tabs were restored."""
         # Check if user wants to restore session
         startup_behavior = get_settings_value("startup-behavior", str, "restore")

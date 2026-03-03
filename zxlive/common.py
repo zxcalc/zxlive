@@ -28,6 +28,9 @@ def set_settings_value(arg: str, val: T, _type: type[T], settings: QSettings | N
     _settings.setValue(arg, val)
 
 
+
+# TODO: Fix code complexity
+# noqa: complexipy
 def get_settings_value(arg: str, _type: type[T], default: T | None = None, settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
     try:

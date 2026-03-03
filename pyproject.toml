@@ -44,6 +44,7 @@ test = [
     "mypy",
     "ruff",
     "pytest-qt",
+    "complexipy",
 ]
 doc = [
     "sphinx>=9.1.0",
