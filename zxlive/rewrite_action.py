@@ -4,8 +4,6 @@ import copy
 import os
 import subprocess
 import sys
-import json
-import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -32,27 +30,6 @@ from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
-
-# region agent log
-def _agent_debug_log_rewrite_action(hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    """Minimal NDJSON logger for debug mode (rewrite_action)."""
-    try:
-        ts = int(time.time() * 1000)
-        payload = {
-            "id": f"log_{ts}",
-            "timestamp": ts,
-            "location": location,
-            "message": message,
-            "data": data,
-            "runId": "rewrite_action",
-            "hypothesisId": hypothesis_id,
-        }
-        with open("/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log", "a") as f:
-            f.write(json.dumps(payload) + "\n")
-    except Exception:
-        # Logging must never break the app.
-        pass
-# endregion
 
 
 @dataclass
@@ -228,22 +205,6 @@ class RewriteAction:
                         vs.update(cast(list[VT], m))
                 if vs:
                     highlight_verts = list(vs)
-
-        # region agent log
-        _agent_debug_log_rewrite_action(
-            "H_generic_highlight",
-            "rewrite_action.py:do_rewrite",
-            "Computed highlight metadata",
-            {
-                "rule_name": self.name,
-                "is_custom_rule": isinstance(self.rule, CustomRule),
-                "match_type": self.match_type,
-                "matches_list_len": len(matches_list),
-                "highlight_verts": list(highlight_verts) if highlight_verts is not None else None,
-                "highlight_match_pairs": list(highlight_match_pairs) if highlight_match_pairs is not None else None,
-            },
-        )
-        # endregion
 
         cmd = AddRewriteStep(
             panel.graph_view,
