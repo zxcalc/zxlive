@@ -23,7 +23,8 @@ from typing import Callable, Optional, cast
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QMimeData, QSettings, QTextStream, QTimer, QUrl)
+                            QMimeData, QSettings, QTextStream, QTimer, QUrl,
+                            Qt)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
@@ -494,11 +495,12 @@ class MainWindow(QMainWindow):
     def update_tab_name(self, clean: bool) -> None:
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
-        if name.endswith("*"):
-            name = name[:-1]
+        if name.startswith("*"):
+            name = name[1:]
         if not clean:
-            name += "*"
+            name = "*" + name
         self.tab_widget.setTabText(i, name)
+        self.tab_widget.setTabToolTip(i, name)
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
@@ -643,6 +645,7 @@ class MainWindow(QMainWindow):
         name = QFileInfo(file_path).baseName()
         i = self.tab_widget.currentIndex()
         self.tab_widget.setTabText(i, name)
+        self.tab_widget.setTabToolTip(i, name)
         return True
 
     def handle_export_tikz_proof_action(self) -> bool:
@@ -735,7 +738,8 @@ class MainWindow(QMainWindow):
         self.active_panel.delete_selection()
 
     def _new_panel(self, panel: BasePanel, name: str) -> None:
-        self.tab_widget.addTab(panel, name)
+        idx = self.tab_widget.addTab(panel, name)
+        self.tab_widget.setTabToolTip(idx, name)
         self.tab_widget.setCurrentWidget(panel)
 
         self._reset_menus(True)
@@ -775,7 +779,7 @@ class MainWindow(QMainWindow):
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             tab_text = self.tab_widget.tabText(i)
-            if tab_text == name or tab_text == name + "*":
+            if tab_text == name or tab_text == "*" + name:
                 self.tab_widget.setCurrentIndex(i)
                 assert self.active_panel is not None
                 self.active_panel.replace_graph(graph)
@@ -786,7 +790,7 @@ class MainWindow(QMainWindow):
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             tab_text = self.tab_widget.tabText(i)
-            if tab_text == name or tab_text == name + "*":
+            if tab_text == name or tab_text == "*" + name:
                 panel = cast(BasePanel, self.tab_widget.widget(i))
                 return cast(GraphT, copy.deepcopy(panel.graph_scene.g))
         return None
@@ -877,7 +881,7 @@ class MainWindow(QMainWindow):
                 padding: 10px 24px;
                 margin-right: 2px;
                 min-width: 100px;
-                max-width: 200px;
+                max-width: 250px;
             }}
 
             CustomTabBar::tab:selected {{
@@ -999,6 +1003,7 @@ class CustomTabBar(QTabBar):
         super().__init__(parent)
         self.hovered_tab: int = -1
         self.setMouseTracking(True)
+        self.setElideMode(Qt.TextElideMode.ElideRight)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Track which tab is being hovered."""
