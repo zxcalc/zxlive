@@ -178,7 +178,9 @@ class GraphView(QGraphicsView):
         else:
             super().keyPressEvent(e)
 
-    def mouseMoveEvent(self, e: QMouseEvent) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def mouseMoveEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
         super().mouseMoveEvent(e)
         if self.tool == GraphTool.Selection:
             if self.rubberband.isVisible():
@@ -212,7 +214,9 @@ class GraphView(QGraphicsView):
         else:
             e.ignore()
 
-    def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def mouseReleaseEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
         if e.button() == Qt.MouseButton.RightButton and self.graph_scene.selectedItems():
             return
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
