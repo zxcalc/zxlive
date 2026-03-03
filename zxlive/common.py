@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from enum import IntEnum
-from typing import Final, Optional, Type, TypeVar, cast
+from typing import Final, Optional, TypeVar, cast
 
 import pyzx
 from PySide6.QtCore import QSettings
@@ -21,14 +21,14 @@ def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
 
 
-def set_settings_value(arg: str, val: T, _type: Type[T], settings: QSettings | None = None) -> None:
+def set_settings_value(arg: str, val: T, _type: type[T], settings: QSettings | None = None) -> None:
     _settings = settings or QSettings("zxlive", "zxlive")
     if not isinstance(val, _type):
         raise ValueError(f"Unexpected type for {arg}: expected {_type}, got {type(val)}")
     _settings.setValue(arg, val)
 
 
-def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
+def get_settings_value(arg: str, _type: type[T], default: T | None = None, settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
     try:
         val = _settings.value(arg, default)

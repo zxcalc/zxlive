@@ -31,7 +31,7 @@ from PySide6 import QtCore
 from PySide6.QtWidgets import QMessageBox
 from pytestqt.qtbot import QtBot
 
-from zxlive.common import GraphT, get_settings_value, new_graph, set_settings_value
+from zxlive.common import new_graph, set_settings_value
 from zxlive.construct import construct_circuit
 from zxlive.custom_rule import CustomRule
 from zxlive.dialogs import FileFormat

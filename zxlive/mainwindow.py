@@ -244,7 +244,7 @@ class MainWindow(QMainWindow):
             "New rewrite from file", lambda: create_new_rewrite(self),
             None, "New rewrite from file")
         new_rewrite_editor = self._new_action(
-            "New rewrite", lambda: self.new_rule_editor(), None,
+            "New rewrite", self.new_rule_editor, None,
             "New rewrite")
         self.proof_as_rewrite_action = self._new_action(
             "Save proof as a rewrite", self.proof_as_lemma, None,

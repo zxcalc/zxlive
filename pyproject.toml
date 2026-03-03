@@ -70,12 +70,13 @@ zxlive = "zxlive.app:main"
 reportWildcardImportFromLibrary = "none"
 
 [tool.ruff]
+target-version = "py39"
 line-length = 120
 
 [tool.ruff.lint]
 select = [
-    "E",      # pycodestyle
-    "F",      # Pyflakes
+    "E",    # pycodestyle
+    "F",    # Pyflakes
     "UP",   # pyupgrade
     "B",    # flake8-bugbear
     "SIM",  # flake8-simplify
@@ -84,14 +85,25 @@ select = [
 ]
 ignore = [
     "E501",
-    "E721",    # False positive: triggers on .type() method calls, not just type() builtin
-    "E402",    # false positives for local imports
-    "D100",    # ignore missing docs
-    "PLC0415"  # ignore mid-file imports
-]
+    "E721",     # False positive: triggers on .type() method calls, not just type() builtin
+    "D100",     # ignore missing docs
+    "PLC0415",  # ignore mid-file imports
+    "UP045",    # For py>=3.9, false positive for converting Optional[X] to X | None
+    "UP007",    # For py>=3.9, false positive for converting Union[X, Y] to X | Y
 
-[tool.ruff.lint.per-file-ignores]
-"test/*" = ["F401"]
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "PLR2004",
+    "PLW2901",
+
+    "B008",
+    "B904",
+
+    "SIM103",
+    "SIM108",
+]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

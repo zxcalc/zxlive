@@ -2,7 +2,7 @@
 import json
 from collections.abc import Sequence
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import networkx as nx
 import numpy as np
@@ -119,11 +119,11 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
                     subgraph_nx.get_edge_data(matching[v], outside_verts[0])[0]['type'] == EdgeType.SIMPLE and \
                     vtype != VertexType.W_INPUT:
                 continue
-            if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
+            if vtype in (VertexType.Z, VertexType.X, VertexType.Z_BOX):
                 self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
             elif vtype == VertexType.H_BOX:
                 self.unfuse_h_box_vertex(graph, subgraph_nx, matching[v])
-            elif vtype == VertexType.W_OUTPUT or vtype == VertexType.W_INPUT:
+            elif vtype in (VertexType.W_OUTPUT, VertexType.W_INPUT):
                 self.unfuse_w_vertex(graph, subgraph_nx, matching[v], vtype)
 
     def unfuse_update_edges(self, graph: GraphT, subgraph_nx: nx.MultiGraph, old_v: VT, new_v: VT) -> None:
@@ -181,7 +181,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
         })
 
     @classmethod
-    def from_json(cls, json_str: Union[str, Dict[str, Any]]) -> "CustomRule":
+    def from_json(cls, json_str: Union[str, dict[str, Any]]) -> "CustomRule":
         if isinstance(json_str, str):
             d = json.loads(json_str)
         else:
@@ -243,8 +243,8 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     return coeff, var, const
 
 
-def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, Union[int, float, complex, Fraction]]:
-    params: Dict[Var, Union[int, float, complex, Fraction]] = {}
+def match_symbolic_parameters(match: dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> dict[Var, Union[int, float, complex, Fraction]]:
+    params: dict[Var, Union[int, float, complex, Fraction]] = {}
     left_phase = left.nodes.data('phase', default=0)  # type: ignore
     right_phase = right.nodes.data('phase', default=0)  # type: ignore
 
@@ -273,7 +273,7 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: n
     return params
 
 
-def filter_matchings_if_symbolic_compatible(matchings: list[Dict], left: nx.MultiGraph, right: nx.MultiGraph) -> list[Dict]:
+def filter_matchings_if_symbolic_compatible(matchings: list[dict], left: nx.MultiGraph, right: nx.MultiGraph) -> list[dict]:
     new_matchings = []
     for matching in matchings:
         if len(matching) != len(left):

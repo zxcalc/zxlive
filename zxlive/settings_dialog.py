@@ -16,7 +16,7 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QFontDatabase, QIcon
@@ -177,7 +177,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
 
         self.settings = QSettings("zxlive", "zxlive")
-        self.value_dict: Dict[str, QWidget] = {}
+        self.value_dict: dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
         self.prev_dark_mode = self.get_settings_value("dark-mode", str)
@@ -327,7 +327,7 @@ class SettingsDialog(QDialog):
         for name, widget in self.value_dict.items():
             if isinstance(widget, QLineEdit):
                 self.settings.setValue(name, widget.text())
-            elif isinstance(widget, QSpinBox) or isinstance(widget, QDoubleSpinBox):
+            elif isinstance(widget, (QSpinBox, QDoubleSpinBox)):
                 self.settings.setValue(name, widget.value())
             elif isinstance(widget, QComboBox):
                 self.settings.setValue(name, widget.currentData())

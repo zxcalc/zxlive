@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Optional, Type
+from typing import Optional
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
@@ -34,7 +34,7 @@ class ToolbarSection:
 class BasePanel(QWidget):
     """Base class implementing functionality shared between the edit and
     proof panels."""
-    splitter_sizes: dict[Type[BasePanel], list[int]] = dict()
+    splitter_sizes: dict[type[BasePanel], list[int]] = dict()
 
     graph_scene: GraphScene
     graph_view: GraphView

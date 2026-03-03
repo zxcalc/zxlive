@@ -129,7 +129,7 @@ class PauliWebsPanel(BasePanel):
         self.web_list.clear()
         type_counts = {name: 0 for name in priority_map}
 
-        for i, web in enumerate(self._pauli_webs):
+        for i, _web in enumerate(self._pauli_webs):
             # Re-identify type (since we just sorted them, they are grouped)
             # We use the same logic or just grab it from our sorted list
             current_type = annotated_webs[i][0]
@@ -205,13 +205,12 @@ class PauliWebsPanel(BasePanel):
             item = self.web_list.item(i)
             item.setForeground(QBrush())
             item.setFont(QFont())
-            if (e[0], e[1]) in web.half_edges():
-                if item:
-                    item.setForeground(QColor("#FFC107"))
-                    font = QFont()
-                    font.setBold(True)
-                    font.setPointSize(10)  # Optional: Make it larger too
-                    item.setFont(font)
+            if (e[0], e[1]) in web.half_edges() and item:
+                item.setForeground(QColor("#FFC107"))
+                font = QFont()
+                font.setBold(True)
+                font.setPointSize(10)  # Optional: Make it larger too
+                item.setFont(font)
         self.graph_scene.invalidate()
 
     def on_background_double_clicked(self) -> None:

@@ -175,9 +175,9 @@ class EditorBasePanel(BasePanel):
             if sys.platform == "win32":
                 os.startfile(abs_path)
             elif sys.platform == "darwin":
-                subprocess.run(["open", abs_path])
+                subprocess.run(["open", abs_path], check=False)
             else:
-                subprocess.run(["xdg-open", abs_path])
+                subprocess.run(["xdg-open", abs_path], check=False)
         elif self.patterns_folder:
             # Create the folder if it doesn't exist
             os.makedirs(self.patterns_folder, exist_ok=True)
@@ -305,7 +305,7 @@ class EditorBasePanel(BasePanel):
 
         # We will try to connect all the vertices together in order
         # First we filter out the vertices that are not compatible with the edge.
-        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
+        verts = [vitem for vitem in verts if graph.type(vitem.v) != VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
         # but first we check if there any vertices that we do want to additionally connect.
         if not self.snap_vertex_edge or not verts:
             cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
@@ -664,7 +664,7 @@ def toolbar_select_node_edge(parent: EditorBasePanel) -> Iterator[ToolbarSection
     snap.setIcon(QIcon(get_data("icons/vertex-snap-to-edge.svg")))
     snap.setToolTip("Snap vertices to the edge beneath them when adding vertices or edges (f)")
     snap.setShortcut("f")
-    snap.clicked.connect(lambda: parent._snap_vertex_edge_clicked())
+    snap.clicked.connect(parent._snap_vertex_edge_clicked)
     yield ToolbarSection(snap)
 
 

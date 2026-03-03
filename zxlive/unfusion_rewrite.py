@@ -94,7 +94,7 @@ class UnfusionRewriteAction:
                     # Check if this edge is connected to target vertex
                     graph = scene.g
                     s, t = graph.edge_st(item.e)
-                    if s == self.unfusion_manager.target_vertex or t == self.unfusion_manager.target_vertex:
+                    if s in (self.unfusion_manager.target_vertex, self.unfusion_manager.target_vertex):
                         self.unfusion_manager.toggle_edge_selection(item)
 
     def _on_confirmed(self, num_connecting_edges: int, phase1: FractionLike, phase2: FractionLike) -> None:

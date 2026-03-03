@@ -42,7 +42,7 @@ def is_rewrite_data(d: dict) -> bool:
 
 def read_custom_rules() -> list[RewriteData]:
     custom_rules = []
-    for root, dirs, files in os.walk(get_custom_rules_path()):
+    for root, _dirs, files in os.walk(get_custom_rules_path()):
         for file in files:
             if file.endswith(".zxr"):
                 zxr_file = os.path.join(root, file)

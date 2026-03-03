@@ -5,7 +5,7 @@ from collections import namedtuple
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Optional, Set, Union
+from typing import Callable, Optional, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -103,7 +103,7 @@ class UpdateGraph(BaseCommand):
     It will try to reuse existing QGraphicsItem's as much as possible."""
     new_g: GraphT
     old_g: Optional[GraphT] = field(default=None, init=False)
-    old_selected: Optional[Set[VT]] = field(default=None, init=False)
+    old_selected: Optional[set[VT]] = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self.old_g is not None and self.old_selected is not None
@@ -396,7 +396,7 @@ class MergeNodes(BaseCommand):
                 continue
             for e in self.g.incident_edges(v):
                 s, t = self.g.edge_st(e)
-                if s == target or t == target:
+                if target in (s, t):
                     continue
                 ety = self.g.edge_type(e)
                 if s == v and t == v:
@@ -478,7 +478,7 @@ class AddRewriteStep(UpdateGraph):
         self.step_view.selectionModel().blockSignals(False)
 
         # Add back steps that were previously removed
-        for rewrite, graph in reversed(self._old_steps):
+        for rewrite, _graph in reversed(self._old_steps):
             self.proof_model.add_rewrite(rewrite)
 
         # Select the previously selected step

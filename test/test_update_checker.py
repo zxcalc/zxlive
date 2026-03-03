@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
 
-import pytest
 from PySide6.QtCore import QSettings
 
 from zxlive.update_checker import UpdateChecker
