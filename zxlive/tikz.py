@@ -1,8 +1,9 @@
 from PySide6.QtCore import QSettings
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
-from .common import GraphT, get_settings_value
 from zxlive.proof import ProofModel
+
+from .common import GraphT, get_settings_value
 
 
 def proof_to_tikz(proof: ProofModel) -> str:

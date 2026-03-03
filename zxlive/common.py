@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import os
 from enum import IntEnum
-from typing import Final, Optional, TypeVar, Type, cast
+from typing import Final, Optional, TypeVar, cast
 
+import pyzx
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
 from pyzx.graph import EdgeType
 from pyzx.graph.multigraph import Multigraph
 from typing_extensions import TypeAlias
-
-from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication
-
-import pyzx
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 
@@ -23,16 +21,17 @@ def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
 
 
-def set_settings_value(arg: str, val: T, _type: Type[T], settings: QSettings | None = None) -> None:
+def set_settings_value(arg: str, val: T, _type: type[T], settings: QSettings | None = None) -> None:
     _settings = settings or QSettings("zxlive", "zxlive")
     if not isinstance(val, _type):
         raise ValueError(f"Unexpected type for {arg}: expected {_type}, got {type(val)}")
     _settings.setValue(arg, val)
 
 
+
 # TODO: Fix code complexity
 # noqa: complexipy
-def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
+def get_settings_value(arg: str, _type: type[T], default: T | None = None, settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
     try:
         val = _settings.value(arg, default)

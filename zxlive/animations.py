@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import itertools
 import random
-from typing import Optional, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional
 
-from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
-    QParallelAnimationGroup
-from PySide6.QtGui import QUndoStack, QUndoCommand
+from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QParallelAnimationGroup, QPointF
+from PySide6.QtGui import QUndoCommand, QUndoStack
 from pyzx.utils import vertex_is_w
 
+from .common import ANIMATION_DURATION, VT, GraphT, pos_to_view
 from .custom_rule import CustomRule
-from .rewrite_data import rules_basic
-from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
-from .graphscene import GraphScene
-from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
 from .eitem import EItem, EItemAnimation
+from .graphscene import GraphScene
+from .rewrite_data import rules_basic
+from .vitem import VITEM_SELECTED_Z, VITEM_UNSELECTED_Z, VItem, VItemAnimation, get_w_partner_vitem
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel

@@ -7,7 +7,7 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QApplication, QTabWidget
 
-from .common import get_settings_value, SCALE
+from .common import SCALE, get_settings_value
 
 
 class ColorScheme(TypedDict):
@@ -284,11 +284,11 @@ class DisplaySettings:
             return QColor.fromHsl(hue, saturation, lightness, alpha)
         base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
         if self.dark_mode:
-            for k in base:
+            for k, v in base.items():
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
                     base[k] = QColor("#dbdbdb")
                 else:
-                    base[k] = adjust_for_dark(base[k])
+                    base[k] = adjust_for_dark(v)
         # else: do not adjust for light mode
         return base
 

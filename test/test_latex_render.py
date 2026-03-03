@@ -5,13 +5,12 @@ two-argument \\braket{a}{b} form), SVG rendering, and fallback behaviour.
 """
 
 from zxlive.latex_render import (
-    is_latex,
-    _preprocess_dirac,
     _fallback_svg,
+    _preprocess_dirac,
     _svg_viewbox_empty,
+    is_latex,
     latex_to_svg,
 )
-
 
 # Tests to verify if a given string is correctly identified as LaTeX markup
 
@@ -59,21 +58,21 @@ class TestPreprocessDirac:
 
     def test_ket(self) -> None:
         result = _preprocess_dirac(r"\ket{0}")
-        assert r"|{0}\rangle" == result
+        assert result == r"|{0}\rangle"
 
     def test_bra(self) -> None:
         result = _preprocess_dirac(r"\bra{1}")
-        assert r"\langle{1}|" == result
+        assert result == r"\langle{1}|"
 
     def test_braket_single_arg(self) -> None:
         """Single-argument form: \\braket{a} -> \\langle{a}\\rangle"""
         result = _preprocess_dirac(r"\braket{a}")
-        assert r"\langle{a}\rangle" == result
+        assert result == r"\langle{a}\rangle"
 
     def test_braket_two_args(self) -> None:
         """Two-argument form: \\braket{a}{b} -> \\langle{a}|{b}\\rangle"""
         result = _preprocess_dirac(r"\braket{a}{b}")
-        assert r"\langle{a}|{b}\rangle" == result
+        assert result == r"\langle{a}|{b}\rangle"
 
     def test_no_dirac(self) -> None:
         """Plain LaTeX should pass through unchanged."""

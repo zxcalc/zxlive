@@ -1,16 +1,32 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
-                            QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QAbstractListModel,
+    QItemSelection,
+    QModelIndex,
+    QPersistentModelIndex,
+    QPoint,
+    QPointF,
+    QRect,
+    QSize,
+    Qt,
+)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QWidget)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QLineEdit,
+    QListView,
+    QMenu,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+)
 
 from .common import GraphT
 from .settings import display_setting
@@ -24,7 +40,7 @@ class Rewrite(NamedTuple):
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
         return {
             "display_name": self.display_name,
@@ -38,7 +54,7 @@ class Rewrite(NamedTuple):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str, Dict[str, Any]]) -> "Rewrite":
+    def from_json(json_str: Union[str, dict[str, Any]]) -> "Rewrite":
         """Deserializes the rewrite from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -192,7 +208,7 @@ class ProofModel(QAbstractListModel):
                               self.createIndex(index + len(individual_steps), 0),
                               [])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serializes the model to Python dict."""
         initial_graph = self.initial_graph.to_dict()
         proof_steps = [step.to_dict() for step in self.steps]
@@ -207,7 +223,7 @@ class ProofModel(QAbstractListModel):
         return json.dumps(self.to_dict())
 
     @staticmethod
-    def from_json(json_str: Union[str, Dict[str, Any]]) -> "ProofModel":
+    def from_json(json_str: Union[str, dict[str, Any]]) -> "ProofModel":
         """Deserializes the model from JSON or Python dict."""
         if isinstance(json_str, str):
             d = json.loads(json_str)
@@ -380,13 +396,12 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(QColor(50, 60, 80))
             else:
                 painter.setBrush(QColor(35, 39, 46))
+        elif option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            painter.setBrush(QColor(204, 232, 255))
+        elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
+            painter.setBrush(QColor(229, 243, 255))
         else:
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(204, 232, 255))
-            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(229, 243, 255))
-            else:
-                painter.setBrush(Qt.GlobalColor.white)
+            painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
         # Draw line

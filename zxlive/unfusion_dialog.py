@@ -1,21 +1,28 @@
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING, Union
 from collections import Counter
+from fractions import Fraction
+from typing import TYPE_CHECKING, Optional, Union
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QSpinBox, QPushButton, QFrame,
-                               QWidget)
-from PySide6.QtGui import QKeyEvent, QColor
-from fractions import Fraction
+from PySide6.QtGui import QColor, QKeyEvent
+from PySide6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.symbolic import Poly
 
-from .common import VT, ET, GraphT
+from .common import ET, VT, GraphT
 from .dialogs import show_error_msg
 from .eitem import EItem
-
 
 if TYPE_CHECKING:
     from .graphscene import GraphScene

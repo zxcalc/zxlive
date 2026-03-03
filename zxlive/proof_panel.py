@@ -3,22 +3,37 @@ from __future__ import annotations
 import copy
 import json
 import random
-from typing import Iterator, Optional, Union, cast
-
-from PySide6.QtCore import Signal, QPointF, QSize
-from PySide6.QtGui import QAction, QIcon, QVector2D
-from PySide6.QtWidgets import QInputDialog, QToolButton
+from collections.abc import Iterator
+from typing import Optional, Union, cast
 
 import pyzx
+from PySide6.QtCore import QPointF, QSize, Signal
+from PySide6.QtGui import QAction, QIcon, QVector2D
+from PySide6.QtWidgets import QInputDialog, QToolButton
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
-                        set_z_box_label, vertex_is_z_like)
+from pyzx.utils import (
+    EdgeType,
+    FractionLike,
+    VertexType,
+    get_w_partner,
+    get_z_box_label,
+    set_z_box_label,
+    vertex_is_z_like,
+)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
-from .common import (ET, VT, GraphT, ToolType, get_data,
-                     pos_from_view, pos_to_view)
+from .commands import (
+    AddEdge,
+    AddNode,
+    AddRewriteStep,
+    ChangeEdgeCurve,
+    MoveNode,
+    ProofModeCommand,
+    SetGraph,
+    UpdateGraph,
+)
+from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
@@ -172,11 +187,7 @@ class ProofPanel(BasePanel):
         if state == DragState.Onto:
             if pyzx.rewrite_rules.check_fuse(self.graph, v, w):
                 anims.anticipate_fuse(self.graph_scene.vertex_map[w])
-            elif pyzx.rewrite_rules.check_bialgebra(self.graph, v, w):
-                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif pyzx.rewrite_rules.check_copy(self.graph, v):  # TODO: Should check if copy can be applied between v and w
-                anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif pyzx.rewrite_rules.check_pauli(self.graph, w, v):  # Second parameter is the Pauli
+            elif pyzx.rewrite_rules.check_bialgebra(self.graph, v, w) or pyzx.rewrite_rules.check_copy(self.graph, v) or pyzx.rewrite_rules.check_pauli(self.graph, w, v):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
@@ -223,9 +234,7 @@ class ProofPanel(BasePanel):
             self.undo_stack.push(move_cmd)
 
     def _wand_trace_finished(self, trace: WandTrace) -> None:
-        if self._magic_slice(trace):
-            return
-        elif self._magic_identity(trace):
+        if self._magic_slice(trace) or self._magic_identity(trace):
             return
         elif self._magic_hopf(trace):
             self.play_sound_signal.emit(SFXEnum.THEY_FALL_OFF)

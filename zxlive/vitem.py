@@ -14,22 +14,27 @@
 # limitations under the License.
 
 from __future__ import annotations
-from enum import Enum
+
 import math
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Optional, Union
 
-from typing import Optional, Set, Any, TYPE_CHECKING, Union
-
-from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
-from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
+from PySide6.QtCore import QAbstractAnimation, QPointF, QRectF, Qt, QVariantAnimation
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
-from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
-    QStyle, QStyleOptionGraphicsItem, QGraphicsSceneMouseEvent
+from PySide6.QtWidgets import (
+    QGraphicsItem,
+    QGraphicsPathItem,
+    QGraphicsSceneMouseEvent,
+    QGraphicsTextItem,
+    QStyle,
+    QStyleOptionGraphicsItem,
+    QWidget,
+)
+from pyzx.utils import VertexType, get_w_partner, get_z_box_label, phase_to_s, vertex_is_w
 
-
-from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
-
-from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
+from .common import SCALE, VT, W_INPUT_OFFSET, GraphT, pos_from_view, pos_to_view
 from .settings import display_setting
 
 if TYPE_CHECKING:
@@ -60,7 +65,7 @@ class VItem(QGraphicsPathItem):
 
     v: VT
     phase_item: PhaseItem
-    adj_items: Set[EItem]  # Connected edges
+    adj_items: set[EItem]  # Connected edges
     graph_scene: GraphScene
     dummy_text_item: Optional[QGraphicsTextItem] = None
     dummy_svg_item: Optional[QGraphicsSvgItem] = None
@@ -198,7 +203,7 @@ class VItem(QGraphicsPathItem):
     def _make_shape_path(self) -> QPainterPath:
         """Helper to create the path for both drawing and hit-testing."""
         path = QPainterPath()
-        if self.ty == VertexType.H_BOX or self.ty == VertexType.Z_BOX:
+        if self.ty in (VertexType.H_BOX, VertexType.Z_BOX):
             path.addRect(-0.2 * SCALE, -0.2 * SCALE, 0.4 * SCALE, 0.4 * SCALE)
         elif self.ty == VertexType.W_OUTPUT:
             path.moveTo(0, 0.2 * SCALE)
@@ -453,7 +458,7 @@ class VItem(QGraphicsPathItem):
         active_item.setPos(-rect.width() / 2, node_top - gap - rect.height())
         active_item.setVisible(True)
 
-    def boundingRect(self) -> 'QRectF':
+    def boundingRect(self) -> QRectF:
         # Ensure the bounding rect includes the outline (pen width) and antialiasing
         path_rect = self._make_shape_path().boundingRect()
         pen_width = self.pen().widthF() if self.pen() else 1.0

@@ -15,20 +15,25 @@
 
 from __future__ import annotations
 
-from typing import Optional, Iterator, Iterable
+from collections.abc import Iterable, Iterator
+from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, QRectF
-from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
-from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent, QMenu
-
-from pyzx.utils import EdgeType
+from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QPainterPath, QTransform
+from PySide6.QtWidgets import (
+    QGraphicsItem,
+    QGraphicsScene,
+    QGraphicsSceneContextMenuEvent,
+    QGraphicsSceneMouseEvent,
+    QMenu,
+)
 from pyzx.graph.diff import GraphDiff
+from pyzx.utils import EdgeType
 
-
-from .common import SCALE, VT, ET, GraphT, ToolType, pos_from_view, OFFSET_X, OFFSET_Y
-from .vitem import VItem
-from .eitem import EItem, EDragItem
+from .common import ET, OFFSET_X, OFFSET_Y, SCALE, VT, GraphT, ToolType, pos_from_view
+from .eitem import EDragItem, EItem
 from .settings import display_setting
+from .vitem import VItem
 
 
 class GraphScene(QGraphicsScene):

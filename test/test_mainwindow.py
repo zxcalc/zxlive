@@ -14,8 +14,9 @@
 # limitations under the License.
 
 
-import pytest
 import os
+
+import pytest
 from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 

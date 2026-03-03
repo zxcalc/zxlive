@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Iterator
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
 from pyzx import EdgeType, VertexType
 
-
 from .base_panel import ToolbarSection
-from .common import GraphT, ToolType, VT
+from .common import VT, GraphT, ToolType
 from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
+from .eitem import EItem
 from .graphscene import EditGraphScene
 from .graphview import RuleEditGraphView
-from .eitem import EItem
 from .vitem import VItem
 
 
