@@ -32,3 +32,9 @@ jobs:
     - name: Ruff Check
       run:
         ruff check
+    - name: Ruff - Cyclomatic Complexity
+      run:
+        ruff check . --select=PLR0912
+    - name: Complexipy - Cognitive Complexity
+      run:
+        complexipy . --max-complexity-allowed 15
