@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import os
 from enum import IntEnum
-from typing import Final, Optional, TypeVar, Type, cast
+from typing import Final, Optional, Type, TypeVar, cast
 
+import pyzx
+from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QApplication
 from pyzx.graph import EdgeType
 from pyzx.graph.multigraph import Multigraph
 from typing_extensions import TypeAlias
-
-from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication
-
-import pyzx
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 

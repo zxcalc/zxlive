@@ -3,13 +3,13 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING
 
-from pyzx.utils import VertexType, FractionLike
-from pyzx.rewrite import RewriteSimpGraph
 from pyzx.graph.base import BaseGraph
+from pyzx.rewrite import RewriteSimpGraph
+from pyzx.utils import FractionLike, VertexType
 
-from .common import VT, ET, GraphT
-from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
+from .common import ET, VT, GraphT
 from .eitem import EItem
+from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -114,8 +114,8 @@ class UnfusionRewriteAction:
                         node2_edges: list[ET], num_connecting_edges: int,
                         phase1: FractionLike, phase2: FractionLike) -> None:
         """Apply the actual unfusion transformation."""
-        from .commands import AddRewriteStep
         from . import animations as anims
+        from .commands import AddRewriteStep
 
         graph = self.proof_panel.graph_scene.g
         new_g = copy.deepcopy(graph)

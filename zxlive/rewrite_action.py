@@ -4,29 +4,47 @@ import copy
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional, Union, cast
 
-from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
-
-from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
-                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
-from PySide6.QtGui import QPixmap, QColor, QPen, QAction
-from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
-
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QBuffer,
+    QIODevice,
+    QLineF,
+    QMetaObject,
+    QModelIndex,
+    QObject,
+    QPersistentModelIndex,
+    QPoint,
+    QPointF,
+    Qt,
+    Signal,
+)
+from PySide6.QtGui import QAction, QColor, QPen, QPixmap
+from PySide6.QtWidgets import QAbstractItemView, QMenu, QMessageBox, QTreeView
+from pyzx.rewrite import Rewrite, RewriteDoubleVertex, RewriteSimpGraph, RewriteSingleVertex
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT, get_data
+from .common import ET, VT, GraphT, get_data
+from .custom_rule import CustomRule
 from .dialogs import show_error_msg
-from .rewrite_data import (is_rewrite_data, RewriteData,
-                           MatchType, MATCH_SINGLE, MATCH_DOUBLE, MATCH_COMPOUND,
-                           refresh_custom_rules, action_groups, rules_basic)
-from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
-from .custom_rule import CustomRule
+from .rewrite_data import (
+    MATCH_COMPOUND,
+    MATCH_DOUBLE,
+    MATCH_SINGLE,
+    MatchType,
+    RewriteData,
+    action_groups,
+    is_rewrite_data,
+    refresh_custom_rules,
+    rules_basic,
+)
+from .settings import display_setting
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -222,7 +240,7 @@ class RewriteAction:
             buffer.open(QIODevice.OpenModeFlag.WriteOnly)
             pixmap.save(buffer, "PNG", quality=100)
             image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
-        self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
+        self.tooltip_str = f'<img src="data:image/png;base64,{image}" width="500">' + self.tooltip_str
         self.picture_path = None
         return self.tooltip_str
 
@@ -378,7 +396,7 @@ class RewriteActionTreeModel(QAbstractItemModel):
 
 
 class RewriteActionTreeView(QTreeView):
-    def __init__(self, parent: 'ProofPanel'):
+    def __init__(self, parent: ProofPanel):
         super().__init__(parent)
         self.proof_panel = parent
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

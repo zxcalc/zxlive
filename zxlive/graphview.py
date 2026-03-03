@@ -14,23 +14,31 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
-from pyzx.graph.scalar import Scalar
-
 import math
 import random
-from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
-from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
-from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform,
-                           QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence,
-                           QKeyEvent)
-
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
+
+from PySide6.QtCore import QLineF, QObject, QPointF, QRect, QRectF, QSize, Qt, QTimerEvent, Signal
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QKeyEvent,
+    QKeySequence,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QShortcut,
+    QTransform,
+    QWheelEvent,
+)
+from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsItem, QGraphicsPathItem, QGraphicsView, QLabel, QRubberBand
+from pyzx.graph.scalar import Scalar
 
 from . import animations as anims
-from .common import (GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM,
-                     get_settings_value, set_settings_value)
-from .graphscene import GraphScene, VItem, EItem, EditGraphScene
+from .common import MAX_ZOOM, MIN_ZOOM, OFFSET_X, OFFSET_Y, SCALE, GraphT, get_settings_value, set_settings_value
+from .graphscene import EditGraphScene, EItem, GraphScene, VItem
 from .settings import display_setting
 from .vitem import PHASE_ITEM_Z
 
@@ -276,9 +284,8 @@ class GraphView(QGraphicsView):
             zoom_factor = 1 / (1 - ZOOMFACTOR * ydelta)
 
         current_zoom = self.transform().m11()
-        if current_zoom * zoom_factor < MIN_ZOOM:
-            return
-        elif current_zoom * zoom_factor > MAX_ZOOM:
+        zoom_val = current_zoom * zoom_factor
+        if zoom_val < MIN_ZOOM or zoom_val > MAX_ZOOM:
             return
         self.scale(zoom_factor, zoom_factor)
 
@@ -300,9 +307,8 @@ class GraphView(QGraphicsView):
         current_zoom = self.transform().m11()
         if current_zoom < MIN_ZOOM:
             self.scale(MIN_ZOOM / current_zoom, MIN_ZOOM / current_zoom)
-        else:
-            if current_zoom > MAX_ZOOM:
-                self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
+        elif current_zoom > MAX_ZOOM:
+            self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
     def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
         # Use dark or light background based on dark mode

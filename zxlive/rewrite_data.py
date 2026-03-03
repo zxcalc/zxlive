@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import os
-from typing import Callable, Literal, cast, Optional
-from typing_extensions import TypedDict, NotRequired
+from typing import Callable, Literal, Optional, cast
 
 import pyzx
-from pyzx import simplify, extract_circuit
+from pyzx import extract_circuit, simplify
 from pyzx.graph import VertexType
 from pyzx.rewrite import Rewrite, RewriteSimpGraph
+from typing_extensions import NotRequired, TypedDict
 
-from .common import GraphT, VT, get_custom_rules_path
+from .common import VT, GraphT, get_custom_rules_path
 from .custom_rule import CustomRule
 from .unfusion_rewrite import unfusion_rewrite
-
 
 MatchType = Literal[1, 2, 3]
 
@@ -47,7 +46,7 @@ def read_custom_rules() -> list[RewriteData]:
         for file in files:
             if file.endswith(".zxr"):
                 zxr_file = os.path.join(root, file)
-                with open(zxr_file, "r") as f:
+                with open(zxr_file) as f:
                     rule = CustomRule.from_json(f.read()).to_rewrite_data()
                     rule['file_path'] = zxr_file
                     custom_rules.append(rule)

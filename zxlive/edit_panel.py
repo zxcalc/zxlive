@@ -3,9 +3,9 @@ from __future__ import annotations
 import copy
 import json
 import os
-from typing import Iterator
+from collections.abc import Iterator
 
-from PySide6.QtCore import Signal, QSettings
+from PySide6.QtCore import QSettings, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm

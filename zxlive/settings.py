@@ -7,7 +7,7 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QApplication, QTabWidget
 
-from .common import get_settings_value, SCALE
+from .common import SCALE, get_settings_value
 
 
 class ColorScheme(TypedDict):

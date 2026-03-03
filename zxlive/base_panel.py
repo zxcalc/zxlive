@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Iterator, Optional, Sequence, Type
+from typing import Optional, Type
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import (QAbstractButton, QButtonGroup, QSplitter,
-                               QToolBar, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import QAbstractButton, QButtonGroup, QSplitter, QToolBar, QVBoxLayout, QWidget
 
 from .animations import AnimatedUndoStack
 from .commands import SetGraph
@@ -140,9 +140,18 @@ class BasePanel(QWidget):
 
     def show_matrix(self) -> None:
         """Show the matrix of the current graph in a dialog."""
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QSpinBox, QPushButton, QHBoxLayout, QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem
         import pyperclip
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import (
+            QDialog,
+            QHBoxLayout,
+            QPushButton,
+            QSpinBox,
+            QTableWidget,
+            QTableWidgetItem,
+            QVBoxLayout,
+        )
+
         from .common import get_settings_value
         from .dialogs import show_error_msg
         precision: int = get_settings_value("matrix/precision", int, 4)

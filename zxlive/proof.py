@@ -1,16 +1,32 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Union
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
-                            QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
+from PySide6.QtCore import (
+    QAbstractItemModel,
+    QAbstractListModel,
+    QItemSelection,
+    QModelIndex,
+    QPersistentModelIndex,
+    QPoint,
+    QPointF,
+    QRect,
+    QSize,
+    Qt,
+)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QWidget)
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QLineEdit,
+    QListView,
+    QMenu,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+)
 
 from .common import GraphT
 from .settings import display_setting
@@ -378,13 +394,12 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(QColor(50, 60, 80))
             else:
                 painter.setBrush(QColor(35, 39, 46))
+        elif option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            painter.setBrush(QColor(204, 232, 255))
+        elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
+            painter.setBrush(QColor(229, 243, 255))
         else:
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(204, 232, 255))
-            elif option.state & QStyle.StateFlag.State_MouseOver:  # type: ignore[attr-defined]
-                painter.setBrush(QColor(229, 243, 255))
-            else:
-                painter.setBrush(Qt.GlobalColor.white)
+            painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
         # Draw line

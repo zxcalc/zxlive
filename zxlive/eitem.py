@@ -14,20 +14,27 @@
 # limitations under the License.
 
 from __future__ import annotations
-from math import sqrt
-from typing import Optional, Any, TYPE_CHECKING, Union
+
 from enum import Enum
+from math import sqrt
+from typing import TYPE_CHECKING, Any, Optional, Union
 
-from PySide6.QtCore import QPointF, QVariantAnimation, QAbstractAnimation, Qt
-from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsItem, \
-    QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
-from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
-
+from PySide6.QtCore import QAbstractAnimation, QPointF, Qt, QVariantAnimation
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPainterPathStroker, QPen
+from PySide6.QtWidgets import (
+    QGraphicsEllipseItem,
+    QGraphicsItem,
+    QGraphicsPathItem,
+    QGraphicsSceneMouseEvent,
+    QStyle,
+    QStyleOptionGraphicsItem,
+    QWidget,
+)
 from pyzx.utils import EdgeType, VertexType
 
-from .common import SCALE, ET, GraphT, get_settings_value
+from .common import ET, SCALE, GraphT, get_settings_value
 from .settings import display_setting
-from .vitem import VItem, EITEM_Z
+from .vitem import EITEM_Z, VItem
 
 if TYPE_CHECKING:
     from .graphscene import GraphScene
@@ -88,12 +95,11 @@ class EItem(QGraphicsPathItem):
         """Reset the color of the edge to the default color."""
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             self.color = QColor(HAD_EDGE_BLUE)
+        elif self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
+           self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
+            self.color = display_setting.effective_colors["dummy_edge"]
         else:
-            if self.g.type(self.g.edge_s(self.e)) == VertexType.DUMMY or \
-               self.g.type(self.g.edge_t(self.e)) == VertexType.DUMMY:
-                self.color = display_setting.effective_colors["dummy_edge"]
-            else:
-                self.color = display_setting.effective_colors["edge"]
+            self.color = display_setting.effective_colors["edge"]
 
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
@@ -154,8 +160,8 @@ class EItem(QGraphicsPathItem):
         # The type stub is missing the 'state' attribute, so there is a
         # false positive mypy error if we set the usual way.
         assert hasattr(option, "state")
-        state = getattr(option, "state")
-        setattr(option, "state", state & ~QStyle.StateFlag.State_Selected)
+        state = option.state
+        option.state = state & ~QStyle.StateFlag.State_Selected
 
         webs: list[tuple[bool, bool, QColor]] = []
 

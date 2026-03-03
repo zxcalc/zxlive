@@ -23,11 +23,11 @@ from PySide6.QtCore import QCommandLineParser, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
+from .common import GraphT, get_data, get_settings_value
+from .dialogs import show_update_available_dialog
 from .mainwindow import MainWindow
-from .common import get_data, GraphT, get_settings_value
 from .settings import display_setting
 from .update_checker import UpdateChecker
-from .dialogs import show_update_available_dialog
 
 # The following hack is needed on windows in order to show the icon in the taskbar
 # See https://stackoverflow.com/questions/1551605/how-to-set-applications-taskbar-icon-in-windows-7/1552105#1552105
@@ -128,7 +128,7 @@ def get_version() -> str:
         with open(pyproject_path, 'rb') as f:
             data = tomllib.load(f)
             return str(data['project']['version'])
-    except (FileNotFoundError, IOError, ImportError, KeyError):
+    except (OSError, FileNotFoundError, ImportError, KeyError):
         # Final fallback to hardcoded version
         return '0.3.1'  # TODO: Update this for new releases
 

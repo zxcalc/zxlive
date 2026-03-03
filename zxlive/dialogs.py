@@ -7,13 +7,22 @@ from typing import TYPE_CHECKING, Optional
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget, QInputDialog)
+from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QInputDialog,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QWidget,
+)
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
-from .common import GraphT, VT
+from .common import VT, GraphT
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
 
@@ -131,7 +140,7 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
 
     selected_format = next(f for f in FileFormat if f.filter == selected_filter)
     if selected_format == FileFormat.All:
-        ext = file_path.split(".")[-1]
+        ext = file_path.rsplit(".", maxsplit=1)[-1]
         try:
             selected_format = next(f for f in FileFormat if f.extension == ext)
         except StopIteration:

@@ -2,22 +2,23 @@ from __future__ import annotations
 
 import copy
 from collections import namedtuple
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Iterable, Optional, Set, Union
+from typing import Callable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
+from pyzx.utils import EdgeType, VertexType, get_w_io, get_w_partner, get_z_box_label, set_z_box_label, vertex_is_w
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
-from .settings import display_setting
 from .eitem import EItem
 from .graphview import GraphView
 from .proof import ProofModel, ProofStepView, Rewrite
+from .settings import display_setting
 
 
 @dataclass

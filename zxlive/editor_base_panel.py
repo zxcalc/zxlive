@@ -4,33 +4,65 @@ import copy
 import os
 import subprocess
 import sys
+from collections.abc import Iterator
 from enum import Enum
-from typing import Callable, Iterator, Optional, TypedDict
+from typing import Callable, Optional, TypedDict
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
+from PySide6.QtCore import QEasingCurve, QParallelAnimationGroup, QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QPainter, QPalette, QPen, QPixmap
-from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
-                               QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
-                               QListWidgetItem, QMenu, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
-                               QSpacerItem, QSplitter, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListView,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpacerItem,
+    QSplitter,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 from pyzx import EdgeType, VertexType
-from pyzx.utils import get_w_partner, vertex_is_w, phase_to_s, get_z_box_label
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.utils import get_w_partner, get_z_box_label, phase_to_s, vertex_is_w
+
 from zxlive.sfx import SFXEnum
 
+from . import animations
 from .base_panel import BasePanel, ToolbarSection
-from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
-                       ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
-                       UpdateGraph)
-from .common import (VT, GraphT, ToolType, get_data,
-                     pos_from_view, get_settings_value)
+from .commands import (
+    AddEdge,
+    AddEdges,
+    AddNode,
+    AddNodeSnapped,
+    AddWNode,
+    BaseCommand,
+    ChangeEdgeColor,
+    ChangeEdgeCurve,
+    ChangeNodeType,
+    ChangePhase,
+    MergeNodes,
+    MoveNode,
+    SetGraph,
+    UpdateGraph,
+)
+from .common import VT, GraphT, ToolType, get_data, get_settings_value, pos_from_view
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
-from .eitem import EItem, HAD_EDGE_BLUE
-from .vitem import VItem, BLACK
+from .eitem import HAD_EDGE_BLUE, EItem
 from .graphscene import EditGraphScene
 from .settings import display_setting
-
-from . import animations
+from .vitem import BLACK, VItem
 
 
 class ShapeType(Enum):

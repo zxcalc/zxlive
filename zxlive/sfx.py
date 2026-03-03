@@ -1,4 +1,5 @@
 from enum import Enum
+
 from PySide6.QtCore import QUrl
 from PySide6.QtMultimedia import QSoundEffect
 

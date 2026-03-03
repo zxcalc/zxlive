@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import copy
-from typing import Iterator, Optional
-from typing_extensions import TypeAlias
+import json
+from collections.abc import Iterator
+from typing import Optional
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor, QBrush, QFont
-from PySide6.QtWidgets import (QLabel, QListWidget,
-                               QListWidgetItem, QSplitter, QVBoxLayout, QWidget, QToolButton)
+from PySide6.QtGui import QAction, QBrush, QColor, QFont
+from PySide6.QtWidgets import QLabel, QListWidget, QListWidgetItem, QSplitter, QToolButton, QVBoxLayout, QWidget
 from pyzx import EdgeType, VertexType, pauliweb
+from pyzx.graph.jsonparser import json_to_graph
+from pyzx.web import compute_pauli_webs
+from typing_extensions import TypeAlias
+
 from zxlive.graphview import GraphView
 
 from .base_panel import BasePanel, ToolbarSection
@@ -16,12 +20,6 @@ from .commands import UpdateGraph
 from .common import ET, GraphT, get_settings_value
 from .dialogs import show_error_msg
 from .graphscene import GraphScene
-
-
-import json
-from pyzx.graph.jsonparser import json_to_graph
-from pyzx.web import compute_pauli_webs
-
 
 PauliWeb: TypeAlias = pauliweb.PauliWeb[int, tuple[int, int]]
 
@@ -129,7 +127,7 @@ class PauliWebsPanel(BasePanel):
 
         # 4. Populate the UI using the now-sorted self._pauli_webs
         self.web_list.clear()
-        type_counts = {name: 0 for name in priority_map.keys()}
+        type_counts = {name: 0 for name in priority_map}
 
         for i, web in enumerate(self._pauli_webs):
             # Re-identify type (since we just sorted them, they are grouped)

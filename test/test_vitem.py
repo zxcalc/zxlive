@@ -6,12 +6,13 @@ or fractions) shouldn't overlap with the node body.
 """
 
 import pytest
+from pytestqt.qtbot import QtBot
 from pyzx.graph.graph_s import GraphS
 from pyzx.utils import VertexType
-from pytestqt.qtbot import QtBot
 
-from zxlive.graphscene import GraphScene
 from zxlive.common import SCALE
+from zxlive.graphscene import GraphScene
+
 
 def test_dummy_label_position(qtbot: QtBot) -> None:
     """Test that dummy labels sit cleanly above the node without overlapping.

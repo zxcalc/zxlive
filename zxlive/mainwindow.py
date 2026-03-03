@@ -22,29 +22,46 @@ import random
 from typing import Callable, Optional, cast
 
 import pyperclip
-from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QMimeData, QSettings, QTextStream, QTimer, QUrl)
-from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
-                           QKeySequence, QMouseEvent, QShortcut)
-from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtCore import (
+    QByteArray,
+    QEvent,
+    QFile,
+    QFileInfo,
+    QIODevice,
+    QMimeData,
+    QSettings,
+    QTextStream,
+    QTimer,
+    QUrl,
+)
+from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QIcon, QKeySequence, QMouseEvent, QShortcut
+from PySide6.QtWidgets import QApplication, QMainWindow, QMessageBox, QTabBar, QTabWidget, QVBoxLayout, QWidget
 from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
-from .common import (GraphT, from_tikz, get_data, get_settings_value,
-                     new_graph, set_settings_value, to_tikz)
+from .common import GraphT, from_tikz, get_data, get_settings_value, new_graph, set_settings_value, to_tikz
 from .construct import construct_circuit
 from .custom_rule import CustomRule, check_rule
-from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
-                      ImportRuleOutput, create_new_rewrite, export_gif_dialog,
-                      export_proof_dialog, get_lemma_name_and_description,
-                      import_diagram_dialog, import_diagram_from_file,
-                      save_diagram_dialog, save_proof_dialog, save_rule_dialog,
-                      show_error_msg)
+from .dialogs import (
+    FileFormat,
+    ImportGraphOutput,
+    ImportProofOutput,
+    ImportRuleOutput,
+    create_new_rewrite,
+    export_gif_dialog,
+    export_proof_dialog,
+    get_lemma_name_and_description,
+    import_diagram_dialog,
+    import_diagram_from_file,
+    save_diagram_dialog,
+    save_proof_dialog,
+    save_rule_dialog,
+    show_error_msg,
+)
 from .edit_panel import GraphEditPanel
-from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
+from .proof_panel import ProofPanel
 from .rule_panel import RulePanel
 from .settings import display_setting
 from .settings_dialog import open_settings_dialog
@@ -948,8 +965,8 @@ class MainWindow(QMainWindow):
 
     def check_for_updates(self) -> None:
         """Manually check for updates."""
-        from .dialogs import show_update_available_dialog
         from .app import ZXLive
+        from .dialogs import show_update_available_dialog
 
         app = QApplication.instance()
         if not app or not hasattr(app, 'update_checker'):

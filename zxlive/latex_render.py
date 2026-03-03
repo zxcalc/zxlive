@@ -119,8 +119,8 @@ def latex_to_svg(text: str, color: str = "#222222", size: float = 24) -> bytes:
 
     try:
         import matplotlib as mpl
-        from matplotlib.figure import Figure
         from matplotlib.backends.backend_svg import FigureCanvasSVG
+        from matplotlib.figure import Figure
 
         # Configure matplotlib to output text as paths (no font dependency)
         # and use Computer Modern font for LaTeX look.

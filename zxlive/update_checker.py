@@ -6,8 +6,7 @@ from typing import Optional
 
 from packaging import version as pkg_version
 from PySide6.QtCore import QObject, QSettings, QUrl, Signal
-from PySide6.QtNetwork import (QNetworkAccessManager, QNetworkReply,
-                               QNetworkRequest)
+from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 
 from .common import get_settings_value, set_settings_value
 

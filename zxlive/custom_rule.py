@@ -1,20 +1,19 @@
 
 import json
+from collections.abc import Sequence
 from fractions import Fraction
-from typing import TYPE_CHECKING, Optional, Sequence, Dict, Union, Any
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 import networkx as nx
 import numpy as np
-from networkx.algorithms.isomorphism import (GraphMatcher,
-                                             categorical_node_match, categorical_edge_match)
+from networkx.algorithms.isomorphism import GraphMatcher, categorical_edge_match, categorical_node_match
 from networkx.classes.reportviews import NodeView
-from pyzx.utils import EdgeType, VertexType, get_w_io
-from shapely import Polygon
-
-from pyzx.symbolic import Poly, Var
 from pyzx.graph import jsonparser
 from pyzx.graph.base import BaseGraph
 from pyzx.rewrite import RewriteSimpGraph
+from pyzx.symbolic import Poly, Var
+from pyzx.utils import EdgeType, VertexType, get_w_io
+from shapely import Polygon
 
 from .common import ET, VT, GraphT
 
@@ -231,13 +230,12 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
         else:
             const = v.terms[0][0]
             return 1, None, const
+    elif len(v.terms[0][1].vars) > 0:
+        var_term = v.terms[0]
+        const = v.terms[1][0]
     else:
-        if len(v.terms[0][1].vars) > 0:
-            var_term = v.terms[0]
-            const = v.terms[1][0]
-        else:
-            var_term = v.terms[1]
-            const = v.terms[0][0]
+        var_term = v.terms[1]
+        const = v.terms[0][0]
     coeff = var_term[0]
     var, power = var_term[1].vars[0]
     if power != 1:
