@@ -10,31 +10,40 @@ env:
   SRC_DIR: zxlive
 
 jobs:
-  lint:
+  mypy:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [ '3.11' ]
-    continue-on-error: true
     steps:
-    - uses: actions/checkout@v6
-    - name: Setup Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-    - name: Install dependencies
-      run:
-        pip install ".[test]"
-    - name: mypy
-      run:
-        mypy zxlive
-    - name: Ruff Check
-      run:
-        ruff check
-    - name: Ruff - Cyclomatic Complexity
-      run:
-        ruff check . --select=PLR0912
-    - name: Complexipy - Cognitive Complexity
-      run:
-        complexipy . --max-complexity-allowed 15
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install ".[test]"
+      - run: mypy zxlive
+
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install ".[test]"
+      - run: ruff check
+
+  code-complexity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install ruff complexipy
+      - name: Ruff - Cyclomatic Complexity
+        if: always()
+        run: ruff check . --select=PLR0912
+      - name: Complexipy - Cognitive Complexity
+        if: always()
+        run: complexipy . --max-complexity-allowed 15
