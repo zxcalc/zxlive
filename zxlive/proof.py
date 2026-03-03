@@ -16,14 +16,6 @@ from .common import GraphT, ET
 from .settings import display_setting
 
 
-def _edges_between(g: GraphT, v1: int, v2: int) -> set[ET]:
-    """Return the set of edges between v1 and v2 in g.
-
-    Thin wrapper around ``g.edges(v1, v2)`` to make intent explicit.
-    """
-    return set(g.edges(v1, v2))
-
-
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
@@ -352,7 +344,7 @@ class ProofStepView(QListView):
                 if isinstance(pair, tuple) and len(pair) == 2:
                     v1, v2 = int(pair[0]), int(pair[1])
                     if v1 in current_verts and v2 in current_verts:
-                        edges_only_set |= _edges_between(g_current, v1, v2)
+                        edges_only_set |= set(g_current.edges(v1, v2))
             if edges_only_set:
                 scene.set_rewrite_highlight(set(), edges_only_set)
                 return
@@ -369,7 +361,7 @@ class ProofStepView(QListView):
                         continue
                     verts_set.add(v1)
                     verts_set.add(v2)
-                    edges_set |= _edges_between(g_current, v1, v2)
+                    edges_set |= set(g_current.edges(v1, v2))
             scene.set_rewrite_highlight(verts_set, edges_set)
             return
 
@@ -380,7 +372,7 @@ class ProofStepView(QListView):
             edges_highlight: set[ET]
             if len(verts_set) == 2:
                 s = sorted(verts_set)
-                edges_highlight = _edges_between(g_current, s[0], s[1])
+                edges_highlight = set(g_current.edges(s[0], s[1]))
             else:
                 edges_highlight = set()
                 for v in verts_set:

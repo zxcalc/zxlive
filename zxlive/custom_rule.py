@@ -1,5 +1,6 @@
 
 import json
+import time
 from fractions import Fraction
 from typing import TYPE_CHECKING, Optional, Sequence, Dict, Union, Any
 
@@ -20,6 +21,28 @@ from .common import ET, VT, GraphT
 
 if TYPE_CHECKING:
     from .rewrite_data import RewriteData
+
+
+# region agent log
+def _agent_debug_log_custom_rule(hypothesis_id: str, location: str, message: str, data: Dict[str, Any]) -> None:
+    """Minimal NDJSON logger for debug mode (custom_rule)."""
+    try:
+        ts = int(time.time() * 1000)
+        payload = {
+            "id": f"log_{ts}",
+            "timestamp": ts,
+            "location": location,
+            "message": message,
+            "data": data,
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+        }
+        with open("/Users/hatanakatomoya/Developer/zxlive/.cursor/debug.log", "a") as f:
+            f.write(json.dumps(payload) + "\n")
+    except Exception:
+        # Logging must never break the app.
+        pass
+# endregion
 
 
 class CustomRule(RewriteSimpGraph[VT, ET]):
@@ -163,6 +186,16 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
 
     def is_match(self, graph: GraphT, in_selection: list[VT]) -> list[VT]:
         vertices = [v for v in graph.vertices() if v in in_selection]
+        _agent_debug_log_custom_rule(
+            "H1",
+            "custom_rule.py:is_match:entry",
+            "CustomRule.is_match called",
+            {
+                "selection": list(in_selection),
+                "filtered_vertices": vertices,
+                "is_rewrite_unfusable": self.is_rewrite_unfusable,
+            },
+        )
         if self.is_rewrite_unfusable:
             subgraph_nx = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
             lhs_graph_nx = self.lhs_graph_without_boundaries_nx
@@ -173,6 +206,16 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
                                      node_match=categorical_node_match('type', 1),
                                      edge_match=categorical_edge_match('type', 1))
         matchings = filter_matchings_if_symbolic_compatible(list(graph_matcher.match()), lhs_graph_nx, subgraph_nx)
+        _agent_debug_log_custom_rule(
+            "H1",
+            "custom_rule.py:is_match:result",
+            "CustomRule.is_match result",
+            {
+                "vertices": vertices,
+                "num_matchings": len(matchings),
+                "matched": bool(matchings),
+            },
+        )
         return vertices if matchings else []
 
     def to_json(self) -> str:
