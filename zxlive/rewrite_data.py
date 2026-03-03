@@ -7,7 +7,7 @@ from typing_extensions import TypedDict, NotRequired
 import pyzx
 from pyzx import simplify, extract_circuit
 from pyzx.graph import VertexType
-from pyzx.rewrite import Rewrite, RewriteSimpGraph, RewriteSingleVertex
+from pyzx.rewrite import Rewrite, RewriteSimpGraph
 
 from .common import GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
@@ -36,23 +36,6 @@ class RewriteData(TypedDict):
     file_path: NotRequired[str]
 
 
-def _make_change_z_to_x_rewrite() -> RewriteSingleVertex:
-    """Special-case rewrite for change-z-to-x.zxr.
-
-    This is a local rule that only looks at a single vertex and flips its
-    type from Z to X without doing full subgraph isomorphism.
-    """
-
-    def is_match(graph: GraphT, v: VT) -> bool:
-        return graph.type(v) == VertexType.Z
-
-    def applier(graph: GraphT, v: VT) -> bool:
-        graph.set_type(v, VertexType.X)
-        return True
-
-    return RewriteSingleVertex(is_match, applier)
-
-
 def is_rewrite_data(d: dict) -> bool:
     proof_action_keys = {"text", "tooltip", "rule", "type"}
     return proof_action_keys.issubset(set(d.keys()))
@@ -65,25 +48,9 @@ def read_custom_rules() -> list[RewriteData]:
             if file.endswith(".zxr"):
                 zxr_file = os.path.join(root, file)
                 with open(zxr_file, "r") as f:
-                    content = f.read()
-                    # Special-case: change-z-to-x is intended as a purely local
-                    # color-change rule, not a full subgraph isomorphism-based
-                    # CustomRule. We treat it as a MATCH_SINGLE rewrite that
-                    # flips a Z spider to X based only on the vertex type.
-                    if os.path.basename(zxr_file) == "change-z-to-x.zxr":
-                        rule: RewriteData = {
-                            "text": "change-z-to-x",
-                            "tooltip": "Change a Z spider into an X spider",
-                            "rule": _make_change_z_to_x_rewrite(),
-                            "type": MATCH_SINGLE,
-                            "custom_rule": True,
-                            "file_path": zxr_file,
-                        }
-                        custom_rules.append(rule)
-                    else:
-                        rule = CustomRule.from_json(content).to_rewrite_data()
-                        rule["file_path"] = zxr_file
-                        custom_rules.append(rule)
+                    rule = CustomRule.from_json(f.read()).to_rewrite_data()
+                    rule["file_path"] = zxr_file
+                    custom_rules.append(rule)
     return custom_rules
 
 
