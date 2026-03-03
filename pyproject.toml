@@ -76,14 +76,18 @@ line-length = 120
 select = [
     "E",      # pycodestyle
     "F",      # Pyflakes
-    # "UP",   # pyupgrade
-    # "B",    # flake8-bugbear
-    # "SIM",  # flake8-simplify
-    # "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "PL",   # Pylint
 ]
 ignore = [
     "E501",
-    "E721", # False positive: triggers on .type() method calls, not just type() builtin
+    "E721",    # False positive: triggers on .type() method calls, not just type() builtin
+    "E402",    # false positives for local imports
+    "D100",    # ignore missing docs
+    "PLC0415"  # ignore mid-file imports
 ]
 
 [tool.ruff.lint.per-file-ignores]
