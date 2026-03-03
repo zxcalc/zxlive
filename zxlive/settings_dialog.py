@@ -99,6 +99,7 @@ general_settings: list[SettingsData] = [
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
+    {"id": "phase-label-color", "label": "Phase label color (hex)", "type": FormInputType.Str},
 ]
 
 
