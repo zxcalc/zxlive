@@ -44,6 +44,7 @@ class FormInputType(IntEnum):
     Folder = 3
     Combo = 4
     Bool = 5
+    Color = 6
 
 
 class SettingsData(TypedDict):
@@ -99,7 +100,7 @@ general_settings: list[SettingsData] = [
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
-    {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Str},
+    {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Color},
 ]
 
 
@@ -242,38 +243,47 @@ class SettingsDialog(QDialog):
         widget.setChecked(self.get_settings_from_data(data, bool))
         return widget
 
+    def make_color_form_input(self, data: SettingsData) -> QWidget:
+        container = QWidget()
+        hlayout = QHBoxLayout()
+        hlayout.setContentsMargins(0, 0, 0, 0)
+        container.setLayout(hlayout)
+        color_value = self.get_settings_from_data(data, str)
+        btn = QPushButton()
+
+        def update_button(color_str: str) -> None:
+            container.color_value = color_str  # type: ignore[attr-defined]
+            color = QColor(color_str)
+            if color.isValid():
+                text_color = "#000" if color.lightness() > 128 else "#fff"
+                btn.setStyleSheet(f"QPushButton {{ background-color: {color.name()}; color: {text_color}; }}")
+                btn.setText(color.name())
+            else:
+                btn.setStyleSheet("")
+                btn.setText("Default")
+
+        def pick_color() -> None:
+            current = QColor(container.color_value)  # type: ignore[attr-defined]
+            if not current.isValid():
+                current = display_setting.effective_colors["outline"]
+            selected = QColorDialog.getColor(current, self, "Select phase label color")
+            if selected.isValid():
+                update_button(selected.name())
+
+        btn.clicked.connect(pick_color)
+        update_button(color_value)
+        reset_btn = QPushButton()
+        reset_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton))
+        reset_btn.setToolTip("Reset to default")
+        reset_btn.setFixedWidth(30)
+        reset_btn.clicked.connect(lambda: update_button(""))
+        hlayout.addWidget(btn)
+        hlayout.addWidget(reset_btn)
+        return container
+
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
         widget = QLineEdit()
         widget.setText(self.get_settings_from_data(data, str))
-        if data["id"] == "phase-label-color":
-            widget.setReadOnly(True)
-            widget.setPlaceholderText("Default")
-
-            def pick_color() -> None:
-                current = QColor(widget.text())
-                if not current.isValid():
-                    current = display_setting.effective_colors["outline"]
-                selected = QColorDialog.getColor(current, self, "Select phase label color")
-                if selected.isValid():
-                    widget.setText(selected.name())
-
-            def clear_color() -> None:
-                widget.clear()
-
-            clear_action = widget.addAction(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton),
-                QLineEdit.ActionPosition.TrailingPosition,
-            )
-            clear_action.setToolTip("Reset to default")
-            clear_action.triggered.connect(clear_color)
-
-            pick_action = widget.addAction(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton),
-                QLineEdit.ActionPosition.TrailingPosition,
-            )
-            pick_action.setToolTip("Choose color")
-            pick_action.triggered.connect(pick_color)
-
         return widget
 
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
@@ -324,9 +334,10 @@ class SettingsDialog(QDialog):
             FormInputType.Folder: self.make_folder_form_input,
             FormInputType.Combo: self.make_combo_form_input,
             FormInputType.Bool: self.make_bool_form_input,
+            FormInputType.Color: self.make_color_form_input,
         }
         setting_widget_maker = setting_maker[settings_data["type"]]
-        widget: QWidget = setting_widget_maker(settings_data)
+        widget = setting_widget_maker(settings_data)
 
         form.addRow(settings_data["label"], widget)
         self.value_dict[settings_data["id"]] = widget
@@ -345,7 +356,9 @@ class SettingsDialog(QDialog):
 
     def update_global_settings(self) -> None:
         for name, widget in self.value_dict.items():
-            if isinstance(widget, QLineEdit):
+            if hasattr(widget, 'color_value'):
+                self.settings.setValue(name, widget.color_value)  # type: ignore[attr-defined]
+            elif isinstance(widget, QLineEdit):
                 self.settings.setValue(name, widget.text())
             elif isinstance(widget, QSpinBox):
                 self.settings.setValue(name, widget.value())
