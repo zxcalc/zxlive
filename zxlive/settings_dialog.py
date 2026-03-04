@@ -18,14 +18,14 @@ from __future__ import annotations
 from enum import IntEnum
 from typing import TYPE_CHECKING, Dict, Any
 
-from PySide6.QtGui import QIcon, QFontDatabase
+from PySide6.QtGui import QColor, QIcon, QFontDatabase
 from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
-    QComboBox, QApplication, QCheckBox, QMessageBox
+    QComboBox, QApplication, QCheckBox, QMessageBox, QColorDialog, QStyle
 )
 
 from .common import get_settings_value, T, get_data
@@ -99,7 +99,7 @@ general_settings: list[SettingsData] = [
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
-    {"id": "phase-label-color", "label": "Phase label color (hex)", "type": FormInputType.Str},
+    {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Str},
 ]
 
 
@@ -245,6 +245,35 @@ class SettingsDialog(QDialog):
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
         widget = QLineEdit()
         widget.setText(self.get_settings_from_data(data, str))
+        if data["id"] == "phase-label-color":
+            widget.setReadOnly(True)
+            widget.setPlaceholderText("Default")
+
+            def pick_color() -> None:
+                current = QColor(widget.text())
+                if not current.isValid():
+                    current = display_setting.effective_colors["outline"]
+                selected = QColorDialog.getColor(current, self, "Select phase label color")
+                if selected.isValid():
+                    widget.setText(selected.name())
+
+            def clear_color() -> None:
+                widget.clear()
+
+            clear_action = widget.addAction(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton),
+                QLineEdit.ActionPosition.TrailingPosition,
+            )
+            clear_action.setToolTip("Reset to default")
+            clear_action.triggered.connect(clear_color)
+
+            pick_action = widget.addAction(
+                self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton),
+                QLineEdit.ActionPosition.TrailingPosition,
+            )
+            pick_action.setToolTip("Choose color")
+            pick_action.triggered.connect(pick_color)
+
         return widget
 
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
