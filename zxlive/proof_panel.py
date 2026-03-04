@@ -108,8 +108,10 @@ class ProofPanel(BasePanel):
         self.identity_choice[0].setText("Z")
         self.identity_choice[0].setCheckable(True)
         self.identity_choice[0].setChecked(True)
+        self.identity_choice[0].setShortcut("z")
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
+        self.identity_choice[1].setShortcut("x")
 
         yield ToolbarSection(*self.identity_choice, exclusive=True)
         yield ToolbarSection(*self.actions())
