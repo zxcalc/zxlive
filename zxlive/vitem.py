@@ -29,7 +29,7 @@ from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGr
 
 from pyzx.utils import VertexType, phase_to_s, get_w_partner, vertex_is_w, get_z_box_label
 
-from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view
+from .common import VT, W_INPUT_OFFSET, GraphT, SCALE, pos_to_view, pos_from_view, get_settings_value
 from .settings import display_setting
 
 if TYPE_CHECKING:
@@ -394,6 +394,7 @@ class VItem(QGraphicsPathItem):
 
     def update_font(self) -> None:
         self.phase_item.setFont(display_setting.font)
+        self.phase_item.update_text_color()
         # Clear dummy-label cache so changed font triggers re-render
         self._cached_dummy_text = ""
         self._cached_font_key = ""
@@ -538,14 +539,22 @@ class PhaseItem(QGraphicsTextItem):
     def __init__(self, v_item: VItem) -> None:
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
-
-        # Set phase label color based on dark mode
-        if display_setting.dark_mode:
-            self.setDefaultTextColor(QColor("#00e6e6"))  # bright cyan for dark mode
-        else:
-            self.setDefaultTextColor(QColor("#006bb3"))  # original blue for light mode
         self.v_item = v_item
+        self.update_text_color()
         self.refresh()
+
+    def update_text_color(self) -> None:
+        custom_color = get_settings_value("phase-label-color", str, "").strip()
+        if custom_color:
+            color = QColor(custom_color)
+            if color.isValid():
+                self.setDefaultTextColor(color)
+                return
+
+        if display_setting.dark_mode:
+            self.setDefaultTextColor(QColor("#00e6e6"))
+        else:
+            self.setDefaultTextColor(QColor("#006bb3"))
 
     def refresh(self) -> None:
         """Call this when a vertex moves or its phase changes"""
