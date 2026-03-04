@@ -37,6 +37,35 @@ if TYPE_CHECKING:
     from .mainwindow import MainWindow
 
 
+class ColorButton(QPushButton):
+    """A button that shows a color and opens a QColorDialog on click."""
+
+    def __init__(self, color_str: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.color_value = ""
+        self.clicked.connect(self._pick_color)
+        self.set_color(color_str)
+
+    def set_color(self, color_str: str) -> None:
+        self.color_value = color_str
+        color = QColor(color_str)
+        if color.isValid():
+            text_color = "#000" if color.lightness() > 128 else "#fff"
+            self.setStyleSheet(f"QPushButton {{ background-color: {color.name()}; color: {text_color}; }}")
+            self.setText(color.name())
+        else:
+            self.setStyleSheet("")
+            self.setText("Default")
+
+    def _pick_color(self) -> None:
+        current = QColor(self.color_value)
+        if not current.isValid():
+            current = display_setting.effective_colors["outline"]
+        selected = QColorDialog.getColor(current, self.window(), "Select color")
+        if selected.isValid():
+            self.set_color(selected.name())
+
+
 class FormInputType(IntEnum):
     Str = 0
     Int = 1
@@ -248,37 +277,15 @@ class SettingsDialog(QDialog):
         hlayout = QHBoxLayout()
         hlayout.setContentsMargins(0, 0, 0, 0)
         container.setLayout(hlayout)
-        color_value = self.get_settings_from_data(data, str)
-        btn = QPushButton()
-
-        def update_button(color_str: str) -> None:
-            container.color_value = color_str  # type: ignore[attr-defined]
-            color = QColor(color_str)
-            if color.isValid():
-                text_color = "#000" if color.lightness() > 128 else "#fff"
-                btn.setStyleSheet(f"QPushButton {{ background-color: {color.name()}; color: {text_color}; }}")
-                btn.setText(color.name())
-            else:
-                btn.setStyleSheet("")
-                btn.setText("Default")
-
-        def pick_color() -> None:
-            current = QColor(container.color_value)  # type: ignore[attr-defined]
-            if not current.isValid():
-                current = display_setting.effective_colors["outline"]
-            selected = QColorDialog.getColor(current, self, "Select phase label color")
-            if selected.isValid():
-                update_button(selected.name())
-
-        btn.clicked.connect(pick_color)
-        update_button(color_value)
+        btn = ColorButton(self.get_settings_from_data(data, str))
         reset_btn = QPushButton()
         reset_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton))
         reset_btn.setToolTip("Reset to default")
         reset_btn.setFixedWidth(30)
-        reset_btn.clicked.connect(lambda: update_button(""))
+        reset_btn.clicked.connect(lambda: btn.set_color(""))
         hlayout.addWidget(btn)
         hlayout.addWidget(reset_btn)
+        container.color_button = btn  # type: ignore[attr-defined]
         return container
 
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
@@ -356,8 +363,8 @@ class SettingsDialog(QDialog):
 
     def update_global_settings(self) -> None:
         for name, widget in self.value_dict.items():
-            if hasattr(widget, 'color_value'):
-                self.settings.setValue(name, widget.color_value)  # type: ignore[attr-defined]
+            if hasattr(widget, 'color_button'):
+                self.settings.setValue(name, widget.color_button.color_value)  # type: ignore[attr-defined]
             elif isinstance(widget, QLineEdit):
                 self.settings.setValue(name, widget.text())
             elif isinstance(widget, QSpinBox):
