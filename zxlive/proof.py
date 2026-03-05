@@ -743,6 +743,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     # Sub-tree layout for expanded groups
     triangle_size = 5
     sub_indent = 20
@@ -790,7 +792,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             return QColor(229, 243, 255)
         return QColor(255, 255, 255)
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
