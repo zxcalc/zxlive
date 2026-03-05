@@ -81,7 +81,7 @@ class ProofModel(QAbstractItemModel):
             return self.createIndex(row, column, 0)
         return self.createIndex(row, column, parent.row() + 1)
 
-    def parent(self, child: Union[QModelIndex, QPersistentModelIndex]) -> QModelIndex:
+    def parent(self, child: Union[QModelIndex, QPersistentModelIndex]) -> QModelIndex:  # type: ignore[override]
         if not child.isValid() or child.internalId() == 0:
             return QModelIndex()
         return self.createIndex(child.internalId() - 1, 0, 0)
@@ -367,7 +367,9 @@ class ProofStepView(QTreeView):
             sub_idx = index.row()
             step = self.model().steps[step_idx]
             if step.grouped_rewrites and sub_idx < len(step.grouped_rewrites):
-                self.graph_view.set_graph(step.grouped_rewrites[sub_idx].graph.copy())
+                graph = step.grouped_rewrites[sub_idx].graph.copy()
+                assert isinstance(graph, GraphT)
+                self.graph_view.set_graph(graph)
         else:
             self.graph_view.set_graph(self.model().get_graph(index.row()))
 

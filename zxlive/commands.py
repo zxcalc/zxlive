@@ -445,7 +445,7 @@ class AddRewriteStep(UpdateGraph):
     The rewrite is inserted after the currently selected step. In particular, it
     replaces all rewrites that were previously after the current selection.
     """
-    step_view: QListView
+    step_view: ProofStepView
     name: str
     diff: Optional[GraphDiff] = None
 
@@ -556,7 +556,9 @@ class UngroupRewriteSteps(BaseCommand):
     _group_size: int = field(default=0, init=False)
 
     def redo(self) -> None:
-        self._group_size = len(self.step_view.model().steps[self.group_index].grouped_rewrites)
+        grouped = self.step_view.model().steps[self.group_index].grouped_rewrites
+        assert grouped is not None
+        self._group_size = len(grouped)
         self.step_view.model().ungroup_steps(self.group_index)
         self.step_view.move_to_step(self.group_index + 1)
 
