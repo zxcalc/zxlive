@@ -115,7 +115,7 @@ def render_graph_thumbnail(graph: GraphT, device_pixel_ratio: float = 1.0) -> QP
 
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    scene.render(painter, QRectF(0, 0, phys_w, phys_h), rect)
+    scene.render(painter, QRectF(0, 0, w, h), rect)
     painter.end()
 
     scene.clear()
