@@ -1,18 +1,17 @@
-from __future__ import annotations
-
 import json
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
+from PySide6.QtCore import (QAbstractItemModel, QEvent,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
                             QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPainterPath, QPen, QPolygonF
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QMouseEvent, QPainter,
+                           QPen, QPolygonF)
+from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QMenu,
                                QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QWidget)
+                               QStyleOptionViewItem, QTreeView, QWidget)
 
 from .common import GraphT
 from .settings import display_setting
@@ -59,94 +58,98 @@ class Rewrite(NamedTuple):
         )
 
 
-class ProofModel(QAbstractListModel):
-    """List model capturing the individual steps in a proof.
+class ProofModel(QAbstractItemModel):
+    """Tree model capturing the individual steps in a proof.
 
-    There is a row for each graph in the proof sequence. Furthermore, we store the
-    rewrite that was used to go from one graph to next.
+    There is a top-level row for each graph sequence.
+    Grouped rewrites have child rows representing their individual sub-steps.
     """
 
     initial_graph: GraphT
-    steps: list['Rewrite']
+    steps: list[Rewrite]
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
         self.initial_graph = start_graph
         self.steps = []
 
+    def index(self, row: int, column: int,
+              parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> QModelIndex:
+        if not self.hasIndex(row, column, parent):
+            return QModelIndex()
+        if not parent.isValid():
+            return self.createIndex(row, column, 0)
+        return self.createIndex(row, column, parent.row() + 1)
+
+    def parent(self, child: Union[QModelIndex, QPersistentModelIndex]) -> QModelIndex:
+        if not child.isValid() or child.internalId() == 0:
+            return QModelIndex()
+        return self.createIndex(child.internalId() - 1, 0, 0)
+
+    def rowCount(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+        if not parent.isValid():
+            return len(self.steps) + 1
+        if parent.internalId() != 0:
+            return 0  # No grandchildren
+        step_idx = parent.row() - 1
+        if step_idx < 0 or step_idx >= len(self.steps):
+            return 0
+        grouped = self.steps[step_idx].grouped_rewrites
+        return len(grouped) if grouped else 0
+
+    def columnCount(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
+        return 1
+
+    def hasChildren(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> bool:
+        return self.rowCount(parent) > 0
+
+    def _display_name(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Any:
+        """Return the display name for a model index."""
+        if index.internalId() == 0:
+            if index.row() == 0:
+                return "START"
+            step_idx = index.row() - 1
+            return self.steps[step_idx].display_name if step_idx < len(self.steps) else None
+        parent_step_idx = index.internalId() - 2  # internalId = parent_row + 1, step_idx = parent_row - 1
+        if 0 <= parent_step_idx < len(self.steps):
+            grouped = self.steps[parent_step_idx].grouped_rewrites
+            if grouped and index.row() < len(grouped):
+                return grouped[index.row()].display_name
+        return None
+
+    def data(self, index: Union[QModelIndex, QPersistentModelIndex],
+             role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if not index.isValid():
+            return None
+        if role == Qt.ItemDataRole.DisplayRole:
+            return self._display_name(index)
+        if role == Qt.ItemDataRole.FontRole:
+            return QFont("monospace", 12)
+        return None
+
+    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags  # type: ignore[return-value]
+        base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        if index.internalId() == 0 and index.row() == 0:
+            return base  # type: ignore[return-value]  # START not editable
+        return base | Qt.ItemFlag.ItemIsEditable  # type: ignore[return-value]
+
+    def headerData(self, section: int, orientation: Qt.Orientation,
+                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        return None
+
     def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
             self.initial_graph = graph
         else:
-            old_step = self.steps[index - 1]
-            new_step = Rewrite(old_step.display_name, old_step.rule, graph, old_step.grouped_rewrites)
-            self.steps[index - 1] = new_step
-
-            # Rerender to ensure the model reflects the change immediately
-            modelIndex = self.createIndex(index, 0)
-            self.dataChanged.emit(modelIndex, modelIndex, [])
-
-    def set_sub_graph(self, step_idx: int, sub_idx: int, graph: GraphT) -> None:
-        old_step = self.steps[step_idx]
-        grouped = old_step.grouped_rewrites
-        if grouped is None or sub_idx >= len(grouped):
-            return
-
-        old_sub_step = grouped[sub_idx]
-        new_sub_step = Rewrite(old_sub_step.display_name, old_sub_step.rule, graph, old_sub_step.grouped_rewrites)
-
-        new_grouped = list(grouped)
-        new_grouped[sub_idx] = new_sub_step
-
-        self.steps[step_idx] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped)
-
-        # Rerender
-        modelIndex = self.createIndex(step_idx + 1, 0)
-        self.dataChanged.emit(modelIndex, modelIndex, [])
+            old = self.steps[index - 1]
+            self.steps[index - 1] = Rewrite(old.display_name, old.rule, graph, old.grouped_rewrites)
+            mi = self.createIndex(index, 0, 0)
+            self.dataChanged.emit(mi, mi, [])
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
-
-    def data(self, index: Union[QModelIndex, QPersistentModelIndex], role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        """Overrides `QAbstractItemModel.data` to populate a view with rewrite steps"""
-
-        if index.row() >= len(self.steps) + 1 or index.column() >= 1:
-            return None
-
-        if role == Qt.ItemDataRole.DisplayRole:
-            if index.row() == 0:
-                return "START"
-            else:
-                return self.steps[index.row() - 1].display_name
-        elif role == Qt.ItemDataRole.FontRole:
-            return QFont("monospace", 12)
-
-    def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
-        if index.row() == 0:
-            return super().flags(index)
-        return super().flags(index) | Qt.ItemFlag.ItemIsEditable
-
-    def headerData(self, section: int, orientation: Qt.Orientation,
-                   role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        """Overrides `QAbstractItemModel.headerData`.
-
-        Indicates that this model doesn't have a header.
-        """
-        return None
-
-    def columnCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
-        """The number of columns"""
-        return 1
-
-    def rowCount(self, index: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
-        """The number of rows"""
-        # This is a quirk of Qt list models: Since they are based on tree models, the
-        # user has to specify the index of the parent. In a list, we always expect the
-        # parent to be `None` or the empty `QModelIndex()`
-        if not index or not index.isValid():
-            return len(self.steps) + 1
-        else:
-            return 0
 
     def add_rewrite(self, rewrite: Rewrite, position: Optional[int] = None) -> None:
         """Adds a rewrite step to the model."""
@@ -178,16 +181,10 @@ class ProofModel(QAbstractListModel):
         return copy
 
     def rename_step(self, index: int, name: str) -> None:
-        """Change the display name"""
-        old_step = self.steps[index]
-
-        # If this is a grouped step whose header contains "→", try to update
-        # the sub-step display names to stay in sync with the header text.
-        grouped = old_step.grouped_rewrites
+        """Change the display name of a step (and sync sub-step names if applicable)."""
+        old = self.steps[index]
+        grouped = old.grouped_rewrites
         if grouped and "\u2192" in name:
-            # Strip any prefix before the first sub-step name.
-            # The auto-generated format is "Prefix: sub1 → sub2 → ...",
-            # so we split on ": " once to separate the prefix.
             body = name.split(": ", 1)[-1] if ": " in name else name
             sub_names = [s.strip() for s in body.split("\u2192")]
             if len(sub_names) == len(grouped):
@@ -196,35 +193,23 @@ class ProofModel(QAbstractListModel):
                     if sub_names[i] != rw.display_name else rw
                     for i, rw in enumerate(grouped)
                 ]
-
-        # Must create a new Rewrite object instead of modifying current object
-        # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, grouped)
-
-        # Rerender the proof step otherwise it will display the old name until
-        # the cursor moves
-        modelIndex = self.createIndex(index + 1, 0)
-        self.dataChanged.emit(modelIndex, modelIndex, [])
+        self.steps[index] = Rewrite(name, old.rule, old.graph, grouped)
+        mi = self.createIndex(index + 1, 0, 0)
+        self.dataChanged.emit(mi, mi, [])
 
     def rename_sub_step(self, step_index: int, sub_index: int, name: str) -> None:
-        """Change the display name of a sub-step"""
-        old_step = self.steps[step_index]
-        grouped = old_step.grouped_rewrites
+        """Change the display name of a sub-step."""
+        old = self.steps[step_index]
+        grouped = old.grouped_rewrites
         if grouped is None or sub_index >= len(grouped):
             return
-
-        old_sub_step = grouped[sub_index]
-        new_sub_step = Rewrite(name, old_sub_step.rule, old_sub_step.graph, old_sub_step.grouped_rewrites)
-
+        old_sub = grouped[sub_index]
         new_grouped = list(grouped)
-        new_grouped[sub_index] = new_sub_step
-
-        # Update the main step's grouped rewrites
-        self.steps[step_index] = Rewrite(old_step.display_name, old_step.rule, old_step.graph, new_grouped)
-
-        # Rerender
-        modelIndex = self.createIndex(step_index + 1, 0)
-        self.dataChanged.emit(modelIndex, modelIndex, [])
+        new_grouped[sub_index] = Rewrite(name, old_sub.rule, old_sub.graph, old_sub.grouped_rewrites)
+        self.steps[step_index] = Rewrite(old.display_name, old.rule, old.graph, new_grouped)
+        parent_mi = self.index(step_index + 1, 0)
+        child_mi = self.index(sub_index, 0, parent_mi)
+        self.dataChanged.emit(child_mi, child_mi, [])
 
     def group_steps(self, start_index: int, end_index: int) -> None:
         """Replace the individual steps from `start_index` to `end_index` with a new grouped step"""
@@ -235,10 +220,8 @@ class ProofModel(QAbstractListModel):
             self.steps[start_index:end_index + 1]
         )
         for _ in range(end_index - start_index + 1):
-            self.pop_rewrite(start_index)[0]
+            self.pop_rewrite(start_index)
         self.add_rewrite(new_rewrite, start_index)
-        modelIndex = self.createIndex(start_index + 1, 0)
-        self.dataChanged.emit(modelIndex, modelIndex, [])
 
     def ungroup_steps(self, index: int) -> None:
         """Replace the grouped step at `index` with the individual_steps"""
@@ -248,18 +231,49 @@ class ProofModel(QAbstractListModel):
         self.pop_rewrite(index)
         for i, step in enumerate(individual_steps):
             self.add_rewrite(step, index + i)
-        self.dataChanged.emit(self.createIndex(index + 1, 0),
-                              self.createIndex(index + len(individual_steps), 0),
-                              [])
 
+    def truncate_group(self, step_index: int, keep_count: int) -> 'Rewrite':
+        """Truncate a grouped step, keeping only the first `keep_count` sub-steps.
+
+        If keep_count == 1 the group is replaced by the single remaining sub-step
+        (i.e. the group is "ungrouped").  Returns the *original* Rewrite so that
+        the caller can restore it later via `restore_group`.
+        """
+        old = self.steps[step_index]
+        assert old.grouped_rewrites is not None
+        assert 0 < keep_count <= len(old.grouped_rewrites)
+
+        kept = old.grouped_rewrites[:keep_count]
+
+        if keep_count == 1:
+            # Ungroup: replace the grouped step with the single sub-step.
+            self.pop_rewrite(step_index)
+            self.add_rewrite(kept[0], step_index)
+        else:
+            # Shrink in-place, notifying the tree view about removed children.
+            parent_idx = self.index(step_index + 1, 0)
+            n_old = len(old.grouped_rewrites)
+            if keep_count < n_old:
+                self.beginRemoveRows(parent_idx, keep_count, n_old - 1)
+            self.steps[step_index] = Rewrite(
+                old.display_name, old.rule, kept[-1].graph, kept,
+            )
+            if keep_count < n_old:
+                self.endRemoveRows()
+            mi = self.createIndex(step_index + 1, 0, 0)
+            self.dataChanged.emit(mi, mi, [])
+
+        return old
+
+    def restore_group(self, step_index: int, original: 'Rewrite') -> None:
+        """Restore a previously truncated / ungrouped step to its original group."""
+        self.pop_rewrite(step_index)
+        self.add_rewrite(original, step_index)
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the model to Python dict."""
-        initial_graph = self.initial_graph.to_dict()
-        proof_steps = [step.to_dict() for step in self.steps]
-
         return {
-            "initial_graph": initial_graph,
-            "proof_steps": proof_steps
+            "initial_graph": self.initial_graph.to_dict(),
+            "proof_steps": [step.to_dict() for step in self.steps]
         }
 
     def to_json(self) -> str:
@@ -280,45 +294,44 @@ class ProofModel(QAbstractListModel):
         initial_graph.set_auto_simplify(False)
         model = ProofModel(initial_graph)
         for step in d["proof_steps"]:
-            rewrite = Rewrite.from_json(step)
-            model.add_rewrite(rewrite)
+            model.add_rewrite(Rewrite.from_json(step))
         return model
 
 
-class ProofStepView(QListView):
+class ProofStepView(QTreeView):
     """A view for displaying the steps in a proof."""
 
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
-        self.expanded_groups: set[int] = set()
-        # Track currently selected sub-step: (step_index, sub_step_index) or None
-        self.selected_sub_step: Optional[tuple[int, int]] = None
-        self._active_sub_editor: Optional[QLineEdit] = None
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
+
+        # Tree config: all visual layout handled by our delegate
+        self.setIndentation(0)
+        self.setRootIsDecorated(False)
+        self.setItemsExpandable(False)
+        self.setExpandsOnDoubleClick(False)
+        self.setHeaderHidden(True)
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
-        # Set background color for dark mode (panel background)
-        if display_setting.dark_mode:
-            self.setStyleSheet("background-color: #23272e;")
-        else:
-            self.setStyleSheet("")
-        # Set background color for dark mode
+
+        # Styling
         pal = self.palette()
         if display_setting.dark_mode:
+            self.setStyleSheet("background-color: #23272e;")
             pal.setColor(self.backgroundRole(), QColor(35, 39, 46))
             pal.setColor(self.viewport().backgroundRole(), QColor(35, 39, 46))
         else:
+            self.setStyleSheet("")
             pal.setColor(self.backgroundRole(), QColor(255, 255, 255))
             pal.setColor(self.viewport().backgroundRole(), QColor(255, 255, 255))
         self.setPalette(pal)
-        self.setSpacing(0)
+
         self.setMouseTracking(True)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(False)
+        self.setUniformRowHeights(True)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -334,334 +347,58 @@ class ProofStepView(QListView):
 
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
-        self.expanded_groups.clear()
-        self.selected_sub_step = None
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setCurrentIndex(model.index(len(model.steps), 0))
 
-    def toggle_group_expansion(self, step_index: int) -> None:
-        """Toggle the expanded/collapsed state of a grouped step."""
-        if step_index in self.expanded_groups:
-            self.expanded_groups.discard(step_index)
-            # Clear sub-step selection when collapsing
-            if self.selected_sub_step and self.selected_sub_step[0] == step_index:
-                self.selected_sub_step = None
-        else:
-            self.expanded_groups.add(step_index)
-        model_index = self.model().index(step_index + 1, 0)
-        self.model().dataChanged.emit(model_index, model_index, [])
-        self.doItemsLayout()
-
-    def _sub_step_hit_test(self, step_idx: int, event_pos_y: int, rect_y: int) -> int:
-        """Determine which sub-step (if any) was clicked in an expanded group.
-
-        Returns the 0-based sub-step index, or -1 if the click was not on a sub-step.
-        """
-        delegate = self.itemDelegate()
-        if not isinstance(delegate, ProofStepItemDelegate):
-            return -1
-        step = self.model().steps[step_idx]
-        if step.grouped_rewrites is None:
-            return -1
-        text_h = QFontMetrics(self.font()).height()
-        row_height = text_h + 2 * delegate.vert_padding
-        header_h = row_height  # header occupies first row_height pixels
-        click_y = event_pos_y - rect_y
-        if click_y <= header_h:
-            return -1  # Click is in the header area
-        sub_y = click_y - header_h
-        sub_idx = int(sub_y // row_height)
-        if 0 <= sub_idx < len(step.grouped_rewrites):
-            return sub_idx
-        return -1
-
-    def _triangle_hit_test(self, step_idx: int, event_pos_x: int, event_pos_y: int, rect_x: int, rect_y: int) -> bool:
-        """Check if the click was on the collapse/expand triangle."""
-        delegate = self.itemDelegate()
-        if not isinstance(delegate, ProofStepItemDelegate):
-            return False
-        text_h = QFontMetrics(self.font()).height()
-        row_height = text_h + 2 * delegate.vert_padding
-        text_x_base = rect_x + delegate.line_width + 2 * delegate.line_padding
-        tri_size = delegate.triangle_size
-        tri_cy = rect_y + row_height / 2
-        click_x = event_pos_x
-        click_y = event_pos_y
-        # Triangle bounds: roughly text_x_base to text_x_base + tri_size*2
-        # and tri_cy - tri_size to tri_cy + tri_size
-        return (text_x_base <= click_x <= text_x_base + tri_size * 2 and
-                tri_cy - tri_size <= click_y <= tri_cy + tri_size)
-
-    def _navigate_to_sub_step(self, step_idx: int, sub_idx: int) -> None:
-        """Display the graph corresponding to a sub-step within a grouped rewrite."""
-        step = self.model().steps[step_idx]
-        if step.grouped_rewrites is None or sub_idx < 0 or sub_idx >= len(step.grouped_rewrites):
-            return
-        self.selected_sub_step = (step_idx, sub_idx)
-        sub_graph = step.grouped_rewrites[sub_idx].graph.copy()
-        assert isinstance(sub_graph, GraphT)
-        self.graph_view.set_graph(sub_graph)
-        # Trigger repaint so the delegate can highlight the selected sub-step
-        model_index = self.model().index(step_idx + 1, 0)
-        self.model().dataChanged.emit(model_index, model_index, [])
-
-    def _click_target_for_pos(self, event: QMouseEvent) -> tuple[int, bool, int]:
-        """Classify a mouse-press into (toggle_idx, sub_step_clicked, step_idx).
-
-        toggle_idx      – step index whose triangle was clicked, or -1
-        sub_step_clicked – True when a sub-step row was clicked
-        step_idx        – the step row the click landed on (only meaningful
-                          when toggle_idx >= 0 or sub_step_clicked is True)
-        """
-        index = self.indexAt(event.pos())
-        if not index.isValid() or index.row() <= 0:
-            return -1, False, -1
-        step_idx = index.row() - 1
-        if step_idx >= len(self.model().steps):
-            return -1, False, -1
-        step = self.model().steps[step_idx]
-        if step.grouped_rewrites is None:
-            return -1, False, -1
-        delegate = self.itemDelegate()
-        if not isinstance(delegate, ProofStepItemDelegate):
-            return -1, False, -1
-        rect = self.visualRect(index)
-        if self._triangle_hit_test(step_idx, int(event.pos().x()), int(event.pos().y()),
-                                   rect.x(), rect.y()):
-            return step_idx, False, step_idx   # triangle clicked → toggle
-        if step_idx in self.expanded_groups:
-            sub_idx = self._sub_step_hit_test(step_idx, int(event.pos().y()), rect.y())
-            if sub_idx >= 0:
-                self._navigate_to_sub_step(step_idx, sub_idx)
-                return -1, True, step_idx      # sub-step clicked
-        return -1, False, -1
-
-    def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
-        """Handle mouse clicks on grouped steps to toggle expansion.
-
-        Only clicking on the triangle triggers expand/collapse.
-        Clicking on a sub-step navigates to that sub-step's graph.
-        """
-        index = self.indexAt(event.pos())
-        # Save old sub-step selection; if the user clicks a sub-step in a
-        # different group we need to repaint the old group's row to clear
-        # its stale highlight.
-        old_sub_step = self.selected_sub_step
-
-        toggle_idx, sub_step_clicked, step_idx = self._click_target_for_pos(event)
-
-        # Clear sub-step selection when clicking on a non-sub-step area
-        if not sub_step_clicked and self.selected_sub_step is not None:
-            old_step_idx = self.selected_sub_step[0]
-            self.selected_sub_step = None
-            old_model_idx = self.model().index(old_step_idx + 1, 0)
-            self.model().dataChanged.emit(old_model_idx, old_model_idx, [])
-
-        if sub_step_clicked:
-            # Repaint the old group's row if we switched from a different group,
-            # so the stale sub-step highlight is cleared.
-            if old_sub_step is not None and old_sub_step[0] != step_idx:
-                old_model_idx = self.model().index(old_sub_step[0] + 1, 0)
-                self.model().dataChanged.emit(old_model_idx, old_model_idx, [])
-            # Select the parent row in QListView so it appears as the active
-            # step, but block signals to prevent proof_step_selected from
-            # overwriting the sub-step graph we just navigated to.
-            self.selectionModel().blockSignals(True)
-            self.setCurrentIndex(index)
-            self.selectionModel().blockSignals(False)
-        else:
-            super().mousePressEvent(event)
-
-        if toggle_idx >= 0:
-            self.toggle_group_expansion(toggle_idx)
-
-    def _repaint_step(self, step_idx: int) -> None:
-        """Trigger repaint for a step row by its 0-based step index."""
-        self.update(self.model().index(step_idx + 1, 0))
-
-    def _hover_target_for_pos(self, pos: Any) -> tuple[int, int, int]:
-        """Return (new_step, new_sub, new_header) for the given mouse position.
-
-        Each value is -1 when not applicable.
-        """
-        index = self.indexAt(pos)
-        if not index.isValid() or index.row() <= 0:
-            return -1, -1, -1
-        step_idx = index.row() - 1
-        if step_idx >= len(self.model().steps):
-            return -1, -1, -1
-        step = self.model().steps[step_idx]
-        if step.grouped_rewrites is None:
-            return -1, -1, -1
-        if step_idx not in self.expanded_groups:
-            return -1, -1, step_idx
-        rect = self.visualRect(index)
-        sub_idx = self._sub_step_hit_test(step_idx, int(pos.y()), rect.y())
-        if sub_idx >= 0:
-            return step_idx, sub_idx, -1
-        return -1, -1, step_idx
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
-        """Track which sub-step the mouse is hovering over and trigger repaint."""
-        delegate = self.itemDelegate()
-        if not isinstance(delegate, ProofStepItemDelegate):
-            super().mouseMoveEvent(event)
-            return
-
-        old_step = delegate.hover_step_idx
-        old_sub = delegate.hover_sub_idx
-        old_header = delegate.hover_header_step_idx
-        new_step, new_sub, new_header = self._hover_target_for_pos(event.pos())
-
-        if new_step != old_step or new_sub != old_sub:
-            delegate.hover_step_idx = new_step
-            delegate.hover_sub_idx = new_sub
-            if old_step >= 0:
-                self._repaint_step(old_step)
-            if new_step >= 0:
-                self._repaint_step(new_step)
-
-        if new_header != old_header:
-            delegate.hover_header_step_idx = new_header
-            if old_header >= 0:
-                self._repaint_step(old_header)
-            if new_header >= 0:
-                self._repaint_step(new_header)
-
-        if new_sub >= 0:
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-        else:
-            self.unsetCursor()
-
-        super().mouseMoveEvent(event)
-
-    def leaveEvent(self, event: Any) -> None:
-        """Clear sub-step hover state when the mouse leaves the widget."""
-        delegate = self.itemDelegate()
-        if isinstance(delegate, ProofStepItemDelegate):
-            old_step = delegate.hover_step_idx
-            old_header = delegate.hover_header_step_idx
-            delegate.hover_step_idx = -1
-            delegate.hover_sub_idx = -1
-            delegate.hover_header_step_idx = -1
-            if old_step >= 0:
-                self._repaint_step(old_step)
-            if old_header >= 0:
-                self._repaint_step(old_header)
-        self.unsetCursor()
-        super().leaveEvent(event)
-
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
-        self.clearSelection()
-        self.selectionModel().blockSignals(True)
         self.setCurrentIndex(idx)
-        self.selectionModel().blockSignals(False)
-        self.update(idx)
-        g = self.model().get_graph(index)
-        self.graph_view.set_graph(g)
+
+    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        if not selected:
+            return
+        index = selected.first().topLeft()
+        if not index.isValid():
+            return
+        if index.parent().isValid():
+            # Sub-step clicked → show sub-step graph natively
+            step_idx = index.parent().row() - 1
+            sub_idx = index.row()
+            step = self.model().steps[step_idx]
+            if step.grouped_rewrites and sub_idx < len(step.grouped_rewrites):
+                self.graph_view.set_graph(step.grouped_rewrites[sub_idx].graph.copy())
+        else:
+            self.graph_view.set_graph(self.model().get_graph(index.row()))
+
+    # Context menu
 
     def show_context_menu(self, position: QPoint) -> None:
-        selected_indexes = self.selectedIndexes()
-        if not selected_indexes:
+        index = self.indexAt(position)
+        if not index.isValid():
             return
         context_menu = QMenu(self)
-        action_function_map = {}
+        action_map: dict[Any, Any] = {}
 
-        index = selected_indexes[0].row()
-        if len(selected_indexes) > 1:
-            group_action = context_menu.addAction("Group Steps")
-            action_function_map[group_action] = self.group_selected_steps
-        elif index != 0:
-            rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
-            if self.model().steps[index - 1].grouped_rewrites is not None:
-                ungroup_action = context_menu.addAction("Ungroup Steps")
-                action_function_map[ungroup_action] = self.ungroup_selected_step
-
-                # Check if we clicked on a sub-step
-                step_idx = index - 1
-                if step_idx in self.expanded_groups:
-                    rect = self.visualRect(selected_indexes[0])
-                    # We need the relative position within the item rect
-                    # mapToGlobal(position) is global, position is local to widget
-                    # position is passed from customContextMenuRequested, which is in widget coords
-                    sub_idx = self._sub_step_hit_test(
-                        step_idx, int(position.y()), rect.y()
-                    )
-                    if sub_idx >= 0:
-                        # If a sub-step is clicked, we probably want to rename the sub-step,
-                        # not the parent group step.
-                        context_menu.removeAction(rename_action)
-                        rename_sub_action = context_menu.addAction("Rename Sub-step")
-                        action_function_map[rename_sub_action] = lambda: self._open_sub_step_editor(step_idx, sub_idx)
+        if index.parent().isValid():
+            # Right-clicked on a sub-step
+            rename_action = context_menu.addAction("Rename Sub-step")
+            action_map[rename_action] = lambda: self.edit(index)
+        else:
+            top_level = [i for i in self.selectedIndexes() if not i.parent().isValid()]
+            if len(top_level) > 1:
+                action_map[context_menu.addAction("Group Steps")] = self.group_selected_steps
+            elif index.row() != 0:
+                action_map[context_menu.addAction("Rename Step")] = lambda: self.edit(index)
+                step_idx = index.row() - 1
+                if step_idx < len(self.model().steps) and self.model().steps[step_idx].grouped_rewrites is not None:
+                    action_map[context_menu.addAction("Ungroup Steps")] = self.ungroup_selected_step
 
         action = context_menu.exec_(self.mapToGlobal(position))
-        if action in action_function_map:
-            action_function_map[action]()
+        if action in action_map:
+            action_map[action]()
 
-    def _open_sub_step_editor(self, step_idx: int, sub_idx: int) -> None:
-        """Opens an inline editor for renaming a sub-step."""
-        delegate = self.itemDelegate()
-        if not isinstance(delegate, ProofStepItemDelegate):
-            return
-
-        # Ensure the item is visible
-        model_idx = self.model().index(step_idx + 1, 0)
-        self.scrollTo(model_idx)
-
-        # Get the visual rect of the main item
-        rect = self.visualRect(model_idx)
-
-        # Calculate sub-step position logic (matching delegate.paint)
-        font = self.font()
-        text_height = QFontMetrics(font).height()
-        row_height = text_height + 2 * delegate.vert_padding
-
-        main_cx = delegate.line_padding + delegate.line_width / 2
-        sub_tree_x = main_cx + delegate.sub_indent
-
-        # Calculate vertical position of the sub-step
-        # Header + sub_steps before this one
-        header_height = row_height
-        sub_step_top = rect.y() + header_height + sub_idx * row_height
-
-        sub_text_x = int(sub_tree_x + delegate.circle_radius + 10)
-
-        editor_x = sub_text_x
-        # Center vertically in the row
-        editor_y = int(sub_step_top + delegate.vert_padding)
-        editor_w = rect.width() - sub_text_x - 5  # Small padding on right
-        editor_h = text_height
-
-        editor = QLineEdit(self)
-        step = self.model().steps[step_idx]
-        if step.grouped_rewrites:
-            editor.setText(step.grouped_rewrites[sub_idx].display_name)
-
-        editor.setGeometry(editor_x, editor_y, editor_w, editor_h)
-        # Style to blend in or look like an editor
-        if display_setting.dark_mode:
-            editor.setStyleSheet("QLineEdit { background-color: #2c313a; color: #e0e0e0; border: 1px solid #4b5362; }")
-        else:
-            editor.setStyleSheet("QLineEdit { background-color: white; color: black; border: 1px solid #ccc; }")
-
-        # Connect signals
-        editor.editingFinished.connect(lambda: self._finish_sub_step_edit(step_idx, sub_idx, editor))
-
-        editor.show()
-        editor.setFocus()
-        self._active_sub_editor = editor
-
-    def _finish_sub_step_edit(self, step_idx: int, sub_idx: int, editor: QLineEdit) -> None:
-        if not editor.isVisible():
-            # Already finished/deleted
-            return
-        new_name = editor.text()
-        self.rename_proof_sub_step(new_name, step_idx, sub_idx)
-        editor.deleteLater()
-        self._active_sub_editor = None
+    # Rename
 
     def rename_proof_sub_step(self, new_name: str, step_index: int, sub_index: int) -> None:
         from .commands import UndoableChange
@@ -682,57 +419,39 @@ class ProofStepView(QListView):
                              lambda: self.model().rename_step(index, new_name))
         self.undo_stack.push(cmd)
 
-    def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
-        if not selected or not deselected:
-            return
-        # Clear sub-step selection when a different main step is selected
-        if self.selected_sub_step is not None:
-            old_step_idx = self.selected_sub_step[0]
-            self.selected_sub_step = None
-            old_model_idx = self.model().index(old_step_idx + 1, 0)
-            self.model().dataChanged.emit(old_model_idx, old_model_idx, [])
-        step_index = selected.first().topLeft().row()
-        self.move_to_step(step_index)
+    # Group / Ungroup
 
     def group_selected_steps(self) -> None:
         from .commands import GroupRewriteSteps
         from .dialogs import show_error_msg
-        selected_indexes = self.selectedIndexes()
-        if not selected_indexes or len(selected_indexes) < 2:
+        selected = sorted(i.row() for i in self.selectedIndexes() if not i.parent().isValid())
+        if len(selected) < 2:
             raise ValueError("Can only group two or more steps")
-
-        indices = sorted(index.row() for index in selected_indexes)
-        if indices[-1] - indices[0] != len(indices) - 1:
+        if selected[-1] - selected[0] != len(selected) - 1:
             show_error_msg("Can only group contiguous steps")
             raise ValueError("Can only group contiguous steps")
-        if indices[0] == 0:
+        if selected[0] == 0:
             show_error_msg("Cannot group the first step")
             raise ValueError("Cannot group the first step")
-
-        self.move_to_step(indices[-1] - 1)
-        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
-        self.undo_stack.push(cmd)
+        self.move_to_step(selected[-1] - 1)
+        self.undo_stack.push(GroupRewriteSteps(self.graph_view, self, selected[0] - 1, selected[-1] - 1))
 
     def ungroup_selected_step(self) -> None:
         from .commands import UngroupRewriteSteps
-        selected_indexes = self.selectedIndexes()
-        if not selected_indexes or len(selected_indexes) != 1:
+        top_level = [i for i in self.selectedIndexes() if not i.parent().isValid()]
+        if len(top_level) != 1:
             raise ValueError("Can only ungroup one step")
-
-        index = selected_indexes[0].row()
-        if index == 0 or self.model().steps[index - 1].grouped_rewrites is None:
+        row = top_level[0].row()
+        if row == 0 or self.model().steps[row - 1].grouped_rewrites is None:
             raise ValueError("Step is not grouped")
-
-        self.move_to_step(index - 1)
-        cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
-        self.undo_stack.push(cmd)
+        self.move_to_step(row - 1)
+        self.undo_stack.push(UngroupRewriteSteps(self.graph_view, self, row - 1))
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
     """This class controls the painting of items in the proof steps list view.
 
     We paint a "git-style" line with circles to denote individual steps in a proof.
-    Grouped steps render as expandable tree nodes with sub-step branches.
     """
 
     line_width = 3
@@ -743,313 +462,209 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    # Sub-tree layout for expanded groups
     triangle_size = 5
     sub_indent = 20
-    sub_branch_len = 15
 
-    # Track hover position for sub-steps
-    hover_step_idx: int = -1
-    hover_sub_idx: int = -1
-    # Track hover over group header
-    hover_header_step_idx: int = -1
-
-    def _step_info(self, index: Union[QModelIndex, QPersistentModelIndex]) -> tuple[bool, bool, Optional[list['Rewrite']]]:
-        """Return (is_grouped, is_expanded, grouped_rewrites) for a given row."""
-        if index.row() == 0:
-            return False, False, None
-        model = index.model()
-        if not isinstance(model, ProofModel):
-            return False, False, None
-        step_idx = index.row() - 1
-        if step_idx >= len(model.steps):
-            return False, False, None
-        step = model.steps[step_idx]
-        if step.grouped_rewrites is None:
-            return False, False, None
-        view = self.parent()
-        is_expanded = isinstance(view, ProofStepView) and step_idx in view.expanded_groups
-        return True, is_expanded, step.grouped_rewrites
+    def editorEvent(self, event: QEvent, model: QAbstractItemModel,
+                    option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> bool:
+        """Handle triangle clicks natively within the delegate's event flow without view coordinate tracking."""
+        if event.type() == QEvent.Type.MouseButtonPress and isinstance(event, QMouseEvent):
+            step_view = self.parent()
+            if isinstance(step_view, QTreeView):
+                rect = option.rect  # type: ignore[attr-defined]
+                text_h = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+                row_h = text_h + 2 * self.vert_padding
+                text_x = rect.x() + self.line_width + 2 * self.line_padding
+                cy = rect.y() + row_h / 2
+                s = self.triangle_size
+                
+                pos = event.pos()
+                # Check hit test using native option rect properties
+                if text_x <= pos.x() <= text_x + s * 2 and cy - s <= pos.y() <= cy + s:
+                    if not index.parent().isValid() and model.hasChildren(index):
+                        step_view.setCurrentIndex(index)
+                        step_view.setExpanded(index, not step_view.isExpanded(index))
+                        return True
+        return super().editorEvent(event, model, option, index)
 
     @staticmethod
-    def _bg_color(selected: bool, sub_selected: bool, hovered: bool) -> QColor:
-        """Return the background color for the given state."""
-        if display_setting.dark_mode:
-            if selected:
-                return QColor(60, 80, 120)
-            if sub_selected:
-                return QColor(45, 50, 60)
-            if hovered:
-                return QColor(50, 60, 80)
-            return QColor(35, 39, 46)
+    def _bg_color(selected: bool, hovered: bool) -> QColor:
+        """Return background color for the given state."""
+        dark = display_setting.dark_mode
         if selected:
-            return QColor(204, 232, 255)
-        if sub_selected:
-            return QColor(240, 245, 250)
+            return QColor(60, 80, 120) if dark else QColor(204, 232, 255)
         if hovered:
-            return QColor(229, 243, 255)
-        return QColor(255, 255, 255)
+            return QColor(50, 60, 80) if dark else QColor(229, 243, 255)
+        return QColor(35, 39, 46) if dark else QColor(255, 255, 255)
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem,
+              index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        is_grouped, is_expanded, grouped_rewrites = self._step_info(index)
+        is_selected = bool(option.state & QStyle.StateFlag.State_Selected)  # type: ignore[attr-defined]
+        is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore[attr-defined]
+
+        # Background
+        painter.setPen(Qt.GlobalColor.transparent)
+        painter.setBrush(self._bg_color(is_selected, is_hovered))
+        painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
         font = QFont(option.font)  # type: ignore[attr-defined]
-        text_height = QFontMetrics(font).height()
-        row_height = text_height + 2 * self.vert_padding
+        text_h = QFontMetrics(font).height()
+        row_h = text_h + 2 * self.vert_padding
         fg = QColor(224, 224, 224) if display_setting.dark_mode else QColor(0, 0, 0)
         line_clr = QColor(180, 180, 180) if display_setting.dark_mode else QColor(0, 0, 0)
 
-        # Check if a sub-step is selected in this grouped rewrite
-        view = self.parent()
-        has_selected_sub_step = False
-        if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
-            sel_step_idx, _ = view.selected_sub_step
-            if index.row() - 1 == sel_step_idx:
-                has_selected_sub_step = True
-
-        # ── Background ──────────────────────────────────────────────────
-        is_selected = bool(option.state & QStyle.StateFlag.State_Selected)  # type: ignore[attr-defined]
-        is_mouse_over = bool(option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore[attr-defined]
-        is_header_hovered = (is_grouped
-                             and index.row() > 0
-                             and self.hover_header_step_idx == index.row() - 1)
-
-        bg = self._bg_color(is_selected, has_selected_sub_step, is_mouse_over)
-        neutral_bg = self._bg_color(False, False, False)
-
-        painter.setPen(Qt.GlobalColor.transparent)
-        if is_expanded:
-            # Fill entire area with neutral, then highlight just the header row
-            painter.setBrush(neutral_bg)
-            painter.drawRect(option.rect)  # type: ignore[attr-defined]
-            if is_selected or has_selected_sub_step or is_header_hovered:
-                header_bg = self._bg_color(is_selected, has_selected_sub_step, is_header_hovered)
-                painter.setBrush(header_bg)
-                painter.drawRect(QRect(
-                    option.rect.x(), option.rect.y(),  # type: ignore[attr-defined]
-                    option.rect.width(), row_height))  # type: ignore[attr-defined]
+        if index.parent().isValid():
+            self._paint_child(painter, option, index, font, text_h, row_h, fg, line_clr)
         else:
-            painter.setBrush(bg)
-            painter.drawRect(option.rect)  # type: ignore[attr-defined]
+            self._paint_toplevel(painter, option, index, font, text_h, row_h, fg, line_clr)
 
-        # ── Main timeline line ──────────────────────────────────────────
-        is_last = index.row() == index.model().rowCount() - 1
+        painter.restore()
 
-        # Use a Pen with RoundCap for lines to allow smooth overlaps with neighbor
-        # segments and the diverted path.
+    def _paint_toplevel(self, painter: QPainter, option: QStyleOptionViewItem,
+                        index: Union[QModelIndex, QPersistentModelIndex],
+                        font: QFont, text_h: int, row_h: int,
+                        fg: QColor, line_clr: QColor) -> None:
+        """Paint a top-level step on the main timeline."""
+        rect = option.rect  # type: ignore[attr-defined]
+        main_cx = self.line_padding + self.line_width / 2
+        circle_cy = rect.y() + row_h / 2
+
         pen = QPen(line_clr, self.line_width)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.setBrush(Qt.GlobalColor.transparent)
 
-        circle_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
-        main_cx = self.line_padding + self.line_width / 2
+        # Line: top → circle
+        painter.drawLine(QPointF(main_cx, rect.y()), QPointF(main_cx, circle_cy))
 
-        # Draw line from top to center
-        painter.drawLine(QPointF(main_cx, option.rect.y()), QPointF(main_cx, circle_cy))  # type: ignore[attr-defined]
+        # Check grouped & expanded
+        is_grouped = False
+        is_expanded = False
+        model = index.model()
+        if isinstance(model, ProofModel) and index.row() > 0:
+            step_idx = index.row() - 1
+            if step_idx < len(model.steps) and model.steps[step_idx].grouped_rewrites:
+                is_grouped = True
+                view = self.parent()
+                is_expanded = isinstance(view, QTreeView) and view.isExpanded(index)
 
-        # For expanded groups, draw the sub-tree BEFORE the circle so the
-        # path doesn't draw over the circle.
-        if is_expanded and grouped_rewrites:
-            self._paint_sub_tree(painter, option, index.row() - 1,
-                                 grouped_rewrites,
-                                 row_height, text_height, font, fg, line_clr)
+        is_last = index.row() == index.model().rowCount() - 1
 
-        # Draw bottom half of line (from center of circle to bottom)
-        # Only if NOT expanded (if expanded, the line diverts to the sub-steps)
-        if not is_expanded:
-            bottom_y = option.rect.y() + option.rect.height()  # type: ignore[attr-defined]
-            if not is_last:
-                painter.setPen(pen)
-                painter.setBrush(Qt.GlobalColor.transparent)
-                painter.drawLine(QPointF(main_cx, circle_cy), QPointF(main_cx, bottom_y))
+        # Line: circle → bottom
+        if is_expanded:
+            painter.drawLine(QPointF(main_cx, circle_cy),
+                             QPointF(main_cx + self.sub_indent, rect.y() + rect.height()))
+        elif not is_last:
+            painter.drawLine(QPointF(main_cx, circle_cy),
+                             QPointF(main_cx, rect.y() + rect.height()))
 
-        # ── Main circle ─────────────────────────────────────────────────
-        circle_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
+        # Circle
         painter.setPen(QPen(line_clr, self.circle_outline_width))
         painter.setBrush(display_setting.effective_colors["z_spider"])
         cr = self.circle_radius_selected \
             if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
-        main_cx = self.line_padding + self.line_width / 2
         painter.drawEllipse(QPointF(main_cx, circle_cy), cr, cr)
 
-        # ── Text / group indicator ──────────────────────────────────────
-        text_x_base = int(option.rect.x() + self.line_width + 2 * self.line_padding)  # type: ignore[attr-defined]
-
+        # Text (with optional triangle for groups)
+        text_x = int(rect.x() + self.line_width + 2 * self.line_padding)
         if is_grouped:
             s = self.triangle_size
-            tri_cy = int(option.rect.y() + row_height / 2)  # type: ignore[attr-defined]
+            tri_cy = int(rect.y() + row_h / 2)
             painter.setPen(Qt.GlobalColor.transparent)
             painter.setBrush(fg)
-
             if is_expanded:
-                # Down-pointing triangle  ▼
-                triangle = QPolygonF([
-                    QPointF(text_x_base, tri_cy - s * 0.5),
-                    QPointF(text_x_base + s * 2, tri_cy - s * 0.5),
-                    QPointF(text_x_base + s, tri_cy + s * 0.5 + 1),
-                ])
+                tri = QPolygonF([QPointF(text_x, tri_cy - s * 0.5),
+                                 QPointF(text_x + s * 2, tri_cy - s * 0.5),
+                                 QPointF(text_x + s, tri_cy + s * 0.5 + 1)])
             else:
-                # Right-pointing triangle  ▶
-                triangle = QPolygonF([
-                    QPointF(text_x_base, tri_cy - s),
-                    QPointF(text_x_base + s, tri_cy),
-                    QPointF(text_x_base, tri_cy + s),
-                ])
-            painter.drawPolygon(triangle)
+                tri = QPolygonF([QPointF(text_x, tri_cy - s),
+                                 QPointF(text_x + s, tri_cy),
+                                 QPointF(text_x, tri_cy + s)])
+            painter.drawPolygon(tri)
+            text_x += s * 2 + 4
 
-            tri_offset = s * 2 + 4
-            # Always show the actual display name, not hardcoded "Grouped Steps"
-            header_text = index.data(Qt.ItemDataRole.DisplayRole)
-            text_rect = QRect(
-                text_x_base + tri_offset,
-                int(option.rect.y() + row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
-                int(option.rect.width() - self.line_width - 2 * self.line_padding - tri_offset),  # type: ignore[attr-defined]
-                text_height
-            )
-            # Only make bold if selected, not just because it's grouped
-            draw_font = QFont(font)
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                draw_font.setWeight(QFont.Weight.Bold)
-            painter.setFont(draw_font)
-            painter.setPen(fg)
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, header_text)
+        draw_font = QFont(font)
+        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            draw_font.setWeight(QFont.Weight.Bold)
+        painter.setFont(draw_font)
+        painter.setPen(fg)
+        painter.drawText(
+            QRect(text_x, int(rect.y() + row_h / 2 - text_h / 2),
+                  int(rect.width() - text_x + rect.x()), text_h),
+            Qt.AlignmentFlag.AlignLeft,
+            index.data(Qt.ItemDataRole.DisplayRole))
 
-            # Sub-tree was already drawn above (before the circle) for expanded groups
-        else:
-            # Regular (non-grouped) step text
-            text = index.data(Qt.ItemDataRole.DisplayRole)
-            text_rect = QRect(
-                text_x_base,
-                int(option.rect.y() + row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
-                int(option.rect.width() - self.line_width - 2 * self.line_padding),  # type: ignore[attr-defined]
-                text_height
-            )
-            draw_font = QFont(font)
-            if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
-                draw_font.setWeight(QFont.Weight.Bold)
-            painter.setFont(draw_font)
-            painter.setPen(fg)
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
-
-        painter.restore()
-
-    def _paint_sub_tree(self, painter: QPainter, option: QStyleOptionViewItem,
-                        step_idx: int,
-                        grouped_rewrites: list['Rewrite'], row_height: int,
-                        text_height: int, font: QFont,
-                        fg: QColor, line_clr: QColor) -> None:
+    def _paint_child(self, painter: QPainter, option: QStyleOptionViewItem,
+                     index: Union[QModelIndex, QPersistentModelIndex],
+                     font: QFont, text_h: int, row_h: int,
+                     fg: QColor, line_clr: QColor) -> None:
+        """Paint a sub-step on the branch line."""
+        rect = option.rect  # type: ignore[attr-defined]
         main_cx = self.line_padding + self.line_width / 2
-        sub_tree_x = main_cx + self.sub_indent
-        n = len(grouped_rewrites)
+        branch_x = main_cx + self.sub_indent
+        circle_cy = rect.y() + row_h / 2
+        n_siblings = index.model().rowCount(index.parent())
+        is_last = index.row() == n_siblings - 1
 
-        header_cy = option.rect.y() + row_height / 2  # type: ignore[attr-defined]
-        first_sub_cy = option.rect.y() + row_height + row_height / 2  # type: ignore[attr-defined]
-        last_sub_cy = option.rect.y() + row_height + (n - 1) * row_height + row_height / 2  # type: ignore[attr-defined]
-        bottom_y = option.rect.y() + option.rect.height()  # type: ignore[attr-defined]
-
-        # 1. Draw sub-step highlights first so they sit in the background
-        for i, sub_step in enumerate(grouped_rewrites):
-            sub_cy = first_sub_cy + i * row_height
-            is_sub_selected = False
-            # Determine which sub-step is selected (if any)
-            view = self.parent()
-            if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
-                sel_step_idx, sel_sub_idx = view.selected_sub_step
-                if step_idx == sel_step_idx and i == sel_sub_idx:
-                    is_sub_selected = True
-
-            # Check if this sub-step is being hovered (for individual hover effect)
-            is_sub_hovered = (self.hover_step_idx == step_idx and self.hover_sub_idx == i)
-
-            # Highlight spans the full width of the item, starting from the left edge
-            if is_sub_selected or is_sub_hovered:
-                painter.setPen(Qt.GlobalColor.transparent)
-                painter.setBrush(self._bg_color(is_sub_selected, False, is_sub_hovered))
-                painter.drawRect(QRect(
-                    option.rect.x(), int(sub_cy - row_height / 2),  # type: ignore[attr-defined]
-                    option.rect.width(), row_height))  # type: ignore[attr-defined]
-
-        # 2. Draw the path connecting header -> sub-steps -> next step
         pen = QPen(line_clr, self.line_width)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.setBrush(Qt.GlobalColor.transparent)
 
-        path = QPainterPath()
-        # Start at the headers circle
-        path.moveTo(main_cx, header_cy)
-        # Line to first sub-step
-        path.lineTo(sub_tree_x, first_sub_cy)
-        # Line down to last sub-step
-        path.lineTo(sub_tree_x, last_sub_cy)
-        # Line back to main axis at the bottom
-        path.lineTo(main_cx - 0.3, bottom_y)
+        # Branch line: top → circle
+        painter.drawLine(QPointF(branch_x, rect.y()), QPointF(branch_x, circle_cy))
+        # Branch line: circle → bottom (or diagonal back to main axis)
+        if is_last:
+            painter.drawLine(QPointF(branch_x, circle_cy),
+                             QPointF(main_cx, rect.y() + rect.height()))
+        else:
+            painter.drawLine(QPointF(branch_x, circle_cy),
+                             QPointF(branch_x, rect.y() + rect.height()))
 
-        painter.drawPath(path)
+        # Circle
+        painter.setPen(QPen(line_clr, self.line_width))
+        painter.setBrush(display_setting.effective_colors["z_spider"])
+        cr = self.circle_radius_selected \
+            if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
+        painter.drawEllipse(QPointF(branch_x, circle_cy), cr, cr)
 
-        # 3. Draw sub-step circles and text
-        for i, sub_step in enumerate(grouped_rewrites):
-            sub_cy = first_sub_cy + i * row_height
-            is_sub_selected = False
-            view = self.parent()
-            if isinstance(view, ProofStepView) and view.selected_sub_step is not None:
-                sel_step_idx, sel_sub_idx = view.selected_sub_step
-                if step_idx == sel_step_idx and i == sel_sub_idx:
-                    is_sub_selected = True
+        # Text
+        sub_text_x = int(branch_x + self.circle_radius + 10)
+        draw_font = QFont(font)
+        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            draw_font.setWeight(QFont.Weight.Bold)
+        painter.setFont(draw_font)
+        painter.setPen(fg)
+        painter.drawText(
+            QRect(sub_text_x, int(circle_cy - text_h / 2),
+                  int(rect.width() - sub_text_x), text_h),
+            Qt.AlignmentFlag.AlignLeft,
+            index.data(Qt.ItemDataRole.DisplayRole))
 
-            # Sub-step circle
-            painter.setPen(QPen(line_clr, self.line_width))
-            if is_sub_selected:
-                painter.setBrush(display_setting.effective_colors["z_spider"])  # brighter blue when selected
-                r = self.circle_radius_selected
-            else:
-                painter.setBrush(display_setting.effective_colors["z_spider"])  # default steel-blue
-                r = self.circle_radius
-            painter.drawEllipse(QPointF(sub_tree_x, sub_cy), r, r)
-
-            # Sub-step text
-            sub_text_x = int(sub_tree_x + self.circle_radius + 10)
-            sub_text_rect = QRect(
-                sub_text_x,
-                int(sub_cy - text_height / 2),
-                int(option.rect.width() - sub_text_x),  # type: ignore[attr-defined]
-                text_height
-            )
-            sub_font = QFont(font)
-            if is_sub_selected:
-                sub_font.setWeight(QFont.Weight.Bold)
-            painter.setFont(sub_font)
-            painter.setPen(fg)
-            painter.drawText(sub_text_rect, Qt.AlignmentFlag.AlignLeft, sub_step.display_name)
-
-    def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
+    def sizeHint(self, option: QStyleOptionViewItem,
+                 index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
-        single_row = text_height + 2 * self.vert_padding
-        total = single_row
+        text_h = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        return QSize(size.width(), text_h + 2 * self.vert_padding)
 
-        is_grouped, is_expanded, grouped_rewrites = self._step_info(index)
-        if is_grouped and is_expanded and grouped_rewrites:
-            total += len(grouped_rewrites) * single_row
-
-        return QSize(size.width(), total)
-
-    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem,
+                     index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
 
-    def setEditorData(self, editor: QWidget, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def setEditorData(self, editor: QWidget,
+                      index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         assert isinstance(editor, QLineEdit)
-        value = index.model().data(index, Qt.ItemDataRole.DisplayRole)
-        editor.setText(str(value))
+        editor.setText(str(index.model().data(index, Qt.ItemDataRole.DisplayRole)))
 
-    def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def setModelData(self, editor: QWidget, model: QAbstractItemModel,
+                     index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
         assert isinstance(step_view, ProofStepView)
         assert isinstance(editor, QLineEdit)
-        step_view.rename_proof_step(editor.text(), index.row() - 1)
+        if index.parent().isValid():
+            step_view.rename_proof_sub_step(editor.text(), index.parent().row() - 1, index.row())
+        else:
+            step_view.rename_proof_step(editor.text(), index.row() - 1)
