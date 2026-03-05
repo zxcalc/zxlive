@@ -651,70 +651,75 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex], text_row_height: int) -> None:
         """Draw thumbnail preview if enabled on this view."""
         parent_view = self.parent()
-        if isinstance(parent_view, _ProofStepListView) and parent_view.thumbnails_visible:
-            screen_dpr = parent_view.devicePixelRatio()
-            model = parent_view.model()
-            row = index.row()
-            pixmap = index.data(THUMBNAIL_ROLE)
-            if pixmap is None or pixmap.isNull() or pixmap.devicePixelRatio() != screen_dpr:
-                # To prevent freezing the UI, we do not render the graph asynchronously here if
-                # there's lots of rows. We instead ask the model to do it, and in the meantime
-                # the delegate continues without drawing one.
-                # Use QTimer to delay rendering.
-                from PySide6.QtCore import QTimer
+        if not isinstance(parent_view, _ProofStepListView) or not parent_view.thumbnails_visible:
+            return
 
-                if row not in parent_view._pending_thumbnails:
-                    parent_view._pending_thumbnails.add(row)
+        screen_dpr = parent_view.devicePixelRatio()
+        model = parent_view.model()
+        row = index.row()
+        pixmap = index.data(THUMBNAIL_ROLE)
+        if pixmap is None or pixmap.isNull() or pixmap.devicePixelRatio() != screen_dpr:
+            self._schedule_thumbnail_render(parent_view, model, row, screen_dpr)
 
-                    def render_task(r: int = row, dpr: float = screen_dpr) -> None:
-                        parent_view._pending_thumbnails.discard(r)
-                        try:
-                            graph = model.get_graph(r)
-                            new_pixmap = render_graph_thumbnail(graph, dpr)
-                            model.set_thumbnail(r, new_pixmap)
-                            idx = model.index(r, 0)
-                            model.dataChanged.emit(idx, idx, [])
-                        except Exception:
-                            pass  # Graph might be deleted in between
+        if pixmap is not None and not pixmap.isNull():
+            self._paint_pixmap(painter, option, parent_view, pixmap, text_row_height)
 
-                    QTimer.singleShot(0, render_task)
+    def _schedule_thumbnail_render(self, parent_view: '_ProofStepListView', model: 'ProofModel', row: int, screen_dpr: float) -> None:
+        """Schedule asynchronous rendering of a thumbnail for the given row."""
+        from PySide6.QtCore import QTimer
 
-            if pixmap is not None and not pixmap.isNull():
-                # Clamp available_width to the actual usable space inside the
-                # viewport, accounting for where this item starts horizontally.
-                # This prevents overflow when the panel is very narrow.
-                viewport_right = parent_view.viewport().width()
-                item_x = int(option.rect.x())  # type: ignore[attr-defined]
-                content_left = item_x + self.line_width + 2 * self.line_padding
-                max_right = viewport_right - self.thumbnail_padding
-                available_width = max(0, max_right - content_left)
-                thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
-                # Use logical dimensions (physical / DPR) for layout.
-                dpr = pixmap.devicePixelRatio()
-                logical_w = pixmap.width() / dpr
-                logical_h = pixmap.height() / dpr
-                if available_width > 0 and logical_w > 0:
-                    thumb_height = min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
-                    target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
-                    # Clip all drawing to the item rect to guarantee no overflow.
-                    painter.setClipRect(option.rect)  # type: ignore[attr-defined]
-                    border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
-                    painter.setPen(QPen(border_color, 1))
-                    painter.setBrush(Qt.GlobalColor.transparent)
-                    painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
+        if row in parent_view._pending_thumbnails:
+            return
+        parent_view._pending_thumbnails.add(row)
 
-                    # Let QPainter natively scale the pixmap dynamically during paint.
-                    # This avoids QPixmap.scaled() which drops resolution on High-DPI screens.
-                    scale = min(target_rect.width() / logical_w, target_rect.height() / logical_h)
-                    draw_w = logical_w * scale
-                    draw_h = logical_h * scale
+        def render_task(r: int = row, dpr: float = screen_dpr) -> None:
+            parent_view._pending_thumbnails.discard(r)
+            try:
+                graph = model.get_graph(r)
+                new_pixmap = render_graph_thumbnail(graph, dpr)
+                model.set_thumbnail(r, new_pixmap)
+                idx = model.index(r, 0)
+                model.dataChanged.emit(idx, idx, [])
+            except Exception:
+                pass  # Graph might be deleted in between
 
-                    x_off = (target_rect.width() - draw_w) / 2
-                    y_off = (target_rect.height() - draw_h) / 2
+        QTimer.singleShot(0, render_task)
 
-                    draw_rect = QRectF(target_rect.x() + x_off, target_rect.y() + y_off, draw_w, draw_h)
-                    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-                    painter.drawPixmap(draw_rect, pixmap, QRectF(pixmap.rect()))
+    def _paint_pixmap(self, painter: QPainter, option: QStyleOptionViewItem, parent_view: '_ProofStepListView', pixmap: QPixmap, text_row_height: int) -> None:
+        """Paint a thumbnail pixmap into the delegate area."""
+        viewport_right = parent_view.viewport().width()
+        item_x = int(option.rect.x())  # type: ignore[attr-defined]
+        content_left = item_x + self.line_width + 2 * self.line_padding
+        available_width = max(0, viewport_right - self.thumbnail_padding - content_left)
+        thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
+
+        dpr = pixmap.devicePixelRatio()
+        logical_w = pixmap.width() / dpr
+        logical_h = pixmap.height() / dpr
+        if available_width <= 0 or logical_w <= 0:
+            return
+
+        thumb_height = min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
+        target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
+        # Clip all drawing to the item rect to guarantee no overflow.
+        painter.setClipRect(option.rect)  # type: ignore[attr-defined]
+        border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
+        painter.setPen(QPen(border_color, 1))
+        painter.setBrush(Qt.GlobalColor.transparent)
+        painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
+
+        # Let QPainter natively scale the pixmap dynamically during paint.
+        # This avoids QPixmap.scaled() which drops resolution on High-DPI screens.
+        scale = min(target_rect.width() / logical_w, target_rect.height() / logical_h)
+        draw_w = logical_w * scale
+        draw_h = logical_h * scale
+
+        x_off = (target_rect.width() - draw_w) / 2
+        y_off = (target_rect.height() - draw_h) / 2
+
+        draw_rect = QRectF(target_rect.x() + x_off, target_rect.y() + y_off, draw_w, draw_h)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(draw_rect, pixmap, QRectF(pixmap.rect()))
 
     def _compute_thumb_height(self, parent: '_ProofStepListView', pixmap: QPixmap) -> int:
         """Compute the thumbnail display height for the current viewport width.
