@@ -5,14 +5,17 @@ if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
-                            QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
-                               QStyle, QStyledItemDelegate,
-                               QStyleOptionViewItem, QWidget)
+                            QItemSelection, QModelIndex,
+                            QPersistentModelIndex, QPoint, QPointF, QRect,
+                            QRectF, QSize, Qt)
+from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter,
+                           QPen, QPixmap)
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
+                               QLineEdit, QListView, QMenu, QStyle,
+                               QStyledItemDelegate, QStyleOptionViewItem,
+                               QToolButton, QVBoxLayout, QWidget)
 
-from .common import GraphT
+from .common import GraphT, get_settings_value
 from .settings import display_setting
 
 
@@ -57,6 +60,68 @@ class Rewrite(NamedTuple):
         )
 
 
+THUMBNAIL_ROLE = Qt.ItemDataRole.UserRole + 1
+MAX_THUMBNAIL_HEIGHT = 200  # Maximum thumbnail height in pixels when displayed
+
+
+def render_graph_thumbnail(graph: GraphT, device_pixel_ratio: float = 1.0) -> QPixmap:
+    """Render a graph to a QPixmap thumbnail using an off-screen GraphScene.
+
+    Args:
+        graph: the graph to render.
+        device_pixel_ratio: the screen's DPR (e.g. 2.0 on HiDPI displays).
+            The pixmap is rendered at DPR times the logical size so that
+            it appears crisp on high-resolution screens.
+    """
+    from .graphscene import GraphScene
+
+    scene = GraphScene()
+    scene.set_graph(graph)
+    rect = scene.itemsBoundingRect()
+    if rect.isEmpty():
+        scene.clear()
+        return QPixmap()
+
+    padding = 20.0
+    rect.adjust(-padding, -padding, padding, padding)
+
+    # Render at a higher maximum resolution so that thumbnails remain crisp on
+    # modern HiDPI (Retina) displays when dynamically scaled down by QPainter.
+    max_dim = 800.0
+    scale = min(max_dim / rect.width(), max_dim / rect.height())
+    if scale > 2.0:
+        scale = 2.0
+
+    w = max(1, int(rect.width() * scale))
+    h = max(1, int(rect.height() * scale))
+
+    # Limit the aspect ratio so that very tall diagrams don't produce
+    # absurdly large pixmaps.  We cap the height at 3x the width.
+    max_h = w * 3
+    if h > max_h:
+        h = max_h
+
+    # Render at physical resolution for HiDPI crispness.
+    dpr = max(1.0, device_pixel_ratio)
+    phys_w = max(1, int(w * dpr))
+    phys_h = max(1, int(h * dpr))
+
+    pixmap = QPixmap(phys_w, phys_h)
+    pixmap.setDevicePixelRatio(dpr)
+    if display_setting.dark_mode:
+        pixmap.fill(QColor(30, 30, 30))
+    else:
+        pixmap.fill(QColor(255, 255, 255))
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    scene.render(painter, QRectF(0, 0, w, h), rect)
+    painter.end()
+
+    scene.clear()
+    return pixmap
+
+
 class ProofModel(QAbstractListModel):
     """List model capturing the individual steps in a proof.
 
@@ -69,8 +134,10 @@ class ProofModel(QAbstractListModel):
 
     def __init__(self, start_graph: GraphT):
         super().__init__()
+        import collections
         self.initial_graph = start_graph
         self.steps = []
+        self._thumbnail_cache: collections.OrderedDict[int, QPixmap] = collections.OrderedDict()
 
     def set_graph(self, index: int, graph: GraphT) -> None:
         if index == 0:
@@ -79,6 +146,10 @@ class ProofModel(QAbstractListModel):
             old_step = self.steps[index - 1]
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index - 1] = new_step
+        self.invalidate_thumbnail(index)
+        # Notify views so that the delegate re-computes sizeHint / repaints
+        model_index = self.createIndex(index, 0)
+        self.dataChanged.emit(model_index, model_index, [])
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
@@ -96,6 +167,14 @@ class ProofModel(QAbstractListModel):
                 return self.steps[index.row() - 1].display_name
         elif role == Qt.ItemDataRole.FontRole:
             return QFont("monospace", 12)
+        elif role == THUMBNAIL_ROLE:
+            row = index.row()
+            if row not in self._thumbnail_cache:
+                return None
+            # Move accessed item to end for LRU
+            pixmap = self._thumbnail_cache.pop(row)
+            self._thumbnail_cache[row] = pixmap
+            return pixmap
 
     def flags(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Qt.ItemFlag:
         if index.row() == 0:
@@ -131,6 +210,7 @@ class ProofModel(QAbstractListModel):
         self.beginInsertRows(QModelIndex(), position + 1, position + 1)
         self.steps.insert(position, rewrite)
         self.endInsertRows()
+        self.invalidate_thumbnails(position + 1)
 
     def pop_rewrite(self, position: Optional[int] = None) -> tuple[Rewrite, GraphT]:
         """Removes the latest rewrite from the model.
@@ -142,6 +222,7 @@ class ProofModel(QAbstractListModel):
         self.beginRemoveRows(QModelIndex(), position + 1, position + 1)
         rewrite = self.steps.pop(position)
         self.endRemoveRows()
+        self.invalidate_thumbnails(position + 1)
         return rewrite, rewrite.graph
 
     def get_graph(self, index: int) -> GraphT:
@@ -152,6 +233,25 @@ class ProofModel(QAbstractListModel):
             copy = self.steps[index - 1].graph.copy()
         assert isinstance(copy, GraphT)
         return copy
+
+    def invalidate_thumbnails(self, from_row: int = 0) -> None:
+        """Remove cached thumbnails from the given row index onward."""
+        keys = [k for k in self._thumbnail_cache if k >= from_row]
+        for k in keys:
+            del self._thumbnail_cache[k]
+
+    def invalidate_thumbnail(self, row: int) -> None:
+        """Remove a specific cached thumbnail."""
+        self._thumbnail_cache.pop(row, None)
+
+    def set_thumbnail(self, row: int, pixmap: QPixmap) -> None:
+        """Set the cached thumbnail for a specific row, preserving an LRU bound."""
+        if row in self._thumbnail_cache:
+            self._thumbnail_cache.pop(row)
+        self._thumbnail_cache[row] = pixmap
+        # Limit cache size to 50 thumbnails max
+        while len(self._thumbnail_cache) > 50:
+            self._thumbnail_cache.popitem(last=False)
 
     def rename_step(self, index: int, name: str) -> None:
         """Change the display name"""
@@ -225,16 +325,86 @@ class ProofModel(QAbstractListModel):
         return model
 
 
-class ProofStepView(QListView):
-    """A view for displaying the steps in a proof."""
+class ProofStepView(QWidget):
+    """Widget containing the proof step list and a thumbnail toggle button."""
 
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
         self.undo_stack = parent.undo_stack
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # --- Thumbnail toggle header row ---
+        header = QWidget(self)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(4, 4, 4, 4)
+
+        title = QLabel("Proof steps", header)
+        font = title.font()
+        font.setBold(True)
+        title.setFont(font)
+        header_layout.addWidget(title)
+
+        header_layout.addStretch()
+
+        self.thumbnails_toggle = QToolButton(header)
+        self.thumbnails_toggle.setText("Thumbnails")
+        self.thumbnails_toggle.setCheckable(True)
+        show_thumbnails = get_settings_value("proof/show-thumbnails", bool)
+        self.thumbnails_toggle.setChecked(show_thumbnails)
+        self.thumbnails_toggle.setAutoRaise(True)
+        self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
+        self.thumbnails_toggle.setShortcut("t")
+        self.thumbnails_toggle.clicked.connect(self.set_thumbnails_visible)
+        header_layout.addWidget(self.thumbnails_toggle)
+        layout.addWidget(header)
+
+        # Add a subtle separator line
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(line)
+
+        # --- List view ---
+        self._list = _ProofStepListView(self)
+        layout.addWidget(self._list)
+
+    # ---- proxy properties so the rest of the codebase keeps working ----
+    @property
+    def thumbnails_visible(self) -> bool:
+        return self._list.thumbnails_visible
+
+    @thumbnails_visible.setter
+    def thumbnails_visible(self, value: bool) -> None:
+        self._list.thumbnails_visible = value
+
+    def update(self, *args: Any) -> None:
+        super().update(*args)
+        self._list.viewport().update()
+
+    def set_thumbnails_visible(self, visible: bool) -> None:
+        self.thumbnails_toggle.setChecked(visible)
+        self._list.set_thumbnails_visible(visible)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._list, name)
+
+
+class _ProofStepListView(QListView):
+    """Internal list view for proof steps."""
+
+    def __init__(self, owner: ProofStepView):
+        super().__init__(owner)
+        self._owner = owner
+        self.graph_view = owner.graph_view
+        self.undo_stack = owner.undo_stack
         self.setModel(ProofModel(self.graph_view.graph_scene.g))
         self.setCurrentIndex(self.model().index(0, 0))
         self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
+        self._pending_thumbnails: set[int] = set()
         # Set background color for dark mode (panel background)
         if display_setting.dark_mode:
             self.setStyleSheet("background-color: #23272e;")
@@ -252,9 +422,14 @@ class ProofStepView(QListView):
         self.setSpacing(0)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.thumbnails_visible = owner.thumbnails_toggle.isChecked()
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
+        self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
+        # Never allow horizontal scrolling: items must always fit within the
+        # viewport width. Without this, Qt may assign items a width wider than
+        # the viewport, which causes thumbnail overflow and broken sizeHints.
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
@@ -335,7 +510,7 @@ class ProofStepView(QListView):
             raise ValueError("Cannot group the first step")
 
         self.move_to_step(indices[-1] - 1)
-        cmd = GroupRewriteSteps(self.graph_view, self, indices[0] - 1, indices[-1] - 1)
+        cmd = GroupRewriteSteps(self.graph_view, self._owner, indices[0] - 1, indices[-1] - 1)
         self.undo_stack.push(cmd)
 
     def ungroup_selected_step(self) -> None:
@@ -349,8 +524,36 @@ class ProofStepView(QListView):
             raise ValueError("Step is not grouped")
 
         self.move_to_step(index - 1)
-        cmd = UngroupRewriteSteps(self.graph_view, self, index - 1)
+        cmd = UngroupRewriteSteps(self.graph_view, self._owner, index - 1)
         self.undo_stack.push(cmd)
+
+    def set_thumbnails_visible(self, visible: bool) -> None:
+        """Toggle thumbnail previews in the proof step list."""
+        self.thumbnails_visible = visible
+        self.model().invalidate_thumbnails()
+        self.scheduleDelayedItemsLayout()
+        self.viewport().update()
+
+    def refresh_current_thumbnail(self) -> None:
+        """Invalidate and repaint the thumbnail for the currently selected step."""
+        if not self.thumbnails_visible:
+            return
+        row = self.currentIndex().row()
+        self.model().invalidate_thumbnail(row)
+        idx = self.model().createIndex(row, 0)
+        self.model().dataChanged.emit(idx, idx, [])
+        self.scheduleDelayedItemsLayout()
+
+    def showEvent(self, event: object) -> None:  # type: ignore[override]
+        """Force relayout when this tab becomes visible (tab switch)."""
+        super().showEvent(event)  # type: ignore[arg-type]
+        self.scheduleDelayedItemsLayout()
+
+    def resizeEvent(self, event: object) -> None:  # type: ignore[override]
+        super().resizeEvent(event)  # type: ignore[arg-type]
+        if self.thumbnails_visible:
+            self.scheduleDelayedItemsLayout()
+            self.viewport().update()
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
@@ -362,6 +565,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     line_width = 3
     line_padding = 13
     vert_padding = 10
+    thumbnail_padding = 8
 
     circle_radius = 4
     circle_radius_selected = 6
@@ -371,6 +575,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     # noqa: complexipy
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
         painter.save()
+        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        text_row_height = text_height + 2 * self.vert_padding
+
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
@@ -389,13 +596,14 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 painter.setBrush(Qt.GlobalColor.white)
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
-        # Draw line
+        # Draw vertical line
         is_last = index.row() == index.model().rowCount() - 1
+        line_height = int(text_row_height / 2) if is_last else int(option.rect.height())  # type: ignore[attr-defined]
         line_rect = QRect(
             self.line_padding,
             int(option.rect.y()),  # type: ignore[attr-defined]
             self.line_width,
-            int(option.rect.height() if not is_last else option.rect.height() / 2)  # type: ignore[attr-defined]
+            line_height
         )
         if display_setting.dark_mode:
             painter.setBrush(QColor(180, 180, 180))
@@ -403,7 +611,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawRect(line_rect)
 
-        # Draw circle
+        # Draw circle centered in text row
         if display_setting.dark_mode:
             painter.setPen(QPen(QColor(180, 180, 180), self.circle_outline_width))
         else:
@@ -411,17 +619,16 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         painter.setBrush(display_setting.effective_colors["z_spider"])
         circle_radius = self.circle_radius_selected if option.state & QStyle.StateFlag.State_Selected else self.circle_radius  # type: ignore[attr-defined]
         painter.drawEllipse(
-            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + option.rect.height() / 2),  # type: ignore[attr-defined]
+            QPointF(self.line_padding + self.line_width / 2, option.rect.y() + text_row_height / 2),  # type: ignore[attr-defined]
             circle_radius,
             circle_radius
         )
 
-        # Draw text
+        # Draw text centered in text row
         text = index.data(Qt.ItemDataRole.DisplayRole)
-        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_rect = QRect(
             int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            int(option.rect.y() + text_row_height / 2 - text_height / 2),  # type: ignore[attr-defined]
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
@@ -437,11 +644,120 @@ class ProofStepItemDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.GlobalColor.black)
         painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft, text)
 
+        self._draw_thumbnail(painter, option, index, text_row_height)
+
         painter.restore()
+
+    def _draw_thumbnail(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex], text_row_height: int) -> None:
+        """Draw thumbnail preview if enabled on this view."""
+        parent_view = self.parent()
+        if not isinstance(parent_view, _ProofStepListView) or not parent_view.thumbnails_visible:
+            return
+
+        screen_dpr = parent_view.devicePixelRatio()
+        model = parent_view.model()
+        row = index.row()
+        pixmap = index.data(THUMBNAIL_ROLE)
+        if pixmap is None or pixmap.isNull() or pixmap.devicePixelRatio() != screen_dpr:
+            self._schedule_thumbnail_render(parent_view, model, row, screen_dpr)
+
+        if pixmap is not None and not pixmap.isNull():
+            self._paint_pixmap(painter, option, parent_view, pixmap, text_row_height)
+
+    def _schedule_thumbnail_render(self, parent_view: '_ProofStepListView', model: 'ProofModel', row: int, screen_dpr: float) -> None:
+        """Schedule asynchronous rendering of a thumbnail for the given row."""
+        from PySide6.QtCore import QTimer
+
+        if row in parent_view._pending_thumbnails:
+            return
+        parent_view._pending_thumbnails.add(row)
+
+        def render_task(r: int = row, dpr: float = screen_dpr) -> None:
+            parent_view._pending_thumbnails.discard(r)
+            try:
+                graph = model.get_graph(r)
+                new_pixmap = render_graph_thumbnail(graph, dpr)
+                model.set_thumbnail(r, new_pixmap)
+                idx = model.index(r, 0)
+                model.dataChanged.emit(idx, idx, [])
+            except Exception:
+                pass  # Graph might be deleted in between
+
+        QTimer.singleShot(0, render_task)
+
+    def _paint_pixmap(self, painter: QPainter, option: QStyleOptionViewItem, parent_view: '_ProofStepListView', pixmap: QPixmap, text_row_height: int) -> None:
+        """Paint a thumbnail pixmap into the delegate area."""
+        viewport_right = parent_view.viewport().width()
+        item_x = int(option.rect.x())  # type: ignore[attr-defined]
+        content_left = item_x + self.line_width + 2 * self.line_padding
+        available_width = max(0, viewport_right - self.thumbnail_padding - content_left)
+        thumb_top = int(option.rect.y()) + text_row_height + self.thumbnail_padding  # type: ignore[attr-defined]
+
+        dpr = pixmap.devicePixelRatio()
+        logical_w = pixmap.width() / dpr
+        logical_h = pixmap.height() / dpr
+        if available_width <= 0 or logical_w <= 0:
+            return
+
+        thumb_height = min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
+        target_rect = QRect(content_left, thumb_top, available_width, thumb_height)
+        # Clip all drawing to the item rect to guarantee no overflow.
+        painter.setClipRect(option.rect)  # type: ignore[attr-defined]
+        border_color = QColor(80, 80, 80) if display_setting.dark_mode else QColor(200, 200, 200)
+        painter.setPen(QPen(border_color, 1))
+        painter.setBrush(Qt.GlobalColor.transparent)
+        painter.drawRect(target_rect.adjusted(-1, -1, 1, 1))
+
+        # Let QPainter natively scale the pixmap dynamically during paint.
+        # This avoids QPixmap.scaled() which drops resolution on High-DPI screens.
+        scale = min(target_rect.width() / logical_w, target_rect.height() / logical_h)
+        draw_w = logical_w * scale
+        draw_h = logical_h * scale
+
+        x_off = (target_rect.width() - draw_w) / 2
+        y_off = (target_rect.height() - draw_h) / 2
+
+        draw_rect = QRectF(target_rect.x() + x_off, target_rect.y() + y_off, draw_w, draw_h)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(draw_rect, pixmap, QRectF(pixmap.rect()))
+
+    def _compute_thumb_height(self, parent: '_ProofStepListView', pixmap: QPixmap) -> int:
+        """Compute the thumbnail display height for the current viewport width.
+
+        Uses the same formula as paint() so that sizeHint() and the actual
+        rendered content always agree, preventing misalignment on resize.
+        """
+        # Mirror the clamping logic from paint(): usable width runs from
+        # content_left to (viewport_right - thumbnail_padding).  Here we assume
+        # item_x == 0 (typical for QListView with no indent), which is safe
+        # because paint() will also clamp to the same boundary.
+        viewport_right = parent.viewport().width()
+        content_left = self.line_width + 2 * self.line_padding
+        available_width = max(0, viewport_right - self.thumbnail_padding - content_left)
+        # Use logical dimensions for consistent layout.
+        dpr = pixmap.devicePixelRatio()
+        logical_w = pixmap.width() / dpr
+        logical_h = pixmap.height() / dpr
+        if available_width > 0 and not pixmap.isNull() and logical_w > 0:
+            return min(int(logical_h * available_width / logical_w), MAX_THUMBNAIL_HEIGHT)
+        return MAX_THUMBNAIL_HEIGHT
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        text_row_height = size.height() + 2 * self.vert_padding
+        parent = self.parent()
+        if not isinstance(parent, _ProofStepListView) or not parent.thumbnails_visible:
+            return QSize(size.width(), text_row_height)
+        # Compute the thumbnail height that paint() will actually use for the
+        # current viewport width so that the allocated row height always matches
+        # what is painted, preventing gaps or clipping when the panel is narrow.
+        pixmap = index.data(THUMBNAIL_ROLE)
+        if pixmap is not None and not pixmap.isNull():
+            thumb_height = self._compute_thumb_height(parent, pixmap)
+        else:
+            thumb_height = MAX_THUMBNAIL_HEIGHT
+        total = text_row_height + 2 * self.thumbnail_padding + thumb_height
+        return QSize(size.width(), total)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)
@@ -453,6 +769,6 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor: QWidget, model: QAbstractItemModel, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
         step_view = self.parent()
-        assert isinstance(step_view, ProofStepView)
+        assert isinstance(step_view, _ProofStepListView)
         assert isinstance(editor, QLineEdit)
         step_view.rename_proof_step(editor.text(), index.row() - 1)

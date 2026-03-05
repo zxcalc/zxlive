@@ -59,12 +59,13 @@ class ProofPanel(BasePanel):
         self.graph_scene.edge_added.connect(self._add_dummy_edge)
 
         self.step_view = ProofStepView(self)
-
         self.splitter.addWidget(self.step_view)
+
+        self.graph_view.keyboard_vertices_moved.connect(self._on_keyboard_vertices_moved)
 
     @property
     def proof_model(self) -> ProofModel:
-        return self.step_view.model()
+        return cast(ProofModel, self.step_view.model())
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         icon_size = QSize(32, 32)
@@ -137,6 +138,11 @@ class ProofPanel(BasePanel):
 
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_pauliwebs_signal.emit(new_g)
+
+    def _on_keyboard_vertices_moved(self) -> None:
+        """Refresh the thumbnail for the current proof step after keyboard-based vertex moves."""
+        idx = self.step_view.currentIndex().row()
+        self.proof_model.set_graph(idx, copy.deepcopy(self.graph_scene.g))
 
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
