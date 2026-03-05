@@ -571,7 +571,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
         painter.save()
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
         text_row_height = text_height + 2 * self.vert_padding

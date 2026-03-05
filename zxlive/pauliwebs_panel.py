@@ -61,6 +61,8 @@ class PauliWebsPanel(BasePanel):
 
         self.edge_clicked = False
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def _compute_pauli_webs(self) -> None:
         # First convert the graph to a simple graph so that pyzx can compute the pauli webs
         graph_json = json.loads(self.graph_scene.g.to_json())
@@ -147,6 +149,8 @@ class PauliWebsPanel(BasePanel):
             self._pauli_web_index = []
             self._show_current_pauli_web()
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def _show_current_pauli_web(self) -> None:
         new_g = copy.deepcopy(self.graph_scene.g)
         for e in new_g.edges():

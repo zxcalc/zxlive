@@ -71,11 +71,18 @@ class ZXLive(QApplication):
         parser.addVersionOption()
         parser.addPositionalArgument("files", "File(s) to open.", "[files...]")
         parser.process(self)
-        if not parser.positionalArguments():
-            self.main_window.open_demo_graph()
-        else:
+
+        # Try to restore session state first
+        session_restored = self.main_window._restore_session_state()
+
+        # Handle command-line file arguments
+        if parser.positionalArguments():
+            # Open command-line files as additional tabs
             for f in parser.positionalArguments():
                 self.main_window.open_file_from_path(f)
+        elif not session_restored:
+            # No files provided and no session restored - open demo graph
+            self.main_window.open_demo_graph()
 
     def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""

@@ -111,7 +111,9 @@ class GraphScene(QGraphicsScene):
         self.add_items()
         self.invalidate()
 
-    def update_graph(self, new: GraphT, select_new: bool = False) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def update_graph(self, new: GraphT, select_new: bool = False) -> None:  # noqa: PLR0912
         """Update the PyZX graph for the scene.
         This will update the scene to match the given graph. It will
         try to reuse existing QGraphicsItem's as much as possible.

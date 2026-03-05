@@ -150,6 +150,8 @@ class ChangeNodeType(BaseCommand):
                 self.g.remove_vertex(w_in)
         self.update_graph_view()
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def redo(self) -> None:
         self._old_w_info = self._old_w_info or {}
         self._new_w_inputs = self._new_w_inputs or []
@@ -384,6 +386,8 @@ class MergeNodes(BaseCommand):
         self.g = self._old_g
         self.update_graph_view()
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def redo(self) -> None:
         self._old_g = copy.deepcopy(self.g)
         if len(self.vertices_to_merge) < 2:
