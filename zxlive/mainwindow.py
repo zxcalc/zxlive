@@ -154,10 +154,10 @@ class MainWindow(QMainWindow):
 
         self.undo_action = self._new_action(
             "Undo", self.undo, QKeySequence.StandardKey.Undo,
-            "Undoes the last action", "undo.svg")
+            "Undo (Ctrl+Z)", "undo.svg")
         self.redo_action = self._new_action(
             "Redo", self.redo, QKeySequence.StandardKey.Redo,
-            "Redoes the last action", "redo.svg")
+            "Redo (Ctrl+Shift+Z)", "redo.svg")
         self.cut_action = self._new_action(
             "Cut", self.cut_graph, QKeySequence.StandardKey.Cut,
             "Cut the selected part of the diagram")
