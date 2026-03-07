@@ -261,7 +261,10 @@ class ProofPanel(BasePanel):
                 new_g.remove_edge(edges[0])
             # TODO: Add animation for Hopf
             # anim = anims.hopf(edges, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
+            cmd = AddRewriteStep(
+                self.graph_view, new_g, self.step_view, "Remove parallel edges",
+                highlight_edge_pairs=[(source, target)],
+            )
             self.undo_stack.push(cmd)
             return True
         return False
