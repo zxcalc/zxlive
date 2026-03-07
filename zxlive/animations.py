@@ -305,23 +305,38 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         for v in rem_verts:
             anim_before.addAnimation(remove_id(panel.graph_scene.vertex_map[v]))
     elif self.name == rules_basic['copy']['text']:
+        # COPY is MATCH_SINGLE: matches is a list of vertices. We animate the
+        # neighbor each spider is being copied through.
         anim_before = QParallelAnimationGroup()
         for v in matches:
             w = list(panel.graph.neighbors(v))[0]
-            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[v],
-                                          panel.graph_scene.vertex_map[w]))
+            anim_before.addAnimation(
+                fuse(panel.graph_scene.vertex_map[v],
+                     panel.graph_scene.vertex_map[w])
+            )
         anim_after = QParallelAnimationGroup()
         for v in matches:
             w = list(panel.graph.neighbors(v))[0]
-            anim_after.addAnimation(strong_comp(panel.graph, g, w, panel.graph_scene))
+            anim_after.addAnimation(
+                strong_comp(panel.graph, g, w, panel.graph_scene)
+            )
     elif self.name == rules_basic['pauli']['text']:
+        # PAULI is MATCH_DOUBLE: matches is a list of (v1, v2) pairs.
         anim_before = QParallelAnimationGroup()
         for m in matches:
-            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[m[0]],
-                                          panel.graph_scene.vertex_map[m[1]]))
+            if isinstance(m, tuple) and len(m) == 2:
+                v1, v2 = m
+                anim_before.addAnimation(
+                    fuse(panel.graph_scene.vertex_map[v1],
+                         panel.graph_scene.vertex_map[v2])
+                )
         anim_after = QParallelAnimationGroup()
         for m in matches:
-            anim_after.addAnimation(strong_comp(panel.graph, g, m[1], panel.graph_scene))
+            if isinstance(m, tuple) and len(m) == 2:
+                _, v2 = m
+                anim_after.addAnimation(
+                    strong_comp(panel.graph, g, v2, panel.graph_scene)
+                )
     elif self.name == rules_basic['bialgebra']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:

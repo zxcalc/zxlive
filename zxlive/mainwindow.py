@@ -223,6 +223,11 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
+        self.show_rewrite_highlights_action = QAction("Show rewrite highlights", self)
+        self.show_rewrite_highlights_action.setCheckable(True)
+        self.show_rewrite_highlights_action.setChecked(get_settings_value("highlight-rewrites", bool))
+        self.show_rewrite_highlights_action.triggered.connect(self._toggle_rewrite_highlights)
+        view_menu.addAction(self.show_rewrite_highlights_action)
 
         new_rewrite_from_file = self._new_action(
             "New rewrite from file", lambda: create_new_rewrite(self),
@@ -420,7 +425,9 @@ class MainWindow(QMainWindow):
             return False
 
         try:
-            session_data = json.loads(session_json)
+            # QSettings.value can return various types; ensure we pass a str/bytes-like
+            # object to json.loads for type-checker correctness.
+            session_data = json.loads(str(session_json))
             tabs_state = session_data.get('tabs', [])
             active_tab = session_data.get('active_tab', 0)
 
@@ -501,6 +508,22 @@ class MainWindow(QMainWindow):
             name = "*" + name
         self.tab_widget.setTabText(i, name)
         self.tab_widget.setTabToolTip(i, name)
+
+    def _toggle_rewrite_highlights(self, checked: bool) -> None:
+        display_setting.highlight_rewrites = checked
+        self.refresh_rewrite_highlight()
+
+    def refresh_rewrite_highlight(self) -> None:
+        """Re-apply or clear rewrite step highlighting based on current setting.
+        Call after changing the highlight-rewrites setting so the graph updates immediately."""
+        self.show_rewrite_highlights_action.setChecked(display_setting.highlight_rewrites)
+        if not isinstance(self.active_panel, ProofPanel):
+            return
+        proof_panel = cast(ProofPanel, self.active_panel)
+        step_view = proof_panel.step_view
+        current_row = step_view.currentIndex().row()
+        if current_row >= 0:
+            step_view.move_to_step(current_row)
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):

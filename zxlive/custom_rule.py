@@ -33,14 +33,18 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
         self.name = name
         self.description = description
         self.last_rewrite_center = None
+        self.last_rewrite_verts: Optional[list[VT]] = None
         self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
         if self.is_rewrite_unfusable:
-            self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
-                [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
+            self.lhs_graph_without_boundaries_nx = nx.MultiGraph(
+                self.lhs_graph_nx.subgraph(
+                    [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
+                )
+            )
 
     # TODO: Fix code complexity
     # noqa: complexipy
-    def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:  # noqa: PLR0912
+    def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:  # noqa: PLR0912  # pylint: disable=too-many-locals,too-many-branches
         assert isinstance(graph, GraphT)
         if self.is_rewrite_unfusable:
             self.unfuse_subgraph_for_rewrite(graph, vertices)
@@ -98,6 +102,13 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
             etab[(v1, v2)][data['type'] - 1] += 1
 
         graph.add_edge_table(etab)
+        # Prefer non-boundary RHS vertices so highlight is limited to the gadget region;
+        # fall back to all mapped vertices if there are no non-boundary (e.g. degenerate rule).
+        non_boundary = [
+            vertex_map[v] for v in self.rhs_graph_nx.nodes()
+            if self.rhs_graph_nx.nodes()[v].get('type') != VertexType.BOUNDARY
+        ]
+        self.last_rewrite_verts = non_boundary if non_boundary else list(vertex_map.values())
         graph.remove_vertices(vertices_to_remove)
         return True
 

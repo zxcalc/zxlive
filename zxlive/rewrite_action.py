@@ -31,7 +31,91 @@ from .custom_rule import CustomRule
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
 
-# operations = copy.deepcopy(pyzx.editor.operations)
+MatchItem = Union[VT, tuple[VT, VT], list[VT]]
+
+
+def _find_matches(
+    rule: Rewrite,
+    match_type: MatchType,
+    g: GraphT,
+    verts: list[VT],
+    edges: list[ET],
+) -> list[MatchItem]:
+    """Find matches for the rule in the graph based on selection."""
+    if isinstance(rule, CustomRule):
+        return [rule.is_match(g, verts)]  # type: ignore[return-value]
+    if match_type == MATCH_SINGLE:
+        rule_sv = cast(RewriteSingleVertex, rule)
+        return [v for v in verts if rule_sv.is_match(g, v)]
+    if match_type == MATCH_DOUBLE:
+        rule_dv = cast(RewriteDoubleVertex, rule)
+        return [
+            g.edge_st(e) for e in edges
+            if g.edge_st(e)[0] != g.edge_st(e)[1]
+            and rule_dv.is_match(g, *g.edge_st(e))
+        ]
+    if match_type == MATCH_COMPOUND:
+        return [list(g.vertices())] if len(verts) == 0 else [verts.copy()]  # type: ignore[return-value]
+    return []
+
+
+def _apply_single_match(
+    rule: Rewrite,
+    match_type: MatchType,
+    g: GraphT,
+    m: MatchItem,
+) -> bool:
+    """Apply one match; returns True if the rule was applied."""
+    if match_type == MATCH_DOUBLE:
+        rule_dv = cast(RewriteDoubleVertex, rule)
+        v1, v2 = cast(tuple[VT, VT], m)
+        return rule_dv.apply(g, v1, v2)
+    if match_type == MATCH_SINGLE:
+        rule_sv = cast(RewriteSingleVertex, rule)
+        return rule_sv.apply(g, cast(VT, m))
+    rule_sg = cast(RewriteSimpGraph, rule)
+    return rule_sg.apply(g, cast(list[VT], m))
+
+
+def _compute_highlight_verts(
+    matches_list: list[MatchItem],
+    match_type: MatchType,
+    name: str,
+) -> Optional[list[VT]]:
+    """Compute highlight_verts from matches_list."""
+    if not matches_list:
+        return None
+    # 1) Compound: highlight all matched vertices.
+    if match_type == MATCH_COMPOUND:
+        all_v: set[VT] = set()
+        for m in matches_list:
+            if isinstance(m, list):
+                all_v.update(m)
+        return list(all_v) if all_v else None
+    # 2) Bialgebra: highlight all spiders in MATCH_DOUBLE pairs.
+    if (
+        match_type == MATCH_DOUBLE
+        and name == rules_basic["bialgebra"]["text"]
+    ):
+        involved: set[VT] = set()
+        for m in matches_list:
+            if isinstance(m, tuple) and len(m) == 2:
+                v1, v2 = cast(tuple[VT, VT], m)
+                involved.add(v1)
+                involved.add(v2)
+        return list(involved) if involved else None
+    # 3) Generic: MATCH_SINGLE or MATCH_DOUBLE.
+    vs: set[VT] = set()
+    for m in matches_list:
+        if isinstance(m, int):
+            vs.add(cast(VT, m))
+        elif isinstance(m, tuple) and len(m) == 2:
+            v1, v2 = cast(tuple[VT, VT], m)
+            vs.add(v1)
+            vs.add(v2)
+        elif isinstance(m, list):
+            vs.update(cast(list[VT], m))
+    return list(vs) if vs else None
 
 
 @dataclass
@@ -79,7 +163,7 @@ class RewriteAction:
 
     # TODO: Fix code complexity
     # noqa: complexipy
-    def do_rewrite(self, panel: ProofPanel) -> None:  # noqa: PLR0912
+    def do_rewrite(self, panel: ProofPanel) -> None:  # noqa: PLR0912  # pylint: disable=too-many-locals
         if not self.enabled:
             return
 
@@ -92,62 +176,57 @@ class RewriteAction:
                 self.unfusion_action.start_unfusion(verts[0])
             return
 
-        g = copy.deepcopy(panel.graph_scene.g)
+        base_g = panel.graph_scene.g
+        g = copy.deepcopy(base_g)
         verts, edges = panel.parse_selection()
 
         rem_verts_list: list[VT] = []
-        matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
+        matches_list: list[MatchItem] = []
+        is_fuse_rule = (
+            self.name == rules_basic["fuse_simp"]["text"]
+            and self.match_type == MATCH_DOUBLE
+        )
+        highlight_match_pairs: list[tuple[VT, VT]] | None = None
+
         while True:
-            matches: list[VT | tuple[VT, VT] | list[VT]] = []
-            if isinstance(self.rule, CustomRule):
-                matches = [self.rule.is_match(g, verts)]  # type: ignore
-            elif self.match_type == MATCH_SINGLE:
-                rule_sv = cast(RewriteSingleVertex, self.rule)
-                matches = [v for v in verts if rule_sv.is_match(g, v)]
-            elif self.match_type == MATCH_DOUBLE:
-                rule_dv = cast(RewriteDoubleVertex, self.rule)
-                matches = [g.edge_st(e) for e in edges
-                           if g.edge_st(e)[0] != g.edge_st(e)[1]
-                           and rule_dv.is_match(g, *g.edge_st(e))]
-            elif self.match_type == MATCH_COMPOUND:  # We don't necessarily have a matcher in this case
-                if len(verts) == 0:
-                    matches = [list(g.vertices())]  # type: ignore
-                else:
-                    matches = [verts.copy()]  # type: ignore
+            matches = _find_matches(self.rule, self.match_type, g, verts, edges)
             matches_list.extend(matches)
             if not matches:
                 break
             try:
                 applied = False
                 for m in matches:
-                    if self.match_type == MATCH_DOUBLE:
-                        rule_dv = cast(RewriteDoubleVertex, self.rule)
+                    if is_fuse_rule and self.match_type == MATCH_DOUBLE:
                         v1, v2 = cast(tuple[VT, VT], m)
-                        if rule_dv.apply(g, v1, v2):
-                            applied = True
-                    elif self.match_type == MATCH_SINGLE:
-                        rule_sv = cast(RewriteSingleVertex, self.rule)
-                        if rule_sv.apply(g, cast(VT, m)):
-                            applied = True
-                    else:
-                        rule_sg = cast(RewriteSimpGraph, self.rule)
-                        if rule_sg.apply(g, cast(list[VT], m)):
-                            applied = True
-                # g, rem_verts = self.apply_rewrite(g, matches)
-                # rem_verts_list.extend(rem_verts)
+                        if highlight_match_pairs is None:
+                            highlight_match_pairs = []
+                        highlight_match_pairs.append((v1, v2))
+                    if _apply_single_match(self.rule, self.match_type, g, m):
+                        applied = True
             except Exception as ex:
                 show_error_msg('Error while applying rewrite rule', str(ex))
                 return
             if not self.repeat_rule_application or not applied:
                 break
 
-        cmd = AddRewriteStep(panel.graph_view, g, panel.step_view, self.name)
+        highlight_verts = _compute_highlight_verts(
+            matches_list, self.match_type, self.name
+        )
+
+        cmd = AddRewriteStep(
+            panel.graph_view,
+            g,
+            panel.step_view,
+            self.name,
+            highlight_match_pairs=highlight_match_pairs if is_fuse_rule else None,
+            highlight_verts=highlight_verts,
+        )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
     # TODO: Fix code complexity
     # noqa: complexipy
-    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # noqa: PLR0912
+    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # noqa: PLR0912  # pylint: disable=too-many-branches
         if self.copy_first:
             g = copy.deepcopy(g)
         if self.match_type == MATCH_SINGLE:

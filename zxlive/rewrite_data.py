@@ -49,7 +49,7 @@ def read_custom_rules() -> list[RewriteData]:
                 zxr_file = os.path.join(root, file)
                 with open(zxr_file, "r") as f:
                     rule = CustomRule.from_json(f.read()).to_rewrite_data()
-                    rule['file_path'] = zxr_file
+                    rule["file_path"] = zxr_file
                     custom_rules.append(rule)
     return custom_rules
 
