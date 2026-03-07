@@ -477,7 +477,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # pylint: disable=too-many-branches
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912  # pylint: disable=too-many-branches
         painter.save()
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)

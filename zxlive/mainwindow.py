@@ -23,7 +23,8 @@ from typing import Callable, Optional, cast
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream, QTimer, QUrl)
+                            QMimeData, QSettings, QTextStream, QTimer, QUrl,
+                            Qt)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
@@ -54,6 +55,7 @@ from .tikz import proof_to_tikz
 
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
+    CLIPBOARD_MIME = "application/vnd.zxlive-graph+json"
 
     def __init__(self) -> None:
         super().__init__()
@@ -259,6 +261,7 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
+        QApplication.clipboard().dataChanged.connect(self._on_clipboard_changed)
 
         # Set up periodic session state saving for crash protection
         # Auto-save session state every minute if there are open tabs
@@ -287,7 +290,7 @@ class MainWindow(QMainWindow):
         self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
-        self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
+        self.paste_action.setEnabled(has_active_tab and self._has_pasteable_clipboard_data())
 
         # Undo and redo are always disabled whether on a new tab or closing the last tab.
         self.undo_action.setEnabled(False)
@@ -317,6 +320,19 @@ class MainWindow(QMainWindow):
                 elif alt_shortcut not in action.shortcuts():
                     action.setShortcuts([shortcut, alt_shortcut])  # type: ignore
         return action
+
+    def _has_pasteable_clipboard_data(self) -> bool:
+        if self.copied_graph is not None:
+            return True
+        mime = QApplication.clipboard().mimeData()
+        if mime is None:
+            return False
+        if mime.hasFormat(self.CLIPBOARD_MIME):
+            return True
+        return bool(mime.text().strip())
+
+    def _on_clipboard_changed(self) -> None:
+        self.paste_action.setEnabled(self.active_panel is not None and self._has_pasteable_clipboard_data())
 
     @property
     def active_panel(self) -> Optional[BasePanel]:
@@ -395,7 +411,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.warning(f"Failed to save session state: {e}")
 
-    def _restore_session_state(self) -> bool:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def _restore_session_state(self) -> bool:  # noqa: PLR0912
         """Restore previously saved tabs. Returns True if any tabs were restored."""
         # Check if user wants to restore session
         startup_behavior = get_settings_value("startup-behavior", str, "restore")
@@ -484,11 +502,12 @@ class MainWindow(QMainWindow):
     def update_tab_name(self, clean: bool) -> None:
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
-        if name.endswith("*"):
-            name = name[:-1]
+        if name.startswith("*"):
+            name = name[1:]
         if not clean:
-            name += "*"
+            name = "*" + name
         self.tab_widget.setTabText(i, name)
+        self.tab_widget.setTabToolTip(i, name)
 
     def _toggle_rewrite_highlights(self, checked: bool) -> None:
         display_setting.highlight_rewrites = checked
@@ -621,7 +640,7 @@ class MainWindow(QMainWindow):
             show_error_msg("Could not write to file", parent=self)
             return False
         out = QTextStream(file)
-        out << data
+        _ = out << data
         file.close()
         self.active_panel.undo_stack.setClean()
         if random.random() < 0.1:
@@ -649,6 +668,7 @@ class MainWindow(QMainWindow):
         name = QFileInfo(file_path).baseName()
         i = self.tab_widget.currentIndex()
         self.tab_widget.setTabText(i, name)
+        self.tab_widget.setTabToolTip(i, name)
         return True
 
     def handle_export_tikz_proof_action(self) -> bool:
@@ -674,12 +694,14 @@ class MainWindow(QMainWindow):
     def cut_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self._copy_graph_to_system_clipboard(self.copied_graph)
         self.paste_action.setEnabled(True)
         self.active_panel.delete_selection()
 
     def copy_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self._copy_graph_to_system_clipboard(self.copied_graph)
         self.paste_action.setEnabled(True)
 
     def copy_graph_to_clipboard(self) -> None:
@@ -687,27 +709,60 @@ class MainWindow(QMainWindow):
         that can be understood by Tikzit."""
         assert self.active_panel is not None
         copied_graph = self.active_panel.copy_selection()
-        tikz = to_tikz(copied_graph)
-        pyperclip.copy(tikz)
+        self._copy_graph_to_system_clipboard(copied_graph, include_internal=False)
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
-        if self.copied_graph is not None:
-            self.active_panel.paste_graph(self.copied_graph)
+        copied_graph = self._read_graph_from_system_clipboard()
+        if copied_graph is None and self.copied_graph is not None:
+            copied_graph = self.copied_graph
+        if copied_graph is not None:
+            self.active_panel.paste_graph(copied_graph)
 
     def paste_graph_from_clipboard(self) -> None:
         assert self.active_panel is not None
-        tikz = pyperclip.paste()
-        copied_graph = from_tikz(tikz)
+        copied_graph = self._read_graph_from_system_clipboard(include_internal=False)
         if copied_graph is not None:
             self.active_panel.paste_graph(copied_graph)
+
+    def _copy_graph_to_system_clipboard(self, graph: GraphT, include_internal: bool = True) -> None:
+        mime = QMimeData()
+        tikz = to_tikz(graph)
+        mime.setText(tikz)
+
+        if include_internal:
+            payload = json.dumps({"graph_json": graph.to_json()}).encode("utf-8")
+            mime.setData(self.CLIPBOARD_MIME, QByteArray(payload))
+        QApplication.clipboard().setMimeData(mime)
+
+    def _read_graph_from_system_clipboard(self, include_internal: bool = True) -> Optional[GraphT]:
+        mime = QApplication.clipboard().mimeData()
+        if include_internal and mime is not None and mime.hasFormat(self.CLIPBOARD_MIME):
+            try:
+                raw = bytes(mime.data(self.CLIPBOARD_MIME).data())
+                payload = json.loads(raw.decode("utf-8"))
+                graph_json = payload.get("graph_json")
+                if isinstance(graph_json, str):  # type: ignore
+                    g = GraphT.from_json(graph_json)
+                    assert isinstance(g, GraphT)  # type: ignore[misc]
+                    g.rebind_variables_to_registry()
+                    g.set_auto_simplify(False)
+                    return g
+            except Exception:
+                pass
+
+        tikz = QApplication.clipboard().text()
+        if not tikz:
+            tikz = pyperclip.paste()
+        return from_tikz(tikz) if tikz else None
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
         self.active_panel.delete_selection()
 
     def _new_panel(self, panel: BasePanel, name: str) -> None:
-        self.tab_widget.addTab(panel, name)
+        idx = self.tab_widget.addTab(panel, name)
+        self.tab_widget.setTabToolTip(idx, name)
         self.tab_widget.setCurrentWidget(panel)
 
         self._reset_menus(True)
@@ -740,14 +795,14 @@ class MainWindow(QMainWindow):
         Replaces the graph in an existing tab if it has the same name."""
 
         # The graph we are given is not a MultiGraph
-        if not isinstance(graph, GraphT):
+        if not isinstance(graph, GraphT):  # type: ignore
             graph = graph.copy(backend='multigraph')
             graph.set_auto_simplify(False)
 
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             tab_text = self.tab_widget.tabText(i)
-            if tab_text == name or tab_text == name + "*":
+            if tab_text == name or tab_text == "*" + name:
                 self.tab_widget.setCurrentIndex(i)
                 assert self.active_panel is not None
                 self.active_panel.replace_graph(graph)
@@ -758,7 +813,7 @@ class MainWindow(QMainWindow):
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             tab_text = self.tab_widget.tabText(i)
-            if tab_text == name or tab_text == name + "*":
+            if tab_text == name or tab_text == "*" + name:
                 panel = cast(BasePanel, self.tab_widget.widget(i))
                 return cast(GraphT, copy.deepcopy(panel.graph_scene.g))
         return None
@@ -849,7 +904,7 @@ class MainWindow(QMainWindow):
                 padding: 10px 24px;
                 margin-right: 2px;
                 min-width: 100px;
-                max-width: 200px;
+                max-width: 250px;
             }}
 
             CustomTabBar::tab:selected {{
@@ -971,6 +1026,7 @@ class CustomTabBar(QTabBar):
         super().__init__(parent)
         self.hovered_tab: int = -1
         self.setMouseTracking(True)
+        self.setElideMode(Qt.TextElideMode.ElideRight)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Track which tab is being hovered."""

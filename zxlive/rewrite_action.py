@@ -161,7 +161,9 @@ class RewriteAction:
             file_path=d.get('file_path', None),
         )
 
-    def do_rewrite(self, panel: ProofPanel) -> None:  # pylint: disable=too-many-locals
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def do_rewrite(self, panel: ProofPanel) -> None:  # noqa: PLR0912  # pylint: disable=too-many-locals
         if not self.enabled:
             return
 
@@ -222,7 +224,9 @@ class RewriteAction:
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
-    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # pylint: disable=too-many-branches
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # noqa: PLR0912  # pylint: disable=too-many-branches
         if self.copy_first:
             g = copy.deepcopy(g)
         if self.match_type == MATCH_SINGLE:

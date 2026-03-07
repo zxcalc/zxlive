@@ -60,8 +60,7 @@ class UnfusionRewriteAction:
     def can_unfuse(self, vertex: VT) -> bool:
         """Check if a vertex can be unfused."""
         graph = self.proof_panel.graph_scene.g
-        return (graph.type(vertex) != VertexType.BOUNDARY and
-                len(list(graph.incident_edges(vertex))) >= 2)
+        return bool(graph.type(vertex) != VertexType.BOUNDARY)
 
     def start_unfusion(self, vertex: VT) -> bool:
         """Start the unfusion process for a vertex."""

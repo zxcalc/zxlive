@@ -54,6 +54,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "auto-save": False,
     "patterns-folder": "patterns/",
     "startup-behavior": "restore",
+    "phase-label-color": "",
 }
 
 font_defaults: dict[str, str | int | None] = {

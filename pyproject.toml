@@ -42,16 +42,16 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "mypy",
-    "pyproject-flake8",
-    "pylint",
+    "ruff",
     "pytest-qt",
+    "complexipy",
 ]
 doc = [
-    "sphinx>=2.3,<7",  # see: https://github.com/readthedocs/readthedocs.org/issues/10279
-    "sphinx_autodoc_typehints>=1.10",
-    "sphinx_rtd_theme>=0.4,",
-    "sphinxcontrib-svg2pdfconverter>=1.2.2",
-    "myst-parser>=3.0.0"
+    "sphinx>=9.1.0",
+    "sphinx_autodoc_typehints>=3.9.5",
+    "sphinx_rtd_theme>=3.1.0",
+    "sphinxcontrib-svg2pdfconverter>=2.0.0",
+    "myst-parser>=5.0.0"
 ]
 
 [project.urls]
@@ -70,18 +70,28 @@ zxlive = "zxlive.app:main"
 [tool.pyright]
 reportWildcardImportFromLibrary = "none"
 
-[tool.flake8]
-extend-ignore = [
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle
+    "F",      # Pyflakes
+    # "UP",   # pyupgrade
+    # "B",    # flake8-bugbear
+    # "SIM",  # flake8-simplify
+    # "I",    # isort
+]
+ignore = [
     "E501",
-    "E721",  # False positive: triggers on .type() method calls, not just type() builtin
+    "E721", # False positive: triggers on .type() method calls, not just type() builtin
 ]
 
-[tool.autopep8]
-max_line_length = 120
-ignore = ["E501"]
-in-place = true
-recursive = true
-aggressive = 2
+[tool.ruff.lint.per-file-ignores]
+"test/*" = ["F401"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
 
 [tool.mypy]
 python_version = "3.11"

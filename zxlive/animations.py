@@ -285,7 +285,9 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
                        duration=700, ease=QEasingCurve(QEasingCurve.Type.OutElastic))
 
 
-def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:
+# TODO: Fix code complexity
+# noqa: complexipy
+def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:  # noqa: PLR0912
     anim_before: Optional[QAbstractAnimation] = None
     anim_after: Optional[QAbstractAnimation] = None
     if self.name == rules_basic['fuse_simp']['text']:  # or self.name == operations['fuse_w']['text']:
