@@ -16,6 +16,63 @@ from .common import GraphT, ET
 from .settings import display_setting
 
 
+def _apply_rewrite_highlight(  # pylint: disable=too-many-locals,too-many-branches
+    scene: "GraphScene",
+    rewrite_meta: "Rewrite",
+    g_current: GraphT,
+) -> None:
+    """Apply forward-looking rewrite highlight based on rewrite metadata."""
+    current_verts = set(g_current.vertices())
+
+    # 1) Edge-only highlighting (e.g. Add identity - the edge the magic wand acts on).
+    highlight_edge_pairs = getattr(rewrite_meta, "highlight_edge_pairs", None)
+    if highlight_edge_pairs:
+        edges_only_set: set[ET] = set()
+        for pair in highlight_edge_pairs:
+            if isinstance(pair, tuple) and len(pair) == 2:
+                v1, v2 = int(pair[0]), int(pair[1])
+                if v1 in current_verts and v2 in current_verts:
+                    edges_only_set |= set(g_current.edges(v1, v2))
+        if edges_only_set:
+            scene.set_rewrite_highlight(set(), edges_only_set)
+            return
+
+    # 2) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
+    highlight_match_pairs = getattr(rewrite_meta, "highlight_match_pairs", None)
+    if highlight_match_pairs:
+        verts_set: set[int] = set()
+        edges_set: set[ET] = set()
+        for match in highlight_match_pairs:
+            if isinstance(match, tuple) and len(match) == 2:
+                v1, v2 = int(match[0]), int(match[1])
+                if v1 not in current_verts or v2 not in current_verts:
+                    continue
+                verts_set.add(v1)
+                verts_set.add(v2)
+                edges_set |= set(g_current.edges(v1, v2))
+        scene.set_rewrite_highlight(verts_set, edges_set)
+        return
+
+    # 3) Vertex-based highlighting (unfuse, color change, strong comp, remove identity, etc.).
+    highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
+    if highlight_verts_list:
+        verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}
+        if len(verts_set) == 2:
+            s = sorted(verts_set)
+            edges_highlight = set(g_current.edges(s[0], s[1]))
+        else:
+            edges_highlight = set()
+            for v in verts_set:
+                for e in g_current.incident_edges(v):
+                    s, t = g_current.edge_st(e)
+                    if s in verts_set and t in verts_set:
+                        edges_highlight.add(e)
+        scene.set_rewrite_highlight(verts_set, edges_highlight)
+        return
+
+    scene.clear_rewrite_highlight()
+
+
 class Rewrite(NamedTuple):
     """A rewrite turns a graph into another graph."""
 
@@ -334,56 +391,7 @@ class ProofStepView(QListView):
             return
         # There is a rewrite taking graph index -> index + 1.
         rewrite_meta = self.model().steps[index]
-        current_verts = set(g_current.vertices())
-
-        # 1) Edge-only highlighting (e.g. Add identity - the edge the magic wand acts on).
-        highlight_edge_pairs = getattr(rewrite_meta, "highlight_edge_pairs", None)
-        if highlight_edge_pairs:
-            edges_only_set: set[ET] = set()
-            for pair in highlight_edge_pairs:
-                if isinstance(pair, tuple) and len(pair) == 2:
-                    v1, v2 = int(pair[0]), int(pair[1])
-                    if v1 in current_verts and v2 in current_verts:
-                        edges_only_set |= set(g_current.edges(v1, v2))
-            if edges_only_set:
-                scene.set_rewrite_highlight(set(), edges_only_set)
-                return
-
-        # 2) Match-based forward highlighting (MATCH_DOUBLE, e.g. Spider Fusion).
-        highlight_match_pairs = getattr(rewrite_meta, "highlight_match_pairs", None)
-        if highlight_match_pairs:
-            verts_set: set[int] = set()
-            edges_set: set[ET] = set()
-            for match in highlight_match_pairs:
-                if isinstance(match, tuple) and len(match) == 2:
-                    v1, v2 = int(match[0]), int(match[1])
-                    if v1 not in current_verts or v2 not in current_verts:
-                        continue
-                    verts_set.add(v1)
-                    verts_set.add(v2)
-                    edges_set |= set(g_current.edges(v1, v2))
-            scene.set_rewrite_highlight(verts_set, edges_set)
-            return
-
-        # 3) Vertex-based highlighting (unfuse, color change, strong comp, remove identity, etc.).
-        highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
-        if highlight_verts_list:
-            verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}
-            edges_highlight: set[ET]
-            if len(verts_set) == 2:
-                s = sorted(verts_set)
-                edges_highlight = set(g_current.edges(s[0], s[1]))
-            else:
-                edges_highlight = set()
-                for v in verts_set:
-                    for e in g_current.incident_edges(v):
-                        s, t = g_current.edge_st(e)
-                        if s in verts_set and t in verts_set:
-                            edges_highlight.add(e)
-            scene.set_rewrite_highlight(verts_set, edges_highlight)
-            return
-
-        scene.clear_rewrite_highlight()
+        _apply_rewrite_highlight(scene, rewrite_meta, g_current)
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
@@ -469,7 +477,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # pylint: disable=too-many-branches
         painter.save()
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)

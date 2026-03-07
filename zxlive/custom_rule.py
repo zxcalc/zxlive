@@ -39,7 +39,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
-    def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
+    def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:  # pylint: disable=too-many-locals,too-many-branches
         assert isinstance(graph, GraphT)
         if self.is_rewrite_unfusable:
             self.unfuse_subgraph_for_rewrite(graph, vertices)
