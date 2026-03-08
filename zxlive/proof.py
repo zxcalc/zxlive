@@ -6,7 +6,7 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QRectF, QSize, Qt)
+                            QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
@@ -269,6 +269,9 @@ class ProofStepView(QListView):
         self._previews_visible = bool(display_setting.previews_show)
         self._preview_hidden_rows: set[int] = set()
         self._connected_model: Optional[ProofModel] = None
+        self._resize_layout_timer = QTimer(self)
+        self._resize_layout_timer.setSingleShot(True)
+        self._resize_layout_timer.timeout.connect(self._finish_resize_layout)
         self._connect_model_signals(self.model())
 
     # overriding this method to change the return type and stop mypy from complaining
@@ -335,16 +338,34 @@ class ProofStepView(QListView):
         """Clear preview caches and relayout items when the view is resized."""
         super().resizeEvent(event)
         self._clear_step_preview_cache()
+        # Defer expensive relayout until resize settles to avoid repaint storms/crashes.
+        self._resize_layout_timer.start(50)
+
+    def _finish_resize_layout(self) -> None:
         self.doItemsLayout()
 
     def previews_enabled(self) -> bool:
         return self._previews_visible
 
+    def all_previews_visible(self) -> bool:
+        return self._previews_visible and not self._preview_hidden_rows
+
     def set_previews_enabled(self, visible: bool) -> None:
-        """Enable or disable diagram previews for all proof steps."""
-        if self._previews_visible == visible:
-            return
+        """Enable or disable diagram previews globally."""
+        changed = self._previews_visible != visible
         self._previews_visible = visible
+        if not changed:
+            return
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def set_all_previews_visible(self) -> None:
+        """Force all step previews visible."""
+        changed = (not self._previews_visible) or bool(self._preview_hidden_rows)
+        self._previews_visible = True
+        self._preview_hidden_rows.clear()
+        if not changed:
+            return
         self._clear_step_preview_cache()
         self.doItemsLayout()
 
@@ -364,6 +385,17 @@ class ProofStepView(QListView):
                 changed = True
         if not changed:
             return
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def show_only_selected_previews(self, indexes: list[int]) -> None:
+        """Show previews only for selected rows, even if global previews are currently hidden."""
+        row_count = self.model().rowCount()
+        selected = {row for row in indexes if 0 <= row < row_count}
+        if not selected:
+            return
+        self._previews_visible = True
+        self._preview_hidden_rows = {row for row in range(row_count) if row not in selected}
         self._clear_step_preview_cache()
         self.doItemsLayout()
 
@@ -445,6 +477,8 @@ class ProofStepView(QListView):
         return pixmap
 
     def preview_image(self, index: int, size: QSize) -> QPixmap:
+        if index < 0 or index >= self.model().rowCount() or size.width() <= 0 or size.height() <= 0:
+            return QPixmap(max(1, size.width()), max(1, size.height()))
         key = (index, size.width(), size.height())
         if key not in self._step_preview_cache:
             self._step_preview_cache[key] = self._render_preview_image(index, size)
@@ -462,44 +496,50 @@ class ProofStepView(QListView):
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
-        if not selected_indexes:
-            return
         context_menu = QMenu(self)
         action_function_map = {}
 
-        index = selected_indexes[0].row()
-        if len(selected_indexes) > 1:
-            group_action = context_menu.addAction("Group Steps")
-            action_function_map[group_action] = self.group_selected_steps
-        elif index != 0:
-            rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
-            if self.model().steps[index - 1].grouped_rewrites is not None:
-                ungroup_action = context_menu.addAction("Ungroup Steps")
-                action_function_map[ungroup_action] = self.ungroup_selected_step
+        if selected_indexes:
+            index = selected_indexes[0].row()
+            if len(selected_indexes) > 1:
+                group_action = context_menu.addAction("Group Steps")
+                action_function_map[group_action] = self.group_selected_steps
+            elif index != 0:
+                rename_action = context_menu.addAction("Rename Step")
+                action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+                if self.model().steps[index - 1].grouped_rewrites is not None:
+                    ungroup_action = context_menu.addAction("Ungroup Steps")
+                    action_function_map[ungroup_action] = self.ungroup_selected_step
 
-        context_menu.addSeparator()
-        toggle_preview_action = context_menu.addAction("Show Diagram Previews")
+            context_menu.addSeparator()
+
+        toggle_preview_action = context_menu.addAction("Show All Step Previews")
         toggle_preview_action.setCheckable(True)
-        toggle_preview_action.setChecked(self.previews_enabled())
+        toggle_preview_action.setChecked(self.all_previews_visible())
         action_function_map[toggle_preview_action] = self.toggle_diagram_previews
 
-        selected_rows = [selected_index.row() for selected_index in selected_indexes]
-        selected_previews_are_visible = all(self.preview_visible_for_index(row) for row in selected_rows)
-        if selected_previews_are_visible:
-            toggle_selected_preview_action = context_menu.addAction("Hide Selected Step Previews")
-            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, False)
-        else:
-            toggle_selected_preview_action = context_menu.addAction("Show Selected Step Previews")
-            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, True)
+        if selected_indexes:
+            selected_rows = [selected_index.row() for selected_index in selected_indexes]
+            selected_previews_are_visible = all(self.preview_visible_for_index(row) for row in selected_rows)
+            if selected_previews_are_visible:
+                toggle_selected_preview_action = context_menu.addAction("Hide Selected Step Previews")
+                action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, False)
+            else:
+                toggle_selected_preview_action = context_menu.addAction("Show Only Selected Step Previews")
+                if self.previews_enabled():
+                    action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, True)
+                else:
+                    action_function_map[toggle_selected_preview_action] = lambda: self.show_only_selected_previews(selected_rows)
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
 
     def toggle_diagram_previews(self) -> None:
-        previews_are_visible = self.previews_enabled()
-        self.set_previews_enabled(not previews_are_visible)
+        if self.all_previews_visible():
+            self.set_previews_enabled(False)
+        else:
+            self.set_all_previews_visible()
 
     def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange

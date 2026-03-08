@@ -162,6 +162,8 @@ class GraphView(QGraphicsView):
                 # Merge vertices at the same position
                 self.merge_triggered.emit()
                 return
+
+            moved_vertices = []
             for v in self.graph_scene.selected_vertices:
                 vitem = self.graph_scene.vertex_map[v]
                 x = g.row(v)
@@ -174,7 +176,16 @@ class GraphView(QGraphicsView):
                     g.set_position(v, y, x - distance)
                 elif e.key() == Qt.Key.Key_Right:
                     g.set_position(v, y, x + distance)
+                else:
+                    continue
                 vitem.set_pos_from_graph()
+                moved_vertices.append((v, g.row(v), g.qubit(v)))
+
+            if moved_vertices:
+                self.graph_scene.vertices_moved.emit(moved_vertices)
+                e.accept()
+            else:
+                super().keyPressEvent(e)
         else:
             super().keyPressEvent(e)
 
