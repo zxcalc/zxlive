@@ -119,6 +119,7 @@ general_settings: list[SettingsData] = [
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
+    {"id": "proof/show-thumbnails", "label": "Show proof-step thumbnails by default", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
     {"id": "swap-pauli-web-colors", "label": "Swap Pauli web colors", "type": FormInputType.Bool},
