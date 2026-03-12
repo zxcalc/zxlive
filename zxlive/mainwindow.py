@@ -152,18 +152,21 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self.auto_save_action)
 
+        native_shortcut = lambda key: QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText)
         self.undo_action = self._new_action(
             "Undo", self.undo, QKeySequence.StandardKey.Undo,
-            "Undo (Ctrl+Z)", "undo.svg")
+            f"Undo ({native_shortcut(QKeySequence.StandardKey.Undo)})",
+            "undo.svg")
         self.redo_action = self._new_action(
             "Redo", self.redo, QKeySequence.StandardKey.Redo,
-            "Redo (Ctrl+Shift+Z)", "redo.svg")
+            f"Redo ({native_shortcut(QKeySequence.StandardKey.Redo)})",
+            "redo.svg")
         self.cut_action = self._new_action(
             "Cut", self.cut_graph, QKeySequence.StandardKey.Cut,
-            "Cut the selected part of the diagram")
+            f"Cut ({native_shortcut(QKeySequence.StandardKey.Cut)})")
         self.copy_action = self._new_action(
             "&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
-            "Copy the selected part of the diagram")
+            f"Copy ({native_shortcut(QKeySequence.StandardKey.Copy)})")
         self.copy_clipboard_action = self._new_action(
             "Copy tikz to clipboard", self.copy_graph_to_clipboard,
             QKeySequence("Ctrl+Shift+C"),
@@ -171,7 +174,7 @@ class MainWindow(QMainWindow):
             "as tikz")
         self.paste_action = self._new_action(
             "Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
-            "Paste the copied part of the diagram")
+            f"Paste ({native_shortcut(QKeySequence.StandardKey.Paste)})")
         self.paste_clipboard_action = self._new_action(
             "Paste tikz from clipboard", self.paste_graph_from_clipboard,
             QKeySequence("Ctrl+Shift+V"),
