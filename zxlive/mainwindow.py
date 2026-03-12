@@ -152,7 +152,9 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction(self.auto_save_action)
 
-        native_shortcut = lambda key: QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText)
+        def native_shortcut(key: QKeySequence.StandardKey) -> str:
+            return QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText)
+
         self.undo_action = self._new_action(
             "Undo", self.undo, QKeySequence.StandardKey.Undo,
             f"Undo ({native_shortcut(QKeySequence.StandardKey.Undo)})",
