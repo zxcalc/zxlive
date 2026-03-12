@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
         action = QAction(name, self)
         if icon_file:
             action.setIcon(QIcon(get_data(f"icons/{icon_file}")))
-        action.setStatusTip(tooltip)
+        action.setToolTip(tooltip)
         action.triggered.connect(trigger)
         if shortcut:
             action.setShortcut(shortcut)
