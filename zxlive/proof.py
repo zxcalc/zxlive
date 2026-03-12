@@ -494,42 +494,58 @@ class ProofStepView(QListView):
         g = self.model().get_graph(index)
         self.graph_view.set_graph(g)
 
-    def show_context_menu(self, position: QPoint) -> None:
-        selected_indexes = self.selectedIndexes()
-        context_menu = QMenu(self)
-        action_function_map = {}
+    def _add_step_edit_actions(self, context_menu: QMenu, selected_indexes: list[QModelIndex],
+                               action_function_map: dict[Any, Any]) -> None:
+        if not selected_indexes:
+            return
 
-        if selected_indexes:
-            index = selected_indexes[0].row()
-            if len(selected_indexes) > 1:
-                group_action = context_menu.addAction("Group Steps")
-                action_function_map[group_action] = self.group_selected_steps
-            elif index != 0:
-                rename_action = context_menu.addAction("Rename Step")
-                action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
-                if self.model().steps[index - 1].grouped_rewrites is not None:
-                    ungroup_action = context_menu.addAction("Ungroup Steps")
-                    action_function_map[ungroup_action] = self.ungroup_selected_step
+        index = selected_indexes[0].row()
+        if len(selected_indexes) > 1:
+            group_action = context_menu.addAction("Group Steps")
+            action_function_map[group_action] = self.group_selected_steps
+            return
 
-            context_menu.addSeparator()
+        if index == 0:
+            return
 
+        rename_action = context_menu.addAction("Rename Step")
+        action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+        if self.model().steps[index - 1].grouped_rewrites is not None:
+            ungroup_action = context_menu.addAction("Ungroup Steps")
+            action_function_map[ungroup_action] = self.ungroup_selected_step
+
+    def _add_preview_actions(self, context_menu: QMenu, selected_indexes: list[QModelIndex],
+                             action_function_map: dict[Any, Any]) -> None:
         toggle_preview_action = context_menu.addAction("Show All Step Previews")
         toggle_preview_action.setCheckable(True)
         toggle_preview_action.setChecked(self.all_previews_visible())
         action_function_map[toggle_preview_action] = self.toggle_diagram_previews
 
+        if not selected_indexes:
+            return
+
+        selected_rows = [selected_index.row() for selected_index in selected_indexes]
+        selected_previews_are_visible = all(self.preview_visible_for_index(row) for row in selected_rows)
+        if selected_previews_are_visible:
+            toggle_selected_preview_action = context_menu.addAction("Hide Selected Step Previews")
+            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, False)
+            return
+
+        toggle_selected_preview_action = context_menu.addAction("Show Only Selected Step Previews")
+        if self.previews_enabled():
+            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, True)
+        else:
+            action_function_map[toggle_selected_preview_action] = lambda: self.show_only_selected_previews(selected_rows)
+
+    def show_context_menu(self, position: QPoint) -> None:
+        selected_indexes = self.selectedIndexes()
+        context_menu = QMenu(self)
+        action_function_map: dict[Any, Any] = {}
+
+        self._add_step_edit_actions(context_menu, selected_indexes, action_function_map)
         if selected_indexes:
-            selected_rows = [selected_index.row() for selected_index in selected_indexes]
-            selected_previews_are_visible = all(self.preview_visible_for_index(row) for row in selected_rows)
-            if selected_previews_are_visible:
-                toggle_selected_preview_action = context_menu.addAction("Hide Selected Step Previews")
-                action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, False)
-            else:
-                toggle_selected_preview_action = context_menu.addAction("Show Only Selected Step Previews")
-                if self.previews_enabled():
-                    action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, True)
-                else:
-                    action_function_map[toggle_selected_preview_action] = lambda: self.show_only_selected_previews(selected_rows)
+            context_menu.addSeparator()
+        self._add_preview_actions(context_menu, selected_indexes, action_function_map)
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
