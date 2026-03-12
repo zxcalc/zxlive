@@ -6,13 +6,14 @@ if TYPE_CHECKING:
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex, QPersistentModelIndex,
-                            QPoint, QPointF, QRect, QSize, Qt)
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+                            QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer)
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
 from .common import GraphT
+from .graphscene import GraphScene
 from .settings import display_setting
 
 
@@ -79,6 +80,9 @@ class ProofModel(QAbstractListModel):
             old_step = self.steps[index - 1]
             new_step = Rewrite(old_step.display_name, old_step.rule, graph)
             self.steps[index - 1] = new_step
+
+        model_index = self.createIndex(index, 0)
+        self.dataChanged.emit(model_index, model_index, [])
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
@@ -253,13 +257,22 @@ class ProofStepView(QListView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.ContiguousSelection)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setResizeMode(QListView.ResizeMode.Adjust)
-        self.setUniformItemSizes(True)
+        self.setUniformItemSizes(False)
         self.setAlternatingRowColors(True)
         self.viewport().setAttribute(Qt.WidgetAttribute.WA_Hover)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.show_context_menu)
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
         self.setItemDelegate(ProofStepItemDelegate(self))
+        self._step_preview_cache: dict[tuple[int, int, int], QPixmap] = {}
+        self._preview_aspect_ratio_cache: dict[int, float] = {}
+        self._previews_visible = bool(display_setting.previews_show)
+        self._preview_hidden_rows: set[int] = set()
+        self._connected_model: Optional[ProofModel] = None
+        self._resize_layout_timer = QTimer(self)
+        self._resize_layout_timer.setSingleShot(True)
+        self._resize_layout_timer.timeout.connect(self._finish_resize_layout)
+        self._connect_model_signals(self.model())
 
     # overriding this method to change the return type and stop mypy from complaining
     def model(self) -> ProofModel:
@@ -269,9 +282,207 @@ class ProofStepView(QListView):
 
     def set_model(self, model: ProofModel) -> None:
         self.setModel(model)
+        self._preview_hidden_rows.clear()
+        self._clear_step_preview_cache()
         # it looks like the selectionModel is linked to the model, so after updating the model we need to reconnect the selectionModel signals.
         self.selectionModel().selectionChanged.connect(self.proof_step_selected)
+        self._connect_model_signals(model)
         self.setCurrentIndex(model.index(len(model.steps), 0))
+
+    def _connect_model_signals(self, model: ProofModel) -> None:
+        if self._connected_model is not None:
+            self._disconnect_model_signals(self._connected_model)
+        model.rowsInserted.connect(self._on_rows_inserted)
+        model.rowsRemoved.connect(self._on_rows_removed)
+        model.dataChanged.connect(self._on_data_changed)
+        self._connected_model = model
+
+    def _disconnect_model_signals(self, model: ProofModel) -> None:
+        model.rowsInserted.disconnect(self._on_rows_inserted)
+        model.rowsRemoved.disconnect(self._on_rows_removed)
+        model.dataChanged.disconnect(self._on_data_changed)
+
+    def _on_rows_inserted(self, _parent: QModelIndex, first: int, last: int) -> None:
+        shift_by = last - first + 1
+        shifted_hidden_rows = set()
+        for row in self._preview_hidden_rows:
+            if row >= first:
+                shifted_hidden_rows.add(row + shift_by)
+            else:
+                shifted_hidden_rows.add(row)
+        self._preview_hidden_rows = shifted_hidden_rows
+        self._clear_step_preview_cache()
+
+    def _on_rows_removed(self, _parent: QModelIndex, first: int, last: int) -> None:
+        removed_count = last - first + 1
+        shifted_hidden_rows = set()
+        for row in self._preview_hidden_rows:
+            if first <= row <= last:
+                continue
+            if row > last:
+                shifted_hidden_rows.add(row - removed_count)
+            else:
+                shifted_hidden_rows.add(row)
+        self._preview_hidden_rows = shifted_hidden_rows
+        self._clear_step_preview_cache()
+
+    def _on_data_changed(self, *_: Any) -> None:
+        self._clear_step_preview_cache()
+
+    def _clear_step_preview_cache(self) -> None:
+        self._step_preview_cache.clear()
+        self._preview_aspect_ratio_cache.clear()
+        self.viewport().update()
+
+    def resizeEvent(self, event: Any) -> None:
+        """Clear preview caches and relayout items when the view is resized."""
+        super().resizeEvent(event)
+        self._clear_step_preview_cache()
+        # Defer expensive relayout until resize settles to avoid repaint storms/crashes.
+        self._resize_layout_timer.start(50)
+
+    def _finish_resize_layout(self) -> None:
+        self.doItemsLayout()
+
+    def previews_enabled(self) -> bool:
+        return self._previews_visible
+
+    def all_previews_visible(self) -> bool:
+        return self._previews_visible and not self._preview_hidden_rows
+
+    def set_previews_enabled(self, visible: bool) -> None:
+        """Enable or disable diagram previews globally."""
+        changed = self._previews_visible != visible
+        self._previews_visible = visible
+        if not changed:
+            return
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def set_all_previews_visible(self) -> None:
+        """Force all step previews visible."""
+        changed = (not self._previews_visible) or bool(self._preview_hidden_rows)
+        self._previews_visible = True
+        self._preview_hidden_rows.clear()
+        if not changed:
+            return
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def preview_visible_for_index(self, index: int) -> bool:
+        if not self._previews_visible:
+            return False
+        return index not in self._preview_hidden_rows
+
+    def set_preview_visibility_for_indexes(self, indexes: list[int], visible: bool) -> None:
+        changed = False
+        for index in indexes:
+            if visible and index in self._preview_hidden_rows:
+                self._preview_hidden_rows.remove(index)
+                changed = True
+            if not visible and index not in self._preview_hidden_rows:
+                self._preview_hidden_rows.add(index)
+                changed = True
+        if not changed:
+            return
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def show_only_selected_previews(self, indexes: list[int]) -> None:
+        """Show previews only for selected rows, even if global previews are currently hidden."""
+        row_count = self.model().rowCount()
+        selected = {row for row in indexes if 0 <= row < row_count}
+        if not selected:
+            return
+        self._previews_visible = True
+        self._preview_hidden_rows = {row for row in range(row_count) if row not in selected}
+        self._clear_step_preview_cache()
+        self.doItemsLayout()
+
+    def _preview_aspect_ratio(self, index: int) -> float:
+        if index not in self._preview_aspect_ratio_cache:
+            graph = self.model().get_graph(index)
+            scene = GraphScene()
+            scene.set_graph(graph)
+            source_rect = scene.itemsBoundingRect().adjusted(-25, -25, 25, 25)
+            if source_rect.isNull() or source_rect.width() < 1 or source_rect.height() < 1:
+                source_rect = QRectF(0, 0, 1, 1)
+            self._preview_aspect_ratio_cache[index] = source_rect.height() / source_rect.width()
+        return self._preview_aspect_ratio_cache[index]
+
+    def preview_size(self, index: int) -> QSize:
+        """Return an adaptive preview thumbnail size for a proof-step index."""
+        available_width = max(80, self.viewport().width() - 2 * ProofStepItemDelegate.line_padding - 28)
+        min_thumb_height = 70
+        max_thumb_height = 280
+        min_height_width_ratio = 0.3
+        max_height_width_ratio = 1.25
+
+        adaptive_ratio = self._preview_aspect_ratio(index)
+        bounded_ratio = max(min_height_width_ratio, min(max_height_width_ratio, adaptive_ratio))
+
+        thumb_width = available_width
+        thumb_height = int(thumb_width * bounded_ratio)
+
+        if thumb_height > max_thumb_height:
+            thumb_height = max_thumb_height
+            thumb_width = max(80, min(available_width, int(thumb_height / bounded_ratio)))
+        elif thumb_height < min_thumb_height:
+            thumb_height = min_thumb_height
+            thumb_width = max(80, min(available_width, int(thumb_height / bounded_ratio)))
+
+        return QSize(thumb_width, thumb_height)
+
+    def _render_preview_image(self, index: int, size: QSize) -> QPixmap:
+        graph = self.model().get_graph(index)
+        scene = GraphScene()
+        scene.set_graph(graph)
+
+        device_pixel_ratio = max(1.0, self.devicePixelRatioF())
+        render_width = max(1, int(size.width() * device_pixel_ratio))
+        render_height = max(1, int(size.height() * device_pixel_ratio))
+        pixmap = QPixmap(render_width, render_height)
+        pixmap.setDevicePixelRatio(device_pixel_ratio)
+
+        if display_setting.dark_mode:
+            background_color = QColor(32, 35, 41)
+        else:
+            background_color = QColor(252, 252, 252)
+        pixmap.fill(background_color)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        source_rect = scene.itemsBoundingRect().adjusted(-10, -10, 10, 10)
+        if source_rect.isNull() or source_rect.width() < 1 or source_rect.height() < 1:
+            source_rect = QRectF(0, 0, 1, 1)
+
+        scale = min(size.width() / source_rect.width(), size.height() / source_rect.height())
+        target_width = source_rect.width() * scale
+        target_height = source_rect.height() * scale
+        target_rect = QRectF(
+            (size.width() - target_width) / 2,
+            (size.height() - target_height) / 2,
+            target_width,
+            target_height,
+        )
+
+        scene.render(
+            painter,
+            target_rect,
+            source_rect,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+        )
+        painter.end()
+        return pixmap
+
+    def preview_image(self, index: int, size: QSize) -> QPixmap:
+        if index < 0 or index >= self.model().rowCount() or size.width() <= 0 or size.height() <= 0:
+            return QPixmap(max(1, size.width()), max(1, size.height()))
+        key = (index, size.width(), size.height())
+        if key not in self._step_preview_cache:
+            self._step_preview_cache[key] = self._render_preview_image(index, size)
+        return self._step_preview_cache[key]
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
@@ -283,27 +494,68 @@ class ProofStepView(QListView):
         g = self.model().get_graph(index)
         self.graph_view.set_graph(g)
 
-    def show_context_menu(self, position: QPoint) -> None:
-        selected_indexes = self.selectedIndexes()
+    def _add_step_edit_actions(self, context_menu: QMenu, selected_indexes: list[QModelIndex],
+                               action_function_map: dict[Any, Any]) -> None:
         if not selected_indexes:
             return
-        context_menu = QMenu(self)
-        action_function_map = {}
 
         index = selected_indexes[0].row()
         if len(selected_indexes) > 1:
             group_action = context_menu.addAction("Group Steps")
             action_function_map[group_action] = self.group_selected_steps
-        elif index != 0:
-            rename_action = context_menu.addAction("Rename Step")
-            action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
-            if self.model().steps[index - 1].grouped_rewrites is not None:
-                ungroup_action = context_menu.addAction("Ungroup Steps")
-                action_function_map[ungroup_action] = self.ungroup_selected_step
+            return
+
+        if index == 0:
+            return
+
+        rename_action = context_menu.addAction("Rename Step")
+        action_function_map[rename_action] = lambda: self.edit(selected_indexes[0])
+        if self.model().steps[index - 1].grouped_rewrites is not None:
+            ungroup_action = context_menu.addAction("Ungroup Steps")
+            action_function_map[ungroup_action] = self.ungroup_selected_step
+
+    def _add_preview_actions(self, context_menu: QMenu, selected_indexes: list[QModelIndex],
+                             action_function_map: dict[Any, Any]) -> None:
+        toggle_preview_action = context_menu.addAction("Show All Step Previews")
+        toggle_preview_action.setCheckable(True)
+        toggle_preview_action.setChecked(self.all_previews_visible())
+        action_function_map[toggle_preview_action] = self.toggle_diagram_previews
+
+        if not selected_indexes:
+            return
+
+        selected_rows = [selected_index.row() for selected_index in selected_indexes]
+        selected_previews_are_visible = all(self.preview_visible_for_index(row) for row in selected_rows)
+        if selected_previews_are_visible:
+            toggle_selected_preview_action = context_menu.addAction("Hide Selected Step Previews")
+            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, False)
+            return
+
+        toggle_selected_preview_action = context_menu.addAction("Show Only Selected Step Previews")
+        if self.previews_enabled():
+            action_function_map[toggle_selected_preview_action] = lambda: self.set_preview_visibility_for_indexes(selected_rows, True)
+        else:
+            action_function_map[toggle_selected_preview_action] = lambda: self.show_only_selected_previews(selected_rows)
+
+    def show_context_menu(self, position: QPoint) -> None:
+        selected_indexes = self.selectedIndexes()
+        context_menu = QMenu(self)
+        action_function_map: dict[Any, Any] = {}
+
+        self._add_step_edit_actions(context_menu, selected_indexes, action_function_map)
+        if selected_indexes:
+            context_menu.addSeparator()
+        self._add_preview_actions(context_menu, selected_indexes, action_function_map)
 
         action = context_menu.exec_(self.mapToGlobal(position))
         if action in action_function_map:
             action_function_map[action]()
+
+    def toggle_diagram_previews(self) -> None:
+        if self.all_previews_visible():
+            self.set_previews_enabled(False)
+        else:
+            self.set_all_previews_visible()
 
     def rename_proof_step(self, new_name: str, index: int) -> None:
         from .commands import UndoableChange
@@ -354,9 +606,8 @@ class ProofStepView(QListView):
 
 
 class ProofStepItemDelegate(QStyledItemDelegate):
-    """This class controls the painting of items in the proof steps list view.
-
-    We paint a "git-style" line with circles to denote individual steps in a proof.
+    """
+    This class controls the painting of items in the proof steps list view.
     """
 
     line_width = 3
@@ -371,6 +622,9 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     # noqa: complexipy
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
         painter.save()
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        show_preview_image = step_view.preview_visible_for_index(index.row())
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
         if display_setting.dark_mode:
@@ -419,9 +673,22 @@ class ProofStepItemDelegate(QStyledItemDelegate):
         # Draw text
         text = index.data(Qt.ItemDataRole.DisplayRole)
         text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        text_y = int(option.rect.y() + option.rect.height() / 2 - text_height / 2)  # type: ignore[attr-defined]
+
+        if show_preview_image:
+            image_size = step_view.preview_size(index.row())
+            image_available_width = max(80, step_view.viewport().width() - 2 * self.line_padding - 28)
+            image_left = int(
+                option.rect.x() + self.line_width + 2 * self.line_padding + max(0, (image_available_width - image_size.width()) / 2)
+            )  # type: ignore[attr-defined]
+            image_top = int(option.rect.y() + self.vert_padding)  # type: ignore[attr-defined]
+            preview_pixmap = step_view.preview_image(index.row(), image_size)
+            painter.drawPixmap(image_left, image_top, preview_pixmap)
+            text_y = image_top + image_size.height() + self.vert_padding
+
         text_rect = QRect(
             int(option.rect.x() + self.line_width + 2 * self.line_padding),  # type: ignore[attr-defined]
-            int(option.rect.y() + option.rect.height() / 2 - text_height / 2),  # type: ignore[attr-defined]
+            text_y,
             option.rect.width(),  # type: ignore[attr-defined]
             text_height
         )
@@ -441,7 +708,13 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        step_view = self.parent()
+        assert isinstance(step_view, ProofStepView)
+        if step_view.preview_visible_for_index(index.row()):
+            preview_block_height = step_view.preview_size(index.row()).height() + self.vert_padding
+        else:
+            preview_block_height = 0
+        return QSize(size.width(), size.height() + 2 * self.vert_padding + preview_block_height)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         return QLineEdit(parent)

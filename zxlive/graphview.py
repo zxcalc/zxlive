@@ -28,7 +28,7 @@ from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform,
 from dataclasses import dataclass
 
 from . import animations as anims
-from .common import (GraphT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM,
+from .common import (GraphT, VT, SCALE, OFFSET_X, OFFSET_Y, MIN_ZOOM, MAX_ZOOM,
                      get_settings_value, set_settings_value)
 from .graphscene import GraphScene, VItem, EItem, EditGraphScene
 from .settings import display_setting
@@ -150,33 +150,53 @@ class GraphView(QGraphicsView):
         else:
             e.ignore()
 
+    def _keyboard_move_delta(self, key: int, distance: float) -> Optional[tuple[float, float]]:
+        if key == Qt.Key.Key_Up:
+            return 0.0, -distance
+        if key == Qt.Key.Key_Down:
+            return 0.0, distance
+        if key == Qt.Key.Key_Left:
+            return -distance, 0.0
+        if key == Qt.Key.Key_Right:
+            return distance, 0.0
+        return None
+
+    def _move_selected_vertices_with_keyboard(self, key: int, distance: float) -> list[tuple[VT, float, float]]:
+        delta = self._keyboard_move_delta(key, distance)
+        if delta is None:
+            return []
+
+        delta_x, delta_y = delta
+        g = self.graph_scene.g
+        moved_vertices: list[tuple[VT, float, float]] = []
+        for v in self.graph_scene.selected_vertices:
+            vitem = self.graph_scene.vertex_map[v]
+            old_x = g.row(v)
+            old_y = g.qubit(v)
+            g.set_position(v, old_y + delta_y, old_x + delta_x)
+            vitem.set_pos_from_graph()
+            moved_vertices.append((v, g.row(v), g.qubit(v)))
+        return moved_vertices
+
     def keyPressEvent(self, e: QKeyEvent) -> None:
         """Logic for moving selected vertices with arrow keys and merging selected vertices with Ctrl+M"""
-        if Qt.KeyboardModifier.ControlModifier & e.modifiers():
-            g = self.graph_scene.g
-            if Qt.KeyboardModifier.ShiftModifier & e.modifiers():
-                distance = 1 / get_settings_value("snap-granularity", int)
-            else:
-                distance = 0.5
-            if e.key() == Qt.Key.Key_M:
-                # Merge vertices at the same position
-                self.merge_triggered.emit()
-                return
-            for v in self.graph_scene.selected_vertices:
-                vitem = self.graph_scene.vertex_map[v]
-                x = g.row(v)
-                y = g.qubit(v)
-                if e.key() == Qt.Key.Key_Up:
-                    g.set_position(v, y - distance, x)
-                elif e.key() == Qt.Key.Key_Down:
-                    g.set_position(v, y + distance, x)
-                elif e.key() == Qt.Key.Key_Left:
-                    g.set_position(v, y, x - distance)
-                elif e.key() == Qt.Key.Key_Right:
-                    g.set_position(v, y, x + distance)
-                vitem.set_pos_from_graph()
-        else:
+        if not (Qt.KeyboardModifier.ControlModifier & e.modifiers()):
             super().keyPressEvent(e)
+            return
+
+        if e.key() == Qt.Key.Key_M:
+            # Merge vertices at the same position
+            self.merge_triggered.emit()
+            return
+
+        distance = (1 / get_settings_value("snap-granularity", int)
+                    if Qt.KeyboardModifier.ShiftModifier & e.modifiers() else 0.5)
+        moved_vertices = self._move_selected_vertices_with_keyboard(e.key(), distance)
+        if not moved_vertices:
+            super().keyPressEvent(e)
+            return
+        self.graph_scene.vertices_moved.emit(moved_vertices)
+        e.accept()
 
     # TODO: Fix code complexity
     # noqa: complexipy
