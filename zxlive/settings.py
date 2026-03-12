@@ -33,6 +33,8 @@ class ColorScheme(TypedDict):
     z_pauli_web: QColor
     x_pauli_web: QColor
     y_pauli_web: QColor
+    rewrite_highlight_vertex: QColor
+    rewrite_highlight_edge: QColor
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
@@ -45,6 +47,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "input-circuit-format": 'openqasm',
     "previews-show": True,
     "sparkle-mode": True,
+    "highlight-rewrites": True,
     'sound-effects': False,
     "matrix/precision": 4,
     "dark-mode": "system",
@@ -134,6 +137,8 @@ modern_red_green: ColorScheme = {
     "z_pauli_web": QColor("#ccffcc"),
     "x_pauli_web": QColor("#ff8888"),
     "y_pauli_web": QColor("#6688ff"),
+    "rewrite_highlight_vertex": QColor("#E65100"),
+    "rewrite_highlight_edge": QColor("#FF9800"),
 }
 
 classic_red_green: ColorScheme = {
@@ -147,6 +152,8 @@ classic_red_green: ColorScheme = {
     "z_pauli_web": QColor("#00ff00"),
     "x_pauli_web": QColor("#ff0d00"),
     "y_pauli_web": QColor("#0000ff"),
+    "rewrite_highlight_vertex": QColor("#E65100"),
+    "rewrite_highlight_edge": QColor("#FF9800"),
 }
 
 white_gray: ColorScheme = {
@@ -159,6 +166,8 @@ white_gray: ColorScheme = {
     "x_spider_pressed": QColor("#a0a0a0"),
     "hadamard": QColor("#ffffff"),
     "hadamard_pressed": QColor("#dddddd"),
+    "rewrite_highlight_vertex": QColor("#1976D2"),
+    "rewrite_highlight_edge": QColor("#42A5F5"),
 }
 
 gidney: ColorScheme = {
@@ -169,6 +178,8 @@ gidney: ColorScheme = {
     "z_spider_pressed": QColor("#222222"),
     "x_spider": QColor("#ffffff"),
     "x_spider_pressed": QColor("#dddddd"),
+    "rewrite_highlight_vertex": QColor("#1565C0"),
+    "rewrite_highlight_edge": QColor("#42A5F5"),
 }
 
 color_schemes = {
@@ -244,6 +255,15 @@ class DisplaySettings:
         settings.setValue("previews-show", value)
 
     @property
+    def highlight_rewrites(self) -> bool:
+        """Whether proof-step rewrite highlighting is enabled."""
+        return get_settings_value("highlight-rewrites", bool)
+
+    @highlight_rewrites.setter
+    def highlight_rewrites(self, value: bool) -> None:
+        settings.setValue("highlight-rewrites", value)
+
+    @property
     def dark_mode(self) -> bool:
         dark_mode_setting = str(settings.value("dark-mode", "system"))
         if dark_mode_setting == "system":
@@ -283,11 +303,17 @@ class DisplaySettings:
             lightness = int(lightness * 0.6)
             saturation = int(saturation * 0.4)
             return QColor.fromHsl(hue, saturation, lightness, alpha)
+
         base: dict[str, QColor] = {k: v for k, v in self.colors.items() if isinstance(v, QColor)}
+        # Always use fixed highlight colors for readability in both light and dark mode
+        base["rewrite_highlight_vertex"] = QColor("#FFB74D")
+        base["rewrite_highlight_edge"] = QColor("#FFC107")
         if self.dark_mode:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
                     base[k] = QColor("#dbdbdb")
+                elif k in ("rewrite_highlight_vertex", "rewrite_highlight_edge"):
+                    pass  # Already set above
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode

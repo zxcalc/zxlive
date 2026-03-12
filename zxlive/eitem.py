@@ -106,6 +106,12 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setDashPattern([4.0, 2.0])
         pen.setColor(self.color)
+
+        if self.graph_scene.is_edge_highlighted(self.e):
+            # Emphasize highlighted edges with a thicker, accent-colored pen.
+            pen.setWidthF(self.thickness + 2.0)
+            pen.setColor(display_setting.effective_colors["rewrite_highlight_edge"])
+
         self.setPen(QPen(pen))
 
         if not self.is_dragging:
