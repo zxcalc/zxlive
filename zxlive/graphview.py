@@ -178,8 +178,7 @@ class GraphView(QGraphicsView):
         else:
             super().keyPressEvent(e)
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
+    # TODO: Fix code complexity  # noqa: complexipy
     def mouseMoveEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
         super().mouseMoveEvent(e)
         if self.tool == GraphTool.Selection:
@@ -214,8 +213,7 @@ class GraphView(QGraphicsView):
         else:
             e.ignore()
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
+    # TODO: Fix code complexity  # noqa: complexipy
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
         if e.button() == Qt.MouseButton.RightButton and self.graph_scene.selectedItems():
             return

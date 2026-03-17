@@ -27,6 +27,7 @@ from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
 from .custom_rule import CustomRule
+from pyzx.utils import get_w_io, vertex_is_w
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -77,6 +78,41 @@ def _apply_single_match(
     return rule_sg.apply(g, cast(list[VT], m))
 
 
+def _highlight_verts_compound(matches_list: list[MatchItem]) -> Optional[list[VT]]:
+    """Compute highlight vertices for MATCH_COMPOUND rules."""
+    all_v: set[VT] = set()
+    for match in matches_list:
+        if isinstance(match, list):
+            all_v.update(match)
+    return list(all_v) if all_v else None
+
+
+def _highlight_verts_bialgebra(matches_list: list[MatchItem]) -> Optional[list[VT]]:
+    """Compute highlight vertices for the bialgebra rule."""
+    involved: set[VT] = set()
+    for match in matches_list:
+        if isinstance(match, tuple) and len(match) == 2:
+            v1, v2 = cast(tuple[VT, VT], match)
+            involved.add(v1)
+            involved.add(v2)
+    return list(involved) if involved else None
+
+
+def _highlight_verts_generic(matches_list: list[MatchItem]) -> Optional[list[VT]]:
+    """Compute generic highlight vertices for MATCH_SINGLE or MATCH_DOUBLE."""
+    vs: set[VT] = set()
+    for match in matches_list:
+        if isinstance(match, int):
+            vs.add(cast(VT, match))
+        elif isinstance(match, tuple) and len(match) == 2:
+            v1, v2 = cast(tuple[VT, VT], match)
+            vs.add(v1)
+            vs.add(v2)
+        elif isinstance(match, list):
+            vs.update(cast(list[VT], match))
+    return list(vs) if vs else None
+
+
 def _compute_highlight_verts(
     matches_list: list[MatchItem],
     match_type: MatchType,
@@ -85,37 +121,14 @@ def _compute_highlight_verts(
     """Compute highlight_verts from matches_list."""
     if not matches_list:
         return None
-    # 1) Compound: highlight all matched vertices.
+
     if match_type == MATCH_COMPOUND:
-        all_v: set[VT] = set()
-        for m in matches_list:
-            if isinstance(m, list):
-                all_v.update(m)
-        return list(all_v) if all_v else None
-    # 2) Bialgebra: highlight all spiders in MATCH_DOUBLE pairs.
-    if (
-        match_type == MATCH_DOUBLE
-        and name == rules_basic["bialgebra"]["text"]
-    ):
-        involved: set[VT] = set()
-        for m in matches_list:
-            if isinstance(m, tuple) and len(m) == 2:
-                v1, v2 = cast(tuple[VT, VT], m)
-                involved.add(v1)
-                involved.add(v2)
-        return list(involved) if involved else None
-    # 3) Generic: MATCH_SINGLE or MATCH_DOUBLE.
-    vs: set[VT] = set()
-    for m in matches_list:
-        if isinstance(m, int):
-            vs.add(cast(VT, m))
-        elif isinstance(m, tuple) and len(m) == 2:
-            v1, v2 = cast(tuple[VT, VT], m)
-            vs.add(v1)
-            vs.add(v2)
-        elif isinstance(m, list):
-            vs.update(cast(list[VT], m))
-    return list(vs) if vs else None
+        return _highlight_verts_compound(matches_list)
+
+    if match_type == MATCH_DOUBLE and name == rules_basic["bialgebra"]["text"]:
+        return _highlight_verts_bialgebra(matches_list)
+
+    return _highlight_verts_generic(matches_list)
 
 
 @dataclass
@@ -161,8 +174,7 @@ class RewriteAction:
             file_path=d.get('file_path', None),
         )
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
+    # TODO: Fix code complexity  # noqa: complexipy, D401
     def do_rewrite(self, panel: ProofPanel) -> None:  # noqa: PLR0912  # pylint: disable=too-many-locals
         if not self.enabled:
             return
@@ -187,6 +199,7 @@ class RewriteAction:
             and self.match_type == MATCH_DOUBLE
         )
         highlight_match_pairs: list[tuple[VT, VT]] | None = None
+        fuse_w_verts: Optional[list[VT]] = None
 
         while True:
             matches = _find_matches(self.rule, self.match_type, g, verts, edges)
@@ -198,6 +211,8 @@ class RewriteAction:
                 for m in matches:
                     if is_fuse_rule and self.match_type == MATCH_DOUBLE:
                         v1, v2 = cast(tuple[VT, VT], m)
+                        if fuse_w_verts is None and vertex_is_w(g.type(v1)) and vertex_is_w(g.type(v2)):
+                            fuse_w_verts = list(get_w_io(g, v1)) + list(get_w_io(g, v2))
                         if highlight_match_pairs is None:
                             highlight_match_pairs = []
                         highlight_match_pairs.append((v1, v2))
@@ -218,14 +233,13 @@ class RewriteAction:
             g,
             panel.step_view,
             self.name,
-            highlight_match_pairs=highlight_match_pairs if is_fuse_rule else None,
-            highlight_verts=highlight_verts,
+            highlight_match_pairs=None if fuse_w_verts is not None else (highlight_match_pairs if is_fuse_rule else None),
+            highlight_verts=fuse_w_verts if fuse_w_verts is not None else highlight_verts,
         )
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
+    # TODO: Fix code complexity  # noqa: complexipy, D401
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # noqa: PLR0912  # pylint: disable=too-many-branches
         if self.copy_first:
             g = copy.deepcopy(g)

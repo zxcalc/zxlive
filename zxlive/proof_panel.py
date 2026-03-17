@@ -11,8 +11,8 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
-from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
-                        set_z_box_label, vertex_is_z_like)
+from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_io, get_w_partner,
+                        get_z_box_label, set_z_box_label, vertex_is_w, vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
@@ -191,10 +191,19 @@ class ProofPanel(BasePanel):
         if pyzx.rewrite_rules.check_fuse(g, v, w):
             pyzx.rewrite_rules.fuse(g, w, v)
             anim = anims.fuse(self.graph_scene.vertex_map[v], self.graph_scene.vertex_map[w])
-            cmd = AddRewriteStep(
-                self.graph_view, g, self.step_view, "Fuse spiders",
-                highlight_match_pairs=[(v, w)],
-            )
+            # For W fusion, highlight both W nodes (input+output each); proof filters to existing verts.
+            if vertex_is_w(base_g.type(v)) and vertex_is_w(base_g.type(w)):
+                v_in, v_out = get_w_io(base_g, v)
+                w_in, w_out = get_w_io(base_g, w)
+                cmd = AddRewriteStep(
+                    self.graph_view, g, self.step_view, "Fuse spiders",
+                    highlight_verts=[v_in, v_out, w_in, w_out],
+                )
+            else:
+                cmd = AddRewriteStep(
+                    self.graph_view, g, self.step_view, "Fuse spiders",
+                    highlight_match_pairs=[(v, w)],
+                )
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
         elif pyzx.rewrite_rules.check_copy(g, v):
