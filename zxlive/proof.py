@@ -86,11 +86,12 @@ def _apply_vertex_based_highlight(
     if not verts_set:
         return False
 
+    edges_highlight: set[ET]
     if len(verts_set) == 2:
         s = sorted(verts_set)
         edges_highlight = set(g_current.edges(s[0], s[1]))
     else:
-        edges_highlight: set[ET] = set()
+        edges_highlight = set()
         for v in verts_set:
             for e in g_current.incident_edges(v):
                 s, t = g_current.edge_st(e)
