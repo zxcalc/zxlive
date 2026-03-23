@@ -39,6 +39,25 @@ if TYPE_CHECKING:
 
 BLACK = "#000000"
 
+_VITEM_COLOR_MAP = {
+    VertexType.Z: "z_spider",
+    VertexType.Z_BOX: "z_spider",
+    VertexType.X: "x_spider",
+    VertexType.H_BOX: "hadamard",
+    VertexType.W_INPUT: "w_input",
+    VertexType.W_OUTPUT: "w_output",
+    VertexType.DUMMY: "dummy",
+}
+_VITEM_PRESSED_COLOR_MAP = {
+    VertexType.Z: "z_spider_pressed",
+    VertexType.Z_BOX: "z_spider_pressed",
+    VertexType.X: "x_spider_pressed",
+    VertexType.H_BOX: "hadamard_pressed",
+    VertexType.W_INPUT: "w_input_pressed",
+    VertexType.W_OUTPUT: "w_output_pressed",
+    VertexType.DUMMY: "dummy_pressed",
+}
+
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
 # vertices during movement. Phase items are drawn on the very top.
@@ -132,74 +151,61 @@ class VItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    def refresh(self) -> None:
-        """Call this method whenever a vertex moves or its data changes"""
-        self.update_shape()
-        color_map = {
-            VertexType.Z: "z_spider",
-            VertexType.Z_BOX: "z_spider",
-            VertexType.X: "x_spider",
-            VertexType.H_BOX: "hadamard",
-            VertexType.W_INPUT: "w_input",
-            VertexType.W_OUTPUT: "w_output",
-            VertexType.DUMMY: "dummy",
-        }
-        pressed_color_map = {
-            VertexType.Z: "z_spider_pressed",
-            VertexType.Z_BOX: "z_spider_pressed",
-            VertexType.X: "x_spider_pressed",
-            VertexType.H_BOX: "hadamard_pressed",
-            VertexType.W_INPUT: "w_input_pressed",
-            VertexType.W_OUTPUT: "w_output_pressed",
-            VertexType.DUMMY: "dummy_pressed",
-        }
+    def _base_brush_pen_for_refresh(self) -> tuple[QBrush, QPen]:
+        """Brush and pen before rewrite-step highlight overlay."""
         pen = QPen()
         if not self.isSelected():
-            color_key = color_map.get(self.ty, "boundary")
+            color_key = _VITEM_COLOR_MAP.get(self.ty, "boundary")
             brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
             pen.setColor(display_setting.effective_colors["outline"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy"])
+            return brush, pen
+
+        color_key = _VITEM_PRESSED_COLOR_MAP.get(self.ty, "boundary_pressed")
+        brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
+        brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+        pen.setWidthF(5)
+        if display_setting.dark_mode:
+            pen.setColor(QColor("#dbdbdb"))
         else:
-            color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
-            brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-            pen.setWidthF(5)
-            # Use a light outline in dark mode, otherwise use the pressed color
-            if display_setting.dark_mode:
-                pen.setColor(QColor("#dbdbdb"))
-            else:
-                pen.setColor(display_setting.effective_colors["boundary_pressed"])
-            if self.ty == VertexType.DUMMY:
-                pen.setColor(display_setting.effective_colors["dummy_pressed"])
+            pen.setColor(display_setting.effective_colors["boundary_pressed"])
+        if self.ty == VertexType.DUMMY:
+            pen.setColor(display_setting.effective_colors["dummy_pressed"])
+        return brush, pen
 
-        if self.graph_scene.is_vertex_highlighted(self.v):
-            # Emphasize highlighted vertices with a thicker, accent-colored outline.
-            pen.setWidthF(pen.widthF() + 2.0)
-            pen.setColor(display_setting.effective_colors["rewrite_highlight_vertex"])
+    def _apply_rewrite_highlight_pen(self, pen: QPen) -> None:
+        """Thicken and recolor pen when this vertex is in rewrite highlight."""
+        pen.setWidthF(pen.widthF() + 2.0)
+        pen.setColor(display_setting.effective_colors["rewrite_highlight_vertex"])
 
-        self.prepareGeometryChange()
-        self.setBrush(brush)
-        self.setPen(pen)
-
-        # Render dummy node text (plain or LaTeX)
+    def _refresh_dummy_phase_and_edges(self) -> None:
+        """Update dummy label, phase item, paired W output, and incident edges."""
         if self.ty == VertexType.DUMMY:
             self._update_dummy_display(self.g.vdata(self.v, 'text', ''))
         else:
             self.remove_dummy_label()
-
         if self.phase_item:
             self.phase_item.refresh()
         if self.ty == VertexType.W_INPUT:
             w_out = get_w_partner_vitem(self)
             if w_out:
                 w_out.refresh()
-
         for e_item in self.adj_items:
             e_item.refresh()
+
+    # TODO: Fix code complexity
+    def refresh(self) -> None:
+        """Call this method whenever a vertex moves or its data changes"""
+        self.update_shape()
+        brush, pen = self._base_brush_pen_for_refresh()
+        if self.graph_scene.is_vertex_highlighted(self.v):
+            self._apply_rewrite_highlight_pen(pen)
+        self.prepareGeometryChange()
+        self.setBrush(brush)
+        self.setPen(pen)
+        self._refresh_dummy_phase_and_edges()
 
     def _make_shape_path(self) -> QPainterPath:
         """Helper to create the path for both drawing and hit-testing."""
@@ -303,7 +309,6 @@ class VItem(QGraphicsPathItem):
         self._old_pos = self.pos()
 
     # TODO: Fix code complexity
-    # noqa: complexipy
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
         super().mouseMoveEvent(e)
         if self.is_animated:
@@ -348,7 +353,6 @@ class VItem(QGraphicsPathItem):
         e.ignore()
 
     # TODO: Fix code complexity
-    # noqa: complexipy
     def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
