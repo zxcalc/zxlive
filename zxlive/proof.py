@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
                             QItemSelection, QModelIndex,
                             QPersistentModelIndex, QPoint, QPointF, QRect,
-                            QRectF, QSize, Qt)
+                            QRectF, QSize, Qt, Signal)
 from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter,
                            QPen, QPixmap)
 from PySide6.QtWidgets import (QAbstractItemView, QFrame, QHBoxLayout, QLabel,
@@ -328,6 +328,8 @@ class ProofModel(QAbstractListModel):
 class ProofStepView(QWidget):
     """Widget containing the proof step list and a thumbnail toggle button."""
 
+    thumbnails_toggled = Signal(bool)
+
     def __init__(self, parent: 'ProofPanel'):
         super().__init__(parent)
         self.graph_view = parent.graph_view
@@ -357,9 +359,9 @@ class ProofStepView(QWidget):
         self.thumbnails_toggle.setChecked(show_thumbnails)
         self.thumbnails_toggle.setAutoRaise(True)
         self.thumbnails_toggle.setToolTip("Toggle proof step diagram previews (t)")
-        self.thumbnails_toggle.setShortcut("t")
-        self.thumbnails_toggle.clicked.connect(self.set_thumbnails_visible)
+        self.thumbnails_toggle.toggled.connect(self._on_toggled)
         header_layout.addWidget(self.thumbnails_toggle)
+
         layout.addWidget(header)
 
         # Add a subtle separator line
@@ -372,22 +374,22 @@ class ProofStepView(QWidget):
         self._list = _ProofStepListView(self)
         layout.addWidget(self._list)
 
+    def _on_toggled(self, checked: bool) -> None:
+        self._list.set_thumbnails_visible(checked)
+        self.thumbnails_toggled.emit(checked)
+
     # ---- proxy properties so the rest of the codebase keeps working ----
     @property
     def thumbnails_visible(self) -> bool:
-        return self._list.thumbnails_visible
+        return self.thumbnails_toggle.isChecked()
 
     @thumbnails_visible.setter
     def thumbnails_visible(self, value: bool) -> None:
-        self._list.thumbnails_visible = value
+        self.thumbnails_toggle.setChecked(value)
 
     def update(self, *args: Any) -> None:
         super().update(*args)
         self._list.viewport().update()
-
-    def set_thumbnails_visible(self, visible: bool) -> None:
-        self.thumbnails_toggle.setChecked(visible)
-        self._list.set_thumbnails_visible(visible)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._list, name)
