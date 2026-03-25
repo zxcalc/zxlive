@@ -257,7 +257,11 @@ class MainWindow(QMainWindow):
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
-        self.effects = {e: load_sfx(e) for e in SFXEnum}
+        # Lazy load SFX to avoid Qt multimedia backend issues in headless/CI.
+        # (Tests run with sound-effects disabled by default.)
+        self.effects: dict[SFXEnum, object] = {}
+        if self.sfx_on:
+            self.effects = {e: load_sfx(e) for e in SFXEnum}
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
@@ -952,8 +956,14 @@ class MainWindow(QMainWindow):
         set_settings_value("sound-effects", value, bool, self.settings)
 
     def play_sound(self, s: SFXEnum) -> None:
-        if self.sfx_on:
-            self.effects[s].play()
+        if not self.sfx_on:
+            return
+        if s not in self.effects:
+            # Load on first use (or when user enables sound effects).
+            self.effects[s] = load_sfx(s)
+        # `load_sfx` returns QSoundEffect; we keep the type loose to avoid
+        # importing QtMultimedia for typing in this module.
+        self.effects[s].play()  # type: ignore[no-any-return]
 
     def _toggle_sfx(self) -> None:
         self.sfx_on = not self.sfx_on
