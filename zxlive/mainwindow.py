@@ -19,7 +19,7 @@ import copy
 import json
 import logging
 import random
-from typing import Callable, Optional, cast
+from typing import Callable, Optional, cast, TYPE_CHECKING
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
@@ -51,6 +51,9 @@ from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
+
+if TYPE_CHECKING:
+    from PySide6.QtMultimedia import QSoundEffect
 
 
 class MainWindow(QMainWindow):
@@ -228,6 +231,11 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
+        self.show_rewrite_highlights_action = QAction("Show rewrite highlights", self)
+        self.show_rewrite_highlights_action.setCheckable(True)
+        self.show_rewrite_highlights_action.setChecked(get_settings_value("highlight-rewrites", bool))
+        self.show_rewrite_highlights_action.triggered.connect(self._toggle_rewrite_highlights)
+        view_menu.addAction(self.show_rewrite_highlights_action)
 
         new_rewrite_from_file = self._new_action(
             "New rewrite from file", lambda: create_new_rewrite(self),
@@ -257,7 +265,11 @@ class MainWindow(QMainWindow):
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
-        self.effects = {e: load_sfx(e) for e in SFXEnum}
+        # Lazy load SFX to avoid Qt multimedia backend issues in headless/CI.
+        # (Tests run with sound-effects disabled by default.)
+        self.effects: dict[SFXEnum, "QSoundEffect"] = {}
+        if self.sfx_on:
+            self.effects = {e: load_sfx(e) for e in SFXEnum}
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
@@ -425,7 +437,9 @@ class MainWindow(QMainWindow):
             return False
 
         try:
-            session_data = json.loads(session_json)
+            # QSettings.value can return various types; ensure we pass a str/bytes-like
+            # object to json.loads for type-checker correctness.
+            session_data = json.loads(str(session_json))
             tabs_state = session_data.get('tabs', [])
             active_tab = session_data.get('active_tab', 0)
 
@@ -506,6 +520,22 @@ class MainWindow(QMainWindow):
             name = "*" + name
         self.tab_widget.setTabText(i, name)
         self.tab_widget.setTabToolTip(i, name)
+
+    def _toggle_rewrite_highlights(self, checked: bool) -> None:
+        display_setting.highlight_rewrites = checked
+        self.refresh_rewrite_highlight()
+
+    def refresh_rewrite_highlight(self) -> None:
+        """Re-apply or clear rewrite step highlighting based on current setting.
+        Call after changing the highlight-rewrites setting so the graph updates immediately."""
+        self.show_rewrite_highlights_action.setChecked(display_setting.highlight_rewrites)
+        if not isinstance(self.active_panel, ProofPanel):
+            return
+        proof_panel = cast(ProofPanel, self.active_panel)
+        step_view = proof_panel.step_view
+        current_row = step_view.currentIndex().row()
+        if current_row >= 0:
+            step_view.move_to_step(current_row)
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
@@ -934,8 +964,12 @@ class MainWindow(QMainWindow):
         set_settings_value("sound-effects", value, bool, self.settings)
 
     def play_sound(self, s: SFXEnum) -> None:
-        if self.sfx_on:
-            self.effects[s].play()
+        if not self.sfx_on:
+            return
+        if s not in self.effects:
+            # Load on first use (or when user enables sound effects).
+            self.effects[s] = load_sfx(s)
+        self.effects[s].play()
 
     def _toggle_sfx(self) -> None:
         self.sfx_on = not self.sfx_on

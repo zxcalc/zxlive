@@ -1,8 +1,11 @@
 from enum import Enum
 from PySide6.QtCore import QUrl
-from PySide6.QtMultimedia import QSoundEffect
+from typing import TYPE_CHECKING
 
 from .common import get_data
+
+if TYPE_CHECKING:
+    from PySide6.QtMultimedia import QSoundEffect
 
 
 class SFXEnum(Enum):
@@ -17,8 +20,12 @@ class SFXEnum(Enum):
     WELCOME_EVERYBODY = "welcome-everybody.wav"
 
 
-def load_sfx(e: SFXEnum) -> QSoundEffect:
+def load_sfx(e: SFXEnum) -> "QSoundEffect":
     """Load a sound effect from a file."""
+    # Import QtMultimedia lazily to avoid importing / initializing multimedia
+    # backends during module import (important for headless CI).
+    from PySide6.QtMultimedia import QSoundEffect
+
     effect = QSoundEffect()
     fullpath = get_data("sfx/" + e.value)
     url = QUrl.fromLocalFile(fullpath)

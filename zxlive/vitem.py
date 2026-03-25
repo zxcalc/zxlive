@@ -39,6 +39,25 @@ if TYPE_CHECKING:
 
 BLACK = "#000000"
 
+_VITEM_COLOR_MAP = {
+    VertexType.Z: "z_spider",
+    VertexType.Z_BOX: "z_spider",
+    VertexType.X: "x_spider",
+    VertexType.H_BOX: "hadamard",
+    VertexType.W_INPUT: "w_input",
+    VertexType.W_OUTPUT: "w_output",
+    VertexType.DUMMY: "dummy",
+}
+_VITEM_PRESSED_COLOR_MAP = {
+    VertexType.Z: "z_spider_pressed",
+    VertexType.Z_BOX: "z_spider_pressed",
+    VertexType.X: "x_spider_pressed",
+    VertexType.H_BOX: "hadamard_pressed",
+    VertexType.W_INPUT: "w_input_pressed",
+    VertexType.W_OUTPUT: "w_output_pressed",
+    VertexType.DUMMY: "dummy_pressed",
+}
+
 # Z values for different items. We use those to make sure that edges
 # are drawn below vertices and selected vertices above unselected
 # vertices during movement. Phase items are drawn on the very top.
@@ -132,68 +151,61 @@ class VItem(QGraphicsPathItem):
     def is_animated(self) -> bool:
         return len(self.active_animations) > 0
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    def refresh(self) -> None:
-        """Call this method whenever a vertex moves or its data changes"""
-        self.update_shape()
-        color_map = {
-            VertexType.Z: "z_spider",
-            VertexType.Z_BOX: "z_spider",
-            VertexType.X: "x_spider",
-            VertexType.H_BOX: "hadamard",
-            VertexType.W_INPUT: "w_input",
-            VertexType.W_OUTPUT: "w_output",
-            VertexType.DUMMY: "dummy",
-        }
-        pressed_color_map = {
-            VertexType.Z: "z_spider_pressed",
-            VertexType.Z_BOX: "z_spider_pressed",
-            VertexType.X: "x_spider_pressed",
-            VertexType.H_BOX: "hadamard_pressed",
-            VertexType.W_INPUT: "w_input_pressed",
-            VertexType.W_OUTPUT: "w_output_pressed",
-            VertexType.DUMMY: "dummy_pressed",
-        }
+    def _base_brush_pen_for_refresh(self) -> tuple[QBrush, QPen]:
+        """Brush and pen before rewrite-step highlight overlay."""
         pen = QPen()
         if not self.isSelected():
-            color_key = color_map.get(self.ty, "boundary")
+            color_key = _VITEM_COLOR_MAP.get(self.ty, "boundary")
             brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
             pen.setWidthF(3)
             pen.setColor(display_setting.effective_colors["outline"])
             if self.ty == VertexType.DUMMY:
                 pen.setColor(display_setting.effective_colors["dummy"])
-        else:
-            color_key = pressed_color_map.get(self.ty, "boundary_pressed")
-            brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
-            brush.setStyle(Qt.BrushStyle.Dense1Pattern)
-            pen.setWidthF(5)
-            # Use a light outline in dark mode, otherwise use the pressed color
-            if display_setting.dark_mode:
-                pen.setColor(QColor("#dbdbdb"))
-            else:
-                pen.setColor(display_setting.effective_colors["boundary_pressed"])
-            if self.ty == VertexType.DUMMY:
-                pen.setColor(display_setting.effective_colors["dummy_pressed"])
-        self.prepareGeometryChange()
-        self.setBrush(brush)
-        self.setPen(pen)
+            return brush, pen
 
-        # Render dummy node text (plain or LaTeX)
+        color_key = _VITEM_PRESSED_COLOR_MAP.get(self.ty, "boundary_pressed")
+        brush = QBrush(display_setting.effective_colors[color_key])  # type: ignore # https://github.com/python/mypy/issues/7178
+        brush.setStyle(Qt.BrushStyle.Dense1Pattern)
+        pen.setWidthF(5)
+        if display_setting.dark_mode:
+            pen.setColor(QColor("#dbdbdb"))
+        else:
+            pen.setColor(display_setting.effective_colors["boundary_pressed"])
+        if self.ty == VertexType.DUMMY:
+            pen.setColor(display_setting.effective_colors["dummy_pressed"])
+        return brush, pen
+
+    def _apply_rewrite_highlight_pen(self, pen: QPen) -> None:
+        """Thicken and recolor pen when this vertex is in rewrite highlight."""
+        pen.setWidthF(pen.widthF() + 2.0)
+        pen.setColor(display_setting.effective_colors["rewrite_highlight_vertex"])
+
+    def _refresh_dummy_phase_and_edges(self) -> None:
+        """Update dummy label, phase item, paired W output, and incident edges."""
         if self.ty == VertexType.DUMMY:
             self._update_dummy_display(self.g.vdata(self.v, 'text', ''))
         else:
             self.remove_dummy_label()
-
         if self.phase_item:
             self.phase_item.refresh()
         if self.ty == VertexType.W_INPUT:
             w_out = get_w_partner_vitem(self)
             if w_out:
                 w_out.refresh()
-
         for e_item in self.adj_items:
             e_item.refresh()
+
+    # TODO: Fix code complexity
+    def refresh(self) -> None:
+        """Call this method whenever a vertex moves or its data changes"""
+        self.update_shape()
+        brush, pen = self._base_brush_pen_for_refresh()
+        if self.graph_scene.is_vertex_highlighted(self.v):
+            self._apply_rewrite_highlight_pen(pen)
+        self.prepareGeometryChange()
+        self.setBrush(brush)
+        self.setPen(pen)
+        self._refresh_dummy_phase_and_edges()
 
     def _make_shape_path(self) -> QPainterPath:
         """Helper to create the path for both drawing and hit-testing."""
@@ -296,9 +308,47 @@ class VItem(QGraphicsPathItem):
             return
         self._old_pos = self.pos()
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
+    def _mouse_move_drag_w_vertex(self, e: QGraphicsSceneMouseEvent) -> bool:
+        """Move coupled W input/output during drag. Returns True if event handling should stop."""
+        if not self.is_dragging:
+            return False
+        if self.ty == VertexType.W_OUTPUT:
+            w_in = get_w_partner_vitem(self)
+            assert w_in is not None
+            if self._last_pos is None:
+                self._last_pos = self.pos()
+            w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
+            self._last_pos = self.pos()
+            return False
+        if self.ty == VertexType.W_INPUT:
+            w_out = get_w_partner_vitem(self)
+            if w_out is None:
+                e.ignore()
+                return True
+            w_out.set_vitem_rotation()
+        return False
+
+    def _mouse_move_drag_hover_onto(self, scene: GraphScene) -> None:
+        """Emit vertex_dragged when dragging over another vertex while single-selected."""
+        reset = True
+        for it in scene.items():
+            if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
+                continue
+            if isinstance(it, VItem) and vertex_is_w(self.ty) and get_w_partner(self.g, self.v) == it.v:
+                continue
+            if it == self._dragged_on:
+                reset = False
+            elif isinstance(it, VItem) and it != self:
+                scene.vertex_dragged.emit(DragState.Onto, self.v, it.v)
+                if self._dragged_on is not None:
+                    scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
+                self._dragged_on = it
+                return
+        if reset and self._dragged_on is not None:
+            scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
+            self._dragged_on = None
+
+    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         if self.is_animated:
             e.ignore()
@@ -306,81 +356,57 @@ class VItem(QGraphicsPathItem):
         scene = self.scene()
         if TYPE_CHECKING:
             assert isinstance(scene, GraphScene)
-        if self.is_dragging and self.ty == VertexType.W_OUTPUT:
-            w_in = get_w_partner_vitem(self)
-            assert w_in is not None
-            if self._last_pos is None:
-                self._last_pos = self.pos()
-            w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
-            self._last_pos = self.pos()
-        elif self.is_dragging and self.ty == VertexType.W_INPUT:
-            w_out = get_w_partner_vitem(self)
-            if w_out is None:
-                e.ignore()
-                return
-            w_out.set_vitem_rotation()
+        if self._mouse_move_drag_w_vertex(e):
+            return
         if self.is_dragging and len(scene.selectedItems()) == 1:
-            reset = True
-            for it in scene.items():
-                if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
-                    continue
-                if isinstance(it, VItem) and vertex_is_w(self.ty) and get_w_partner(self.g, self.v) == it.v:
-                    continue
-                if it == self._dragged_on:
-                    reset = False
-                elif isinstance(it, VItem) and it != self:
-                    scene.vertex_dragged.emit(DragState.Onto, self.v, it.v)
-                    # If we previously hovered over a vertex, notify the scene that we
-                    # are no longer
-                    if self._dragged_on is not None:
-                        scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
-                    self._dragged_on = it
-                    return
-            if reset and self._dragged_on is not None:
-                scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
-                self._dragged_on = None
+            self._mouse_move_drag_hover_onto(scene)
         e.ignore()
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
+    def _snap_w_input_after_drag(self) -> None:
+        """Place W input next to its partner at the correct angle."""
+        w_out = get_w_partner_vitem(self)
+        assert w_out is not None
+        w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
+        w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
+        self.setPos(w_in_pos)
+
+    def _emit_vertices_moved_or_dropped(self, scene: GraphScene) -> None:
+        if self._dragged_on is not None and len(scene.selectedItems()) == 1:
+            scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
+            return
+        moved_vertices: list[VItem] = []
+        for it in scene.selectedItems():
+            if not isinstance(it, VItem):
+                continue
+            moved_vertices.append(it)
+            if vertex_is_w(it.ty):
+                partner = get_w_partner_vitem(it)
+                if partner:
+                    moved_vertices.append(partner)
+        scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
+
+    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)
         if self.is_animated:
             e.ignore()
             return
-        if e.button() == Qt.MouseButton.LeftButton:
-            if self._old_pos is None or self._old_pos != self.pos():
-                if self.ty == VertexType.W_INPUT:
-                    # set the position of w_in to next to w_out at the same angle
-                    w_out = get_w_partner_vitem(self)
-                    assert w_out is not None
-                    w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
-                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
-                    self.setPos(w_in_pos)
-                scene = self.scene()
-                if TYPE_CHECKING:
-                    assert isinstance(scene, GraphScene)
-                if self._dragged_on is not None and len(scene.selectedItems()) == 1:
-                    scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
-                else:
-                    moved_vertices = []
-                    for it in scene.selectedItems():
-                        if not isinstance(it, VItem):
-                            continue
-                        moved_vertices.append(it)
-                        if vertex_is_w(it.ty):
-                            partner = get_w_partner_vitem(it)
-                            if partner:
-                                moved_vertices.append(partner)
-                    scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
-                self._dragged_on = None
-                self._old_pos = None
-            else:
-                e.ignore()
-        else:
+        if e.button() != Qt.MouseButton.LeftButton:
             e.ignore()
+            return
+        if self._old_pos is not None and self._old_pos == self.pos():
+            e.ignore()
+            return
+
+        if self.ty == VertexType.W_INPUT:
+            self._snap_w_input_after_drag()
+        scene = self.scene()
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
+        self._emit_vertices_moved_or_dropped(scene)
+        self._dragged_on = None
+        self._old_pos = None
 
     def remove_dummy_label(self) -> None:
         """Hides the dummy label items and clears their cache."""

@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import json
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
 
 if TYPE_CHECKING:
+    from .graphscene import GraphScene
     from .proof_panel import ProofPanel
 
 from PySide6.QtCore import (QAbstractItemModel, QAbstractListModel,
@@ -12,8 +15,109 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
-from .common import GraphT
+from .common import GraphT, ET
 from .settings import display_setting
+
+
+def _apply_edge_only_highlight(
+    scene: GraphScene,
+    rewrite_meta: "Rewrite",
+    g_current: GraphT,
+    current_verts: set[int],
+) -> bool:
+    """Handle edge-only highlighting (e.g. Add identity)."""
+    highlight_edge_pairs = getattr(rewrite_meta, "highlight_edge_pairs", None)
+    if not highlight_edge_pairs:
+        return False
+
+    edges_only_set: set[ET] = set()
+    for pair in highlight_edge_pairs:
+        if isinstance(pair, tuple) and len(pair) == 2:
+            v1, v2 = int(pair[0]), int(pair[1])
+            if v1 in current_verts and v2 in current_verts:
+                edges_only_set |= set(g_current.edges(v1, v2))
+    if not edges_only_set:
+        return False
+
+    scene.set_rewrite_highlight(set(), edges_only_set)
+    return True
+
+
+def _apply_match_pair_highlight(
+    scene: GraphScene,
+    rewrite_meta: "Rewrite",
+    g_current: GraphT,
+    current_verts: set[int],
+) -> bool:
+    """Handle MATCH_DOUBLE-style highlighting from vertex pairs."""
+    highlight_match_pairs = getattr(rewrite_meta, "highlight_match_pairs", None)
+    if not highlight_match_pairs:
+        return False
+
+    verts_set: set[int] = set()
+    edges_set: set[ET] = set()
+    for match in highlight_match_pairs:
+        if isinstance(match, tuple) and len(match) == 2:
+            v1, v2 = int(match[0]), int(match[1])
+            if v1 not in current_verts or v2 not in current_verts:
+                continue
+            verts_set.add(v1)
+            verts_set.add(v2)
+            edges_set |= set(g_current.edges(v1, v2))
+    if not verts_set and not edges_set:
+        return False
+
+    scene.set_rewrite_highlight(verts_set, edges_set)
+    return True
+
+
+def _apply_vertex_based_highlight(
+    scene: GraphScene,
+    rewrite_meta: "Rewrite",
+    g_current: GraphT,
+    current_verts: set[int],
+) -> bool:
+    """Handle vertex-based highlighting (unfuse, color change, strong comp, etc.)."""
+    highlight_verts_list = getattr(rewrite_meta, "highlight_verts", None)
+    if not highlight_verts_list:
+        return False
+
+    verts_set = {int(v) for v in highlight_verts_list if int(v) in current_verts}
+    if not verts_set:
+        return False
+
+    edges_highlight: set[ET]
+    if len(verts_set) == 2:
+        s = sorted(verts_set)
+        edges_highlight = set(g_current.edges(s[0], s[1]))
+    else:
+        edges_highlight = set()
+        for v in verts_set:
+            for e in g_current.incident_edges(v):
+                s, t = g_current.edge_st(e)
+                if s in verts_set and t in verts_set:
+                    edges_highlight.add(e)
+
+    scene.set_rewrite_highlight(verts_set, edges_highlight)
+    return True
+
+
+def _apply_rewrite_highlight(
+    scene: GraphScene,
+    rewrite_meta: "Rewrite",
+    g_current: GraphT,
+) -> None:
+    """Apply forward-looking rewrite highlight based on rewrite metadata."""
+    current_verts = {int(v) for v in g_current.vertices()}
+
+    if _apply_edge_only_highlight(scene, rewrite_meta, g_current, current_verts):
+        return
+    if _apply_match_pair_highlight(scene, rewrite_meta, g_current, current_verts):
+        return
+    if _apply_vertex_based_highlight(scene, rewrite_meta, g_current, current_verts):
+        return
+
+    scene.clear_rewrite_highlight()
 
 
 class Rewrite(NamedTuple):
@@ -23,6 +127,13 @@ class Rewrite(NamedTuple):
     rule: str  # Name of the rule that was applied to get to this step
     graph: GraphT  # New graph after applying the rewrite
     grouped_rewrites: Optional[list['Rewrite']] = None  # Optional field to store the grouped rewrites
+    # Optional semantic highlight for forward highlighting:
+    # - highlight_match_pairs: For MATCH_DOUBLE (e.g. Spider Fusion) [(v1, v2), ...].
+    # - highlight_verts: Vertex IDs to highlight (unfuse, color change, strong comp, remove id, etc.).
+    # - highlight_edge_pairs: Edge-only (e.g. Add identity) [(v1, v2), ...] - highlight edges between pairs only.
+    highlight_match_pairs: Optional[list[tuple[int, int]]] = None
+    highlight_verts: Optional[list[int]] = None
+    highlight_edge_pairs: Optional[list[tuple[int, int]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the rewrite to Python dictionary."""
@@ -30,7 +141,10 @@ class Rewrite(NamedTuple):
             "display_name": self.display_name,
             "rule": self.rule,
             "graph": self.graph.to_dict(),
-            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None
+            "grouped_rewrites": [r.to_dict() for r in self.grouped_rewrites] if self.grouped_rewrites else None,
+            "highlight_match_pairs": self.highlight_match_pairs,
+            "highlight_verts": self.highlight_verts,
+            "highlight_edge_pairs": self.highlight_edge_pairs,
         }
 
     def to_json(self) -> str:
@@ -49,11 +163,23 @@ class Rewrite(NamedTuple):
         assert isinstance(graph, GraphT)
         graph.set_auto_simplify(False)
 
+        pairs = d.get("highlight_match_pairs")
+        if pairs is not None:
+            pairs = [tuple(p) for p in pairs]
+        edge_pairs = d.get("highlight_edge_pairs")
+        if edge_pairs is not None:
+            edge_pairs = [tuple(p) for p in edge_pairs]
+        # Backward compat: old proofs may have highlight_unfuse_verts
+        highlight_verts = d.get("highlight_verts") or d.get("highlight_unfuse_verts")
+
         return Rewrite(
             display_name=d.get("display_name", d["rule"]),  # Old proofs may not have display names
             rule=d["rule"],
             graph=graph,
-            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None
+            grouped_rewrites=[Rewrite.from_json(r) for r in grouped_rewrites] if grouped_rewrites else None,
+            highlight_match_pairs=pairs,
+            highlight_verts=highlight_verts,
+            highlight_edge_pairs=edge_pairs,
         )
 
 
@@ -77,7 +203,15 @@ class ProofModel(QAbstractListModel):
             self.initial_graph = graph
         else:
             old_step = self.steps[index - 1]
-            new_step = Rewrite(old_step.display_name, old_step.rule, graph)
+            new_step = Rewrite(
+                old_step.display_name,
+                old_step.rule,
+                graph,
+                old_step.grouped_rewrites,
+                old_step.highlight_match_pairs,
+                old_step.highlight_verts,
+                old_step.highlight_edge_pairs,
+            )
             self.steps[index - 1] = new_step
 
     def graphs(self) -> list[GraphT]:
@@ -159,7 +293,11 @@ class ProofModel(QAbstractListModel):
 
         # Must create a new Rewrite object instead of modifying current object
         # since Rewrite inherits NamedTuple and is hence immutable
-        self.steps[index] = Rewrite(name, old_step.rule, old_step.graph, old_step.grouped_rewrites)
+        self.steps[index] = Rewrite(
+            name, old_step.rule, old_step.graph, old_step.grouped_rewrites,
+            old_step.highlight_match_pairs, old_step.highlight_verts,
+            old_step.highlight_edge_pairs,
+        )
 
         # Rerender the proof step otherwise it will display the old name until
         # the cursor moves
@@ -172,7 +310,8 @@ class ProofModel(QAbstractListModel):
             "Grouped Steps: " + " 🡒 ".join(self.steps[i].display_name for i in range(start_index, end_index + 1)),
             "Grouped",
             self.get_graph(end_index + 1),
-            self.steps[start_index:end_index + 1]
+            self.steps[start_index:end_index + 1],
+            None, None, None,
         )
         for _ in range(end_index - start_index + 1):
             self.pop_rewrite(start_index)[0]
@@ -280,8 +419,26 @@ class ProofStepView(QListView):
         self.setCurrentIndex(idx)
         self.selectionModel().blockSignals(False)
         self.update(idx)
-        g = self.model().get_graph(index)
-        self.graph_view.set_graph(g)
+        g_current = self.model().get_graph(index)
+        self.graph_view.set_graph(g_current)
+
+        # Highlight the differences between this step and the *next* one.
+        scene = self.graph_view.graph_scene
+        num_steps = len(self.model().steps)
+
+        # If highlighting is disabled in the settings, always clear any
+        # existing rewrite highlight and return.
+        if not display_setting.highlight_rewrites:
+            scene.clear_rewrite_highlight()
+            return
+
+        # Last proof step: no "next" transition to highlight (forward-looking).
+        if index >= num_steps:
+            scene.clear_rewrite_highlight()
+            return
+        # There is a rewrite taking graph index -> index + 1.
+        rewrite_meta = self.model().steps[index]
+        _apply_rewrite_highlight(scene, rewrite_meta, g_current)
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
@@ -367,9 +524,8 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     circle_radius_selected = 6
     circle_outline_width = 3
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912
+    # TODO: Fix code complexity  # noqa: complexipy
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> None:  # noqa: PLR0912  # pylint: disable=too-many-branches
         painter.save()
         # Draw background
         painter.setPen(Qt.GlobalColor.transparent)
