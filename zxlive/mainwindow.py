@@ -419,6 +419,7 @@ class MainWindow(QMainWindow):
             logging.warning(f"Failed to save session state: {e}")
 
     # TODO: Fix code complexity
+    # noqa: complexipy
     def _restore_session_state(self) -> bool:  # noqa: PLR0912
         """Restore previously saved tabs. Returns True if any tabs were restored."""
         # Check if user wants to restore session
