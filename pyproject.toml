@@ -37,6 +37,7 @@ dependencies = [
     "imageio",
     "packaging",
     "matplotlib>=3.3",
+    "galois",
 ]
 
 [project.optional-dependencies]
