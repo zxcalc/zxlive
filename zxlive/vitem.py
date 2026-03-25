@@ -308,8 +308,47 @@ class VItem(QGraphicsPathItem):
             return
         self._old_pos = self.pos()
 
-    # TODO: Fix code complexity
-    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
+    def _mouse_move_drag_w_vertex(self, e: QGraphicsSceneMouseEvent) -> bool:
+        """Move coupled W input/output during drag. Returns True if event handling should stop."""
+        if not self.is_dragging:
+            return False
+        if self.ty == VertexType.W_OUTPUT:
+            w_in = get_w_partner_vitem(self)
+            assert w_in is not None
+            if self._last_pos is None:
+                self._last_pos = self.pos()
+            w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
+            self._last_pos = self.pos()
+            return False
+        if self.ty == VertexType.W_INPUT:
+            w_out = get_w_partner_vitem(self)
+            if w_out is None:
+                e.ignore()
+                return True
+            w_out.set_vitem_rotation()
+        return False
+
+    def _mouse_move_drag_hover_onto(self, scene: GraphScene) -> None:
+        """Emit vertex_dragged when dragging over another vertex while single-selected."""
+        reset = True
+        for it in scene.items():
+            if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
+                continue
+            if isinstance(it, VItem) and vertex_is_w(self.ty) and get_w_partner(self.g, self.v) == it.v:
+                continue
+            if it == self._dragged_on:
+                reset = False
+            elif isinstance(it, VItem) and it != self:
+                scene.vertex_dragged.emit(DragState.Onto, self.v, it.v)
+                if self._dragged_on is not None:
+                    scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
+                self._dragged_on = it
+                return
+        if reset and self._dragged_on is not None:
+            scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
+            self._dragged_on = None
+
+    def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         if self.is_animated:
             e.ignore()
@@ -317,80 +356,57 @@ class VItem(QGraphicsPathItem):
         scene = self.scene()
         if TYPE_CHECKING:
             assert isinstance(scene, GraphScene)
-        if self.is_dragging and self.ty == VertexType.W_OUTPUT:
-            w_in = get_w_partner_vitem(self)
-            assert w_in is not None
-            if self._last_pos is None:
-                self._last_pos = self.pos()
-            w_in.setPos(w_in.pos() + (self.pos() - self._last_pos))
-            self._last_pos = self.pos()
-        elif self.is_dragging and self.ty == VertexType.W_INPUT:
-            w_out = get_w_partner_vitem(self)
-            if w_out is None:
-                e.ignore()
-                return
-            w_out.set_vitem_rotation()
+        if self._mouse_move_drag_w_vertex(e):
+            return
         if self.is_dragging and len(scene.selectedItems()) == 1:
-            reset = True
-            for it in scene.items():
-                if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
-                    continue
-                if isinstance(it, VItem) and vertex_is_w(self.ty) and get_w_partner(self.g, self.v) == it.v:
-                    continue
-                if it == self._dragged_on:
-                    reset = False
-                elif isinstance(it, VItem) and it != self:
-                    scene.vertex_dragged.emit(DragState.Onto, self.v, it.v)
-                    # If we previously hovered over a vertex, notify the scene that we
-                    # are no longer
-                    if self._dragged_on is not None:
-                        scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
-                    self._dragged_on = it
-                    return
-            if reset and self._dragged_on is not None:
-                scene.vertex_dragged.emit(DragState.OffOf, self.v, self._dragged_on.v)
-                self._dragged_on = None
+            self._mouse_move_drag_hover_onto(scene)
         e.ignore()
 
-    # TODO: Fix code complexity
-    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:  # noqa: PLR0912
+    def _snap_w_input_after_drag(self) -> None:
+        """Place W input next to its partner at the correct angle."""
+        w_out = get_w_partner_vitem(self)
+        assert w_out is not None
+        w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
+        w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
+        self.setPos(w_in_pos)
+
+    def _emit_vertices_moved_or_dropped(self, scene: GraphScene) -> None:
+        if self._dragged_on is not None and len(scene.selectedItems()) == 1:
+            scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
+            return
+        moved_vertices: list[VItem] = []
+        for it in scene.selectedItems():
+            if not isinstance(it, VItem):
+                continue
+            moved_vertices.append(it)
+            if vertex_is_w(it.ty):
+                partner = get_w_partner_vitem(it)
+                if partner:
+                    moved_vertices.append(partner)
+        scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
+
+    def mouseReleaseEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # Unfortunately, Qt does not provide a "MoveFinished" event, so we have to
         # manually detect mouse releases.
         super().mouseReleaseEvent(e)
         if self.is_animated:
             e.ignore()
             return
-        if e.button() == Qt.MouseButton.LeftButton:
-            if self._old_pos is None or self._old_pos != self.pos():
-                if self.ty == VertexType.W_INPUT:
-                    # set the position of w_in to next to w_out at the same angle
-                    w_out = get_w_partner_vitem(self)
-                    assert w_out is not None
-                    w_in_pos = w_out.pos() + QPointF(0, W_INPUT_OFFSET * SCALE)
-                    w_in_pos = rotate_point(w_in_pos, w_out.pos(), w_out.rotation())
-                    self.setPos(w_in_pos)
-                scene = self.scene()
-                if TYPE_CHECKING:
-                    assert isinstance(scene, GraphScene)
-                if self._dragged_on is not None and len(scene.selectedItems()) == 1:
-                    scene.vertex_dropped_onto.emit(self.v, self._dragged_on.v)
-                else:
-                    moved_vertices = []
-                    for it in scene.selectedItems():
-                        if not isinstance(it, VItem):
-                            continue
-                        moved_vertices.append(it)
-                        if vertex_is_w(it.ty):
-                            partner = get_w_partner_vitem(it)
-                            if partner:
-                                moved_vertices.append(partner)
-                    scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
-                self._dragged_on = None
-                self._old_pos = None
-            else:
-                e.ignore()
-        else:
+        if e.button() != Qt.MouseButton.LeftButton:
             e.ignore()
+            return
+        if self._old_pos is not None and self._old_pos == self.pos():
+            e.ignore()
+            return
+
+        if self.ty == VertexType.W_INPUT:
+            self._snap_w_input_after_drag()
+        scene = self.scene()
+        if TYPE_CHECKING:
+            assert isinstance(scene, GraphScene)
+        self._emit_vertices_moved_or_dropped(scene)
+        self._dragged_on = None
+        self._old_pos = None
 
     def remove_dummy_label(self) -> None:
         """Hides the dummy label items and clears their cache."""
