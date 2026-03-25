@@ -19,7 +19,7 @@ import copy
 import json
 import logging
 import random
-from typing import Callable, Optional, cast
+from typing import Callable, Optional, cast, TYPE_CHECKING
 
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
@@ -51,6 +51,9 @@ from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz
+
+if TYPE_CHECKING:
+    from PySide6.QtMultimedia import QSoundEffect
 
 
 class MainWindow(QMainWindow):
@@ -259,7 +262,7 @@ class MainWindow(QMainWindow):
 
         # Lazy load SFX to avoid Qt multimedia backend issues in headless/CI.
         # (Tests run with sound-effects disabled by default.)
-        self.effects: dict[SFXEnum, object] = {}
+        self.effects: dict[SFXEnum, "QSoundEffect"] = {}
         if self.sfx_on:
             self.effects = {e: load_sfx(e) for e in SFXEnum}
 
@@ -416,7 +419,6 @@ class MainWindow(QMainWindow):
             logging.warning(f"Failed to save session state: {e}")
 
     # TODO: Fix code complexity
-    # noqa: complexipy
     def _restore_session_state(self) -> bool:  # noqa: PLR0912
         """Restore previously saved tabs. Returns True if any tabs were restored."""
         # Check if user wants to restore session
@@ -961,9 +963,7 @@ class MainWindow(QMainWindow):
         if s not in self.effects:
             # Load on first use (or when user enables sound effects).
             self.effects[s] = load_sfx(s)
-        # `load_sfx` returns QSoundEffect; we keep the type loose to avoid
-        # importing QtMultimedia for typing in this module.
-        self.effects[s].play()  # type: ignore[no-any-return]
+        self.effects[s].play()
 
     def _toggle_sfx(self) -> None:
         self.sfx_on = not self.sfx_on

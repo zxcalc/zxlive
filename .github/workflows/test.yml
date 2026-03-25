@@ -18,7 +18,6 @@ jobs:
         python-version: [ '3.11' ]
     env:
       DISPLAY: ':99.0'
-      QT_QPA_PLATFORM: offscreen
     steps:
     - uses: actions/checkout@v6
     - name: Setup Python ${{ matrix.python-version }}
