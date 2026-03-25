@@ -95,7 +95,7 @@ def test_save_single_graph_tab(mw: MainWindow) -> None:
     mw._save_session_state()
 
     raw = mw.settings.value("session_state")
-    assert raw is not None
+    assert isinstance(raw, str)
     data = json.loads(raw)
     assert len(data["tabs"]) == 1
     tab = data["tabs"][0]
@@ -116,7 +116,7 @@ def test_save_preserves_file_path_and_type(mw: MainWindow) -> None:
 
     mw._save_session_state()
 
-    data = json.loads(mw.settings.value("session_state"))
+    data = json.loads(str(mw.settings.value("session_state")))
     tab = data["tabs"][0]
     assert tab["file_path"] == "/tmp/test.zxg"
     assert tab["file_type"] == FileFormat.QGraph.value
@@ -132,7 +132,7 @@ def test_save_multiple_tabs_and_active_index(mw: MainWindow) -> None:
 
     mw._save_session_state()
 
-    data = json.loads(mw.settings.value("session_state"))
+    data = json.loads(str(mw.settings.value("session_state")))
     assert len(data["tabs"]) == 3
     assert data["active_tab"] == 1
     names = [t["name"] for t in data["tabs"]]
@@ -149,7 +149,7 @@ def test_save_proof_tab(mw: MainWindow, qtbot: QtBot) -> None:
 
     mw._save_session_state()
 
-    data = json.loads(mw.settings.value("session_state"))
+    data = json.loads(str(mw.settings.value("session_state")))
     proof_tabs = [t for t in data["tabs"] if t["type"] == "proof"]
     assert len(proof_tabs) == 1
     # Proof data should be valid JSON containing initial_graph and proof_steps
@@ -169,7 +169,7 @@ def test_save_rule_tab(mw: MainWindow) -> None:
 
     mw._save_session_state()
 
-    data = json.loads(mw.settings.value("session_state"))
+    data = json.loads(str(mw.settings.value("session_state")))
     rule_tabs = [t for t in data["tabs"] if t["type"] == "rule"]
     assert len(rule_tabs) == 1
     assert rule_tabs[0]["name"] == "My Rule"
@@ -418,7 +418,7 @@ def test_close_event_saves_session(mw: MainWindow, qtbot: QtBot) -> None:
     mw.close()
 
     raw = mw.settings.value("session_state")
-    assert raw is not None
+    assert isinstance(raw, str)
     data = json.loads(raw)
     assert len(data["tabs"]) == 1
     assert data["tabs"][0]["name"] == "Close Test"
@@ -437,7 +437,7 @@ def test_close_event_with_blank_setting_prompts_save(
 
     # Session state should still be saved (unconditionally) even in blank mode
     raw = mw.settings.value("session_state")
-    assert raw is not None
+    assert isinstance(raw, str)
     data = json.loads(raw)
     assert len(data["tabs"]) == 1
 
@@ -490,7 +490,7 @@ def test_full_round_trip_mixed_panels(mw: MainWindow, qtbot: QtBot) -> None:
     mw._save_session_state()
 
     # Verify saved data has all three
-    data = json.loads(mw.settings.value("session_state"))
+    data = json.loads(str(mw.settings.value("session_state")))
     types = [t["type"] for t in data["tabs"]]
     assert "graph" in types
     assert "proof" in types

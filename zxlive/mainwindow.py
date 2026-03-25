@@ -425,7 +425,7 @@ class MainWindow(QMainWindow):
             return False
 
         try:
-            session_data = json.loads(session_json)
+            session_data = json.loads(str(session_json))
             tabs_state = session_data.get('tabs', [])
             active_tab = session_data.get('active_tab', 0)
 
