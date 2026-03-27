@@ -113,8 +113,6 @@ class GraphScene(QGraphicsScene):
         self.add_items()
         self.invalidate()
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
     def update_graph(self, new: GraphT, select_new: bool = False) -> None:  # noqa: PLR0912
         """Update the PyZX graph for the scene.
         This will update the scene to match the given graph. It will
@@ -136,6 +134,8 @@ class GraphScene(QGraphicsScene):
             for view in views:
                 view.setUpdatesEnabled(True)
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def _update_graph_inner(self, new: GraphT, select_new: bool) -> None:
         """Inner implementation of update_graph.
 
