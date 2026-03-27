@@ -72,6 +72,11 @@ class GraphScene(QGraphicsScene):
         else:
             self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
 
+    @property
+    def is_bulk_updating(self) -> bool:
+        """Whether the scene is currently applying a bulk graph update."""
+        return self._bulk_updating
+
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # 1. Check if there is an item at the position of the click
         item = self.itemAt(e.scenePos(), self.views()[0].transform())

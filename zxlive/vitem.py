@@ -227,7 +227,7 @@ class VItem(QGraphicsPathItem):
         return path
 
     def shape(self) -> QPainterPath:
-        return self._make_shape_path()
+        return self.path()
 
     def set_vitem_rotation(self) -> None:
         if self.ty == VertexType.W_OUTPUT:
@@ -274,7 +274,7 @@ class VItem(QGraphicsPathItem):
         if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
             # Skip refresh when the scene is performing a bulk graph update
             # (it will refresh all affected items in a single pass afterwards).
-            if not self.is_animated and not self.graph_scene._bulk_updating:
+            if not self.is_animated and not self.graph_scene.is_bulk_updating:
                 self.refresh()
 
             if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
@@ -462,7 +462,7 @@ class VItem(QGraphicsPathItem):
 
     def boundingRect(self) -> 'QRectF':
         # Ensure the bounding rect includes the outline (pen width) and antialiasing
-        path_rect = self._make_shape_path().boundingRect()
+        path_rect = self.path().boundingRect()
         pen_width = self.pen().widthF() if self.pen() else 1.0
         margin = pen_width / 2.0 + 1.0  # +1 for antialiasing
         return path_rect.adjusted(-margin, -margin, margin, margin)
