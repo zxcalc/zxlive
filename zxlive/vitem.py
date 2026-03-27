@@ -336,8 +336,8 @@ class VItem(QGraphicsPathItem):
                 return
             w_out.set_vitem_rotation()
         if self.is_dragging and len(scene.selectedItems()) == 1:
-        reset = True
-        for it in scene.items():
+            reset = True
+            for it in scene.items():
                 if not it.sceneBoundingRect().intersects(self.sceneBoundingRect()):
                     continue
                 if isinstance(it, VItem) and vertex_is_w(self.ty) and get_w_partner(self.g, self.v) == it.v:
