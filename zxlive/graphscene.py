@@ -139,8 +139,6 @@ class GraphScene(QGraphicsScene):
             for view in views:
                 view.setUpdatesEnabled(True)
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
     def _update_graph_inner(self, new: GraphT, select_new: bool) -> None:
         """Inner implementation of update_graph.
 
@@ -150,9 +148,29 @@ class GraphScene(QGraphicsScene):
         """
 
         selected_vertices = set(self.selected_vertices)
-
         diff = GraphDiff(self.g, new)
 
+        # Update order:
+        # 1) Remove scene items using the old graph state (removed edges/verts still exist there)
+        # 2) Apply the graph diff and swap to the new graph state
+        # 3) Add scene items using the new graph data
+        # 4) Refresh all "dirty" items that changed in some way (position, type, etc.)
+        self._remove_diff_vertices(diff, selected_vertices)
+        self._remove_diff_edges(diff)
+
+        new_g = diff.apply_diff(self.g)
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert isinstance(new_g, GraphT)  # type: ignore
+        self.g = new_g
+
+        self._add_new_vertices_from_diff(diff, selected_vertices, select_new)
+        self._add_new_edges_from_diff(diff)
+
+        dirty_vertices, dirty_edges = self._collect_dirty_items(diff)
+        self._refresh_dirty_items(dirty_vertices, dirty_edges)
+        self.select_vertices(selected_vertices)
+
+    def _remove_diff_vertices(self, diff: GraphDiff, selected_vertices: set[VT]) -> None:
         for v in diff.removed_verts:
             v_item = self.vertex_map[v]
             if v_item.phase_item:
@@ -163,6 +181,7 @@ class GraphScene(QGraphicsScene):
             self.removeItem(v_item)
             del self.vertex_map[v]
 
+    def _remove_diff_edges(self, diff: GraphDiff) -> None:
         for e in diff.removed_edges:
             edge_idx = len(self.edge_map[e]) - 1
             e_item = self.edge_map[e][edge_idx]
@@ -180,14 +199,7 @@ class GraphScene(QGraphicsScene):
             if len(self.edge_map[e]) == 0:
                 del self.edge_map[e]
 
-        new_g = diff.apply_diff(self.g)
-        # Mypy issue: https://github.com/python/mypy/issues/11673
-        assert isinstance(new_g, GraphT)  # type: ignore
-        self.g = new_g
-        # g now contains the new graph,
-        # but we still need to update the scene
-        # However, the new vertices and edges automatically follow the new graph structure
-
+    def _add_new_vertices_from_diff(self, diff: GraphDiff, selected_vertices: set[VT], select_new: bool) -> None:
         for v in diff.new_verts:
             v_item = VItem(self, v)
             self.vertex_map[v] = v_item
@@ -196,6 +208,12 @@ class GraphScene(QGraphicsScene):
             if select_new:
                 selected_vertices.add(v)
 
+        # Recompute rotations after all new vertices exist in vertex_map,
+        # so W-partner lookups succeed for pairs added in the same update.
+        for v in diff.new_verts:
+            self.vertex_map[v].set_vitem_rotation()
+
+    def _add_new_edges_from_diff(self, diff: GraphDiff) -> None:
         for (s, t), typ in diff.new_edges:
             e = (s, t, typ)
             if e not in self.edge_map:
@@ -208,22 +226,10 @@ class GraphScene(QGraphicsScene):
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
 
-        for v in diff.new_verts:
-            self.vertex_map[v].set_vitem_rotation()
-
-        # Collect all vertices/edges that need a visual refresh into sets
-        # so each item is refreshed exactly once, regardless of how many diff
-        # categories it appears in (e.g. a vertex whose type, phase, AND
-        # position all changed still gets a single refresh() call).
-        dirty_vertices: set[VT] = set()
-        dirty_edges: set[ET] = set()
-
-        for v in diff.changed_vertex_types:
-            dirty_vertices.add(v)
-        for v in diff.changed_phases:
-            dirty_vertices.add(v)
-        for v in diff.changed_vdata:
-            dirty_vertices.add(v)
+    def _collect_dirty_items(self, diff: GraphDiff) -> tuple[set[VT], set[ET]]:
+        # Refresh each item once, even if it appears in multiple diff categories.
+        dirty_vertices = set(diff.changed_vertex_types) | set(diff.changed_phases) | set(diff.changed_vdata)
+        dirty_edges = set(diff.changed_edata)
 
         for v in diff.changed_pos:
             v_item = self.vertex_map[v]
@@ -235,9 +241,6 @@ class GraphScene(QGraphicsScene):
         for e in diff.changed_edge_types:
             for i in self.edge_map[e]:
                 self.edge_map[e][i].reset_color()
-                dirty_edges.add(e)
-
-        for e in diff.changed_edata:
             dirty_edges.add(e)
 
         # Edges adjacent to dirty vertices must also be refreshed (their
@@ -247,6 +250,9 @@ class GraphScene(QGraphicsScene):
             for e_item in v_item.adj_items:
                 dirty_edges.add(e_item.e)
 
+        return dirty_vertices, dirty_edges
+
+    def _refresh_dirty_items(self, dirty_vertices: set[VT], dirty_edges: set[ET]) -> None:
         for v in dirty_vertices:
             if v in self.vertex_map:
                 self.vertex_map[v].refresh(cascade_edges=False)
@@ -255,8 +261,6 @@ class GraphScene(QGraphicsScene):
             if e in self.edge_map:
                 for i in self.edge_map[e]:
                     self.edge_map[e][i].refresh()
-
-        self.select_vertices(selected_vertices)
 
     def update_edge_curves(self, s: VT, t: VT) -> None:
         edges = []
