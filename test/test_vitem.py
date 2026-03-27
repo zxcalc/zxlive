@@ -6,7 +6,6 @@ or fractions) shouldn't overlap with the node body.
 """
 
 import pytest
-from pyzx.graph.graph_s import GraphS
 from pyzx.utils import VertexType
 from pytestqt.qtbot import QtBot
 
@@ -21,7 +20,8 @@ def test_dummy_label_position(qtbot: QtBot) -> None:
     dummy circle below it. The label's `y` position should be dynamically 
     anchored based on its calculated bounding height.
     """
-    g = GraphS()
+    from zxlive.common import new_graph
+    g = new_graph()
     
     # 1. Plain text label
     v_text = g.add_vertex(VertexType.DUMMY, qubit=0, row=0)
