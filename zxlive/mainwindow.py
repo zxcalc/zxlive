@@ -274,8 +274,9 @@ class MainWindow(QMainWindow):
         self.new_graph(graph)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
-        self.save_file.setEnabled(has_active_tab)
-        self.save_as.setEnabled(has_active_tab)
+        is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
+        self.save_file.setEnabled(is_saveable)
+        self.save_as.setEnabled(is_saveable)
         self.cut_action.setEnabled(has_active_tab)
         self.copy_action.setEnabled(has_active_tab)
         self.delete_action.setEnabled(has_active_tab)
@@ -498,6 +499,8 @@ class MainWindow(QMainWindow):
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean: bool) -> None:
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
         if name.startswith("*"):
@@ -568,7 +571,8 @@ class MainWindow(QMainWindow):
             return False
         widget = self.tab_widget.widget(i)
         assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean() or widget.file_path is None:
+        if not isinstance(widget, PauliWebsPanel) and (
+                not widget.undo_stack.isClean() or widget.file_path is None):
             name = self.tab_widget.tabText(i).replace("*", "")
             button = QMessageBox.StandardButton
             answer = QMessageBox.question(
