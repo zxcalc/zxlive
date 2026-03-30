@@ -596,6 +596,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_file_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if self.active_panel.file_path is None:
             return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
@@ -635,6 +637,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if isinstance(self.active_panel, ProofPanel):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
@@ -761,8 +765,9 @@ class MainWindow(QMainWindow):
 
     def _auto_save_if_needed(self) -> None:
         panel = self.active_panel
-        if (panel and getattr(panel, 'file_path', None) and
-                get_settings_value("auto-save", bool, False)):
+        if (panel and not isinstance(panel, PauliWebsPanel)
+                and getattr(panel, 'file_path', None)
+                and get_settings_value("auto-save", bool, False)):
             self.handle_save_file_action()
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:

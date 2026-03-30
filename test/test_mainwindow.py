@@ -20,8 +20,10 @@ from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 
 from zxlive.dialogs import import_diagram_from_file
+from zxlive.common import new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
+from zxlive.pauliwebs_panel import PauliWebsPanel
 from zxlive.proof_panel import ProofPanel
 from zxlive.settings_dialog import SettingsDialog
 
@@ -118,6 +120,16 @@ def test_file_formats_preserved(app: MainWindow) -> None:
     check_file_format("demo.zxg")
     check_file_format("demo.zxp")
     check_file_format("demo.zxr")
+
+
+def test_pauli_webs_no_save(app: MainWindow) -> None:
+    app.new_pauli_webs(new_graph())
+    assert isinstance(app.active_panel, PauliWebsPanel)
+    assert not app.save_file.isEnabled()
+    assert not app.save_as.isEnabled()
+
+    app.close_action.trigger()
+    assert not isinstance(app.active_panel, PauliWebsPanel)
 
 
 def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
