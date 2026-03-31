@@ -53,6 +53,7 @@ class RewriteAction:
     repeat_rule_application: bool = False
     is_custom_rule: bool = field(default=False)
     file_path: Optional[str] = field(default=None)
+    auto_simplify_multigraph: bool = field(default=False)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -75,6 +76,7 @@ class RewriteAction:
             repeat_rule_application=d.get('repeat_rule_application', False),
             is_custom_rule=d.get('custom_rule', False),
             file_path=d.get('file_path', None),
+            auto_simplify_multigraph=d.get('auto_simplify_multigraph', False),
         )
 
     # TODO: Fix code complexity
@@ -117,6 +119,9 @@ class RewriteAction:
             matches_list.extend(matches)
             if not matches:
                 break
+            current_auto_simplify_setting = g.get_auto_simplify()
+            if self.auto_simplify_multigraph:
+                g.set_auto_simplify(True)
             try:
                 applied = False
                 for m in matches:
@@ -133,11 +138,11 @@ class RewriteAction:
                         rule_sg = cast(RewriteSimpGraph, self.rule)
                         if rule_sg.apply(g, cast(list[VT], m)):
                             applied = True
-                # g, rem_verts = self.apply_rewrite(g, matches)
-                # rem_verts_list.extend(rem_verts)
             except Exception as ex:
                 show_error_msg('Error while applying rewrite rule', str(ex))
                 return
+            if self.auto_simplify_multigraph:
+                g.set_auto_simplify(current_auto_simplify_setting)
             if not self.repeat_rule_application or not applied:
                 break
 
