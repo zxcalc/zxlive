@@ -18,6 +18,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import random
 from typing import Callable, Optional, cast
 
@@ -33,8 +34,8 @@ from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
-from .common import (GraphT, from_tikz, get_data, get_settings_value,
-                     new_graph, set_settings_value, to_tikz)
+from .common import (GraphT, from_tikz, get_custom_rules_path, get_data,
+                     get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -42,7 +43,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       export_proof_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
-                      show_error_msg)
+                      show_error_msg, write_to_file)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
@@ -867,10 +868,33 @@ class MainWindow(QMainWindow):
         name, description = get_lemma_name_and_description(self)
         if name is None or description is None:
             return
+        if not name:
+            show_error_msg("Invalid lemma name",
+                           "The lemma name must not be empty.", self)
+            return
+        # Reject path separators to prevent writing outside the custom rules folder.
+        if os.path.basename(name) != name:
+            show_error_msg("Invalid lemma name",
+                           "The lemma name must not contain path separators.", self)
+            return
+
         lhs_graph = self.active_panel.proof_model.graphs()[0]
         rhs_graph = self.active_panel.proof_model.graphs()[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        save_rule_dialog(rule, self, name + ".zxr" if name else "")
+        file_name = name + ".zxr"
+        custom_rules_path = get_custom_rules_path()
+        os.makedirs(custom_rules_path, exist_ok=True)
+        file_path = os.path.join(custom_rules_path, file_name)
+        if os.path.exists(file_path):
+            reply = QMessageBox.question(
+                self, "Overwrite rule?",
+                f"A rule file '{file_name}' already exists. Overwrite it?")
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        if not write_to_file(file_path, rule.to_json(), self):
+            return
+
+        self.active_panel.rewrites_panel.refresh_rewrites_model()
 
     def update_colors(self) -> None:
         """Update app theme using reliable Qt native methods
