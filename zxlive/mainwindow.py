@@ -275,8 +275,9 @@ class MainWindow(QMainWindow):
         self.new_graph(graph)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
-        self.save_file.setEnabled(has_active_tab)
-        self.save_as.setEnabled(has_active_tab)
+        is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
+        self.save_file.setEnabled(is_saveable)
+        self.save_as.setEnabled(is_saveable)
         self.cut_action.setEnabled(has_active_tab)
         self.copy_action.setEnabled(has_active_tab)
         self.delete_action.setEnabled(has_active_tab)
@@ -499,6 +500,8 @@ class MainWindow(QMainWindow):
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean: bool) -> None:
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
         if name.startswith("*"):
@@ -569,7 +572,8 @@ class MainWindow(QMainWindow):
             return False
         widget = self.tab_widget.widget(i)
         assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean() or widget.file_path is None:
+        if not isinstance(widget, PauliWebsPanel) and (
+                not widget.undo_stack.isClean() or widget.file_path is None):
             name = self.tab_widget.tabText(i).replace("*", "")
             button = QMessageBox.StandardButton
             answer = QMessageBox.question(
@@ -593,6 +597,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_file_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if self.active_panel.file_path is None:
             return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
@@ -632,6 +638,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if isinstance(self.active_panel, ProofPanel):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
@@ -758,8 +766,9 @@ class MainWindow(QMainWindow):
 
     def _auto_save_if_needed(self) -> None:
         panel = self.active_panel
-        if (panel and getattr(panel, 'file_path', None) and
-                get_settings_value("auto-save", bool, False)):
+        if (panel and not isinstance(panel, PauliWebsPanel)
+                and getattr(panel, 'file_path', None)
+                and get_settings_value("auto-save", bool, False)):
             self.handle_save_file_action()
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
