@@ -141,8 +141,9 @@ class RewriteAction:
             except Exception as ex:
                 show_error_msg('Error while applying rewrite rule', str(ex))
                 return
-            if self.auto_simplify_multigraph:
-                g.set_auto_simplify(current_auto_simplify_setting)
+            finally:
+                if self.auto_simplify_multigraph:
+                    g.set_auto_simplify(current_auto_simplify_setting)
             if not self.repeat_rule_application or not applied:
                 break
 
