@@ -86,7 +86,7 @@ class VItem(QGraphicsPathItem):
     dummy_svg_item: Optional[QGraphicsSvgItem] = None
     _dummy_svg_renderer: Optional[QSvgRenderer] = None
     _cached_dummy_text: str = ""
-    _cached_dark_mode: bool = False
+    _cached_text_color: str = ""
     _cached_font_key: str = ""
 
     halftone = "1000100010001000"  # QPixmap("images/halftone.png")
@@ -122,7 +122,7 @@ class VItem(QGraphicsPathItem):
         self.dummy_svg_item = None
         self._dummy_svg_renderer = None
         self._cached_dummy_text = ""
-        self._cached_dark_mode = False
+        self._cached_text_color = ""
         self._cached_font_key = ""
         self._last_type: Optional[VertexType] = None
 
@@ -439,7 +439,7 @@ class VItem(QGraphicsPathItem):
         if self.dummy_svg_item is not None:
             self.dummy_svg_item.setVisible(False)
         self._cached_dummy_text = ""
-        self._cached_dark_mode = False
+        self._cached_text_color = ""
         self._cached_font_key = ""
 
     def update_font(self) -> None:
@@ -459,17 +459,16 @@ class VItem(QGraphicsPathItem):
             self.remove_dummy_label()
             return
 
-        dark = display_setting.dark_mode
+        text_color = display_setting.text_color
         font_key = display_setting.font.toString()
         if (text == self._cached_dummy_text
-                and dark == self._cached_dark_mode
+                and text_color == self._cached_text_color
                 and font_key == self._cached_font_key):
             return
 
         self._cached_dummy_text = text
-        self._cached_dark_mode = dark
+        self._cached_text_color = text_color
         self._cached_font_key = font_key
-        text_color = "#e0e0e0" if dark else "#222222"
 
         from .latex_render import is_latex, latex_to_svg
 
