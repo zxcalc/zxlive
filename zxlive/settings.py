@@ -44,6 +44,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
     "previews-show": True,
+    "rewrite-animations": True,
     "sparkle-mode": True,
     'sound-effects': False,
     "matrix/precision": 4,
@@ -222,10 +223,18 @@ class DisplaySettings:
 
     def __init__(self) -> None:
         self.colors = color_schemes[str(settings.value("color-scheme"))]
+        self._cached_dark_mode: bool | None = None
+        self._cached_effective_colors: dict[str, QColor] | None = None
         self.update()
+
+    def _invalidate_color_cache(self) -> None:
+        """Invalidate cached dark_mode and effective_colors."""
+        self._cached_dark_mode = None
+        self._cached_effective_colors = None
 
     def set_color_scheme(self, scheme_id: str) -> None:
         self.colors = color_schemes[scheme_id]
+        self._invalidate_color_cache()
 
     def update(self) -> None:
         self.SNAP_DIVISION = int(get_settings_value("snap-granularity", str))
@@ -234,6 +243,7 @@ class DisplaySettings:
             get_settings_value("font/size", int)
         )
         self.SNAP = SCALE / self.SNAP_DIVISION
+        self._invalidate_color_cache()
 
     @property
     def previews_show(self) -> bool:
@@ -245,6 +255,8 @@ class DisplaySettings:
 
     @property
     def dark_mode(self) -> bool:
+        if self._cached_dark_mode is not None:
+            return self._cached_dark_mode
         dark_mode_setting = str(settings.value("dark-mode", "system"))
         if dark_mode_setting == "system":
             # Check if we can detect system theme
@@ -253,14 +265,18 @@ class DisplaySettings:
                 try:
                     # Try Qt 6.5+ ColorScheme API
                     color_scheme = app.styleHints().colorScheme()
-                    return color_scheme == Qt.ColorScheme.Dark
+                    self._cached_dark_mode = (color_scheme == Qt.ColorScheme.Dark)
+                    return self._cached_dark_mode
                 except AttributeError:
                     # Fallback for older Qt versions
                     pass
+            self._cached_dark_mode = False
             return False  # Default to light mode if can't detect
         elif dark_mode_setting == "dark":
+            self._cached_dark_mode = True
             return True
         else:  # "light"
+            self._cached_dark_mode = False
             return False
 
     @dark_mode.setter
@@ -268,9 +284,12 @@ class DisplaySettings:
         if isinstance(value, bool):
             value = "dark" if value else "light"
         settings.setValue("dark-mode", value)
+        self._invalidate_color_cache()
 
     @property
     def effective_colors(self) -> dict[str, QColor]:
+        if self._cached_effective_colors is not None:
+            return self._cached_effective_colors
         # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
 
         def adjust_for_dark(color: QColor) -> QColor:
@@ -291,6 +310,7 @@ class DisplaySettings:
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode
+        self._cached_effective_colors = base
         return base
 
 

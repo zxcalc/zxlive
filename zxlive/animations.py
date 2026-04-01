@@ -11,7 +11,7 @@ from pyzx.utils import vertex_is_w
 
 from .custom_rule import CustomRule
 from .rewrite_data import rules_basic
-from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION
+from .common import VT, GraphT, pos_to_view, ANIMATION_DURATION, get_settings_value
 from .graphscene import GraphScene
 from .vitem import VItem, VItemAnimation, VITEM_UNSELECTED_Z, VITEM_SELECTED_Z, get_w_partner_vitem
 from .eitem import EItem, EItemAnimation
@@ -288,6 +288,8 @@ def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstra
 # TODO: Fix code complexity
 # noqa: complexipy
 def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: list, rem_verts: list[VT]) -> tuple:  # noqa: PLR0912
+    if not get_settings_value("rewrite-animations", bool):
+        return None, None
     anim_before: Optional[QAbstractAnimation] = None
     anim_after: Optional[QAbstractAnimation] = None
     if self.name == rules_basic['fuse_simp']['text']:  # or self.name == operations['fuse_w']['text']:

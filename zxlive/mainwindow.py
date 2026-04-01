@@ -18,6 +18,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import random
 from typing import Callable, Optional, cast
 
@@ -33,8 +34,8 @@ from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 
 from .base_panel import BasePanel
-from .common import (GraphT, from_tikz, get_data, get_settings_value,
-                     new_graph, set_settings_value, to_tikz)
+from .common import (GraphT, from_tikz, get_custom_rules_path, get_data,
+                     get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .custom_rule import CustomRule, check_rule
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
@@ -42,7 +43,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       export_proof_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
-                      show_error_msg)
+                      show_error_msg, write_to_file)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
@@ -274,8 +275,9 @@ class MainWindow(QMainWindow):
         self.new_graph(graph)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
-        self.save_file.setEnabled(has_active_tab)
-        self.save_as.setEnabled(has_active_tab)
+        is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
+        self.save_file.setEnabled(is_saveable)
+        self.save_as.setEnabled(is_saveable)
         self.cut_action.setEnabled(has_active_tab)
         self.copy_action.setEnabled(has_active_tab)
         self.delete_action.setEnabled(has_active_tab)
@@ -425,7 +427,7 @@ class MainWindow(QMainWindow):
             return False
 
         try:
-            session_data = json.loads(session_json)
+            session_data = json.loads(str(session_json))
             tabs_state = session_data.get('tabs', [])
             active_tab = session_data.get('active_tab', 0)
 
@@ -498,6 +500,8 @@ class MainWindow(QMainWindow):
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean: bool) -> None:
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
         if name.startswith("*"):
@@ -568,7 +572,8 @@ class MainWindow(QMainWindow):
             return False
         widget = self.tab_widget.widget(i)
         assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean() or widget.file_path is None:
+        if not isinstance(widget, PauliWebsPanel) and (
+                not widget.undo_stack.isClean() or widget.file_path is None):
             name = self.tab_widget.tabText(i).replace("*", "")
             button = QMessageBox.StandardButton
             answer = QMessageBox.question(
@@ -592,6 +597,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_file_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if self.active_panel.file_path is None:
             return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
@@ -631,6 +638,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if isinstance(self.active_panel, ProofPanel):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
@@ -757,8 +766,9 @@ class MainWindow(QMainWindow):
 
     def _auto_save_if_needed(self) -> None:
         panel = self.active_panel
-        if (panel and getattr(panel, 'file_path', None) and
-                get_settings_value("auto-save", bool, False)):
+        if (panel and not isinstance(panel, PauliWebsPanel)
+                and getattr(panel, 'file_path', None)
+                and get_settings_value("auto-save", bool, False)):
             self.handle_save_file_action()
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
@@ -858,10 +868,33 @@ class MainWindow(QMainWindow):
         name, description = get_lemma_name_and_description(self)
         if name is None or description is None:
             return
+        if not name:
+            show_error_msg("Invalid lemma name",
+                           "The lemma name must not be empty.", self)
+            return
+        # Reject path separators to prevent writing outside the custom rules folder.
+        if os.path.basename(name) != name:
+            show_error_msg("Invalid lemma name",
+                           "The lemma name must not contain path separators.", self)
+            return
+
         lhs_graph = self.active_panel.proof_model.graphs()[0]
         rhs_graph = self.active_panel.proof_model.graphs()[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        save_rule_dialog(rule, self, name + ".zxr" if name else "")
+        file_name = name + ".zxr"
+        custom_rules_path = get_custom_rules_path()
+        os.makedirs(custom_rules_path, exist_ok=True)
+        file_path = os.path.join(custom_rules_path, file_name)
+        if os.path.exists(file_path):
+            reply = QMessageBox.question(
+                self, "Overwrite rule?",
+                f"A rule file '{file_name}' already exists. Overwrite it?")
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        if not write_to_file(file_path, rule.to_json(), self):
+            return
+
+        self.active_panel.rewrites_panel.refresh_rewrites_model()
 
     def update_colors(self) -> None:
         """Update app theme using reliable Qt native methods

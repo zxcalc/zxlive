@@ -37,11 +37,12 @@ dependencies = [
     "imageio",
     "packaging",
     "matplotlib>=3.3",
+    "galois",
 ]
 
 [project.optional-dependencies]
 test = [
-    "mypy",
+    "mypy==1.19.1",
     "ruff",
     "pytest-qt",
     "complexipy",
