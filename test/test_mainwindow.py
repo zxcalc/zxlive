@@ -16,12 +16,15 @@
 
 import pytest
 import os
+from pathlib import Path
 from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 
 from zxlive.dialogs import import_diagram_from_file
+from zxlive.common import new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
+from zxlive.pauliwebs_panel import PauliWebsPanel
 from zxlive.proof_panel import ProofPanel
 from zxlive.settings_dialog import SettingsDialog
 
@@ -118,6 +121,42 @@ def test_file_formats_preserved(app: MainWindow) -> None:
     check_file_format("demo.zxg")
     check_file_format("demo.zxp")
     check_file_format("demo.zxr")
+
+
+def test_pauli_webs_no_save(app: MainWindow) -> None:
+    app.new_pauli_webs(new_graph())
+    assert isinstance(app.active_panel, PauliWebsPanel)
+    assert not app.save_file.isEnabled()
+    assert not app.save_as.isEnabled()
+
+    app.close_action.trigger()
+    assert not isinstance(app.active_panel, PauliWebsPanel)
+
+
+def test_proof_as_lemma(app: MainWindow, qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Saving a proof as a lemma writes a .zxr file to the custom rules folder."""
+    import zxlive.mainwindow
+
+    rules_dir = str(tmp_path)
+    monkeypatch.setattr(zxlive.mainwindow, "get_custom_rules_path", lambda: rules_dir)
+    monkeypatch.setattr(zxlive.mainwindow, "get_lemma_name_and_description",
+                        lambda _parent: ("test lemma", "a description"))
+
+    # Start a derivation from the demo graph.
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+
+    app.proof_as_lemma()
+    expected = os.path.join(rules_dir, "test lemma.zxr")
+    assert os.path.exists(expected)
+
+    # Saving again with the monkeypatched QMessageBox (answers No) should not overwrite.
+    with open(expected, "w") as f:
+        f.write("sentinel")
+    app.proof_as_lemma()
+    with open(expected, encoding="utf-8") as f:
+        assert f.read() == "sentinel"
 
 
 def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
