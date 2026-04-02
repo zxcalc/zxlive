@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 import pyzx
 from PySide6.QtCore import Qt
@@ -105,6 +105,27 @@ tikz_import_defaults: dict[str, str] = {
     "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
 }
+
+# (display label, import settings key). Used by the "unknown TikZ styles"
+# dialog to let the user categorise an unfamiliar style; ``None`` means
+# "skip this style". Keys are checked against ``tikz_import_defaults``
+# below so a rename in one place fails loudly instead of silently
+# breaking imports (see #537).
+tikz_import_categories: list[tuple[str, Optional[str]]] = [
+    ("(skip)",   None),
+    ("Z spider", "tikz/Z-spider-import"),
+    ("X spider", "tikz/X-spider-import"),
+    ("Boundary", "tikz/boundary-import"),
+    ("H-box",    "tikz/Hadamard-import"),
+    ("W input",  "tikz/w-input-import"),
+    ("W output", "tikz/w-output-import"),
+    ("Z box",    "tikz/z-box-import"),
+    ("Dummy",    "tikz/dummy-import"),
+]
+
+assert all(key is None or key in tikz_import_defaults
+           for _, key in tikz_import_categories), \
+    "tikz_import_categories keys must exist in tikz_import_defaults"
 
 tikz_layout_defaults: dict[str, float] = {
     "tikz/layout/hspace": 2.0,
