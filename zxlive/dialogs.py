@@ -8,13 +8,14 @@ from typing import TYPE_CHECKING, Optional
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QLineEdit, QMessageBox,
-                               QPushButton, QTextEdit, QWidget, QInputDialog)
+from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
+                               QFileDialog, QFormLayout, QHBoxLayout, QLabel,
+                               QLineEdit, QMessageBox, QPushButton, QTextEdit,
+                               QVBoxLayout, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
-from .common import GraphT, VT
+from .common import GraphT, VT, find_unknown_tikz_styles, from_tikz
 from .settings import get_settings_value
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
@@ -96,6 +97,176 @@ def show_error_msg(title: str, description: Optional[str] = None, parent: Option
     msg.exec()
 
 
+class TikzUnknownStylesDialog(QDialog):
+    """Dialog for categorising unknown TikZ vertex styles.
+
+    Shows the unknown styles found during import and lets the user assign
+    each to a vertex category (Z spider, X spider, etc.) or skip it.
+    The chosen mappings are saved to the TikZ import preferences so that
+    future imports recognise the styles automatically.
+    """
+
+    # (display label, settings key). ``None`` means "skip this style".
+    # TODO(#537): Unify the settings keys with the ones in settings.py
+    # so accidental mismatches don't get introduced in the future.
+    CATEGORIES: list[tuple[str, Optional[str]]] = [
+        ("(skip)", None),
+        ("Z spider", "tikz/Z-spider-import"),
+        ("X spider", "tikz/X-spider-import"),
+        ("Boundary", "tikz/boundary-import"),
+        ("H-box", "tikz/Hadamard-import"),
+        ("W input", "tikz/w-input-import"),
+        ("W output", "tikz/w-output-import"),
+        ("Z box", "tikz/z-box-import"),
+        ("Dummy", "tikz/dummy-import"),
+    ]
+
+    RETRY = 1
+    IGNORE = 2
+
+    def __init__(self, unknown_styles: list[str], error_msg: str,
+                 parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("TikZ import: unknown styles")
+        self.result_action = 0
+
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel(
+            "The following vertex styles are not recognised.\n"
+            "Assign each to a category, or skip it."
+        ))
+
+        if error_msg:
+            err = QLabel(error_msg)
+            err.setWordWrap(True)
+            layout.addWidget(err)
+
+        form = QFormLayout()
+        self._combos: list[tuple[str, QComboBox]] = []
+        for style in unknown_styles:
+            combo = QComboBox()
+            for label, _ in self.CATEGORIES:
+                combo.addItem(label)
+            form.addRow(f'"{style}"', combo)
+            self._combos.append((style, combo))
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        retry_btn = QPushButton("Add to preferences && retry")
+        retry_btn.clicked.connect(lambda: self._finish(self.RETRY))
+        ignore_btn = QPushButton("Import ignoring errors")
+        ignore_btn.clicked.connect(lambda: self._finish(self.IGNORE))
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(retry_btn)
+        btn_layout.addWidget(ignore_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+    def _finish(self, action: int) -> None:
+        self.result_action = action
+        self.accept()
+
+    def selected_mappings(self) -> dict[str, str]:
+        """Return ``{style_name: settings_key}`` for non-skipped entries."""
+        mappings: dict[str, str] = {}
+        for style, combo in self._combos:
+            idx = combo.currentIndex()
+            _, key = self.CATEGORIES[idx]
+            if key is not None:
+                mappings[style] = key
+        return mappings
+
+
+def _apply_tikz_style_mappings(mappings: dict[str, str]) -> None:
+    """Add *mappings* to the TikZ import preferences and refresh PyZX synonyms.
+
+    Each key in *mappings* is a style name; each value is a settings key
+    such as ``"tikz/Z-spider-import"``.
+    """
+    from .settings import settings, refresh_pyzx_tikz_settings
+
+    for style, key in mappings.items():
+        current = str(settings.value(key, ""))
+        entries = [s.strip() for s in current.split(",") if s.strip()]
+        if style.lower() not in (e.lower() for e in entries):
+            entries.append(style)
+            settings.setValue(key, ", ".join(entries))
+
+    refresh_pyzx_tikz_settings()
+
+
+def _confirm_ignore_errors(title: str, body: str, button_text: str,
+                           parent: Optional[QWidget]) -> bool:
+    """Show a warning dialog with a custom accept button; return ``True`` if accepted."""
+    msg = QMessageBox(parent)
+    msg.setIcon(QMessageBox.Icon.Warning)
+    msg.setText(title)
+    msg.setInformativeText(body)
+    accept_btn = msg.addButton(button_text, QMessageBox.ButtonRole.AcceptRole)
+    msg.addButton(QMessageBox.StandardButton.Cancel)
+    msg.exec()
+    return msg.clickedButton() is accept_btn
+
+
+def _retry_strict_with_mappings(tikz: str, mappings: dict[str, str],
+                                parent: Optional[QWidget]) -> tuple[Optional[GraphT], bool]:
+    """Apply style mappings and retry strict TikZ import.
+
+    Returns ``(graph, fall_through)``: ``graph`` is the imported graph on
+    success, otherwise ``None``; ``fall_through`` is ``True`` if the strict
+    retry failed and the user chose to attempt a tolerant import next.
+    """
+    if mappings:
+        _apply_tikz_style_mappings(mappings)
+    try:
+        return from_tikz(tikz), False
+    except Exception as retry_error:
+        return None, _confirm_ignore_errors(
+            "TikZ import: remaining errors",
+            f"Style mappings were saved, but other errors remain:\n{retry_error}",
+            "Import ignoring remaining errors", parent)
+
+
+def try_import_tikz(tikz: str, parent: Optional[QWidget] = None) -> Optional[GraphT]:
+    """Import TikZ with interactive error handling.
+
+    Tries strict import first.  On failure, if unknown styles are found,
+    shows a dialog that lets the user categorise them (saving the mappings
+    to preferences) and retry.  Otherwise offers to retry with all errors
+    tolerated.
+    """
+    try:
+        return from_tikz(tikz)
+    except Exception as e:
+        strict_error = e
+
+    unknown = find_unknown_tikz_styles(tikz)
+    if unknown:
+        dlg = TikzUnknownStylesDialog(unknown, str(strict_error), parent=parent)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None
+        if dlg.result_action == TikzUnknownStylesDialog.RETRY:
+            graph, fall_through = _retry_strict_with_mappings(
+                tikz, dlg.selected_mappings(), parent)
+            if graph is not None:
+                return graph
+            if not fall_through:
+                return None
+    elif not _confirm_ignore_errors("TikZ import error", str(strict_error),
+                                    "Retry ignoring errors", parent):
+        return None
+
+    try:
+        return from_tikz(tikz, ignore_errors=True)
+    except Exception as e:
+        show_error_msg("TikZ import error",
+                       f"Error while importing TikZ: {e}",
+                       parent=parent)
+        return None
+
+
 def import_diagram_dialog(parent: QWidget) -> Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
     """Shows a dialog to import a diagram from disk.
 
@@ -161,14 +332,10 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
             g.set_auto_simplify(False)
             return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
         elif selected_format == FileFormat.TikZ:
-            try:
-                g = GraphT.from_tikz(data)  # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                if TYPE_CHECKING:
-                    assert isinstance(g, GraphT)
-                g.set_auto_simplify(False)
-                return ImportGraphOutput(selected_format, file_path, g)  # type: ignore
-            except ValueError:
-                raise ValueError("Probable reason: attempted to import a proof from TikZ, which is not supported.")
+            tikz_g = try_import_tikz(data, parent=parent)
+            if tikz_g is None:
+                return None
+            return ImportGraphOutput(selected_format, file_path, tikz_g)
         else:
             assert selected_format == FileFormat.All
             try:
@@ -185,16 +352,12 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
                     g.set_auto_simplify(False)
                     return ImportGraphOutput(FileFormat.QGraph, file_path, g)  # type: ignore
                 except Exception:
-                    try:
-                        g = GraphT.from_tikz(data)  # type: ignore # We know the return type is Multigraph, but mypy doesn't
-                        if TYPE_CHECKING:
-                            assert isinstance(g, GraphT)
-                        g.set_auto_simplify(False)
-                        return ImportGraphOutput(FileFormat.TikZ, file_path, g)  # type: ignore
-                    except Exception:
-                        show_error_msg(f"Failed to import {selected_format.name} file",
-                                       f"Couldn't determine filetype: {file_path}.", parent=parent)
-                        return None
+                    tikz_g = try_import_tikz(data, parent=parent)
+                    if tikz_g is not None:
+                        return ImportGraphOutput(FileFormat.TikZ, file_path, tikz_g)
+                    show_error_msg(f"Failed to import {selected_format.name} file",
+                                   f"Couldn't determine filetype: {file_path}.", parent=parent)
+                    return None
 
     except Exception as e:
         show_error_msg(f"Failed to import {selected_format.name} file: {file_path}", str(e), parent=parent)
