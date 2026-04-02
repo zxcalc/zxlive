@@ -782,7 +782,33 @@ class MainWindow(QMainWindow):
         tikz = QApplication.clipboard().text()
         if not tikz:
             tikz = pyperclip.paste()
-        return from_tikz(tikz) if tikz else None
+        if not tikz:
+            return None
+        try:
+            return from_tikz(tikz)
+        except Exception as e:
+            from .common import find_unknown_tikz_styles
+            unknown = find_unknown_tikz_styles(tikz)
+            detail = str(e)
+            if unknown:
+                detail += "\n\nUnknown styles: " + ", ".join(unknown)
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setText("TikZ import error")
+            msg.setInformativeText(detail)
+            retry_btn = msg.addButton("Retry ignoring errors",
+                                      QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton(QMessageBox.StandardButton.Cancel)
+            msg.exec()
+            if msg.clickedButton() != retry_btn:
+                return None
+        try:
+            return from_tikz(tikz, ignore_errors=True)
+        except Exception as e:
+            show_error_msg("TikZ import error",
+                           f"Error while importing TikZ: {e}",
+                           parent=self)
+            return None
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
