@@ -283,7 +283,12 @@ def save_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tupl
 
 def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str = "") -> Optional[tuple[str, FileFormat]]:
     rules_folder = get_settings_value("path/custom-rules", str)
-    default_path = os.path.join(rules_folder, filename) if filename else rules_folder
+    if filename:
+        default_path = os.path.join(rules_folder, filename)
+    elif rule.name:
+        default_path = os.path.join(rules_folder, rule.name + ".zxr")
+    else:
+        default_path = rules_folder
     return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, default_path)
 
 
