@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
@@ -14,6 +15,7 @@ from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
 from .common import GraphT, VT
+from .settings import get_settings_value
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
 
@@ -280,7 +282,9 @@ def save_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tupl
 
 
 def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str = "") -> Optional[tuple[str, FileFormat]]:
-    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, filename)
+    rules_folder = get_settings_value("path/custom-rules", str)
+    default_path = os.path.join(rules_folder, filename) if filename else rules_folder
+    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, default_path)
 
 
 def export_proof_dialog(parent: QWidget) -> Optional[str]:
