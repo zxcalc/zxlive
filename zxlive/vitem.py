@@ -20,7 +20,7 @@ import math
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
-from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
+from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QFont, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
 from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
@@ -86,8 +86,9 @@ class VItem(QGraphicsPathItem):
     dummy_svg_item: Optional[QGraphicsSvgItem] = None
     _dummy_svg_renderer: Optional[QSvgRenderer] = None
     _cached_dummy_text: str = ""
-    _cached_dark_mode: bool = False
+    _cached_text_color: str = ""
     _cached_font_key: str = ""
+    index_text_item: Optional[QGraphicsTextItem] = None
 
     halftone = "1000100010001000"  # QPixmap("images/halftone.png")
 
@@ -122,9 +123,10 @@ class VItem(QGraphicsPathItem):
         self.dummy_svg_item = None
         self._dummy_svg_renderer = None
         self._cached_dummy_text = ""
-        self._cached_dark_mode = False
+        self._cached_text_color = ""
         self._cached_font_key = ""
         self._last_type: Optional[VertexType] = None
+        self.index_text_item = None
 
         self._old_pos = None
         self._dragged_on = None
@@ -215,7 +217,43 @@ class VItem(QGraphicsPathItem):
         if w_out:
             w_out.refresh(cascade_edges=cascade_edges)
 
+    def _refresh_index_label(self) -> None:
+        """Show or hide the vertex index label based on settings."""
+        show_indices = display_setting.show_vertex_indices
+        if show_indices:
+            if self.index_text_item is None:
+                self.index_text_item = QGraphicsTextItem(self)
+                self._apply_index_label_style()
+            offset = 0.25 * SCALE
+            rect = self.index_text_item.boundingRect()
+            shift_x = -rect.width() / 2
+            if self.ty == VertexType.W_OUTPUT and self.rotation():
+                self.index_text_item.setRotation(-self.rotation())
+                angle = math.radians(self.rotation())
+                cos_a = math.cos(angle)
+                sin_a = math.sin(angle)
+                self.index_text_item.setPos(
+                    shift_x * cos_a + offset * sin_a,
+                    -shift_x * sin_a + offset * cos_a)
+            else:
+                self.index_text_item.setRotation(0)
+                self.index_text_item.setPos(shift_x, offset)
+            self.index_text_item.setVisible(True)
+        elif self.index_text_item is not None:
+            self.index_text_item.setVisible(False)
+
+    def _apply_index_label_style(self) -> None:
+        """Update font, colour and text of the index label."""
+        if self.index_text_item is None:
+            return
+        font = QFont(display_setting.font)
+        font.setPointSize(max(8, font.pointSize() - 2))
+        self.index_text_item.setFont(font)
+        self.index_text_item.setDefaultTextColor(QColor(display_setting.text_color))
+        self.index_text_item.setPlainText(str(self.v))
+
     def _refresh_adjacent_edges(self) -> None:
+        self._refresh_index_label()
         for e_item in self.adj_items:
             e_item.refresh()
 
@@ -439,7 +477,7 @@ class VItem(QGraphicsPathItem):
         if self.dummy_svg_item is not None:
             self.dummy_svg_item.setVisible(False)
         self._cached_dummy_text = ""
-        self._cached_dark_mode = False
+        self._cached_text_color = ""
         self._cached_font_key = ""
 
     def update_font(self) -> None:
@@ -450,6 +488,10 @@ class VItem(QGraphicsPathItem):
         self._cached_font_key = ""
         if self.ty == VertexType.DUMMY:
             self._update_dummy_display(self.g.vdata(self.v, 'text', ''))
+        # Update index label style before refreshing so position uses
+        # the updated bounding rect.
+        self._apply_index_label_style()
+        self._refresh_index_label()
 
     def _update_dummy_display(self, text: str) -> None:
         """Render dummy node label. Detects LaTeX and renders to SVG.
@@ -459,17 +501,16 @@ class VItem(QGraphicsPathItem):
             self.remove_dummy_label()
             return
 
-        dark = display_setting.dark_mode
+        text_color = display_setting.text_color
         font_key = display_setting.font.toString()
         if (text == self._cached_dummy_text
-                and dark == self._cached_dark_mode
+                and text_color == self._cached_text_color
                 and font_key == self._cached_font_key):
             return
 
         self._cached_dummy_text = text
-        self._cached_dark_mode = dark
+        self._cached_text_color = text_color
         self._cached_font_key = font_key
-        text_color = "#e0e0e0" if dark else "#222222"
 
         from .latex_render import is_latex, latex_to_svg
 

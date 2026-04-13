@@ -53,6 +53,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "patterns-folder": "patterns/",
     "startup-behavior": "restore",
     "phase-label-color": "",
+    "show-vertex-indices": False,
 }
 
 font_defaults: dict[str, str | int | None] = {
@@ -244,6 +245,15 @@ class DisplaySettings:
         )
         self.SNAP = SCALE / self.SNAP_DIVISION
         self._invalidate_color_cache()
+
+    @property
+    def text_color(self) -> str:
+        """Standard text colour for labels, adapted for dark/light mode."""
+        return "#e0e0e0" if self.dark_mode else "#222222"
+
+    @property
+    def show_vertex_indices(self) -> bool:
+        return get_settings_value("show-vertex-indices", bool)
 
     @property
     def previews_show(self) -> bool:
