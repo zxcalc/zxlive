@@ -1,7 +1,7 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Optional, Sequence, Dict, Union, Any
+from typing import TYPE_CHECKING, Hashable, Optional, Sequence, Dict, Union, Any
 
 import networkx as nx
 import numpy as np
@@ -101,33 +101,47 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
         graph.remove_vertices(vertices_to_remove)
         return True
 
-    def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
-        def get_adjacent_boundary_vertices(g: nx.MultiGraph, v: VT) -> Sequence[VT]:
-            return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
+    @staticmethod
+    def _adjacent_boundary_vertices(g: nx.MultiGraph, v: Hashable) -> Sequence[Hashable]:
+        # Node IDs may be VT for source graphs or str (e.g., 'b0') for subgraphs from create_subgraph.
+        return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
 
+    def _compute_unfuse_matching(self, graph: GraphT, vertices: list[VT]) -> Dict[VT, VT]:
         subgraph_nx_without_boundaries = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
-        lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
+        lhs_vertices = [v for v in self.lhs_graph.vertices()
+                        if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
         lhs_graph_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
                                      node_match=categorical_node_match('type', 1))
-        matching = list(graph_matcher.match())[0]
+        matching: Dict[VT, VT] = list(graph_matcher.match())[0]
+        return matching
 
+    def _should_skip_unfuse(self, subgraph_nx: nx.MultiGraph, matched_v: VT, vtype: VertexType) -> bool:
+        outside_verts = self._adjacent_boundary_vertices(subgraph_nx, matched_v)
+        if len(outside_verts) != 1:
+            return False
+        edge_type = subgraph_nx.get_edge_data(matched_v, outside_verts[0])[0]['type']
+        return edge_type == EdgeType.SIMPLE and vtype != VertexType.W_INPUT
+
+    def _dispatch_unfuse(self, graph: GraphT, subgraph_nx: nx.MultiGraph,
+                         matched_v: VT, vtype: VertexType) -> None:
+        if vtype in (VertexType.Z, VertexType.X, VertexType.Z_BOX):
+            self.unfuse_zx_vertex(graph, subgraph_nx, matched_v, vtype)
+        elif vtype == VertexType.H_BOX:
+            self.unfuse_h_box_vertex(graph, subgraph_nx, matched_v)
+        elif vtype in (VertexType.W_OUTPUT, VertexType.W_INPUT):
+            self.unfuse_w_vertex(graph, subgraph_nx, matched_v, vtype)
+
+    def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
+        matching = self._compute_unfuse_matching(graph, vertices)
         subgraph_nx, _ = create_subgraph(graph, vertices)
         for v in matching:
-            if len(get_adjacent_boundary_vertices(self.lhs_graph_nx, v)) != 1:
+            if len(self._adjacent_boundary_vertices(self.lhs_graph_nx, v)) != 1:
                 continue
             vtype = self.lhs_graph_nx.nodes()[v]['type']
-            outside_verts = get_adjacent_boundary_vertices(subgraph_nx, matching[v])
-            if len(outside_verts) == 1 and \
-                    subgraph_nx.get_edge_data(matching[v], outside_verts[0])[0]['type'] == EdgeType.SIMPLE and \
-                    vtype != VertexType.W_INPUT:
+            if self._should_skip_unfuse(subgraph_nx, matching[v], vtype):
                 continue
-            if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
-                self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
-            elif vtype == VertexType.H_BOX:
-                self.unfuse_h_box_vertex(graph, subgraph_nx, matching[v])
-            elif vtype == VertexType.W_OUTPUT or vtype == VertexType.W_INPUT:
-                self.unfuse_w_vertex(graph, subgraph_nx, matching[v], vtype)
+            self._dispatch_unfuse(graph, subgraph_nx, matching[v], vtype)
 
     def unfuse_update_edges(self, graph: GraphT, subgraph_nx: nx.MultiGraph, old_v: VT, new_v: VT) -> None:
         for e in graph.incident_edges(old_v):

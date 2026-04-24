@@ -256,32 +256,20 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(AddNode(self.graph_view, x, y, self._curr_vty))
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
 
-    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
-        """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
-        If self.snap_vertex_edge is true, then we try to connect `u` through all the `vertices` in `verts`, and then to `v`.
-        """
-        cmd: BaseCommand
-        graph = self.graph_view.graph_scene.g
+    def _is_invalid_edge(self, graph: GraphT, u: VT, v: VT) -> bool:
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
-            return None
+            return True
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
                 graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
-            return None
-        if (graph.type(u) == VertexType.DUMMY and graph.type(v) != VertexType.DUMMY) or \
-                (graph.type(u) != VertexType.DUMMY and graph.type(v) == VertexType.DUMMY):
-            return None
+            return True
+        u_is_dummy = graph.type(u) == VertexType.DUMMY
+        v_is_dummy = graph.type(v) == VertexType.DUMMY
+        return bool(u_is_dummy != v_is_dummy)
 
-        # We will try to connect all the vertices together in order
-        # First we filter out the vertices that are not compatible with the edge.
-        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
-        # but first we check if there any vertices that we do want to additionally connect.
-        if not self.snap_vertex_edge or not verts:
-            cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
-            self.undo_stack.push(cmd)
-            return
-
-        ux, uy = graph.row(u), graph.qubit(u)
+    def _build_snap_pairs(self, graph: GraphT, u: VT, v: VT,
+                          verts: list[VItem]) -> list[tuple[VT, VT]]:
         # Line was drawn from u to v, we want to order vs with the earlier items first.
+        ux, uy = graph.row(u), graph.qubit(u)
 
         def dist(vitem: VItem) -> float:
             return (graph.row(vitem.v) - ux)**2 + (graph.qubit(vitem.v) - uy)**2  # type: ignore
@@ -291,8 +279,26 @@ class EditorBasePanel(BasePanel):
         for i in range(1, len(vs)):
             pairs.append((vs[i - 1], vs[i]))
         pairs.append((vs[-1], v))
-        cmd = AddEdges(self.graph_view, pairs, self._curr_ety)
-        self.undo_stack.push(cmd)
+        return pairs
+
+    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
+        If self.snap_vertex_edge is true, then we try to connect `u` through all the `vertices` in `verts`, and then to `v`.
+        """
+        graph = self.graph_view.graph_scene.g
+        if self._is_invalid_edge(graph, u, v):
+            return None
+
+        # We will try to connect all the vertices together in order
+        # First we filter out the vertices that are not compatible with the edge.
+        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
+        # but first we check if there any vertices that we do want to additionally connect.
+        if not self.snap_vertex_edge or not verts:
+            self.undo_stack.push(AddEdge(self.graph_view, u, v, self._curr_ety))
+            return
+
+        pairs = self._build_snap_pairs(graph, u, v, verts)
+        self.undo_stack.push(AddEdges(self.graph_view, pairs, self._curr_ety))
         group = QParallelAnimationGroup()
         for vitem in verts:
             anim = animations.scale(vitem, 1.0, 400, QEasingCurve(QEasingCurve.Type.InCubic), start=1.3)
