@@ -5,6 +5,9 @@ on:
     tags:
       - "v*.*.*"
 
+  # Allows you to run this workflow manually from the GitHub Actions tab
+  workflow_dispatch:
+
 env:
   SRC_DIR: zxlive
 
