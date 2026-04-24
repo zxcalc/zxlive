@@ -631,6 +631,10 @@ class PhaseItem(QGraphicsTextItem):
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
         self.v_item = v_item
+        # Persistent label for boundary vertices (e.g. I/O labels set by the
+        # rule editor). Survives refresh() calls so it is not wiped by
+        # selection/position changes.
+        self._boundary_label: str = ""
         self.update_text_color()
         self.refresh()
 
@@ -647,14 +651,32 @@ class PhaseItem(QGraphicsTextItem):
         else:
             self.setDefaultTextColor(QColor("#006bb3"))
 
+    def set_boundary_label(self, text: str) -> None:
+        """Set a persistent label for a boundary vertex (e.g. I/O labels).
+
+        Unlike a raw ``setPlainText`` call, labels set through this method
+        survive ``refresh()`` calls, so they are not wiped by selection or
+        position changes."""
+        self._boundary_label = text
+        self.setPlainText(text)
+
     def refresh(self) -> None:
-        """Call this when a vertex moves or its phase changes"""
+        """Call this when a vertex moves or its phase changes."""
         vertex_type = self.v_item.ty
-        if vertex_type == VertexType.Z_BOX:
-            self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
-        elif vertex_type != VertexType.BOUNDARY:
-            phase = self.v_item.g.phase(self.v_item.v)
-            self.setPlainText(phase_to_s(phase, vertex_type))
+        if vertex_type == VertexType.BOUNDARY:
+            # Re-apply the stored boundary label (defaults to ""), clearing
+            # any stale phase text while preserving intentional labels like
+            # I/O indicators set by the rule editor (see #462).
+            self.setPlainText(self._boundary_label)
+        else:
+            # Drop any stored boundary label so it isn't resurrected if the
+            # vertex later transitions back to BOUNDARY.
+            self._boundary_label = ""
+            if vertex_type == VertexType.Z_BOX:
+                self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
+            else:
+                phase = self.v_item.g.phase(self.v_item.v)
+                self.setPlainText(phase_to_s(phase, vertex_type))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
 
