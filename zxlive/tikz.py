@@ -5,6 +5,23 @@ from .common import GraphT, get_settings_value
 from zxlive.proof import ProofModel
 
 
+def _escape_tex(s: str) -> str:
+    """Escape characters that would otherwise break LaTeX parsing."""
+    out = []
+    for ch in s:
+        if ch == "\\":
+            out.append(r"\backslash{}")
+        elif ch in "{}%#&$_":
+            out.append("\\" + ch)
+        elif ch == "^":
+            out.append(r"\string^")
+        elif ch == "~":
+            out.append(r"\string~")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def proof_to_tikz(proof: ProofModel) -> str:
     settings = QSettings("zxlive", "zxlive")
     vspace = get_settings_value("tikz/layout/vspace", float, settings=settings)
@@ -31,6 +48,8 @@ def proof_to_tikz(proof: ProofModel) -> str:
             rewrite = proof.steps[i - 1]
             # Try to look up name in settings
             name = settings.value(f"tikz/names/{rewrite.rule}") if settings.contains(f"tikz/names/{rewrite.rule}") else rewrite.rule
+            # Escape TeX-special characters since the name is interpolated into LaTeX.
+            name = _escape_tex(str(name))
             eq = f"\\node [style=none] ({idoffset}) at ({xoffset - hspace/2:.2f}, {-yoffset - height/2:.2f}) {{$\\mathrel{{\\mathop{{=}}\\limits^{{\\mathit{{{name}}}}}}}$}};"
             total_verts.append(eq)
             idoffset += 1
