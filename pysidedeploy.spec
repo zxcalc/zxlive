@@ -46,7 +46,7 @@ extra_args =
   --nofollow-import-to=sympy 
   --nofollow-import-to=ipywidgets 
   --nofollow-import-to=tkinter 
-  --noinclude-numba-mode 
+  --noinclude-numba-mode=nofollow
   --disable-console 
   --include-package-data=zxlive.icons 
   --macos-create-app-bundle
