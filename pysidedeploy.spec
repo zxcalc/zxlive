@@ -37,7 +37,7 @@ wheel_shiboken =
 # for arm macos add --macos-create-app-bundle
 extra_args =
   --quiet 
-  --noinclude-qt-translations=True 
+  --noinclude-qt-translations
   --nofollow-import-to=IPython 
   --nofollow-import-to=scipy 
   --nofollow-import-to=pytest 
