@@ -38,7 +38,7 @@ jobs:
         run:
           pip install .
       - name: Build ZXLive
-        run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
+        run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files --noinclude-numba-mode
       - name: Rename files, fix deployment file location - Windows
         if: matrix.os == 'windows-latest'
         run: mv build/__main__.exe ./zxlive_app_windows.exe
@@ -46,7 +46,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-              mv build/__main__.bin ./zxlive_app_linux.bin 
+              mv build/ZXLive.bin ./zxlive_app_linux.bin 
           elif [ "$RUNNER_OS" == "macOS" ]; then
               mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_app_macos.bin
           fi
