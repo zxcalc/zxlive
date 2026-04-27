@@ -35,7 +35,21 @@ wheel_shiboken =
 [nuitka]
 # (str) specify any extra nuitka arguments
 # for arm macos add --macos-create-app-bundle
-extra_args = --quiet --noinclude-qt-translations=True --nofollow-import-to=IPython --nofollow-import-to=scipy --nofollow-import-to=pytest --nofollow-import-to=matplotlib --nofollow-import-to=pandas --nofollow-import-to=sympy --nofollow-import-to=ipywidgets --nofollow-import-to=tkinter --noinclude-numba-mode --disable-console --include-package-data=zxlive.icons --macos-create-app-bundle
+extra_args =
+  --quiet 
+  --noinclude-qt-translations=True 
+  --nofollow-import-to=IPython 
+  --nofollow-import-to=scipy 
+  --nofollow-import-to=pytest 
+  --nofollow-import-to=matplotlib 
+  --nofollow-import-to=pandas 
+  --nofollow-import-to=sympy 
+  --nofollow-import-to=ipywidgets 
+  --nofollow-import-to=tkinter 
+  --noinclude-numba-mode 
+  --disable-console 
+  --include-package-data=zxlive.icons 
+  --macos-create-app-bundle
 
 [buildozer]
 # build mode
