@@ -5,7 +5,7 @@ title = ZXLive
 # of input_file
 project_dir = ./zxlive/
 # source file path
-input_file = zxlive/__main__.py
+input_file = __main__.py
 # directory where exec is stored
 exec_directory = ./build/
 # path to .pyproject project file
@@ -17,7 +17,7 @@ python_path = python
 # python packages to install
 # ordered-set = increase compile time performance of nuitka packaging
 # zstandard = provides final executable size optimization
-packages = nuitka==1.8.*,ordered_set,zstandard
+packages = nuitka>=4.0,ordered_set,zstandard
 # buildozer = for deploying Android application
 android_packages = buildozer==1.5.*,cython==0.29.*
 
@@ -35,20 +35,21 @@ wheel_shiboken =
 [nuitka]
 # (str) specify any extra nuitka arguments
 # for arm macos add --macos-create-app-bundle
-extra_args = 
-	--noinclude-qt-translations
-	--nofollow-import-to=IPython
-	--nofollow-import-to=scipy
-	--nofollow-import-to=pytest
-	--nofollow-import-to=matplotlib
-	--nofollow-import-to=pandas
-	--nofollow-import-to=sympy
-	--nofollow-import-to=ipywidgets
-	--nofollow-import-to=tkinter
-	--deployment
-	--disable-console
-	--include-package-data=zxlive.icons
-	--macos-create-app-bundle
+extra_args =
+  --quiet 
+  --noinclude-qt-translations=True 
+  --nofollow-import-to=IPython 
+  --nofollow-import-to=scipy 
+  --nofollow-import-to=pytest 
+  --nofollow-import-to=matplotlib 
+  --nofollow-import-to=pandas 
+  --nofollow-import-to=sympy 
+  --nofollow-import-to=ipywidgets 
+  --nofollow-import-to=tkinter 
+  --noinclude-numba-mode 
+  --disable-console 
+  --include-package-data=zxlive.icons 
+  --macos-create-app-bundle
 
 [buildozer]
 # build mode
@@ -69,4 +70,4 @@ modules =
 local_libs = plugins_platforms_qtforandroid
 # architecture of deployed platform
 # possible values = ["aarch64", "armv7a", "i686", "x86_64"]
-arch = 
+arch =
