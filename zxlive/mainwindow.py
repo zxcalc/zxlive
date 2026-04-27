@@ -28,8 +28,8 @@ from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
                             Qt)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
-from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QMessageBox,
+                               QTabBar, QTabWidget, QVBoxLayout, QWidget)
 from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 
@@ -51,7 +51,7 @@ from .rule_panel import RulePanel
 from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
-from .tikz import proof_to_tikz
+from .tikz import proof_to_tikz, proof_steps_to_tikz
 
 
 class MainWindow(QMainWindow):
@@ -132,6 +132,9 @@ class MainWindow(QMainWindow):
         self.export_gif_proof = self._new_action(
             "Export proof to gif", self.handle_export_gif_proof_action,
             None, "Exports the proof to gif")
+        self.export_tikz_series = self._new_action(
+            "Export proof steps to tikz files", self.handle_export_tikz_series_action,
+            None, "Exports each proof step to a separate tikz file")
         self.auto_save_action = self._new_action(
             "Auto Save", self.toggle_auto_save, None,
             "Automatically save the file after every edit"
@@ -149,6 +152,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.save_file)
         file_menu.addAction(self.save_as)
         file_menu.addAction(self.export_tikz_proof)
+        file_menu.addAction(self.export_tikz_series)
         file_menu.addAction(self.export_gif_proof)
         file_menu.addSeparator()
         file_menu.addAction(self.auto_save_action)
@@ -289,6 +293,7 @@ class MainWindow(QMainWindow):
 
         # Export to tikz and gif are enabled only if there is a proof in the active tab.
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        self.export_tikz_series.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
         self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
@@ -680,6 +685,30 @@ class MainWindow(QMainWindow):
             return False
         graphs: list[BaseGraph] = list(self.active_panel.proof_model.graphs())
         graphs_to_gif(graphs, path, 1000)  # 1000ms per frame
+        return True
+
+    def handle_export_tikz_series_action(self) -> bool:
+        """Export each proof step to a separate TikZ file in a chosen directory."""
+        assert isinstance(self.active_panel, ProofPanel)
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select folder for TikZ files",
+            options=QFileDialog.Option.ShowDirsOnly)
+        if not directory:
+            return False
+
+        steps = proof_steps_to_tikz(self.active_panel.proof_model)
+        padding_width = max(3, len(str(max(len(steps) - 1, 0))))
+        for i, (name, tikz) in enumerate(steps):
+            # Create a safe filename from the step name.
+            safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
+            filename = f"{i:0{padding_width}d}_{safe_name}.tikz"
+            file_path = os.path.join(directory, filename)
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(tikz)
+            except OSError as e:
+                show_error_msg("Export failed", f"Could not write to {file_path}: {e}", parent=self)
+                return False
         return True
 
     def cut_graph(self) -> None:

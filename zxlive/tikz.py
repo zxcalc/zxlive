@@ -68,3 +68,38 @@ def proof_to_tikz(proof: ProofModel) -> str:
         idoffset += max_index
 
     return TIKZ_BASE.format(vertices="\n".join(total_verts), edges="\n".join(total_edges))
+
+
+def graph_to_tikz(graph: GraphT) -> str:
+    """Convert a single graph to TikZ format."""
+    vertices = list(graph.vertices())
+    if vertices:
+        # Translate graph so that the leftmost vertex starts at 0.
+        min_x = min(graph.row(v) for v in vertices)
+        g_t = graph.translate(-min_x, 0)
+        assert isinstance(g_t, GraphT)
+    else:
+        g_t = graph
+
+    verts, edges = _to_tikz(g_t, draw_scalar=False, xoffset=0, yoffset=0, idoffset=0)
+    return TIKZ_BASE.format(vertices="\n".join(verts), edges="\n".join(edges))
+
+
+def proof_steps_to_tikz(proof: ProofModel) -> list[tuple[str, str]]:
+    """Convert each proof step to a separate TikZ string.
+
+    Returns a list of (step_name, tikz_string) tuples.
+    """
+    result = []
+    graphs = proof.graphs()
+
+    for i, g in enumerate(graphs):
+        if i == 0:
+            name = "START"
+        else:
+            name = proof.steps[i - 1].display_name
+
+        tikz = graph_to_tikz(g)
+        result.append((name, tikz))
+
+    return result
