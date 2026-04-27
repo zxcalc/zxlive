@@ -5,7 +5,7 @@ title = ZXLive
 # of input_file
 project_dir = ./zxlive/
 # source file path
-input_file = __main__.py
+input_file = zxlive/__main__.py
 # directory where exec is stored
 exec_directory = ./build/
 # path to .pyproject project file
@@ -70,4 +70,3 @@ local_libs = plugins_platforms_qtforandroid
 # architecture of deployed platform
 # possible values = ["aarch64", "armv7a", "i686", "x86_64"]
 arch = 
-
