@@ -47,7 +47,6 @@ extra_args =
   --nofollow-import-to=tkinter 
   --noinclude-numba-mode=nofollow
   --include-package-data=zxlive.icons 
-  --output-filename=zxlive_bin
   --macos-create-app-bundle
 
 [buildozer]
