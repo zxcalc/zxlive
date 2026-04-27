@@ -50,7 +50,7 @@ jobs:
           elif [ "$RUNNER_OS" == "macOS" ]; then
               mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_app_macos.bin
           fi
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: zxlive_app_*
+      # - name: Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     files: zxlive_app_*
