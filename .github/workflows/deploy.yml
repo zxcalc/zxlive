@@ -14,6 +14,8 @@ env:
 jobs:
   build_and_deploy:
     strategy:
+      # Do not cancel other jobs when one fails
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
         python-version: [ 3.11 ]
@@ -41,16 +43,17 @@ jobs:
         run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
       - name: Rename files, fix deployment file location - Windows
         if: matrix.os == 'windows-latest'
-        run: mv build/ZXLive.exe ./ZXLive_windows.exe
+        run: mv build/zxlive.exe ./zxlive_windows.exe
       - name: Rename files, fix deployment file location - Linux, MacOS
         if: matrix.os != 'windows-latest'
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-              mv build/ZXLive.bin ./ZXLive_linux.bin 
+              mv build/ZXLive.bin ./zxlive_linux.bin 
           elif [ "$RUNNER_OS" == "macOS" ]; then
-              mv build/ZXLive.app ./ZXLive_macos.app
+              mv build/ZXLive.app ./zxlive_macos.app
           fi
-      # - name: Release
-      #   uses: softprops/action-gh-release@v1
-      #   with:
-      #     files: zxlive_app_*
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: zxlive_*
+          draft: true
