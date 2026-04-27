@@ -36,7 +36,7 @@ wheel_shiboken =
 # (str) specify any extra nuitka arguments
 # for arm macos add --macos-create-app-bundle
 extra_args =
-  --quiet 
+  # --quiet 
   --noinclude-qt-translations
   --nofollow-import-to=IPython 
   --nofollow-import-to=scipy 
