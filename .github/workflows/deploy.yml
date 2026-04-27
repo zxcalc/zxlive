@@ -48,7 +48,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then
               mv build/ZXLive.bin ./zxlive_app_linux.bin 
           elif [ "$RUNNER_OS" == "macOS" ]; then
-              mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_app_macos.bin
+              mv zxlive/deployment/__main__.app/Contents/MacOS/ZXLive.app ./zxlive_app_macos.app
           fi
       # - name: Release
       #   uses: softprops/action-gh-release@v1
