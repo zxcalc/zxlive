@@ -5,7 +5,7 @@ title = ZXLive
 # of input_file
 project_dir = ./zxlive/
 # source file path
-input_file = __main__.py
+input_file = zxlive.py
 # directory where exec is stored
 exec_directory = ./build/
 # path to .pyproject project file
