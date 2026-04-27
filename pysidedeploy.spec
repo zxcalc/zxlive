@@ -49,8 +49,6 @@ extra_args =
   --include-package-data=zxlive.icons 
   --macos-create-app-bundle
 
-  # --quiet 
-
 [buildozer]
 # build mode
 # possible options = [release, debug]
