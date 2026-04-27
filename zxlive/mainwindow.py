@@ -224,11 +224,17 @@ class MainWindow(QMainWindow):
         self.fit_view_action = self._new_action(
             "Fit view", self.fit_view, QKeySequence("C"),
             "Fits the view to the diagram")
+        self.show_thumbnails_action = self._new_action(
+            "Show thumbnails", self.toggle_thumbnails, QKeySequence("t"),
+            "Toggle proof step diagram previews", checkable=True)
+        self.show_thumbnails_action.setChecked(get_settings_value("proof/show-thumbnails", bool))
 
         view_menu = menu.addMenu("&View")
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
+        view_menu.addSeparator()
+        view_menu.addAction(self.show_thumbnails_action)
 
         new_rewrite_from_file = self._new_action(
             "New rewrite from file", lambda: create_new_rewrite(self),
@@ -290,6 +296,9 @@ class MainWindow(QMainWindow):
         # Export to tikz and gif are enabled only if there is a proof in the active tab.
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
         self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        self.show_thumbnails_action.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        if has_active_tab and isinstance(self.active_panel, ProofPanel):
+            self.show_thumbnails_action.setChecked(self.active_panel.step_view.thumbnails_visible)
 
         # Paste is enabled only if there is something in the clipboard.
         self.paste_action.setEnabled(has_active_tab and self._has_pasteable_clipboard_data())
@@ -306,10 +315,13 @@ class MainWindow(QMainWindow):
             self, name: str, trigger: Callable,
             shortcut: QKeySequence | QKeySequence.StandardKey | None,
             tooltip: str, icon_file: Optional[str] = None,
-            alt_shortcut: Optional[QKeySequence | QKeySequence.StandardKey] = None
+            alt_shortcut: Optional[QKeySequence | QKeySequence.StandardKey] = None,
+            checkable: bool = False
             ) -> QAction:
         assert not alt_shortcut or shortcut
         action = QAction(name, self)
+        if checkable:
+            action.setCheckable(True)
         if icon_file:
             action.setIcon(QIcon(get_data(f"icons/{icon_file}")))
         action.setToolTip(tooltip)
@@ -514,8 +526,11 @@ class MainWindow(QMainWindow):
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
             self.proof_as_rewrite_action.setEnabled(True)
+            self.show_thumbnails_action.setEnabled(True)
+            self.show_thumbnails_action.setChecked(self.active_panel.step_view.thumbnails_visible)
         else:
             self.proof_as_rewrite_action.setEnabled(False)
+            self.show_thumbnails_action.setEnabled(False)
         self._undo_changed()
         self._redo_changed()
         if self.active_panel:
@@ -763,6 +778,14 @@ class MainWindow(QMainWindow):
         panel.undo_stack.canRedoChanged.connect(self._redo_changed)
         panel.play_sound_signal.connect(self.play_sound)
         panel.undo_stack.indexChanged.connect(self._auto_save_if_needed)
+        if isinstance(panel, ProofPanel):
+            panel.step_view.thumbnails_toggled.connect(self._on_proof_thumbnails_toggled)
+
+    def _on_proof_thumbnails_toggled(self, checked: bool) -> None:
+        # Check if the signal came from the currently active panel
+        if hasattr(self, 'active_panel') and isinstance(self.active_panel, ProofPanel):
+            if self.sender() is self.active_panel.step_view:
+                self.show_thumbnails_action.setChecked(checked)
 
     def _auto_save_if_needed(self) -> None:
         panel = self.active_panel
@@ -983,6 +1006,13 @@ class MainWindow(QMainWindow):
         for i in range(self.tab_widget.count()):
             w = cast(BasePanel, self.tab_widget.widget(i))
             w.update_font()
+
+    def toggle_thumbnails(self) -> None:
+        """Toggle the show thumbnails setting from the View menu."""
+        checked = self.show_thumbnails_action.isChecked()
+        # update current proof panel
+        if isinstance(self.active_panel, ProofPanel):
+            self.active_panel.step_view.thumbnails_visible = checked
 
     def toggle_auto_save(self) -> None:
         """Toggle the auto-save setting from the File menu."""
