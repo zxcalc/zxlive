@@ -8,7 +8,6 @@ from typing import Callable, Iterable, Optional, Set, Union
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
-from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
 from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
@@ -445,12 +444,14 @@ class AddRewriteStep(UpdateGraph):
     The rewrite is inserted after the currently selected step. In particular, it
     replaces all rewrites that were previously after the current selection.
     """
-    step_view: QListView
+    step_view: ProofStepView
     name: str
     diff: Optional[GraphDiff] = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
+    _old_group_rewrite: Optional[Rewrite] = field(default=None, init=False)
+    _old_sub_idx: int = field(default=-1, init=False)
 
     @property
     def proof_model(self) -> ProofModel:
@@ -459,11 +460,32 @@ class AddRewriteStep(UpdateGraph):
         return model
 
     def redo(self) -> None:
-        # Remove steps from the proof model until we're at the currently selected step
-        self._old_selected = int(self.step_view.currentIndex().row())
         self._old_steps = []
-        for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
-            self._old_steps.append(self.proof_model.pop_rewrite())
+        self._old_group_rewrite = None
+        self._old_sub_idx = -1
+
+        current = self.step_view.currentIndex()
+
+        # Check if the user is rewriting from inside a grouped sub-step.
+        if current.parent().isValid() and isinstance(self.step_view, ProofStepView):
+            parent_row = current.parent().row()
+            group_step_idx = parent_row - 1
+            sub_idx = current.row()
+            self._old_selected = parent_row
+            self._old_sub_idx = sub_idx
+
+            # 1. Pop all main steps that come AFTER the grouped step.
+            steps_after_group = self.proof_model.rowCount() - 1 - parent_row
+            for _ in range(steps_after_group):
+                self._old_steps.append(self.proof_model.pop_rewrite())
+
+            # 2. Truncate the grouped step: keep only sub-steps 0..sub_idx.
+            self._old_group_rewrite = self.proof_model.truncate_group(group_step_idx, sub_idx + 1)
+        else:
+            # Normal case: remove all steps after the currently selected step.
+            self._old_selected = int(current.row())
+            for _ in range(self.proof_model.rowCount() - self._old_selected - 1):
+                self._old_steps.append(self.proof_model.pop_rewrite())
 
         self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
 
@@ -480,16 +502,33 @@ class AddRewriteStep(UpdateGraph):
         self.proof_model.pop_rewrite()
         self.step_view.selectionModel().blockSignals(False)
 
-        # Add back steps that were previously removed
+        if self._old_group_rewrite is not None:
+            # Restore the original grouped step (undo truncation/ungrouping).
+            assert self._old_selected is not None
+            group_step_idx = self._old_selected - 1
+            self.proof_model.restore_group(group_step_idx, self._old_group_rewrite)
+
+        # Restore main steps that were popped (LIFO order, restore in reverse).
         for rewrite, graph in reversed(self._old_steps):
             self.proof_model.add_rewrite(rewrite)
 
         # Select the previously selected step
         assert self._old_selected is not None
-        idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
-        self.step_view.selectionModel().blockSignals(True)
-        self.step_view.setCurrentIndex(idx)
-        self.step_view.selectionModel().blockSignals(False)
+        if (self._old_group_rewrite is not None
+                and self._old_sub_idx >= 0
+                and isinstance(self.step_view, ProofStepView)):
+            # Navigate back into the restored group's sub-step.
+            parent_idx = self.step_view.model().index(self._old_selected, 0)
+            self.step_view.expand(parent_idx)
+            child_idx = self.step_view.model().index(self._old_sub_idx, 0, parent_idx)
+            self.step_view.selectionModel().blockSignals(True)
+            self.step_view.setCurrentIndex(child_idx)
+            self.step_view.selectionModel().blockSignals(False)
+        else:
+            idx = self.step_view.model().index(self._old_selected, 0, QModelIndex())
+            self.step_view.selectionModel().blockSignals(True)
+            self.step_view.setCurrentIndex(idx)
+            self.step_view.selectionModel().blockSignals(False)
         super().undo()
 
 
@@ -513,10 +552,15 @@ class UngroupRewriteSteps(BaseCommand):
     step_view: ProofStepView
     group_index: int
 
+    _group_size: int = field(default=0, init=False)
+
     def redo(self) -> None:
+        grouped = self.step_view.model().steps[self.group_index].grouped_rewrites
+        assert grouped is not None
+        self._group_size = len(grouped)
         self.step_view.model().ungroup_steps(self.group_index)
         self.step_view.move_to_step(self.group_index + 1)
 
     def undo(self) -> None:
-        self.step_view.model().group_steps(self.group_index, self.group_index + 1)
+        self.step_view.model().group_steps(self.group_index, self.group_index + self._group_size - 1)
         self.step_view.move_to_step(self.group_index + 1)
