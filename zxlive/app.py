@@ -130,7 +130,7 @@ def get_version() -> str:
             return str(data['project']['version'])
     except (FileNotFoundError, IOError, ImportError, KeyError):
         # Final fallback to hardcoded version
-        return '0.3.1'  # TODO: Update this for new releases
+        return '1.0.0'  # TODO: Update this for new releases
 
 
 def main() -> None:
