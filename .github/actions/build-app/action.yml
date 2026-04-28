@@ -1,0 +1,49 @@
+name: 'Build ZXLive Application'
+description: 'Compiles the PySide6 application using Nuitka across OSs'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download Dependency Walker - Specific to Windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        Invoke-WebRequest -Uri 'https://dependencywalker.com/depends22_x86.zip' -OutFile 'depends22_x86.zip'
+        Add-Type -AssemblyName System.IO.Compression.FileSystem ;
+        [System.IO.Compression.ZipFile]::ExtractToDirectory("depends22_x86.zip", "depends22_x86")
+        New-Item -ItemType Directory -Path C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\ -Force
+        Move-Item -Path depends22_x86\depends.exe -Destination C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install .
+
+    - name: Remove macOS-only override for Linux and Windows
+      if: runner.os != 'macOS'
+      shell: python
+      run: |
+        with open("pysidedeploy.spec", "r") as f:
+            spec = f.read()
+        with open("pysidedeploy.spec", "w") as f:
+            f.write(spec.replace("--output-filename=zxlive_bin", ""))
+
+    - name: Build ZXLive
+      shell: bash
+      run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
+
+    - name: Rename files, fix deployment file location - Windows
+      if: runner.os == 'Windows'
+      shell: bash
+      run: mv build/ZXLive.exe ./zxlive_windows.exe
+
+    - name: Rename, zip, and fix deployment file location - Linux, MacOS
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+            mv build/ZXLive.bin ./zxlive_linux.bin
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+            mv build/ZXLive.app ./zxlive_macos.app
+            zip -r zxlive_macos.zip ./zxlive_macos.app
+            rm -rf ./zxlive_macos.app
+        fi

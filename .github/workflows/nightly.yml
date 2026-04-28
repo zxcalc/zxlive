@@ -1,0 +1,52 @@
+name: Nightly Rolling Release
+on:
+  push:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  build_nightly:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        python-version: [ 3.11 ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Run Build Pipeline
+        uses: ./.github/actions/build-app
+
+      - name: Upload Binary Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-binaries-${{ matrix.os }}
+          path: zxlive_*
+
+  publish_nightly:
+    needs: build_nightly
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update Nightly Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f nightly
+          git push origin -f nightly
+      - uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: nightly
+          prerelease: true
+          files: release_assets/*
