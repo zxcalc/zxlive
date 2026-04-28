@@ -41,7 +41,7 @@ runs:
       shell: bash
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
-            mv build/zxlive.bin ./zxlive_linux.bin
+            mv build/ZXLive.bin ./zxlive_linux.bin
         elif [ "$RUNNER_OS" == "macOS" ]; then
             mv build/ZXLive.app ./zxlive_macos.app
             zip -r zxlive_macos.zip ./zxlive_macos.app
