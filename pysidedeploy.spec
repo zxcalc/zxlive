@@ -37,16 +37,16 @@ wheel_shiboken =
 # for arm macos add --macos-create-app-bundle
 extra_args =
     --noinclude-qt-translations
-    --nofollow-import-to=IPython 
-    --nofollow-import-to=scipy 
-    --nofollow-import-to=pytest 
-    --nofollow-import-to=matplotlib 
-    --nofollow-import-to=pandas 
-    --nofollow-import-to=sympy 
-    --nofollow-import-to=ipywidgets 
-    --nofollow-import-to=tkinter 
+    --nofollow-import-to=IPython
+    --nofollow-import-to=scipy
+    --nofollow-import-to=pytest
+    --nofollow-import-to=matplotlib
+    --nofollow-import-to=pandas
+    --nofollow-import-to=sympy
+    --nofollow-import-to=ipywidgets
+    --nofollow-import-to=tkinter
     --noinclude-numba-mode=nofollow
-    --include-package-data=zxlive.icons 
+    --include-package-data=zxlive.icons
     --macos-create-app-bundle
 
 [buildozer]
