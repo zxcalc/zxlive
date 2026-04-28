@@ -1,20 +1,14 @@
-name: Deploy and release
-
+name: Deploy Official Release
 on:
   push:
-    tags:
-      - "v*.*.*"
+    tags: [ "v*.*.*" ]
 
   # Allows you to run this workflow manually from the GitHub Actions tab
   workflow_dispatch:
 
-env:
-  SRC_DIR: zxlive
-
 jobs:
   build_and_deploy:
     strategy:
-      # Do not cancel other jobs when one fails
       fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
@@ -22,40 +16,14 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
-      - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
-      - name: Download Dependency Walker - Specific to Windows
-        # If this is not done, Nuitka crashes weirdly.
-        if: matrix.os == 'windows-latest'
-        run: |
-          Invoke-WebRequest -Uri 'https://dependencywalker.com/depends22_x86.zip' -OutFile 'depends22_x86.zip'
-          Add-Type -AssemblyName System.IO.Compression.FileSystem ;
-          [System.IO.Compression.ZipFile]::ExtractToDirectory("depends22_x86.zip", "depends22_x86")
-          New-Item -ItemType Directory -Path C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\ -Force
-          Move-Item -Path depends22_x86\depends.exe -Destination C:\Users\runneradmin\AppData\Local\Nuitka\Nuitka\Cache\downloads\depends\x86_64\depends.exe
-      - name: Install dependencies
-        run:
-          pip install .
-      - name: Build ZXLive
-        run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
-      - name: Rename files, fix deployment file location - Windows
-        if: matrix.os == 'windows-latest'
-        run: mv build/ZXLive.exe ./zxlive_windows.exe
-      - name: Rename files, fix deployment file location - Linux, MacOS
-        if: matrix.os != 'windows-latest'
-        run: |
-          if [ "$RUNNER_OS" == "Linux" ]; then
-              mv build/ZXLive.bin ./zxlive_linux.bin 
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-              mv build/ZXLive.app ./zxlive_macos.app
-              # Compress the bundle into a single zip file
-              zip -r zxlive_macos.zip ./zxlive_macos.app
-              # Remove the raw folder so the release action doesn't choke on it
-              rm -rf ./zxlive_macos.app
-          fi
+
+      - name: Run Build Pipeline
+        uses: ./.github/actions/build-app
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
