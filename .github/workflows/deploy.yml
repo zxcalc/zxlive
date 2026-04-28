@@ -14,6 +14,8 @@ env:
 jobs:
   build_and_deploy:
     strategy:
+      # Do not cancel other jobs when one fails
+      fail-fast: false
       matrix:
         os: [ ubuntu-latest, windows-latest, macos-latest ]
         python-version: [ 3.11 ]
@@ -41,16 +43,21 @@ jobs:
         run: pyside6-deploy -v -f -c pysidedeploy.spec --keep-deployment-files
       - name: Rename files, fix deployment file location - Windows
         if: matrix.os == 'windows-latest'
-        run: mv build/__main__.exe ./zxlive_app_windows.exe
+        run: mv build/ZXLive.exe ./zxlive_windows.exe
       - name: Rename files, fix deployment file location - Linux, MacOS
         if: matrix.os != 'windows-latest'
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-              mv build/__main__.bin ./zxlive_app_linux.bin 
+              mv build/ZXLive.bin ./zxlive_linux.bin 
           elif [ "$RUNNER_OS" == "macOS" ]; then
-              mv zxlive/deployment/__main__.app/Contents/MacOS/__main__ ./zxlive_app_macos.bin
+              mv build/ZXLive.app ./zxlive_macos.app
+              # Compress the bundle into a single zip file
+              zip -r zxlive_macos.zip ./zxlive_macos.app
+              # Remove the raw folder so the release action doesn't choke on it
+              rm -rf ./zxlive_macos.app
           fi
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: zxlive_app_*
+          files: zxlive_*
+          draft: true
