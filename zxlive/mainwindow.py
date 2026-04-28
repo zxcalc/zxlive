@@ -22,6 +22,7 @@ import os
 import random
 from typing import Callable, Optional, cast
 
+import networkx as nx
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
                             QMimeData, QSettings, QTextStream, QTimer, QUrl,
@@ -32,12 +33,14 @@ from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QMessageB
                                QTabBar, QTabWidget, QVBoxLayout, QWidget)
 from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
+from pyzx.utils import VertexType
 
 from .base_panel import BasePanel
-from .common import (GraphT, from_tikz, get_custom_rules_path, get_data,
+from .common import (VT, GraphT, from_tikz, get_custom_rules_path, get_data,
                      get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
-from .custom_rule import CustomRule, check_rule
+from .commands import MoveNode, ProofModeCommand
+from .custom_rule import CustomRule, check_rule, to_networkx
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite, export_gif_dialog,
                       export_proof_dialog, get_lemma_name_and_description,
@@ -228,11 +231,15 @@ class MainWindow(QMainWindow):
         self.fit_view_action = self._new_action(
             "Fit view", self.fit_view, QKeySequence("C"),
             "Fits the view to the diagram")
+        self.auto_arrange_action = self._new_action(
+            "Auto arrange", self.auto_arrange, QKeySequence("Ctrl+L"),
+            "Automatically arrange vertices using spring layout")
 
         view_menu = menu.addMenu("&View")
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
+        view_menu.addAction(self.auto_arrange_action)
 
         new_rewrite_from_file = self._new_action(
             "New rewrite from file", lambda: create_new_rewrite(self),
@@ -290,6 +297,7 @@ class MainWindow(QMainWindow):
         self.zoom_in_action.setEnabled(has_active_tab)
         self.zoom_out_action.setEnabled(has_active_tab)
         self.fit_view_action.setEnabled(has_active_tab)
+        self.auto_arrange_action.setEnabled(has_active_tab)
 
         # Export to tikz and gif are enabled only if there is a proof in the active tab.
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
@@ -891,6 +899,44 @@ class MainWindow(QMainWindow):
         assert self.active_panel is not None
         self.active_panel.graph_view.fit_view()
 
+    def auto_arrange(self) -> None:
+        """Automatically arrange vertices using `networkx` spring layout.
+
+        If the active panel has selected vertices, only those are repositioned and their
+        connections to non-selected neighbours are treated as fixed anchor points. Otherwise,
+        all non-boundary vertices are repositioned with the boundary vertices as anchors.
+        W-input vertices are always kept at their original offset relative to their W-output
+        partner, irrespective of selection.
+        """
+        assert self.active_panel is not None
+        g = self.active_panel.graph_view.graph_scene.g
+
+        if g.num_vertices() == 0:
+            return
+
+        movable_set, fixed_set = _auto_arrange_partition(g,
+            set(self.active_panel.graph_view.graph_scene.selected_vertices))
+        w_input_offsets = _auto_arrange_extract_w_inputs(g, movable_set, fixed_set)
+        if not movable_set:
+            return
+
+        pos = _auto_arrange_layout(g, movable_set, fixed_set)
+        moves = _auto_arrange_build_moves(g, movable_set, w_input_offsets, pos)
+        if moves:
+            self._auto_arrange_push(moves)
+
+    def _auto_arrange_push(self, moves: list[tuple[VT, float, float]]) -> None:
+        assert self.active_panel is not None
+        move_cmd = MoveNode(self.active_panel.graph_view, moves)
+        # In proof mode, wrap the move so that the `ProofModel` for the current step is kept in
+        # sync with the view's graph (otherwise serialization and undo/redo become inconsistent).
+        cmd: MoveNode | ProofModeCommand
+        if isinstance(self.active_panel, ProofPanel):
+            cmd = ProofModeCommand(move_cmd, self.active_panel.step_view)
+        else:
+            cmd = move_cmd
+        self.active_panel.undo_stack.push(cmd)
+
     def proof_as_lemma(self) -> None:
         assert self.active_panel is not None
         assert isinstance(self.active_panel, ProofPanel)
@@ -1095,3 +1141,99 @@ class CustomTabBar(QTabBar):
             if button:
                 # Show button only for hovered tab
                 button.setVisible(i == self.hovered_tab)
+
+
+def _auto_arrange_partition(g: GraphT, selected: set[VT]) -> tuple[set[VT], set[VT]]:
+    """Split graph vertices into movable and fixed (anchor) sets for auto-arrange."""
+    if selected:
+        movable_set = set(selected)
+        fixed_set = {n for v in selected for n in g.neighbors(v) if n not in selected}
+    else:
+        movable_set = {v for v in g.vertices() if g.type(v) != VertexType.BOUNDARY}
+        fixed_set = {v for v in g.vertices() if g.type(v) == VertexType.BOUNDARY}
+    return movable_set, fixed_set
+
+
+def _auto_arrange_extract_w_inputs(g: GraphT, movable_set: set[VT],
+                                   fixed_set: set[VT]) -> dict[VT, tuple[VT, float, float]]:
+    """Detach each W-input from its movable W-output partner and record their offset.
+
+    A W-input must follow its W-output partner regardless of how the user selection partitions
+    them: if either half is movable, the W-output is laid out and the W-input is re-snapped
+    afterwards (rather than being a free node, an anchor, or stuck while its partner moves).
+    The remaining W-inputs whose partner is also fixed are left as-is.
+    """
+    w_input_offsets: dict[VT, tuple[VT, float, float]] = {}
+    candidates = [v for v in (movable_set | fixed_set) if g.type(v) == VertexType.W_INPUT]
+    for v in candidates:
+        partner = next((n for n in g.neighbors(v) if g.type(n) == VertexType.W_OUTPUT), None)
+        if partner is None:
+            continue
+        # If the W-input itself is movable, ensure the W-output partner is laid out too.
+        if v in movable_set and partner not in movable_set:
+            movable_set.add(partner)
+            fixed_set.discard(partner)
+        # The W-input follows its partner only if the partner is being laid out.
+        if partner in movable_set:
+            w_input_offsets[v] = (partner,
+                                  g.row(v) - g.row(partner),
+                                  g.qubit(v) - g.qubit(partner))
+            movable_set.discard(v)
+            fixed_set.discard(v)
+    return w_input_offsets
+
+
+def _auto_arrange_layout(g: GraphT, movable_set: set[VT],
+                         fixed_set: set[VT]) -> dict[VT, tuple[float, float]]:
+    """Run spring layout on the relevant subgraph and return positions."""
+    # Lay out only the relevant vertices (movable + their fixed neighbours), so that unrelated
+    # parts of the diagram don't influence (or get influenced by) the result.
+    subgraph_nodes = movable_set | fixed_set
+    G_sub = to_networkx(g).subgraph(subgraph_nodes)
+
+    # Seed every node in the subgraph with its current position so disconnected vertices
+    # stay near where they were.
+    initial_pos = {v: (g.row(v), g.qubit(v)) for v in subgraph_nodes}
+
+    # The optimal edge length `k` is derived from the span of the anchor nodes (or the movable
+    # nodes if there are no anchors) so that misplaced internal vertices don't inflate the
+    # layout area and push everything farther apart.
+    anchor_pos = [initial_pos[v] for v in (fixed_set or movable_set)]
+    rows = [r for r, _ in anchor_pos]
+    qubits = [q for _, q in anchor_pos]
+    width = max(max(rows) - min(rows), 1)
+    height = max(max(qubits) - min(qubits), 1)
+    k = (width * height / max(len(G_sub), 1)) ** 0.5
+
+    if fixed_set:
+        return dict(nx.spring_layout(G_sub, k=k, pos=initial_pos, fixed=fixed_set,
+                                     iterations=50, seed=0))
+    # No anchors to constrain the layout; explicitly preserve the current bounding box
+    # so the diagram isn't squashed into `networkx`'s default unit-scaled output.
+    scale = max(width, height) / 2
+    center = ((max(rows) + min(rows)) / 2, (max(qubits) + min(qubits)) / 2)
+    return dict(nx.spring_layout(G_sub, k=k, pos=initial_pos, iterations=50,
+                                 scale=scale, center=center, seed=0))
+
+
+def _auto_arrange_build_moves(g: GraphT, movable_set: set[VT],
+                              w_input_offsets: dict[VT, tuple[VT, float, float]],
+                              pos: dict[VT, tuple[float, float]]
+                              ) -> list[tuple[VT, float, float]]:
+    """Translate layout positions into a list of (vertex, row, qubit) moves."""
+    moves: list[tuple[VT, float, float]] = []
+    for v in movable_set:
+        if v in pos:
+            _append_move_if_changed(g, moves, v, pos[v])
+    # Re-snap each W-input relative to its partner after the partner's layout position is known.
+    for v, (partner, row_offset, qubit_offset) in w_input_offsets.items():
+        partner_row, partner_qubit = pos.get(partner, (g.row(partner), g.qubit(partner)))
+        _append_move_if_changed(g, moves, v, (partner_row + row_offset, partner_qubit + qubit_offset))
+    return moves
+
+
+def _append_move_if_changed(g: GraphT, moves: list[tuple[VT, float, float]],
+                            v: VT, new_pos: tuple[float, float]) -> None:
+    new_row, new_qubit = new_pos
+    if abs(new_row - g.row(v)) > 0.001 or abs(new_qubit - g.qubit(v)) > 0.001:
+        moves.append((v, new_row, new_qubit))
