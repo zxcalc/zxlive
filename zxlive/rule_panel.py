@@ -5,7 +5,7 @@ from typing import Iterator
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QLineEdit
-from pyzx import EdgeType, VertexType
+from pyzx.utils import EdgeType, VertexType
 
 
 from .base_panel import ToolbarSection
@@ -102,10 +102,17 @@ class RulePanel(EditorBasePanel):
     def update_io_labels(self, scene: EditGraphScene) -> None:
         try:
             scene.g.auto_detect_io()
-            for v in scene.g.vertices():
-                if v in scene.g.inputs():
-                    scene.vertex_map[v].phase_item.setPlainText("in-" + str(scene.g.inputs().index(v)))
-                elif v in scene.g.outputs():
-                    scene.vertex_map[v].phase_item.setPlainText("out-" + str(scene.g.outputs().index(v)))
         except TypeError:
             return
+        inputs = {v: i for i, v in enumerate(scene.g.inputs())}
+        outputs = {v: i for i, v in enumerate(scene.g.outputs())}
+        for v in scene.g.vertices():
+            if scene.g.type(v) != VertexType.BOUNDARY:
+                continue
+            phase_item = scene.vertex_map[v].phase_item
+            if v in inputs:
+                phase_item.set_boundary_label(f"in-{inputs[v]}")
+            elif v in outputs:
+                phase_item.set_boundary_label(f"out-{outputs[v]}")
+            else:
+                phase_item.set_boundary_label("")
