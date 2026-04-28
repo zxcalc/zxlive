@@ -809,9 +809,8 @@ class MainWindow(QMainWindow):
             name = "New Graph"
         self._new_panel(panel, name)
 
-    def open_graph_from_notebook(self, graph: GraphT, name: str) -> None:
-        """Opens a ZXLive window from within a Jupyter notebook to
-        edit a graph.
+    def open_graph_for_editing(self, graph: GraphT, name: str) -> None:
+        """Open a graph for interactive editing.
 
         Replaces the graph in an existing tab if it has the same name."""
 
