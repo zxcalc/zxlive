@@ -70,7 +70,7 @@ class EItem(QGraphicsPathItem):
         self.is_mouse_pressed = False
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
-        self.thickness: float = 3
+        self.thickness: float = 3.0
         self.color: QColor = QColor()
         self.reset_color()
 

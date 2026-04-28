@@ -279,6 +279,17 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     return anim
 
 
+def hopf(edge_items: list[EItem]) -> QAbstractAnimation:
+    """Animation that is played when parallel edges are removed using
+    the Hopf rule via the magic wand."""
+    group = QParallelAnimationGroup()
+    for eitem in edge_items:
+        anim = edge_thickness(eitem, target=0.0, duration=200,
+                              ease=QEasingCurve(QEasingCurve.Type.InBack))
+        group.addAnimation(anim)
+    return group
+
+
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused."""
     return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
