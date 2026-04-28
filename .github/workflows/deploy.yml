@@ -51,6 +51,10 @@ jobs:
               mv build/ZXLive.bin ./zxlive_linux.bin 
           elif [ "$RUNNER_OS" == "macOS" ]; then
               mv build/ZXLive.app ./zxlive_macos.app
+              # Compress the bundle into a single zip file
+              zip -r zxlive_macos.zip ./zxlive_macos.app
+              # Remove the raw folder so the release action doesn't choke on it
+              rm -rf ./zxlive_macos.app
           fi
       - name: Release
         uses: softprops/action-gh-release@v1
