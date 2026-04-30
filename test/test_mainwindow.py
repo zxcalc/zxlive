@@ -430,6 +430,152 @@ def test_auto_arrange_in_proof_mode(app: MainWindow, qtbot: QtBot) -> None:
     assert (proof_graph.row(spider_v), proof_graph.qubit(spider_v)) == spider_after
 
 
+def _new_two_spider_proof_panel(app: MainWindow, qtbot: QtBot) -> tuple[ProofPanel, int, int]:
+    # Open a proof panel on a small graph with two internal Z spiders and return their ids.
+    app.close_action.trigger()
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    s1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    s2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    g.add_edge((inp, s1))
+    g.add_edge((s1, s2))
+    g.add_edge((s2, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    app.new_graph(g)
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+    return app.active_panel, s1, s2
+
+
+def test_proof_mode_command_preserves_selection(app: MainWindow, qtbot: QtBot) -> None:
+    # `ProofModeCommand` calls `move_to_step` (which rebuilds the scene) and may wrap commands
+    # like `SetGraph` that also rebuild the scene; both paths previously wiped the selection.
+    # The snapshotted selection should survive both undo and redo regardless of the wrapped
+    # command. Also, on the first redo the view is already on the target step, so the scene
+    # rebuild should be skipped (verified via `VItem` instance reuse).
+    import copy
+    from zxlive.commands import ProofModeCommand, SetGraph
+    panel, s1, s2 = _new_two_spider_proof_panel(app, qtbot)
+    panel.graph_scene.select_vertices([s1, s2])
+    vitem_s1_before = panel.graph_scene.vertex_map[s1]
+
+    panel._vert_moved([(s1, 5.0, 0.0)])
+    assert panel.graph_scene.vertex_map[s1] is vitem_s1_before
+    for action in (app.undo_action, app.redo_action, app.undo_action):
+        action.trigger()
+        assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+
+    new_g = copy.deepcopy(panel.graph_scene.g)
+    extra_v = new_g.add_vertex(VertexType.Z, qubit=2, row=2)
+    step_index = panel.step_view.currentIndex().row()
+    # Track sidebar refreshes via `selection_changed_custom`; the rewrites sidebar listens to
+    # this signal to re-evaluate rule applicability, and a stale sidebar can let the user
+    # apply a rule that no longer matches.
+    sidebar_refreshes: list[int] = []
+    panel.graph_scene.selection_changed_custom.connect(lambda: sidebar_refreshes.append(1))
+
+    panel.undo_stack.push(ProofModeCommand(SetGraph(panel.graph_view, new_g), panel.step_view))
+    # The proof model's stored graph for the step must stay in sync with the view (regardless
+    # of whether the wrapped command keeps its own `self.g` updated, since `ProofModeCommand`
+    # syncs from the scene's live graph).
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    assert extra_v in panel.proof_model.get_graph(step_index).vertices()
+    assert sidebar_refreshes, "expected sidebar refresh after redo"
+
+    sidebar_refreshes.clear()
+    app.undo_action.trigger()
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    assert extra_v not in panel.proof_model.get_graph(step_index).vertices()
+    assert sidebar_refreshes, "expected sidebar refresh after undo"
+
+    sidebar_refreshes.clear()
+    app.redo_action.trigger()
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    assert extra_v in panel.proof_model.get_graph(step_index).vertices()
+    assert sidebar_refreshes, "expected sidebar refresh after redo"
+
+
+def test_rewrite_selects_replacement_nodes(app: MainWindow, qtbot: QtBot) -> None:
+    # A rewrite that removes a selected node and adds new ones should leave the replacements
+    # selected, so the user can keep working on the result of the rewrite without having to
+    # reselect. This covers Push Pauli (one selected node removed, two new added) and Strong
+    # complementarity (both selected nodes removed, four new added).
+    import copy
+    from fractions import Fraction
+    from zxlive.commands import AddRewriteStep
+
+    # Push Pauli: pauli + non-pauli selected; pauli removed, two new pauli spiders added.
+    app.close_action.trigger()
+    g = new_graph()
+    inp1 = g.add_vertex(VertexType.BOUNDARY, qubit=-1, row=0)
+    inp2 = g.add_vertex(VertexType.BOUNDARY, qubit=1, row=0)
+    non_pauli = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    pauli = g.add_vertex(VertexType.X, qubit=0, row=2, phase=Fraction(1))
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    g.add_edge((inp1, non_pauli))
+    g.add_edge((inp2, non_pauli))
+    g.add_edge((non_pauli, pauli))
+    g.add_edge((pauli, out))
+    g.set_inputs((inp1, inp2))
+    g.set_outputs((out,))
+    app.new_graph(g)
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    panel = app.active_panel
+    assert isinstance(panel, ProofPanel)
+
+    panel.graph_scene.select_vertices([pauli, non_pauli])
+    new_g = copy.deepcopy(panel.graph)
+    from pyzx.rewrite_rules import pauli_push
+    assert pauli_push(new_g, non_pauli, pauli)
+    panel.undo_stack.push(AddRewriteStep(panel.graph_view, new_g, panel.step_view, "Push Pauli"))
+
+    selected = set(panel.graph_scene.selected_vertices)
+    new_pauli_verts = set(new_g.vertices()) - {inp1, inp2, non_pauli, out}
+    # The non-pauli (still present) and the two new pauli spiders (replacements) should be
+    # selected. The old pauli is gone.
+    assert non_pauli in selected
+    assert pauli not in selected
+    assert new_pauli_verts.issubset(selected)
+
+    # Strong complementarity: z + x selected; both removed, four new spiders added.
+    from pyzx.rewrite_rules import bialgebra
+    app.close_action.trigger()
+    g = new_graph()
+    inp1 = g.add_vertex(VertexType.BOUNDARY, qubit=-1, row=0)
+    inp2 = g.add_vertex(VertexType.BOUNDARY, qubit=1, row=0)
+    z = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    x = g.add_vertex(VertexType.X, qubit=0, row=2)
+    out1 = g.add_vertex(VertexType.BOUNDARY, qubit=-1, row=3)
+    out2 = g.add_vertex(VertexType.BOUNDARY, qubit=1, row=3)
+    g.add_edge((inp1, z))
+    g.add_edge((inp2, z))
+    g.add_edge((z, x))
+    g.add_edge((x, out1))
+    g.add_edge((x, out2))
+    g.set_inputs((inp1, inp2))
+    g.set_outputs((out1, out2))
+    app.new_graph(g)
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    panel = app.active_panel
+    assert isinstance(panel, ProofPanel)
+
+    panel.graph_scene.select_vertices([z, x])
+    new_g = copy.deepcopy(panel.graph)
+    assert bialgebra(new_g, z, x)
+    panel.undo_stack.push(AddRewriteStep(panel.graph_view, new_g, panel.step_view, "Strong complementarity"))
+
+    selected = set(panel.graph_scene.selected_vertices)
+    new_spiders = set(new_g.vertices()) - {inp1, inp2, out1, out2}
+    # Both originally selected spiders are gone; the four new replacements should be selected.
+    assert z not in selected and x not in selected
+    assert new_spiders.issubset(selected)
+
+
 def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
     # Regression test to check that the app doesn't crash when closing a proof tab with a derivation in progress,
     # due to accessing the graph after it has been deallocated.
