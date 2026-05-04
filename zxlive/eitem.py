@@ -44,6 +44,7 @@ class EItem(QGraphicsPathItem):
     class Properties(Enum):
         """Properties of an EItem that can be animated."""
         Thickness = 1
+        Opacity = 2
 
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
@@ -412,6 +413,8 @@ class EItemAnimation(QVariantAnimation):
 
         if self.prop == EItem.Properties.Thickness:
             self.it.thickness = value
+        elif self.prop == EItem.Properties.Opacity:
+            self.it.setOpacity(value)
 
         if self.refresh:
             self.it.refresh()

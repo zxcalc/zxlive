@@ -102,7 +102,16 @@ def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve, start: O
 def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
     anim = EItemAnimation(it, EItem.Properties.Thickness, refresh=True)
     anim.setDuration(duration)
-    anim.setStartValue(start or it.thickness)
+    anim.setStartValue(start if start is not None else it.thickness)
+    anim.setEndValue(target)
+    anim.setEasingCurve(ease)
+    return anim
+
+
+def edge_opacity(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
+    anim = EItemAnimation(it, EItem.Properties.Opacity)
+    anim.setDuration(duration)
+    anim.setStartValue(start if start is not None else it.opacity())
     anim.setEndValue(target)
     anim.setEasingCurve(ease)
     return anim
@@ -285,16 +294,9 @@ def hopf(edge_items: list[EItem]) -> QAbstractAnimation:
     """Animation that is played when parallel edges are removed using the Hopf rule."""
     group = QParallelAnimationGroup()
     for eitem in edge_items:
-        anim = edge_thickness(eitem, target=0.0, duration=200,
-                              ease=QEasingCurve(QEasingCurve.Type.InBack))
-        group.addAnimation(anim)
-    # A pen width of 0 in Qt is a cosmetic pen and is still drawn at ~1 device pixel,
-    # so hide the items at the end of the animation so they actually disappear.
-
-    def hide_items() -> None:
-        for eitem in edge_items:
-            eitem.hide()
-    group.finished.connect(hide_items)
+        ease = QEasingCurve(QEasingCurve.Type.InOutCubic)
+        group.addAnimation(edge_thickness(eitem, target=0.8, duration=260, ease=ease))
+        group.addAnimation(edge_opacity(eitem, target=0.0, duration=260, ease=ease))
     return group
 
 
