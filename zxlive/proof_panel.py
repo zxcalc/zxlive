@@ -254,12 +254,17 @@ class ProofPanel(BasePanel):
             # Remove even number of edges
             if num_edges % 2 != 0:
                 num_edges -= 1
+            if num_edges == 0:
+                return False
+            # Collect edge items for animation before removing edges. The diff removes the
+            # highest-indexed items, so animate the same ones from the end of the dict.
+            edge_items = [eitem for eitem in self.graph_scene.edge_map[edges[0]].values()]
             for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
                 new_g.remove_edge(edges[0])
-            # TODO: Add animation for Hopf
-            # anim = anims.hopf(edges, self.graph_scene)
+            # Animate edges fading out
+            anim = anims.hopf(edge_items[-num_edges:])
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
-            self.undo_stack.push(cmd)
+            self.undo_stack.push(cmd, anim_before=anim)
             return True
         return False
 

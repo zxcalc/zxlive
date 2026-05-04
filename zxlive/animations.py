@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import itertools
 import random
+from collections import Counter
 from typing import Optional, Callable, TYPE_CHECKING
 
 from PySide6.QtCore import QEasingCurve, QPointF, QAbstractAnimation, \
     QParallelAnimationGroup
 from PySide6.QtGui import QUndoStack, QUndoCommand
+from pyzx.graph.diff import GraphDiff
 from pyzx.utils import vertex_is_w
 
 from .custom_rule import CustomRule
@@ -100,7 +102,16 @@ def move(it: VItem, target: QPointF, duration: int, ease: QEasingCurve, start: O
 def edge_thickness(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
     anim = EItemAnimation(it, EItem.Properties.Thickness, refresh=True)
     anim.setDuration(duration)
-    anim.setStartValue(start or it.thickness)
+    anim.setStartValue(start if start is not None else it.thickness)
+    anim.setEndValue(target)
+    anim.setEasingCurve(ease)
+    return anim
+
+
+def edge_opacity(it: EItem, target: float, duration: int, ease: QEasingCurve, start: Optional[float] = None) -> EItemAnimation:
+    anim = EItemAnimation(it, EItem.Properties.Opacity)
+    anim.setDuration(duration)
+    anim.setStartValue(start if start is not None else it.opacity())
     anim.setEndValue(target)
     anim.setEasingCurve(ease)
     return anim
@@ -279,6 +290,16 @@ def add_id(v: VT, scene: GraphScene) -> VItemAnimation:
     return anim
 
 
+def hopf(edge_items: list[EItem]) -> QAbstractAnimation:
+    """Animation that is played when parallel edges are removed using the Hopf rule."""
+    group = QParallelAnimationGroup()
+    for eitem in edge_items:
+        ease = QEasingCurve(QEasingCurve.Type.InOutCubic)
+        group.addAnimation(edge_thickness(eitem, target=0.8, duration=260, ease=ease))
+        group.addAnimation(edge_opacity(eitem, target=0.0, duration=260, ease=ease))
+    return group
+
+
 def unfuse(before: GraphT, after: GraphT, src: VT, scene: GraphScene) -> QAbstractAnimation:
     """Animation that is played when a spider is unfused."""
     return morph_graph(before, after, scene, to_start=lambda _: src, to_end=lambda _: None,
@@ -337,6 +358,19 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
             anim_after.addAnimation(strong_comp(panel.graph, g, v2, panel.graph_scene))
             panel.graph.set_row(v2, v2_row)
             panel.graph.set_qubit(v2, v2_qubit)
+    elif self.name == rules_basic['hopf']['text']:
+        # The diff lists each removed parallel edge instance, so the count per edge tuple
+        # tells us how many items to fade out. The scene removes the highest-indexed
+        # items, so animate those.
+        diff = GraphDiff(panel.graph, g)
+        edge_items: list[EItem] = []
+        for e, count in Counter(diff.removed_edges).items():
+            if e not in panel.graph_scene.edge_map:
+                continue
+            items = list(panel.graph_scene.edge_map[e].values())
+            edge_items.extend(items[-count:])
+        if edge_items:
+            anim_before = hopf(edge_items)
     elif self.name == rules_basic['bialgebra_op']['text']:
         all_matched_verts = [v for m in matches for v in m]
         if all_matched_verts:
