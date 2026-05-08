@@ -300,16 +300,22 @@ class EItem(QGraphicsPathItem):
 
 
 class EDragItem(QGraphicsPathItem):
-    """A QGraphicsItem representing an edge in construction during a drag"""
+    """A QGraphicsItem representing edges in construction during a drag."""
 
-    def __init__(self, g: GraphT, ety: EdgeType, start: VItem, mouse_pos: QPointF) -> None:
+    def __init__(self, g: GraphT, ety: EdgeType, start: VItem, mouse_pos: QPointF,
+                 starts: Optional[list[VItem]] = None) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
         self.g = g
         self.ety = ety
         self.start = start
+        self.starts = starts or [start]
         self.mouse_pos = mouse_pos
         self.refresh()
+
+    @property
+    def is_multi(self) -> bool:
+        return len(self.starts) > 1
 
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
@@ -326,10 +332,12 @@ class EDragItem(QGraphicsPathItem):
             pen.setColor(display_setting.effective_colors["edge"])
         self.setPen(QPen(pen))
 
-        # set path as a straight line from source to target
+        # set path as straight parallel lines from source vertices to target offset
+        offset = self.mouse_pos - self.start.pos()
         path = QPainterPath()
-        path.moveTo(self.start.pos())
-        path.lineTo(self.mouse_pos)
+        for start in self.starts:
+            path.moveTo(start.pos())
+            path.lineTo(start.pos() + offset)
         self.setPath(path)
 
 
