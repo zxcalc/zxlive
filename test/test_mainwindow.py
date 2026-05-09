@@ -14,18 +14,23 @@
 # limitations under the License.
 
 
+import copy
 import pytest
 import os
 from pathlib import Path
+from typing import Optional
 from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 
+import pyzx
 from pyzx.utils import EdgeType, VertexType
 
+from zxlive.commands import AddRewriteStep
 from zxlive.dialogs import import_diagram_from_file
 from zxlive.common import GraphT, W_INPUT_OFFSET, new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
+from zxlive.rewrite_action import RewriteActionTree, RewriteActionTreeModel
 from zxlive.pauliwebs_panel import PauliWebsPanel
 from zxlive.proof_panel import ProofPanel
 from zxlive.settings_dialog import SettingsDialog
@@ -190,6 +195,84 @@ def test_proof_as_lemma(app: MainWindow, qtbot: QtBot, tmp_path: Path, monkeypat
     app.proof_as_lemma()
     with open(expected, encoding="utf-8") as f:
         assert f.read() == "sentinel"
+
+
+def test_save_proof_as_lemma_then_reapply(
+    app: MainWindow, qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Saving a proof as a lemma, going back to the start, and reapplying the
+    saved rule must not crash. Regression test for #482."""
+    import zxlive.mainwindow
+    import zxlive.rewrite_data
+
+    rules_dir = str(tmp_path)
+    monkeypatch.setattr(zxlive.mainwindow, "get_custom_rules_path", lambda: rules_dir)
+    monkeypatch.setattr(zxlive.rewrite_data, "get_custom_rules_path", lambda: rules_dir)
+    monkeypatch.setattr(zxlive.mainwindow, "get_lemma_name_and_description",
+                        lambda _parent: ("issue482", "regression"))
+
+    # A Z-Z chain so the lemma's lhs matches the start graph exactly.
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    z1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    z2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    for s, t in ((inp, z1), (z1, z2), (z2, out)):
+        g.add_edge((s, t), EdgeType.SIMPLE)
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    app.new_graph(g)
+
+    edit_panel = app.active_panel
+    assert isinstance(edit_panel, GraphEditPanel)
+    qtbot.mouseClick(edit_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    proof_panel = app.active_panel
+    assert isinstance(proof_panel, ProofPanel)
+
+    fused = copy.deepcopy(proof_panel.graph)
+    pyzx.simplify.spider_simp(fused)
+    expected_vertex_count = len(list(fused.vertices()))
+    proof_panel.undo_stack.push(
+        AddRewriteStep(proof_panel.graph_view, fused, proof_panel.step_view, "fuse")
+    )
+    app.proof_as_lemma()
+    proof_panel.rewrites_panel.refresh_rewrites_model()
+    proof_panel.step_view.move_to_step(0)
+
+    rewrite_model = proof_panel.rewrites_panel.model()
+    assert isinstance(rewrite_model, RewriteActionTreeModel)
+    rule_node = _find_rewrite_node(rewrite_model.root_item, "issue482")
+    assert rule_node is not None
+
+    proof_panel.graph_scene.clearSelection()
+    for v in (z1, z2):
+        proof_panel.graph_scene.vertex_map[v].setSelected(True)
+
+    # Before #482's fix, this raised KeyError once the animation started.
+    rule_node.rewrite_action.enabled = True
+    rule_node.rewrite_action.do_rewrite(proof_panel)
+
+    # The rewrite is committed when anim_before finishes; wait for the graph
+    # to reflect the post-rewrite state instead of using a fixed delay.
+    qtbot.waitUntil(
+        lambda: len(list(proof_panel.graph.vertices())) == expected_vertex_count,
+        timeout=2000,
+    )
+
+    # Vertex IDs are reassigned each application, so check the structural
+    # shape: the saved lemma collapses the two Z spiders into a single one.
+    final = proof_panel.graph
+    internal = [v for v in final.vertices() if final.type(v) != VertexType.BOUNDARY]
+    assert len(internal) == 1 and final.type(internal[0]) == VertexType.Z
+
+
+def _find_rewrite_node(node: RewriteActionTree, name: str) -> Optional[RewriteActionTree]:
+    if node.is_rewrite and node.rewrite_action.name == name:
+        return node
+    for child in node.child_items:
+        if (found := _find_rewrite_node(child, name)) is not None:
+            return found
+    return None
 
 
 def test_auto_arrange(app: MainWindow) -> None:

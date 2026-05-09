@@ -8,12 +8,15 @@ or fractions) shouldn't overlap with the node body.
 from fractions import Fraction
 
 import pytest
+from PySide6.QtCore import QAbstractAnimation, QPointF
 from pyzx.utils import VertexType
 from pytestqt.qtbot import QtBot
 
+from zxlive.eitem import EItem, EItemAnimation
 from zxlive.graphscene import GraphScene
 from zxlive.common import SCALE, new_graph
 from zxlive.rule_panel import RulePanel
+from zxlive.vitem import VItem, VItemAnimation
 
 def test_dummy_label_position(qtbot: QtBot) -> None:
     """Test that dummy labels sit cleanly above the node without overlapping.
@@ -176,3 +179,50 @@ def test_update_io_labels_overwrites_stale_labels(qtbot: QtBot) -> None:
     assert scene.vertex_map[v_in1].phase_item.toPlainText() == "in-1"
     assert scene.vertex_map[v_out0].phase_item.toPlainText() == "out-0"
     assert scene.vertex_map[v_out1].phase_item.toPlainText() == "out-1"
+
+
+def test_vitem_animation_handles_missing_vertex(qtbot: QtBot) -> None:
+    """A VItemAnimation whose target id is absent from ``vertex_map`` must
+    no-op rather than raise. Regression test for #482."""
+    g = new_graph()
+    v = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    scene = GraphScene()
+    scene.set_graph(g)
+
+    anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
+    anim.setStartValue(QPointF(0, 0))
+    anim.setEndValue(QPointF(SCALE, SCALE))
+    anim.setDuration(50)
+    del scene.vertex_map[v]
+
+    assert anim.it is None
+    anim._on_state_changed(QAbstractAnimation.State.Running)
+    anim._on_state_changed(QAbstractAnimation.State.Stopped)
+    anim.updateCurrentValue(QPointF(SCALE / 2, SCALE / 2))
+    with qtbot.waitSignal(anim.finished, timeout=500):
+        anim.start()
+
+
+def test_eitem_animation_handles_missing_edge(qtbot: QtBot) -> None:
+    """An EItemAnimation whose target edge is absent from ``edge_map`` must
+    no-op rather than raise. Regression test for #482."""
+    g = new_graph()
+    a = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    b = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    g.add_edge((a, b))
+    scene = GraphScene()
+    scene.set_graph(g)
+    e = next(iter(scene.edge_map))
+
+    anim = EItemAnimation(e, EItem.Properties.Opacity, scene)
+    anim.setStartValue(1.0)
+    anim.setEndValue(0.0)
+    anim.setDuration(50)
+    del scene.edge_map[e]
+
+    assert anim.it is None
+    anim._on_state_changed(QAbstractAnimation.State.Running)
+    anim._on_state_changed(QAbstractAnimation.State.Stopped)
+    anim.updateCurrentValue(0.5)
+    with qtbot.waitSignal(anim.finished, timeout=500):
+        anim.start()
