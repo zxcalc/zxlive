@@ -587,21 +587,23 @@ class VItemAnimation(QVariantAnimation):
         self.stateChanged.connect(self._on_state_changed)
 
     @property
-    def it(self) -> VItem:
+    def it(self) -> Optional[VItem]:
+        # Returns ``None`` if the vertex is no longer in the scene.
         if self._it is None and self.scene is not None and self.v is not None:
-            self._it = self.scene.vertex_map[self.v]
-        assert self._it is not None
+            self._it = self.scene.vertex_map.get(self.v)
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        if (item := self.it) is None:
+            return
+        if state == QAbstractAnimation.State.Running and self not in item.active_animations:
             # Stop all animations that target the same property
-            for anim in self.it.active_animations.copy():
+            for anim in item.active_animations.copy():
                 if anim.prop == self.prop:
                     anim.stop()
-            self.it.active_animations.add(self)
+            item.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
-            self.it.active_animations.remove(self)
+            item.active_animations.discard(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
             #   Note that we cannot just remove ourselves from the set since the garbage
@@ -610,18 +612,18 @@ class VItemAnimation(QVariantAnimation):
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
-        if self.state() != QAbstractAnimation.State.Running:
+        if self.state() != QAbstractAnimation.State.Running or (item := self.it) is None:
             return
 
         if self.prop == VItem.Properties.Position:
-            self.it.setPos(value)
+            item.setPos(value)
         elif self.prop == VItem.Properties.Scale:
-            self.it.setScale(value)
+            item.setScale(value)
         elif self.prop == VItem.Properties.Rect:
-            self.it.setPath(value)
+            item.setPath(value)
 
         if self.refresh:
-            self.it.refresh()
+            item.refresh()
 
 
 class PhaseItem(QGraphicsTextItem):
