@@ -156,6 +156,10 @@ class RewriteAction:
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # noqa: PLR0912
         if self.copy_first:
             g = copy.deepcopy(g)
+        if len(verts) == 0:
+            verts = list(g.vertices())
+        if len(edges) == 0:
+            edges = list(g.edges())
         if self.match_type == MATCH_SINGLE:
             rule_sv = cast(RewriteSingleVertex, self.rule)
             for v in verts:
