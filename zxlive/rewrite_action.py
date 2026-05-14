@@ -96,6 +96,9 @@ class RewriteAction:
 
         g = copy.deepcopy(panel.graph_scene.g)
         verts, edges = panel.parse_selection()
+        if len(verts) == 0 and len(edges) == 0:
+            verts = list(g.vertices())
+            edges = list(g.edges())
 
         rem_verts_list: list[VT] = []
         matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
