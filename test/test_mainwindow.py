@@ -290,8 +290,16 @@ def test_move_to_step_emits_selection_changed_for_rewrite_refresh(app: MainWindo
         AddRewriteStep(proof_panel.graph_view, fused, proof_panel.step_view, "fuse")
     )
 
+    rewrite_model = proof_panel.rewrites_panel.model()
+    assert isinstance(rewrite_model, RewriteActionTreeModel)
+    fuse_node = _find_rewrite_node(rewrite_model.root_item, "Fuse spiders")
+    assert fuse_node is not None
+
+    proof_panel.step_view.move_to_step(1)
+    qtbot.waitUntil(lambda: not fuse_node.rewrite_action.enabled, timeout=1000)
     with qtbot.waitSignal(proof_panel.graph_scene.selection_changed_custom, timeout=1000):
         proof_panel.step_view.move_to_step(0)
+    qtbot.waitUntil(lambda: fuse_node.rewrite_action.enabled, timeout=1000)
 
 
 def _find_rewrite_node(node: RewriteActionTree, name: str) -> Optional[RewriteActionTree]:
