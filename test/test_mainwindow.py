@@ -212,22 +212,10 @@ def test_save_proof_as_lemma_then_reapply(
                         lambda _parent: ("issue482", "regression"))
 
     # A Z-Z chain so the lemma's lhs matches the start graph exactly.
-    g = new_graph()
-    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
-    z1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
-    z2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
-    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
-    for s, t in ((inp, z1), (z1, z2), (z2, out)):
-        g.add_edge((s, t), EdgeType.SIMPLE)
-    g.set_inputs((inp,))
-    g.set_outputs((out,))
+    g, z1, z2 = _new_two_spider_chain_graph()
     app.new_graph(g)
 
-    edit_panel = app.active_panel
-    assert isinstance(edit_panel, GraphEditPanel)
-    qtbot.mouseClick(edit_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
-    proof_panel = app.active_panel
-    assert isinstance(proof_panel, ProofPanel)
+    proof_panel = _start_derivation(app, qtbot)
 
     fused = copy.deepcopy(proof_panel.graph)
     pyzx.simplify.spider_simp(fused)
@@ -267,22 +255,10 @@ def test_save_proof_as_lemma_then_reapply(
 
 
 def test_move_to_step_emits_selection_changed_for_rewrite_refresh(app: MainWindow, qtbot: QtBot) -> None:
-    g = new_graph()
-    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
-    z1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
-    z2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
-    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
-    for s, t in ((inp, z1), (z1, z2), (z2, out)):
-        g.add_edge((s, t), EdgeType.SIMPLE)
-    g.set_inputs((inp,))
-    g.set_outputs((out,))
+    g, _, _ = _new_two_spider_chain_graph()
     app.new_graph(g)
 
-    edit_panel = app.active_panel
-    assert isinstance(edit_panel, GraphEditPanel)
-    qtbot.mouseClick(edit_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
-    proof_panel = app.active_panel
-    assert isinstance(proof_panel, ProofPanel)
+    proof_panel = _start_derivation(app, qtbot)
 
     fused = copy.deepcopy(proof_panel.graph)
     pyzx.simplify.spider_simp(fused)
@@ -300,6 +276,28 @@ def test_move_to_step_emits_selection_changed_for_rewrite_refresh(app: MainWindo
     with qtbot.waitSignal(proof_panel.graph_scene.selection_changed_custom, timeout=1000):
         proof_panel.step_view.move_to_step(0)
     qtbot.waitUntil(lambda: fuse_node.rewrite_action.enabled, timeout=1000)
+
+
+def _new_two_spider_chain_graph() -> tuple[GraphT, int, int]:
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    z1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    z2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    for s, t in ((inp, z1), (z1, z2), (z2, out)):
+        g.add_edge((s, t), EdgeType.SIMPLE)
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    return g, z1, z2
+
+
+def _start_derivation(app: MainWindow, qtbot: QtBot) -> ProofPanel:
+    edit_panel = app.active_panel
+    assert isinstance(edit_panel, GraphEditPanel)
+    qtbot.mouseClick(edit_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    proof_panel = app.active_panel
+    assert isinstance(proof_panel, ProofPanel)
+    return proof_panel
 
 
 def _find_rewrite_node(node: RewriteActionTree, name: str) -> Optional[RewriteActionTree]:
