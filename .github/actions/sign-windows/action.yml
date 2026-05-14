@@ -1,0 +1,126 @@
+name: "Sign Windows executable with SignPath"
+description: "Uploads the Windows executable to SignPath, downloads the signed result, and replaces the local EXE."
+
+inputs:
+  api-token:
+    description: "SignPath API token"
+    required: true
+
+  organization-id:
+    description: "SignPath organization ID"
+    required: true
+
+  project-slug:
+    description: "SignPath project slug"
+    required: true
+
+  signing-policy-slug:
+    description: "SignPath signing policy slug"
+    required: true
+
+  artifact-configuration-slug:
+    description: "SignPath artifact configuration slug"
+    required: true
+
+  artifact-path:
+    description: "Path to the Windows executable to sign"
+    required: false
+    default: "zxlive_windows.exe"
+
+  signed-output-directory:
+    description: "Directory where SignPath should download the signed artifact"
+    required: false
+    default: "signed-windows"
+
+  require-valid-signature:
+    description: "Set to true once using the production certificate. Keep false for the self-signed test certificate."
+    required: false
+    default: "false"
+
+outputs:
+  signing-request-id:
+    description: "SignPath signing request ID"
+    value: ${{ steps.sign.outputs.signing-request-id }}
+
+  signing-request-web-url:
+    description: "SignPath signing request URL"
+    value: ${{ steps.sign.outputs.signing-request-web-url }}
+
+runs:
+  using: "composite"
+
+  steps:
+    - name: Check Windows executable exists
+      shell: pwsh
+      env:
+        ARTIFACT_PATH: ${{ inputs.artifact-path }}
+      run: |
+        if ($env:RUNNER_OS -ne "Windows") {
+          throw "This action must run on a Windows runner."
+        }
+
+        if (-not (Test-Path $env:ARTIFACT_PATH)) {
+          Get-ChildItem -Force
+          throw "Could not find artifact to sign: $env:ARTIFACT_PATH"
+        }
+
+    - name: Upload unsigned Windows executable
+      id: upload-unsigned-artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: unsigned-windows-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ inputs.artifact-path }}
+        if-no-files-found: error
+
+    - name: Submit signing request to SignPath
+      id: sign
+      uses: signpath/github-action-submit-signing-request@v2
+      with:
+        api-token: ${{ inputs.api-token }}
+        organization-id: ${{ inputs.organization-id }}
+        project-slug: ${{ inputs.project-slug }}
+        signing-policy-slug: ${{ inputs.signing-policy-slug }}
+        artifact-configuration-slug: ${{ inputs.artifact-configuration-slug }}
+        github-artifact-id: ${{ steps.upload-unsigned-artifact.outputs.artifact-id }}
+        wait-for-completion: true
+        wait-for-completion-timeout-in-seconds: 3600
+        output-artifact-directory: ${{ inputs.signed-output-directory }}
+        github-token: ${{ github.token }}
+
+    - name: Replace unsigned executable with signed executable
+      shell: pwsh
+      env:
+        ARTIFACT_PATH: ${{ inputs.artifact-path }}
+        SIGNED_OUTPUT_DIRECTORY: ${{ inputs.signed-output-directory }}
+        REQUIRE_VALID_SIGNATURE: ${{ inputs.require-valid-signature }}
+      run: |
+        $artifactPath = $env:ARTIFACT_PATH
+        $signedOutputDirectory = $env:SIGNED_OUTPUT_DIRECTORY
+        $artifactFileName = [System.IO.Path]::GetFileName($artifactPath)
+
+        $signedExe = Get-ChildItem `
+          -Path $signedOutputDirectory `
+          -Filter $artifactFileName `
+          -Recurse |
+          Select-Object -First 1
+
+        if (-not $signedExe) {
+          Write-Host "Contents of signed output directory:"
+          Get-ChildItem -Path $signedOutputDirectory -Recurse | Format-Table FullName
+          throw "Could not find signed executable named $artifactFileName in $signedOutputDirectory"
+        }
+
+        Copy-Item -Path $signedExe.FullName -Destination $artifactPath -Force
+
+        $signature = Get-AuthenticodeSignature -FilePath $artifactPath
+        $signature | Format-List Status, StatusMessage, SignerCertificate
+
+        if ($null -eq $signature.SignerCertificate) {
+          throw "$artifactPath does not contain an Authenticode signature."
+        }
+
+        if ($env:REQUIRE_VALID_SIGNATURE -eq "true" -and $signature.Status -ne "Valid") {
+          throw "$artifactPath signature is not valid: $($signature.Status) $($signature.StatusMessage)"
+        }
+
+        Write-Host "Signed executable is now available at $artifactPath"
