@@ -45,20 +45,20 @@ class ZXLive(QApplication):
 
     main_window: Optional[MainWindow] = None
 
-    def __init__(self) -> None:
-        super().__init__(sys.argv)
-        self.setFont(display_setting.font)
-        self.setApplicationName('ZXLive')
-        self.setDesktopFileName('ZXLive')
-        self.setApplicationVersion(get_version())
-        self.main_window = MainWindow()
-        self.main_window.setWindowIcon(QIcon(get_data('icons/logo.png')))
-        self.setWindowIcon(self.main_window.windowIcon())
+    def __init__(self, *, standalone: bool = True) -> None:
+        # In embedded mode, pass only the program name to avoid
+        # conflicts with the host application's CLI arguments.
+        super().__init__(sys.argv if standalone else sys.argv[:1])
+        self._apply_base_settings()
+        main_window = self._ensure_main_window()
 
         self.lastWindowClosed.connect(self.quit)
 
+        if not standalone:
+            return
+
         # Initialize update checker
-        self.update_checker = UpdateChecker(self.applicationVersion(), self.main_window.settings)
+        self.update_checker = UpdateChecker(self.applicationVersion(), main_window.settings)
         self.update_checker.update_available.connect(self.on_update_available)
 
         # Check for updates in background if needed
@@ -73,16 +73,31 @@ class ZXLive(QApplication):
         parser.process(self)
 
         # Try to restore session state first
-        session_restored = self.main_window._restore_session_state()
+        session_restored = main_window._restore_session_state()
 
         # Handle command-line file arguments
         if parser.positionalArguments():
             # Open command-line files as additional tabs
             for f in parser.positionalArguments():
-                self.main_window.open_file_from_path(f)
+                main_window.open_file_from_path(f)
         elif not session_restored:
             # No files provided and no session restored - open demo graph
-            self.main_window.open_demo_graph()
+            main_window.open_demo_graph()
+
+    def _apply_base_settings(self) -> None:
+        """Set font, app name, and version metadata."""
+        self.setFont(display_setting.font)
+        self.setApplicationName('ZXLive')
+        self.setDesktopFileName('ZXLive')
+        self.setApplicationVersion(get_version())
+
+    def _ensure_main_window(self) -> MainWindow:
+        """Create and configure the main window if it does not already exist."""
+        if not self.main_window:
+            self.main_window = MainWindow()
+            self.main_window.setWindowIcon(QIcon(get_data('icons/logo.png')))
+            self.setWindowIcon(self.main_window.windowIcon())
+        return self.main_window
 
     def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""
@@ -90,11 +105,10 @@ class ZXLive(QApplication):
             show_update_available_dialog(self.applicationVersion(), version, url, self.main_window)
 
     def edit_graph(self, g: GraphT, name: str) -> None:
-        """Opens a ZXLive window from within a notebook to edit a graph."""
-        if not self.main_window:
-            self.main_window = MainWindow()
-        self.main_window.show()
-        self.main_window.open_graph_from_notebook(g, name)
+        """Open a ZXLive window to edit a graph interactively."""
+        win = self._ensure_main_window()
+        win.show()
+        win.open_graph_for_editing(g, name)
 
     def get_copy_of_graph(self, name: str) -> Optional[GraphT]:
         """Returns a copy of the graph which has the given name."""
@@ -103,10 +117,25 @@ class ZXLive(QApplication):
 
 
 def get_embedded_app() -> ZXLive:
-    """Main entry point for ZXLive as an embedded app inside a jupyter notebook."""
-    app = QApplication.instance() or ZXLive()
-    app.__class__ = ZXLive
-    return cast(ZXLive, app)
+    """Get a ZXLive instance for use as an embedded graph editor.
+
+    Works from Jupyter notebooks, standalone scripts, or any Python context.
+    Reuses an existing QApplication if one is running (e.g. from ``%gui qt6``
+    in Jupyter); otherwise creates a new one with minimal initialisation,
+    skipping CLI argument parsing, session restore, and update checks.
+    """
+    app = QApplication.instance()
+    if app is not None:
+        if type(app) is not QApplication:
+            raise TypeError(
+                f"Cannot embed ZXLive into an existing {type(app).__name__} "
+                "application; only a plain QApplication is supported."
+            )
+        app.__class__ = ZXLive
+        zxl = cast(ZXLive, app)
+        zxl._apply_base_settings()
+        return zxl
+    return ZXLive(standalone=False)
 
 
 def get_version() -> str:
