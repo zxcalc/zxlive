@@ -285,6 +285,7 @@ def test_move_to_step_emits_selection_changed_for_rewrite_refresh(app: MainWindo
     assert isinstance(proof_panel, ProofPanel)
 
     fused = copy.deepcopy(proof_panel.graph)
+    assert len(list(fused.vertices())) == len(list(proof_panel.graph.vertices()))
     pyzx.simplify.spider_simp(fused)
     proof_panel.undo_stack.push(
         AddRewriteStep(proof_panel.graph_view, fused, proof_panel.step_view, "fuse")
