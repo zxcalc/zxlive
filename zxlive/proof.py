@@ -282,6 +282,7 @@ class ProofStepView(QListView):
         self.update(idx)
         g = self.model().get_graph(index)
         self.graph_view.set_graph(g)
+        self.graph_view.graph_scene.selection_changed_custom.emit()
 
     def show_context_menu(self, position: QPoint) -> None:
         selected_indexes = self.selectedIndexes()
