@@ -1,10 +1,15 @@
 name: Deploy Official Release
+
 on:
   push:
     tags: [ "v*.*.*" ]
 
   # Allows you to run this workflow manually from the GitHub Actions tab
   workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
 
 jobs:
   build_and_deploy:
@@ -24,8 +29,21 @@ jobs:
       - name: Run Build Pipeline
         uses: ./.github/actions/build-app
 
+      - name: Sign Windows executable
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/sign-windows
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_WINDOWS_ARTIFACT_CONFIGURATION_SLUG }}
+          artifact-path: zxlive_windows.exe
+          require-valid-signature: "false"
+
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: zxlive_*
           draft: true
+          fail_on_unmatched_files: true
