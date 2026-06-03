@@ -84,6 +84,9 @@ class ZXLive(QApplication):
             # No files provided and no session restored - open demo graph
             self.main_window.open_demo_graph()
 
+        # Offer the interactive tutorial on the very first launch.
+        self.main_window.maybe_show_tutorial_on_first_run()
+
     def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""
         if self.main_window:
