@@ -71,10 +71,12 @@ We can no longer add or remove nodes or edges in the graph directly. Intstead, w
 :alt: The Proof window's toolbar
 :align: center
 
-The Proof window's toolbar. 1. Select mode (s), 2. Magic wand (w), 3. The type of spider the magic wand creates when drawn over a plain wire, 4. Undo (Ctrl-U) / Redo (Ctrl-Shift-U).
+The Proof window's toolbar. 1. Select mode (`s`), 2. Magic wand (`w`), 3. The type of spider the magic wand creates when drawn over a plain wire, 4. Undo (Ctrl-U) / Redo (Ctrl-Shift-U).
+
+The magic wand can also remove identity spiders, apply the Hopf rule on parallel edges, and unfuse spiders — see [Proof mode interactions](proof-mode-interactions.md).
 ```
 
-First enter select mode by pressing `s`. Now simply drag and drop one of the Z spiders onto an X spider and ZXLive will automatically perform the bialgebra rule.
+First enter select mode by pressing `s`. Now simply drag and drop one of the Z spiders onto an X spider and ZXLive will automatically perform the bialgebra rule. You can also fuse same-colour spiders, copy π phases, and push Pauli spiders by dragging one spider onto another — see [Proof mode interactions](proof-mode-interactions.md) for all drag-and-drop rewrites.
 
 ```{figure} _static/bialgebra.gif
 :alt: The bialgebra rule
@@ -104,3 +106,9 @@ Simplify the graph to a SWAP.
 ```
 
 Our proof is now complete and we could either save it as a proof file ("File > Save") which could be loaded by ZXLive again later, or we could export the proof to tikz to be included in a LaTex document by selecting "File > Export to Tikz".
+
+## More proof mode interactions
+
+The tutorial above uses drag-and-drop and the magic wand in passing. ZXLive supports several other wand and drag gestures that are easy to miss — adding identity spiders on wires, manually applying the Hopf rule, unfusing spiders, copying π phases, and pushing Pauli spiders.
+
+See [Proof mode interactions](proof-mode-interactions.md) for a full guide with animations for each gesture.
