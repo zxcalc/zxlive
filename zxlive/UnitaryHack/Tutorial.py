@@ -54,16 +54,14 @@ if TYPE_CHECKING:
     from .mainwindow import MainWindow
 
 
-# ---------------------------------------------------------------------------
-# Settings keys – record whether each section has been seen
-# ---------------------------------------------------------------------------
+
+# Settings keys 
 
 _MAIN_SEEN  = "tutorial/main-seen"
 _PROOF_SEEN = "tutorial/proof-seen"
 
-# ---------------------------------------------------------------------------
+
 # Visual constants
-# ---------------------------------------------------------------------------
 
 ACCENT       = "#8a63ff"   # purple highlight used for spotlight ring / card border
 _HOLE_PAD    = 10          # px of padding added around each spotlight target
@@ -73,9 +71,8 @@ _ADVANCE_MS  = 700         # delay after a user completes an action before auto-
 _FIRST_MS    = 420         # delay before auto-starting on first run
 
 
-# ---------------------------------------------------------------------------
+
 # Step definition
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Step:
@@ -99,9 +96,8 @@ class Step:
     hint:        str = ""
 
 
-# ---------------------------------------------------------------------------
+
 # Spotlight overlay
-# ---------------------------------------------------------------------------
 
 class _SpotlightOverlay(QWidget):
     """Full-window dim layer with click-through holes punched around targets."""
@@ -176,9 +172,8 @@ class _SpotlightOverlay(QWidget):
         self.update()
 
 
-# ---------------------------------------------------------------------------
+
 # Coachmark (speech bubble with navigation controls)
-# ---------------------------------------------------------------------------
 
 class _Coachmark(QFrame):
     """Speech-bubble card: title + body + optional hint + Prev/Next/Skip."""
@@ -320,9 +315,8 @@ class _Coachmark(QFrame):
         )
 
 
-# ---------------------------------------------------------------------------
-# Ghost pointer (animated "do it like this" finger indicator)
-# ---------------------------------------------------------------------------
+
+# Ghost pointer 
 
 class _GhostPointer(QWidget):
     """Translucent animated dot that demos where to click or drag."""
