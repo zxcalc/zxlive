@@ -84,6 +84,13 @@ class ZXLive(QApplication):
             # No files provided and no session restored - open demo graph
             self.main_window.open_demo_graph()
 
+        # Auto-start the onboarding tutorial on first launch. Deferred until the
+        # event loop starts so the main window is fully laid out before the
+        # overlay sizes itself to it.
+        from PySide6.QtCore import QTimer
+        from .tutorial import maybe_start_first_run
+        QTimer.singleShot(0, lambda: maybe_start_first_run(cast(MainWindow, self.main_window)))
+
     def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""
         if self.main_window:

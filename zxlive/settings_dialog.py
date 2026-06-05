@@ -132,6 +132,7 @@ general_settings: list[SettingsData] = [
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
     {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Color},
     {"id": "show-vertex-indices", "label": "Show vertex indices", "type": FormInputType.Bool},
+    {"id": "tutorial/show-on-startup", "label": "Show tutorial on startup", "type": FormInputType.Bool},
 ]
 
 
