@@ -12,7 +12,7 @@ Activate the magic wand by clicking its toolbar button or pressing `w`, then dra
 
 ### Draw over a wire — add an identity spider
 
-Drawing the wand across a plain wire inserts a new identity (phaseless) spider in the middle of that wire, splitting it in two. The colour of the new spider (Z or X) is set by the spider-type toggle in the proof toolbar.
+Drawing the wand across a plain wire inserts a new identity (phaseless) spider in the middle of that wire, splitting it in two. The color of the new spider (Z or X) is set by the spider-type toggle in the proof toolbar.
 
 ```{figure} _static/wand_add_identity.gif
 :alt: Adding an identity spider by drawing over a wire
@@ -34,7 +34,7 @@ Draw over a phaseless 2-legged spider to remove it.
 
 ### Draw over a spider — unfuse
 
-Drawing across any other spider unfuses it into two connected spiders. The stroke determines the split: edges on one side of the stroke move to the new spider, edges on the other side stay. The phase remains on the side the stroke favours.
+Drawing across any other spider unfuses it into two connected spiders. The stroke determines the split: edges on one side of the stroke move to the new spider, edges on the other side stay. The phase remains on the side the stroke favors.
 
 ```{figure} _static/wand_unfuse.gif
 :alt: Unfusing a spider by drawing across it
@@ -61,7 +61,7 @@ Hold `Shift` for the entire stroke. If you release it before lifting the mouse b
 
 ### Draw over parallel edges — Hopf rule
 
-Drawing across two or more parallel edges between complementary-coloured spiders (a Z-like and an X spider, or a Hadamard edge between two Z-like spiders) applies the Hopf rule, removing the edges in pairs.
+Drawing across two or more parallel edges between complementary-colored spiders (a Z-like and an X spider, or a Hadamard edge between two Z-like spiders) applies the Hopf rule, removing the edges in pairs.
 
 ```{figure} _static/wand_hopf.gif
 :alt: Applying the Hopf rule to parallel edges
@@ -74,15 +74,15 @@ Draw across parallel edges between complementary spiders to apply the Hopf rule.
 
 In select mode (`s`), some rewrites are triggered by dragging one spider onto another.
 
-### Drag spiders of the same colour together — fusion
+### Drag spiders of the same color together — fusion
 
-Dragging a spider onto an adjacent spider of the same colour fuses them into a single spider, adding their phases.
+Dragging a spider onto an adjacent spider of the same color fuses them into a single spider, adding their phases.
 
 ```{figure} _static/drag_fuse.gif
-:alt: Fusing two spiders of the same colour
+:alt: Fusing two spiders of the same color
 :align: center
 
-Drag same-coloured spiders together to fuse them.
+Drag same-colored spiders together to fuse them.
 ```
 
 ### Drag a Z spider onto an X spider — bialgebra
@@ -100,13 +100,13 @@ Drag a Z spider onto a complementary X spider to apply bialgebra.
 ZXLive records this step as "Strong complementarity" in the rewrite history panel.
 :::
 
-### Drag a 0/π spider through its neighbour — pi copy
+### Drag a 0/π spider through its neighbor — pi copy
 
-Dragging a spider with a phase of 0 or π through its neighbour copies it through, applying the copy (pi-copy) rule.
+Dragging a spider with a phase of 0 or π through its neighbor copies it through, applying the copy (pi-copy) rule.
 
 ```{figure} _static/drag_pi_copy.gif
-:alt: Copying a 0 or pi spider through its neighbour
+:alt: Copying a 0 or pi spider through its neighbor
 :align: center
 
-Drag a 0/π spider through its neighbour to copy it through.
+Drag a 0/π spider through its neighbor to copy it through.
 ```

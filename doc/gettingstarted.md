@@ -75,7 +75,7 @@ The Proof window's toolbar. 1. Select mode (s), 2. Magic wand (w), 3. The type o
 ```
 
 :::{tip}
-The magic wand and drag-and-drop gestures can do much more than this demo shows --- adding and removing identity spiders, unfusing, the Hopf rule, fusion, bialgebra, and pi copy. See [Gestures and rewrites](gestures-and-rewrites.md) for the full reference.
+The magic wand and drag-and-drop gestures can do much more than this demo shows — adding and removing identity spiders, unfusing, the Hopf rule, fusion, bialgebra, and pi copy. See [Gestures and rewrites](gestures-and-rewrites.md) for the full reference.
 :::
 
 First enter select mode by pressing `s`. Now simply drag and drop one of the Z spiders onto an X spider and ZXLive will automatically perform the bialgebra rule.
