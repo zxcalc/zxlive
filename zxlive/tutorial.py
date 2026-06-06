@@ -76,10 +76,17 @@ TargetResolver = Callable[["MainWindow"], Optional[QWidget]]
 
 @dataclass
 class TutorialStep:
-    """A single page of a tour."""
+    """A single page of a tour.
+
+    ``full_only`` steps are the educational/explanatory ones that the condensed
+    *Quick Start* tour skips. ``offer_quick`` marks the welcome step that lets
+    the user drop into Quick Start instead of the full tour.
+    """
     title: str
     text: str  # rich text (a small subset of HTML is supported by QLabel)
     target: Optional[TargetResolver] = None
+    full_only: bool = False
+    offer_quick: bool = False
 
 
 @dataclass
@@ -145,8 +152,13 @@ def _attr(mw: MainWindow, panel_resolver: TargetResolver, name: str) -> Optional
 # Tour definitions
 # --------------------------------------------------------------------------- #
 
-def editor_steps() -> TutorialSpec:
-    """The first-run tour through edit mode."""
+def editor_steps(quick: bool = False) -> TutorialSpec:
+    """The tour through edit mode.
+
+    With ``quick=True`` the explanatory/educational steps (and the welcome
+    chooser) are dropped, leaving a short functional orientation — the path a
+    returning user takes to skip the teaching.
+    """
     def graph_view(mw: MainWindow) -> Optional[QWidget]:
         return _attr(mw, _edit_panel, "graph_view")
 
@@ -175,9 +187,10 @@ def editor_steps() -> TutorialSpec:
         TutorialStep(
             "Welcome to ZXLive! 👋",
             "ZXLive is an interactive tool for building and rewriting diagrams "
-            "in the <b>ZX-calculus</b>.<br><br>This short tour points out the "
-            "main parts of the interface. Use <b>Next</b> and <b>Back</b> to "
-            "move around, or <b>Skip</b> at any time.",
+            "in the <b>ZX-calculus</b>.<br><br>Take the <b>full tour</b> for a "
+            "guided walk through the interface, or <b>Quick start</b> for a "
+            "short functional overview. You can <b>Skip</b> at any time.",
+            offer_quick=True,
         ),
         TutorialStep(
             "The canvas",
@@ -214,12 +227,14 @@ def editor_steps() -> TutorialSpec:
             "H box, and so on. <b>Double-clicking</b> a type here also changes "
             "the type of any currently selected vertices.",
             vertices_sidebar,
+            full_only=True,
         ),
         TutorialStep(
             "Edges sidebar",
             "Choose the edge type for new connections. Double-clicking a type "
             "changes any selected edges between simple and Hadamard.",
             edges_sidebar,
+            full_only=True,
         ),
         TutorialStep(
             "Adding a phase",
@@ -227,6 +242,7 @@ def editor_steps() -> TutorialSpec:
             "phase (in multiples of π). This is how you turn a bare spider into "
             "a rotation.",
             graph_view,
+            full_only=True,
         ),
         TutorialStep(
             "Start Derivation",
@@ -243,6 +259,8 @@ def editor_steps() -> TutorialSpec:
             "Happy rewriting!",
         ),
     ]
+    if quick:
+        steps = [s for s in steps if not (s.full_only or s.offer_quick)]
     return TutorialSpec(steps)
 
 
@@ -348,10 +366,12 @@ class TutorialOverlay(QWidget):
         self.title_label: QLabel = self._card.findChild(QLabel, "tutorial_title")  # type: ignore[assignment]
         self.body_label: QLabel = self._card.findChild(QLabel, "tutorial_body")  # type: ignore[assignment]
         self.progress_label: QLabel = self._card.findChild(QLabel, "tutorial_progress")  # type: ignore[assignment]
+        self.quick_button: QPushButton = self._card.findChild(QPushButton, "tutorial_quick")  # type: ignore[assignment]
         self.skip_button: QPushButton = self._card.findChild(QPushButton, "tutorial_skip")  # type: ignore[assignment]
         self.back_button: QPushButton = self._card.findChild(QPushButton, "tutorial_back")  # type: ignore[assignment]
         self.next_button: QPushButton = self._card.findChild(QPushButton, "tutorial_next")  # type: ignore[assignment]
 
+        self.quick_button.clicked.connect(self._controller.start_quick)
         self.skip_button.clicked.connect(self._controller.skip)
         self.back_button.clicked.connect(self._controller.prev)
         self.next_button.clicked.connect(self._controller.next)
@@ -359,15 +379,16 @@ class TutorialOverlay(QWidget):
         self.setGeometry(parent.rect())
 
     def set_step(self, title: str, body: str, spotlight: Optional[QRect],
-                 step_index: int, step_count: int) -> None:
+                 step_index: int, step_count: int, offer_quick: bool = False) -> None:
         """Update the card contents and reposition relative to the spotlight."""
         self.title_label.setText(title)
         self.body_label.setText(body)
         self.progress_label.setText(f"Step {step_index + 1} of {step_count}")
         self.back_button.setEnabled(step_index > 0)
         is_last = step_index == step_count - 1
-        self.next_button.setText("Finish" if is_last else "Next")
+        self.next_button.setText("Finish" if is_last else ("Full tour" if offer_quick else "Next"))
         self.skip_button.setVisible(not is_last)
+        self.quick_button.setVisible(offer_quick)
 
         self._spotlight = spotlight
         self._position_card(spotlight)
@@ -530,6 +551,10 @@ def _build_card(parent: QWidget) -> QFrame:
     controls.addWidget(progress)
     controls.addStretch()
 
+    quick = QPushButton("Quick start", card)
+    quick.setObjectName("tutorial_quick")
+    controls.addWidget(quick)
+
     skip = QPushButton("Skip", card)
     skip.setObjectName("tutorial_skip")
     controls.addWidget(skip)
@@ -594,6 +619,12 @@ class Tutorial(QObject):
     def skip(self) -> None:
         self._finish()
 
+    def start_quick(self) -> None:
+        """Switch from the welcome step into the condensed Quick Start tour."""
+        self.spec = editor_steps(quick=True)
+        self.index = 0
+        self._show_step()
+
     def reposition(self) -> None:
         """Re-resolve the current target and redraw (after a resize/move)."""
         if self.overlay is not None:
@@ -608,7 +639,7 @@ class Tutorial(QObject):
         spotlight = self._resolve_spotlight(step)
         self.overlay.setGeometry(self.main_window.rect())
         self.overlay.set_step(step.title, step.text, spotlight,
-                              self.index, len(self.spec.steps))
+                              self.index, len(self.spec.steps), step.offer_quick)
         self.overlay.raise_()
 
     def _resolve_spotlight(self, step: TutorialStep) -> Optional[QRect]:
@@ -679,9 +710,9 @@ def _run(main_window: "MainWindow", spec: TutorialSpec) -> None:
     tutorial.start()
 
 
-def start_editor_tutorial(main_window: "MainWindow") -> None:
+def start_editor_tutorial(main_window: "MainWindow", quick: bool = False) -> None:
     """Start (or replay) the edit-mode tour. Used by the Help menu."""
-    _run(main_window, editor_steps())
+    _run(main_window, editor_steps(quick=quick))
 
 
 def start_proof_tutorial(main_window: "MainWindow") -> None:

@@ -134,8 +134,39 @@ def test_starting_a_tour_cancels_the_previous(app: MainWindow) -> None:
     assert second.overlay is not None
 
 
+def test_quick_tour_is_a_functional_subset() -> None:
+    full = editor_steps(quick=False)
+    quick = editor_steps(quick=True)
+    assert 0 < len(quick.steps) < len(full.steps)
+    # The condensed tour drops the educational steps and the welcome chooser.
+    assert not any(s.full_only or s.offer_quick for s in quick.steps)
+    # Exactly one welcome step in the full tour offers Quick Start.
+    assert sum(s.offer_quick for s in full.steps) == 1
+
+
+def test_welcome_offers_quick_then_start_quick_switches(app: MainWindow) -> None:
+    start_editor_tutorial(app, quick=False)
+    tut = app._active_tutorial  # type: ignore[attr-defined]
+    assert tut.spec.steps[0].offer_quick
+    assert tut.overlay.quick_button.isVisible()
+
+    full_len = len(tut.spec.steps)
+    tut.start_quick()
+    assert tut.index == 0
+    assert len(tut.spec.steps) < full_len
+    # The Quick Start button is only shown on the full tour's welcome step.
+    assert not tut.overlay.quick_button.isVisible()
+
+
+def test_quick_tour_from_menu(app: MainWindow) -> None:
+    start_editor_tutorial(app, quick=True)
+    tut = app._active_tutorial  # type: ignore[attr-defined]
+    assert not tut.spec.steps[0].offer_quick
+    assert not tut.overlay.quick_button.isVisible()
+
+
 def test_step_specs_are_well_formed() -> None:
-    for spec in (editor_steps(), proof_steps()):
+    for spec in (editor_steps(), editor_steps(quick=True), proof_steps()):
         assert spec.steps
         for step in spec.steps:
             assert step.title

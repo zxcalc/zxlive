@@ -262,12 +262,17 @@ class MainWindow(QMainWindow):
         check_for_updates = self._new_action(
             "Check for &Updates...", self.check_for_updates, None,
             "Check for new versions of ZXLive")
-        interactive_tutorial = self._new_action(
-            "&Interactive Tutorial", self.start_tutorial, None,
-            "Replay the interactive onboarding tutorial")
+        quick_tour_action = self._new_action(
+            "&Quick Tour", lambda: self.start_tutorial(quick=True), None,
+            "A short, functional tour of the interface")
+        full_tutorial_action = self._new_action(
+            "&Full Tutorial", lambda: self.start_tutorial(quick=False), None,
+            "The complete guided onboarding tour")
         help_menu = menu.addMenu("&Help")
         help_menu.addAction(user_guide)
-        help_menu.addAction(interactive_tutorial)
+        tutorial_menu = help_menu.addMenu("&Interactive Tutorial")
+        tutorial_menu.addAction(quick_tour_action)
+        tutorial_menu.addAction(full_tutorial_action)
         help_menu.addAction(check_for_updates)
 
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
@@ -879,10 +884,10 @@ class MainWindow(QMainWindow):
         from .tutorial import maybe_start_proof_tutorial
         maybe_start_proof_tutorial(self)
 
-    def start_tutorial(self) -> None:
+    def start_tutorial(self, quick: bool = False) -> None:
         """Replay the interactive onboarding tutorial (from the Help menu)."""
         from .tutorial import start_editor_tutorial
-        start_editor_tutorial(self)
+        start_editor_tutorial(self, quick=quick)
 
     def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
         panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)
