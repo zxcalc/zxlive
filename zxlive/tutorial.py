@@ -62,7 +62,7 @@ PROOF_TUTORIAL_SEEN = "tutorial/proof-seen"
 _DIM_ALPHA = 160          # 0-255, how strongly the rest of the UI is dimmed
 _SPOTLIGHT_PAD = 8        # px of breathing room drawn around the target widget
 _SPOTLIGHT_RADIUS = 10    # px corner radius of the spotlight cut-out
-_CARD_WIDTH = 360         # px fixed width of the explanation card
+_CARD_WIDTH = 430         # px fixed width of the explanation card
 _CARD_MARGIN = 18         # px gap between the spotlight and the card
 _BEAK = 11                # px size of the little pointer from the card
 _MIN_TARGET = 6           # px below which a target is treated as not visible
@@ -384,7 +384,9 @@ class TutorialOverlay(QWidget):
         self.title_label.setText(title)
         self.body_label.setText(body)
         self.progress_label.setText(f"Step {step_index + 1} of {step_count}")
-        self.back_button.setEnabled(step_index > 0)
+        # Hide (rather than just disable) Back on the first step so the welcome
+        # step's wider Quick start / Full tour buttons aren't squeezed.
+        self.back_button.setVisible(step_index > 0)
         is_last = step_index == step_count - 1
         self.next_button.setText("Finish" if is_last else ("Full tour" if offer_quick else "Next"))
         self.skip_button.setVisible(not is_last)
