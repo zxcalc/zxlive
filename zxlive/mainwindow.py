@@ -55,6 +55,7 @@ from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz, proof_steps_to_tikz
+from . import tutorial
 
 
 class MainWindow(QMainWindow):
@@ -273,6 +274,8 @@ class MainWindow(QMainWindow):
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
 
+        self.tutorial_controller = tutorial.TutorialController(self)
+
         self.effects = {e: load_sfx(e) for e in SFXEnum}
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
@@ -291,13 +294,11 @@ class MainWindow(QMainWindow):
 
     def start_tutorial(self) -> None:
         """Launch (or replay) the interactive tutorial overlay."""
-        from .tutorial import start_main_tutorial
-        start_main_tutorial(self)
+        tutorial.start_main_tutorial(self)
 
     def maybe_show_tutorial_on_first_run(self) -> None:
         """Auto-start the tutorial on the very first launch."""
-        from .tutorial import maybe_show_tutorial_on_first_run
-        maybe_show_tutorial_on_first_run(self)
+        tutorial.maybe_show_tutorial_on_first_run(self)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
         is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
@@ -886,8 +887,7 @@ class MainWindow(QMainWindow):
             name = "New Proof"
         panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
         self._new_panel(panel, name)
-        from .tutorial import maybe_start_proof_tutorial
-        maybe_start_proof_tutorial(self)
+        tutorial.maybe_start_proof_tutorial(self)
 
     def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
         panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)
