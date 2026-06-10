@@ -20,7 +20,7 @@ import json
 import logging
 import os
 import random
-from typing import Callable, Optional, cast
+from typing import TYPE_CHECKING, Callable, Optional, cast
 
 import networkx as nx
 import pyperclip
@@ -56,10 +56,16 @@ from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz, proof_steps_to_tikz
 
+if TYPE_CHECKING:
+    from .tutorial import Tutorial
+
 
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
     CLIPBOARD_MIME = "application/vnd.zxlive-graph+json"
+
+    # The currently running onboarding tutorial, if any (see zxlive.tutorial).
+    _active_tutorial: Optional["Tutorial"] = None
 
     def __init__(self) -> None:
         super().__init__()
@@ -262,17 +268,17 @@ class MainWindow(QMainWindow):
         check_for_updates = self._new_action(
             "Check for &Updates...", self.check_for_updates, None,
             "Check for new versions of ZXLive")
-        quick_tour_action = self._new_action(
-            "&Quick Tour", lambda: self.start_tutorial(quick=True), None,
-            "A short, functional tour of the interface")
-        full_tutorial_action = self._new_action(
-            "&Full Tutorial", lambda: self.start_tutorial(quick=False), None,
-            "The complete guided onboarding tour")
+        editor_tour_action = self._new_action(
+            "&Editor Tour", lambda: self.start_tutorial(), None,
+            "Guided tour of the editor (offers a quick-start option)")
+        self.proof_tour_action = self._new_action(
+            "&Proof Mode Tour", lambda: self.start_proof_tutorial(), None,
+            "Guided tour of proof mode")
         help_menu = menu.addMenu("&Help")
         help_menu.addAction(user_guide)
         tutorial_menu = help_menu.addMenu("&Interactive Tutorial")
-        tutorial_menu.addAction(quick_tour_action)
-        tutorial_menu.addAction(full_tutorial_action)
+        tutorial_menu.addAction(editor_tour_action)
+        tutorial_menu.addAction(self.proof_tour_action)
         help_menu.addAction(check_for_updates)
 
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
@@ -312,6 +318,10 @@ class MainWindow(QMainWindow):
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
         self.export_tikz_series.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
         self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+
+        # The proof-mode tour only makes sense (and can spotlight its targets)
+        # while a proof tab is active.
+        self.proof_tour_action.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
         self.paste_action.setEnabled(has_active_tab and self._has_pasteable_clipboard_data())
@@ -885,9 +895,14 @@ class MainWindow(QMainWindow):
         maybe_start_proof_tutorial(self)
 
     def start_tutorial(self, quick: bool = False) -> None:
-        """Replay the interactive onboarding tutorial (from the Help menu)."""
+        """Replay the editor onboarding tutorial (from the Help menu)."""
         from .tutorial import start_editor_tutorial
         start_editor_tutorial(self, quick=quick)
+
+    def start_proof_tutorial(self) -> None:
+        """Replay the proof-mode tutorial (from the Help menu)."""
+        from .tutorial import start_proof_tutorial
+        start_proof_tutorial(self)
 
     def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
         panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)

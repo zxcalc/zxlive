@@ -41,9 +41,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional, cast
 
 from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QEvent, QObject,
-                            QPoint, QRect, QVariantAnimation, Qt)
+                            QPoint, QRect, QRectF, QVariantAnimation, Qt)
 from PySide6.QtGui import (QColor, QKeyEvent, QMouseEvent, QPainter,
-                           QPainterPath, QPaintEvent, QPen, QPolygon,
+                           QPainterPath, QPaintEvent, QPalette, QPen, QPolygon,
                            QResizeEvent)
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QToolButton, QVBoxLayout, QWidget)
@@ -363,14 +363,15 @@ class TutorialOverlay(QWidget):
         self._pulse_anim.setLoopCount(-1)
         self._pulse_anim.valueChanged.connect(self._on_pulse)
 
-        self._card = _build_card(self)
-        self.title_label: QLabel = self._card.findChild(QLabel, "tutorial_title")  # type: ignore[assignment]
-        self.body_label: QLabel = self._card.findChild(QLabel, "tutorial_body")  # type: ignore[assignment]
-        self.progress_label: QLabel = self._card.findChild(QLabel, "tutorial_progress")  # type: ignore[assignment]
-        self.quick_button: QPushButton = self._card.findChild(QPushButton, "tutorial_quick")  # type: ignore[assignment]
-        self.skip_button: QPushButton = self._card.findChild(QPushButton, "tutorial_skip")  # type: ignore[assignment]
-        self.back_button: QPushButton = self._card.findChild(QPushButton, "tutorial_back")  # type: ignore[assignment]
-        self.next_button: QPushButton = self._card.findChild(QPushButton, "tutorial_next")  # type: ignore[assignment]
+        widgets = _build_card(self)
+        self._card = widgets.frame
+        self.title_label = widgets.title
+        self.body_label = widgets.body
+        self.progress_label = widgets.progress
+        self.quick_button = widgets.quick
+        self.skip_button = widgets.skip
+        self.back_button = widgets.back
+        self.next_button = widgets.next
 
         self.quick_button.clicked.connect(self._controller.start_quick)
         self.skip_button.clicked.connect(self._controller.skip)
@@ -447,18 +448,18 @@ class TutorialOverlay(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         path = QPainterPath()
-        path.addRect(self.rect())  # type: ignore[arg-type]
-        spot = self._spotlight
-        has_spot = spot is not None and spot.isValid()
-        if has_spot:
+        path.addRect(QRectF(self.rect()))
+        # Fall back to an invalid rect when there is no spotlight, so the
+        # branches below read off spot.isValid() without any Optional juggling.
+        spot = self._spotlight if self._spotlight is not None else QRect()
+        if spot.isValid():
             hole = QPainterPath()
-            hole.addRoundedRect(spot, _SPOTLIGHT_RADIUS, _SPOTLIGHT_RADIUS)  # type: ignore[arg-type]
+            hole.addRoundedRect(QRectF(spot), _SPOTLIGHT_RADIUS, _SPOTLIGHT_RADIUS)
             path = path.subtracted(hole)
 
         painter.fillPath(path, QColor(0, 0, 0, _DIM_ALPHA))
 
-        if has_spot:
-            assert spot is not None
+        if spot.isValid():
             self._paint_beak(painter, spot)
             highlight = self.palette().highlight().color()
             highlight.setAlphaF(self._pulse)
@@ -515,7 +516,43 @@ class TutorialOverlay(QWidget):
             super().keyPressEvent(event)
 
 
-def _build_card(parent: QWidget) -> QFrame:
+def _muted_text_color(palette: QPalette) -> QColor:
+    """A de-emphasised text colour that stays readable on any theme.
+
+    Blends the window text colour 35% of the way towards the window background:
+    since the text colour is guaranteed to contrast with the background, the
+    result is softer than full text but never as low-contrast as a fixed mid
+    tone, in either light or dark mode.
+    """
+    text = palette.color(QPalette.ColorRole.WindowText)
+    bg = palette.color(QPalette.ColorRole.Window)
+    t = 0.35
+    return QColor(
+        round(text.red() * (1 - t) + bg.red() * t),
+        round(text.green() * (1 - t) + bg.green() * t),
+        round(text.blue() * (1 - t) + bg.blue() * t),
+    )
+
+
+@dataclass
+class _CardWidgets:
+    """The explanation card frame and its child widgets, typed for direct use.
+
+    Returned by :func:`_build_card` so the overlay can hold properly typed
+    references instead of looking children up by name (which would force
+    ``Optional`` returns and ``# type: ignore`` casts).
+    """
+    frame: QFrame
+    title: QLabel
+    body: QLabel
+    progress: QLabel
+    quick: QPushButton
+    skip: QPushButton
+    back: QPushButton
+    next: QPushButton
+
+
+def _build_card(parent: QWidget) -> _CardWidgets:
     """Create the explanation card (title, body, progress, buttons)."""
     card = QFrame(parent)
     card.setObjectName("tutorial_card")
@@ -528,7 +565,6 @@ def _build_card(parent: QWidget) -> QFrame:
             border-radius: 10px;
         }
         QLabel#tutorial_title { font-size: 16px; font-weight: bold; }
-        QLabel#tutorial_progress { color: palette(mid); }
         """
     )
 
@@ -542,7 +578,6 @@ def _build_card(parent: QWidget) -> QFrame:
     layout.addWidget(title)
 
     body = QLabel(card)
-    body.setObjectName("tutorial_body")
     body.setWordWrap(True)
     body.setTextFormat(Qt.TextFormat.RichText)
     layout.addWidget(body)
@@ -550,29 +585,23 @@ def _build_card(parent: QWidget) -> QFrame:
     controls = QHBoxLayout()
     controls.setSpacing(8)
     progress = QLabel(card)
-    progress.setObjectName("tutorial_progress")
+    # Muted but readable: a fixed palette role (e.g. "mid") can sit too close to
+    # the window background on some themes, so blend the actual text colour part
+    # way towards the background. This keeps contrast in both light and dark.
+    progress.setStyleSheet(f"color: {_muted_text_color(card.palette()).name()};")
     controls.addWidget(progress)
     controls.addStretch()
 
     quick = QPushButton("Quick start", card)
-    quick.setObjectName("tutorial_quick")
-    controls.addWidget(quick)
-
     skip = QPushButton("Skip", card)
-    skip.setObjectName("tutorial_skip")
-    controls.addWidget(skip)
-
     back = QPushButton("Back", card)
-    back.setObjectName("tutorial_back")
-    controls.addWidget(back)
-
     nxt = QPushButton("Next", card)
-    nxt.setObjectName("tutorial_next")
     nxt.setDefault(True)
-    controls.addWidget(nxt)
+    for btn in (quick, skip, back, nxt):
+        controls.addWidget(btn)
 
     layout.addLayout(controls)
-    return card
+    return _CardWidgets(card, title, body, progress, quick, skip, back, nxt)
 
 
 # --------------------------------------------------------------------------- #
@@ -601,10 +630,10 @@ class Tutorial(QObject):
         self.overlay.setGeometry(self.main_window.rect())
         self.overlay.show()
         self.overlay.raise_()
+        # Take focus so the overlay's own Back/Next/arrow keys work. We
+        # deliberately don't grabKeyboard(): that is an OS-level grab that eats
+        # global shortcuts (alt-tab, the Super key, ...) far beyond this app.
         self.overlay.setFocus()
-        # Grab the keyboard so panel shortcuts (v/e/w/s, ...) and Tab can't
-        # drive the dimmed UI behind the overlay while the tour is running.
-        self.overlay.grabKeyboard()
         self._show_step()
 
     def next(self) -> None:
@@ -684,12 +713,11 @@ class Tutorial(QObject):
         if self.spec.seen_key is not None:
             set_settings_value(self.spec.seen_key, True, bool)
         self.main_window.removeEventFilter(self)
-        self.overlay.releaseKeyboard()
         self.overlay.hide()
         self.overlay.deleteLater()
         self.overlay = None
-        if getattr(self.main_window, "_active_tutorial", None) is self:
-            self.main_window._active_tutorial = None  # type: ignore[attr-defined]
+        if self.main_window._active_tutorial is self:
+            self.main_window._active_tutorial = None
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         if watched is self.main_window and self.overlay is not None:
@@ -711,11 +739,11 @@ class Tutorial(QObject):
 # garbage-collected mid-tour and so only one runs at a time.
 
 def _run(main_window: "MainWindow", spec: TutorialSpec) -> None:
-    existing = getattr(main_window, "_active_tutorial", None)
+    existing = main_window._active_tutorial
     if existing is not None:
         existing.skip()
     tutorial = Tutorial(main_window, spec)
-    main_window._active_tutorial = tutorial  # type: ignore[attr-defined]
+    main_window._active_tutorial = tutorial
     tutorial.start()
 
 
@@ -730,14 +758,15 @@ def start_proof_tutorial(main_window: "MainWindow") -> None:
 
 
 def maybe_start_first_run(main_window: "MainWindow") -> None:
-    """Auto-start the editor tour when the startup setting is enabled.
+    """Auto-start the editor tour on startup when enabled.
 
-    The setting is flipped off immediately so the tour shows exactly once per
-    time the user opts in (via Preferences). Replaying from the Help menu does
-    not touch it.
+    Gated purely by the ``SHOW_ON_STARTUP`` preference (default on); the setting
+    is left untouched, so the tour appears on every startup until the user turns
+    it off under Preferences. This avoids the surprise of a tour vanishing for
+    good just because the window was closed mid-way, and matches the usual
+    "show on startup" behaviour. The Help menu is the way to replay it once.
     """
     if get_settings_value(SHOW_ON_STARTUP, bool, True):
-        set_settings_value(SHOW_ON_STARTUP, False, bool)
         start_editor_tutorial(main_window)
 
 

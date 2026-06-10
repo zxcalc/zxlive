@@ -18,11 +18,13 @@ from PySide6.QtCore import QEvent
 from pytestqt.qtbot import QtBot
 
 from zxlive.common import get_settings_value, set_settings_value
+from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
+from zxlive.proof_panel import ProofPanel
 from zxlive.tutorial import (PROOF_TUTORIAL_SEEN, SHOW_ON_STARTUP, Tutorial,
-                             editor_steps, maybe_start_first_run,
-                             maybe_start_proof_tutorial, proof_steps,
-                             start_editor_tutorial)
+                             TutorialOverlay, editor_steps,
+                             maybe_start_first_run, maybe_start_proof_tutorial,
+                             proof_steps, start_editor_tutorial)
 
 
 @pytest.fixture
@@ -39,6 +41,19 @@ def app(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> MainWindow:
     return mw
 
 
+def active_tutorial(mw: MainWindow) -> Tutorial:
+    """Return the running tutorial, asserting one is active (for type narrowing)."""
+    tut = mw._active_tutorial
+    assert isinstance(tut, Tutorial)
+    return tut
+
+
+def overlay_of(tut: Tutorial) -> TutorialOverlay:
+    """Return the tutorial's overlay, asserting it exists (for type narrowing)."""
+    assert tut.overlay is not None
+    return tut.overlay
+
+
 def test_help_menu_has_tutorial_action(app: MainWindow) -> None:
     actions = [a.text() for a in app.menuBar().actions()]
     assert "&Help" in actions
@@ -46,22 +61,21 @@ def test_help_menu_has_tutorial_action(app: MainWindow) -> None:
 
 def test_editor_tour_navigation(app: MainWindow) -> None:
     start_editor_tutorial(app)
-    tut = app._active_tutorial  # type: ignore[attr-defined]
-    assert isinstance(tut, Tutorial)
-    assert tut.overlay is not None
-    assert tut.overlay.isVisible()
+    tut = active_tutorial(app)
+    ov = overlay_of(tut)
+    assert ov.isVisible()
 
     n = len(tut.spec.steps)
     assert tut.index == 0
     # Back is hidden (not just disabled) on the first step.
-    assert not tut.overlay.back_button.isVisible()
+    assert not ov.back_button.isVisible()
 
     # Walk forward to the end.
     for expected in range(1, n):
         tut.next()
         assert tut.index == expected
-        assert tut.overlay.back_button.isVisible()
-    assert tut.overlay.next_button.text() == "Finish"
+        assert ov.back_button.isVisible()
+    assert ov.next_button.text() == "Finish"
 
     # Going back works.
     tut.prev()
@@ -71,12 +85,12 @@ def test_editor_tour_navigation(app: MainWindow) -> None:
     tut.index = n - 1
     tut.next()
     assert tut.overlay is None
-    assert getattr(app, "_active_tutorial", None) is None
+    assert app._active_tutorial is None
 
 
 def test_skip_closes_the_tour(app: MainWindow) -> None:
     start_editor_tutorial(app)
-    tut = app._active_tutorial  # type: ignore[attr-defined]
+    tut = active_tutorial(app)
     assert tut.overlay is not None
     tut.skip()
     assert tut.overlay is None
@@ -85,20 +99,20 @@ def test_skip_closes_the_tour(app: MainWindow) -> None:
 def test_first_run_respects_startup_setting(app: MainWindow) -> None:
     set_settings_value(SHOW_ON_STARTUP, False, bool)
     maybe_start_first_run(app)
-    assert getattr(app, "_active_tutorial", None) is None
+    assert app._active_tutorial is None
 
     set_settings_value(SHOW_ON_STARTUP, True, bool)
     maybe_start_first_run(app)
-    assert app._active_tutorial is not None  # type: ignore[attr-defined]
-    # The setting is consumed (one-shot) so it won't re-show next launch.
-    assert get_settings_value(SHOW_ON_STARTUP, bool, True) is False
+    assert app._active_tutorial is not None
+    # The setting is left untouched, so the tour keeps showing on each startup
+    # until the user disables it in Preferences.
+    assert get_settings_value(SHOW_ON_STARTUP, bool, True) is True
 
 
 def test_proof_tour_autostarts_and_targets_resolve(app: MainWindow) -> None:
     # Entering proof mode auto-starts the proof tour on first entry.
     app.new_deriv(app.active_panel.graph)  # type: ignore[union-attr]
-    tut = app._active_tutorial  # type: ignore[attr-defined]
-    assert isinstance(tut, Tutorial)
+    tut = active_tutorial(app)
     assert tut.spec.seen_key == PROOF_TUTORIAL_SEEN
 
     # Exercise the spotlight resolver for every step without crashing.
@@ -112,12 +126,12 @@ def test_proof_tour_autostarts_and_targets_resolve(app: MainWindow) -> None:
 def test_proof_tour_skipped_when_seen(app: MainWindow) -> None:
     set_settings_value(PROOF_TUTORIAL_SEEN, True, bool)
     maybe_start_proof_tutorial(app)
-    assert getattr(app, "_active_tutorial", None) is None
+    assert app._active_tutorial is None
 
 
 def test_closing_window_mid_tour_marks_seen(app: MainWindow) -> None:
     app.new_deriv(app.active_panel.graph)  # type: ignore[union-attr]
-    tut = app._active_tutorial  # type: ignore[attr-defined]
+    tut = active_tutorial(app)
     assert tut.overlay is not None
     # Simulate the main window being closed while the proof tour is running.
     tut.eventFilter(app, QEvent(QEvent.Type.Close))
@@ -127,9 +141,9 @@ def test_closing_window_mid_tour_marks_seen(app: MainWindow) -> None:
 
 def test_starting_a_tour_cancels_the_previous(app: MainWindow) -> None:
     start_editor_tutorial(app)
-    first = app._active_tutorial  # type: ignore[attr-defined]
+    first = active_tutorial(app)
     start_editor_tutorial(app)
-    second = app._active_tutorial  # type: ignore[attr-defined]
+    second = active_tutorial(app)
     assert first is not second
     assert first.overlay is None
     assert second.overlay is not None
@@ -147,23 +161,46 @@ def test_quick_tour_is_a_functional_subset() -> None:
 
 def test_welcome_offers_quick_then_start_quick_switches(app: MainWindow) -> None:
     start_editor_tutorial(app, quick=False)
-    tut = app._active_tutorial  # type: ignore[attr-defined]
+    tut = active_tutorial(app)
+    ov = overlay_of(tut)
     assert tut.spec.steps[0].offer_quick
-    assert tut.overlay.quick_button.isVisible()
+    assert ov.quick_button.isVisible()
 
     full_len = len(tut.spec.steps)
     tut.start_quick()
     assert tut.index == 0
     assert len(tut.spec.steps) < full_len
     # The Quick Start button is only shown on the full tour's welcome step.
-    assert not tut.overlay.quick_button.isVisible()
+    assert not ov.quick_button.isVisible()
 
 
 def test_quick_tour_from_menu(app: MainWindow) -> None:
     start_editor_tutorial(app, quick=True)
-    tut = app._active_tutorial  # type: ignore[attr-defined]
+    tut = active_tutorial(app)
+    ov = overlay_of(tut)
     assert not tut.spec.steps[0].offer_quick
-    assert not tut.overlay.quick_button.isVisible()
+    assert not ov.quick_button.isVisible()
+
+
+def test_proof_tour_from_menu(app: MainWindow) -> None:
+    # The proof-mode tour can be replayed from the Help menu.
+    app.new_deriv(app.active_panel.graph)  # type: ignore[union-attr]
+    active_tutorial(app).skip()  # dismiss the auto-started tour
+    app.start_proof_tutorial()
+    tut = active_tutorial(app)
+    assert tut.spec.seen_key == PROOF_TUTORIAL_SEEN
+    tut.skip()
+
+
+def test_proof_tour_action_enabled_only_in_proof_mode(app: MainWindow) -> None:
+    # In edit mode (demo graph) the proof-tour menu entry is disabled...
+    assert isinstance(app.active_panel, GraphEditPanel)
+    assert not app.proof_tour_action.isEnabled()
+    # ...and enabled once a proof tab is active.
+    app.new_deriv(app.active_panel.graph)
+    active_tutorial(app).skip()
+    assert isinstance(app.active_panel, ProofPanel)
+    assert app.proof_tour_action.isEnabled()
 
 
 def test_step_specs_are_well_formed() -> None:

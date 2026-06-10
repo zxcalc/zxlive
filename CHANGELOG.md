@@ -3,7 +3,7 @@
 
 ## Unreleased
 
-- Added an interactive onboarding tutorial. A guided overlay walks new users through the canvas, tools and sidebars on first launch, and a dedicated tour introduces proof mode the first time a derivation is started. The welcome screen offers a **Quick start** (short, functional) as well as the **full tour**, so returning users can skip the explanations. The spotlighted element gently pulses and the explanation card points at it. Both tours can be replayed any time from **Help → Interactive Tutorial** (Quick Tour / Full Tutorial), and auto-start can be toggled under **Preferences → Show tutorial on startup**.
+- Added an interactive onboarding tutorial. A guided overlay walks new users through the canvas, tools and sidebars on first launch, and a dedicated tour introduces proof mode the first time a derivation is started. The welcome screen offers a **Quick start** (short, functional) as well as the **full tour**, so returning users can skip the explanations. The spotlighted element gently pulses and the explanation card points at it. Both tours can be replayed any time from **Help → Interactive Tutorial** (Editor Tour / Proof Mode Tour), and auto-start can be toggled under **Preferences → Show tutorial on startup**.
 
 
 ## v1.0.0
