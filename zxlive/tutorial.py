@@ -36,6 +36,7 @@ users are not pestered.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional, cast
 
@@ -185,7 +186,7 @@ def editor_steps(quick: bool = False) -> TutorialSpec:
 
     steps = [
         TutorialStep(
-            "Welcome to ZXLive! 👋",
+            "Welcome to ZXLive!",
             "ZXLive is an interactive tool for building and rewriting diagrams "
             "in the <b>ZX-calculus</b>.<br><br>Take the <b>full tour</b> for a "
             "guided walk through the interface, or <b>Quick start</b> for a "
@@ -253,7 +254,7 @@ def editor_steps(quick: bool = False) -> TutorialSpec:
             start_derivation,
         ),
         TutorialStep(
-            "You're all set! ✅",
+            "You're all set!",
             "That covers the basics of building diagrams. You can replay this "
             "tour any time from <b>Help → Interactive Tutorial</b>.<br><br>"
             "Happy rewriting!",
@@ -285,7 +286,7 @@ def proof_steps() -> TutorialSpec:
 
     steps = [
         TutorialStep(
-            "Welcome to proof mode! 🪄",
+            "Welcome to proof mode!",
             "In proof mode you transform your diagram with sound ZX-calculus "
             "rewrites. The original diagram is preserved and every step is "
             "recorded, so you can always go back.",
@@ -320,7 +321,7 @@ def proof_steps() -> TutorialSpec:
             step_view,
         ),
         TutorialStep(
-            "Go forth and prove! 🎉",
+            "Go forth and prove!",
             "You can export a finished proof to TikZ or GIF from the "
             "<b>File</b> menu, or save it as a reusable rewrite from the "
             "<b>Rewrites</b> menu. Replay this tour any time from "
@@ -650,22 +651,28 @@ class Tutorial(QObject):
         try:
             widget = step.target(self.main_window)
         except Exception:
+            # Fall back to a centred card, but surface the failure: a resolver
+            # raising usually means a renamed attribute or an unexpected panel
+            # type that should be fixed, not silently hidden.
+            logging.warning("Tutorial target resolver for step %r failed; "
+                            "showing a centred card instead.", step.title,
+                            exc_info=True)
             widget = None
         if widget is None or not widget.isVisible():
             return None
-        # A widget collapsed inside a splitter pane is technically "visible" but
-        # has no on-screen area; spotlighting a sliver looks broken, so fall
-        # back to a centred card instead.
+        # Spotlight only the on-screen part of the widget: a widget collapsed or
+        # clipped inside a splitter/scroll area is technically "visible" but its
+        # occluded region shouldn't be highlighted. Fall back to a centred card
+        # when too little of it is actually showing.
         visible = widget.visibleRegion().boundingRect()
-        if (widget.width() < _MIN_TARGET or widget.height() < _MIN_TARGET
-                or visible.width() < _MIN_TARGET or visible.height() < _MIN_TARGET):
+        if visible.width() < _MIN_TARGET or visible.height() < _MIN_TARGET:
             return None
-        top_left = widget.mapToGlobal(QPoint(0, 0))
+        top_left = widget.mapToGlobal(visible.topLeft())
         local = self.overlay.mapFromGlobal(top_left)
-        rect = QRect(local, widget.size())
+        rect = QRect(local, visible.size())
         rect = rect.adjusted(-_SPOTLIGHT_PAD, -_SPOTLIGHT_PAD,
                              _SPOTLIGHT_PAD, _SPOTLIGHT_PAD)
-        # Clip to what's actually on-screen, and ignore targets scrolled away.
+        # Clip to the overlay, and ignore targets scrolled entirely off-screen.
         rect = rect.intersected(self.overlay.rect())
         if rect.width() < _MIN_TARGET or rect.height() < _MIN_TARGET:
             return None

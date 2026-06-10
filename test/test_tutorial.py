@@ -53,13 +53,14 @@ def test_editor_tour_navigation(app: MainWindow) -> None:
 
     n = len(tut.spec.steps)
     assert tut.index == 0
-    assert not tut.overlay.back_button.isEnabled()
+    # Back is hidden (not just disabled) on the first step.
+    assert not tut.overlay.back_button.isVisible()
 
     # Walk forward to the end.
     for expected in range(1, n):
         tut.next()
         assert tut.index == expected
-        assert tut.overlay.back_button.isEnabled()
+        assert tut.overlay.back_button.isVisible()
     assert tut.overlay.next_button.text() == "Finish"
 
     # Going back works.
