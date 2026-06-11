@@ -187,10 +187,10 @@ def load_tikz_classes() -> dict[str, str]:
         'X': str(settings.value('tikz/X-spider-export', pyzx.settings.tikz_classes['X'])),
         'Z phase': str(settings.value('tikz/Z-phase-export', pyzx.settings.tikz_classes['Z phase'])),
         'X phase': str(settings.value('tikz/X-phase-export', pyzx.settings.tikz_classes['X phase'])),
-        'Z box': str(settings.value('tikz/Z-box-export', pyzx.settings.tikz_classes['Z box'])),
+        'Z box': str(settings.value('tikz/z-box-export', pyzx.settings.tikz_classes['Z box'])),
         'H': str(settings.value('tikz/Hadamard-export', pyzx.settings.tikz_classes['H'])),
-        'W': str(settings.value('tikz/W-output-export', pyzx.settings.tikz_classes['W'])),
-        'W input': str(settings.value('tikz/W-input-export', pyzx.settings.tikz_classes['W input'])),
+        'W': str(settings.value('tikz/w-output-export', pyzx.settings.tikz_classes['W'])),
+        'W input': str(settings.value('tikz/w-input-export', pyzx.settings.tikz_classes['W input'])),
         'dummy': str(settings.value('tikz/dummy-export', pyzx.settings.tikz_classes['dummy'])),
         'edge': str(settings.value('tikz/edge-export', pyzx.settings.tikz_classes['edge'])),
         'H-edge': str(settings.value('tikz/edge-H-export', pyzx.settings.tikz_classes['H-edge'])),
@@ -210,9 +210,9 @@ def refresh_pyzx_tikz_settings() -> None:
     pyzx.tikz.synonyms_z = _get_synonyms('tikz/Z-spider-import', pyzx.tikz.synonyms_z)
     pyzx.tikz.synonyms_x = _get_synonyms('tikz/X-spider-import', pyzx.tikz.synonyms_x)
     pyzx.tikz.synonyms_hadamard = _get_synonyms('tikz/Hadamard-import', pyzx.tikz.synonyms_hadamard)
-    pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/W-input-import', pyzx.tikz.synonyms_w_input)
-    pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/W-output-import', pyzx.tikz.synonyms_w_output)
-    pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/Z-box-import', pyzx.tikz.synonyms_z_box)
+    pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/w-input-import', pyzx.tikz.synonyms_w_input)
+    pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/w-output-import', pyzx.tikz.synonyms_w_output)
+    pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/z-box-import', pyzx.tikz.synonyms_z_box)
     pyzx.tikz.synonyms_dummy = _get_synonyms('tikz/dummy-import', pyzx.tikz.synonyms_dummy)
     pyzx.tikz.synonyms_edge = _get_synonyms('tikz/edge-import', pyzx.tikz.synonyms_edge)
     pyzx.tikz.synonyms_hedge = _get_synonyms('tikz/edge-H-import', pyzx.tikz.synonyms_hedge)
