@@ -11,6 +11,7 @@ Welcome to zxlive's documentation!
    :caption: Contents:
 
    gettingstarted
+   proof-mode-gestures
    adding-rewrites
    tikz_export
 
