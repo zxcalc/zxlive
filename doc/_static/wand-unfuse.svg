@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300" role="img" aria-labelledby="title desc">
+  <title id="title">Unfusing a spider with the magic wand</title>
+  <desc id="desc">A four-legged green spider, a wand stroke through it, and two connected green spiders with the legs divided between them.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#4a5568"/>
+    </marker>
+    <style>
+      .label { font: 18px sans-serif; fill: #263238; text-anchor: middle; }
+      .wire { stroke: #202124; stroke-width: 5; stroke-linecap: round; }
+      .wand { stroke: #1976d2; stroke-width: 8; stroke-linecap: round; }
+      .endpoint { fill: #202124; }
+      .spider { fill: #8fd694; stroke: #245c2c; stroke-width: 4; }
+      .arrow { stroke: #4a5568; stroke-width: 4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <text class="label" x="150" y="35">Before</text>
+  <line class="wire" x1="65" y1="80" x2="150" y2="145"/>
+  <line class="wire" x1="65" y1="220" x2="150" y2="155"/>
+  <line class="wire" x1="235" y1="80" x2="150" y2="145"/>
+  <line class="wire" x1="235" y1="220" x2="150" y2="155"/>
+  <circle class="endpoint" cx="65" cy="80" r="7"/>
+  <circle class="endpoint" cx="65" cy="220" r="7"/>
+  <circle class="endpoint" cx="235" cy="80" r="7"/>
+  <circle class="endpoint" cx="235" cy="220" r="7"/>
+  <circle class="spider" cx="150" cy="150" r="24"/>
+
+  <line class="arrow" x1="270" y1="150" x2="335" y2="150"/>
+
+  <text class="label" x="450" y="35">Draw through the spider</text>
+  <line class="wire" x1="365" y1="80" x2="450" y2="145"/>
+  <line class="wire" x1="365" y1="220" x2="450" y2="155"/>
+  <line class="wire" x1="535" y1="80" x2="450" y2="145"/>
+  <line class="wire" x1="535" y1="220" x2="450" y2="155"/>
+  <circle class="endpoint" cx="365" cy="80" r="7"/>
+  <circle class="endpoint" cx="365" cy="220" r="7"/>
+  <circle class="endpoint" cx="535" cy="80" r="7"/>
+  <circle class="endpoint" cx="535" cy="220" r="7"/>
+  <circle class="spider" cx="450" cy="150" r="24"/>
+  <line class="wand" x1="450" y1="92" x2="450" y2="208"/>
+
+  <line class="arrow" x1="570" y1="150" x2="635" y2="150"/>
+
+  <text class="label" x="750" y="35">After</text>
+  <line class="wire" x1="665" y1="80" x2="710" y2="150"/>
+  <line class="wire" x1="665" y1="220" x2="710" y2="150"/>
+  <line class="wire" x1="790" y1="150" x2="835" y2="80"/>
+  <line class="wire" x1="790" y1="150" x2="835" y2="220"/>
+  <line class="wire" x1="710" y1="150" x2="790" y2="150"/>
+  <circle class="endpoint" cx="665" cy="80" r="7"/>
+  <circle class="endpoint" cx="665" cy="220" r="7"/>
+  <circle class="endpoint" cx="835" cy="80" r="7"/>
+  <circle class="endpoint" cx="835" cy="220" r="7"/>
+  <circle class="spider" cx="710" cy="150" r="24"/>
+  <circle class="spider" cx="790" cy="150" r="24"/>
+  <text class="label" x="750" y="270">The stroke divides the incident wires</text>
+</svg>
