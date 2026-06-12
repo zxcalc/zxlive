@@ -104,3 +104,5 @@ Simplify the graph to a SWAP.
 ```
 
 Our proof is now complete and we could either save it as a proof file ("File > Save") which could be loaded by ZXLive again later, or we could export the proof to tikz to be included in a LaTex document by selecting "File > Export to Tikz".
+
+This demo used just a few of the gestures available in proof mode. For a full reference of the drag-and-drop, double-click, and magic wand gestures --- including adding/removing identity spiders, unfusing, pi copy, and the Hopf rule --- see [Gestures and the magic wand](proof-mode-gestures.md).
