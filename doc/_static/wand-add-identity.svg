@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="250" viewBox="0 0 900 250" role="img" aria-labelledby="title desc">
+  <title id="title">Adding an identity spider with the magic wand</title>
+  <desc id="desc">A wire, a wand stroke across the wire, and the resulting wire with a green identity spider.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#4a5568"/>
+    </marker>
+    <style>
+      .label { font: 18px sans-serif; fill: #263238; text-anchor: middle; }
+      .wire { stroke: #202124; stroke-width: 5; stroke-linecap: round; }
+      .wand { stroke: #1976d2; stroke-width: 8; stroke-linecap: round; }
+      .endpoint { fill: #202124; }
+      .spider { fill: #8fd694; stroke: #245c2c; stroke-width: 4; }
+      .arrow { stroke: #4a5568; stroke-width: 4; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <text class="label" x="150" y="40">Before</text>
+  <line class="wire" x1="55" y1="125" x2="245" y2="125"/>
+  <circle class="endpoint" cx="55" cy="125" r="7"/>
+  <circle class="endpoint" cx="245" cy="125" r="7"/>
+
+  <line class="arrow" x1="270" y1="125" x2="335" y2="125"/>
+
+  <text class="label" x="450" y="40">Draw the wand across one wire</text>
+  <line class="wire" x1="355" y1="125" x2="545" y2="125"/>
+  <circle class="endpoint" cx="355" cy="125" r="7"/>
+  <circle class="endpoint" cx="545" cy="125" r="7"/>
+  <line class="wand" x1="430" y1="72" x2="470" y2="178"/>
+
+  <line class="arrow" x1="570" y1="125" x2="635" y2="125"/>
+
+  <text class="label" x="750" y="40">After</text>
+  <line class="wire" x1="655" y1="125" x2="845" y2="125"/>
+  <circle class="endpoint" cx="655" cy="125" r="7"/>
+  <circle class="endpoint" cx="845" cy="125" r="7"/>
+  <circle class="spider" cx="750" cy="125" r="22"/>
+  <text class="label" x="750" y="205">Z identity (X is also available)</text>
+</svg>

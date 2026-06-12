@@ -85,7 +85,7 @@ Applying the bialgebra rule to two complementary spiders.
 
 Notice that an entry has been added into the rewrite history panel on the right. You can click "START" up the top right to preview the previous state of the graph before applying the bialgebra rule.
 
-Now drag the adjacent Z and X spiders together to fuse them. Notice that there are some spiders with only two legs and are therefore are equal to the identity. We can remove these by either selecting the spider and clicking the "Basic rules > remove identity" rule in the rule panel on the left, or we could use the magic wand (`w`) and draw the wand over the identity to remove it.
+Now drag adjacent spiders of the same type together to fuse them. Notice that there are some spiders with only two legs and are therefore equal to the identity. We can remove these by either selecting the spider and clicking the "Basic rules > Remove identity" rule in the rule panel on the left, or by using the magic wand (`w`) and drawing the wand through the identity.
 
 ```{figure} _static/simplify_graph.gif
 :alt: Merging spiders and removing identities
@@ -94,7 +94,7 @@ Now drag the adjacent Z and X spiders together to fuse them. Notice that there a
 Simplify the graph by merge spiders of the same type and removing identity spiders.
 ```
 
-Apply these techniques one more time to reduce the diagram to the SWAP operation. Notice in the animation before that after merging the X spiders, there should be two edges between the resulting Z and X spider --- however they both disappear. This is because ZXLive automatically applied the Hopf algebra rule to eliminate double wires between complementary spiders.
+Apply these techniques one more time to reduce the diagram to the SWAP operation. When merging the X spiders creates parallel edges between complementary spiders, use the magic wand (`w`) and draw across the parallel edges to apply the Hopf rule and remove them in pairs.
 
 ```{figure} _static/simplify_to_swap.gif
 :alt: Simplify the graph to a SWAP
@@ -104,3 +104,5 @@ Simplify the graph to a SWAP.
 ```
 
 Our proof is now complete and we could either save it as a proof file ("File > Save") which could be loaded by ZXLive again later, or we could export the proof to tikz to be included in a LaTex document by selecting "File > Export to Tikz".
+
+For a complete reference to drag-and-drop, double-click, and magic-wand rewrites, see [Proof mode gestures](proof-mode-gestures.md).
