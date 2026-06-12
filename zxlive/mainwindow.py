@@ -36,7 +36,7 @@ from pyzx.graph.base import BaseGraph
 from pyzx.utils import VertexType
 
 from .base_panel import BasePanel
-from .common import (VT, GraphT, from_tikz, get_custom_rules_path, get_data,
+from .common import (VT, GraphT, get_custom_rules_path, get_data,
                      get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .commands import MoveNode, ProofModeCommand
@@ -46,7 +46,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       export_proof_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
-                      show_error_msg, write_to_file)
+                      show_error_msg, try_import_tikz, write_to_file)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
@@ -784,31 +784,7 @@ class MainWindow(QMainWindow):
             tikz = pyperclip.paste()
         if not tikz:
             return None
-        try:
-            return from_tikz(tikz)
-        except Exception as e:
-            from .common import find_unknown_tikz_styles
-            unknown = find_unknown_tikz_styles(tikz)
-            detail = str(e)
-            if unknown:
-                detail += "\n\nUnknown styles: " + ", ".join(unknown)
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Icon.Warning)
-            msg.setText("TikZ import error")
-            msg.setInformativeText(detail)
-            retry_btn = msg.addButton("Retry ignoring errors",
-                                      QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton(QMessageBox.StandardButton.Cancel)
-            msg.exec()
-            if msg.clickedButton() != retry_btn:
-                return None
-        try:
-            return from_tikz(tikz, ignore_errors=True)
-        except Exception as e:
-            show_error_msg("TikZ import error",
-                           f"Error while importing TikZ: {e}",
-                           parent=self)
-            return None
+        return try_import_tikz(tikz, parent=self)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
