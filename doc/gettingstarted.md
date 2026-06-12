@@ -74,6 +74,10 @@ We can no longer add or remove nodes or edges in the graph directly. Intstead, w
 The Proof window's toolbar. 1. Select mode (s), 2. Magic wand (w), 3. The type of spider the magic wand creates when drawn over a plain wire, 4. Undo (Ctrl-U) / Redo (Ctrl-Shift-U).
 ```
 
+:::{tip}
+The magic wand and drag-and-drop gestures can do much more than this demo shows — adding and removing identity spiders, unfusing, the Hopf rule, fusion, bialgebra, and pi copy. See [Gestures and rewrites](gestures-and-rewrites.md) for the full reference.
+:::
+
 First enter select mode by pressing `s`. Now simply drag and drop one of the Z spiders onto an X spider and ZXLive will automatically perform the bialgebra rule.
 
 ```{figure} _static/bialgebra.gif
