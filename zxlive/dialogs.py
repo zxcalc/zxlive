@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import cmath
 import copy
+import math
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QIntValidator
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
-                               QFormLayout, QLineEdit, QMessageBox,
+                               QFormLayout, QLabel, QLineEdit, QMessageBox,
                                QPushButton, QTextEdit, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
-from pyzx.utils import VertexType
+from pyzx.graph.jsonparser import string_to_phase
+from pyzx.graph.scalar import Scalar
+from pyzx.utils import FractionLike, VertexType
 
 from .common import GraphT, VT
 from .settings import get_settings_value
@@ -366,6 +370,90 @@ def create_new_rewrite(parent: MainWindow) -> None:
     button_box.rejected.connect(dialog.reject)
     if not dialog.exec():
         return
+
+
+SCALAR_ZERO_TOL = 1e-9
+"""Tolerance for treating a scalar magnitude or angle residue as zero."""
+
+
+def _format_scalar_value(scalar: Scalar) -> str:
+    """Format the scalar's numerical value as a clean human-readable string.
+
+    Thresholds tiny floating-point residues, so a scalar that is close enough
+    to 1 shows as ``1``."""
+    val = scalar.to_number()
+    r, th = cmath.polar(val)
+
+    def fmt(x: float) -> str:
+        if abs(x - round(x)) < SCALAR_ZERO_TOL:
+            return str(int(round(x)))
+        return f"{x:.4g}"
+
+    if r < SCALAR_ZERO_TOL:
+        return "0"
+    r_str = fmt(r)
+    angle_pi = th / math.pi
+    n = round(angle_pi)
+    if abs(angle_pi - n) < SCALAR_ZERO_TOL:
+        return r_str if n % 2 == 0 else f"-{r_str}"
+    return f"{r_str} * exp(i pi * {fmt(angle_pi)})"
+
+
+def adjust_scalar_dialog(parent: QWidget, graph: GraphT) -> Optional[tuple[FractionLike, int, complex]]:
+    """Shows a dialog to adjust the global scalar of a graph.
+
+    Returns a tuple ``(phase, power2, floatfactor)`` representing the new scalar,
+    or ``None`` if the user cancels."""
+    scalar = graph.scalar
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Adjust Scalar")
+    dialog.setMinimumWidth(600)
+    form = QFormLayout(dialog)
+    form.addRow(QLabel(f"Current scalar: {_format_scalar_value(scalar)}"))
+    phase_edit = QLineEdit(str(scalar.phase))
+    power2_edit = QLineEdit(str(scalar.power2))
+    power2_edit.setValidator(QIntValidator(power2_edit))
+    floatfactor_edit = QLineEdit(str(scalar.floatfactor))
+    for edit in (phase_edit, power2_edit, floatfactor_edit):
+        edit.setMinimumWidth(300)
+    form.addRow("Float factor (complex)", floatfactor_edit)
+    form.addRow("Power of sqrt(2)", power2_edit)
+    form.addRow("Phase (in units of pi)", phase_edit)
+    button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    form.addRow(button_box)
+    button_box.accepted.connect(dialog.accept)
+    button_box.rejected.connect(dialog.reject)
+
+    ok_button = button_box.button(QDialogButtonBox.StandardButton.Ok)
+    invalid_style = "background-color: #ffcccc;"
+
+    def is_valid(parser: Callable[[], object]) -> bool:
+        try:
+            parser()
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    def revalidate() -> None:
+        checks = [
+            (phase_edit, is_valid(lambda: string_to_phase(phase_edit.text(), graph))),
+            (power2_edit, is_valid(lambda: int(power2_edit.text()))),
+            (floatfactor_edit, is_valid(lambda: complex(floatfactor_edit.text()))),
+        ]
+        for edit, ok in checks:
+            edit.setStyleSheet("" if ok else invalid_style)
+        ok_button.setEnabled(all(ok for _, ok in checks))
+
+    for edit in (phase_edit, power2_edit, floatfactor_edit):
+        edit.textChanged.connect(lambda _: revalidate())
+    revalidate()
+
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return None
+    phase = string_to_phase(phase_edit.text(), graph)
+    power2 = int(power2_edit.text())
+    floatfactor = complex(floatfactor_edit.text())
+    return phase, power2, floatfactor
 
 
 def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[GraphT]:
