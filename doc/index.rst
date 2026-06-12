@@ -11,6 +11,7 @@ Welcome to zxlive's documentation!
    :caption: Contents:
 
    gettingstarted
+   interaction-features
    adding-rewrites
    tikz_export
 
