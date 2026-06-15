@@ -83,6 +83,18 @@ def _scrollable(inner: QWidget) -> QScrollArea:
 
 
 # ---------------------------------------------------------------------------
+# Module-level constants (re-exported for other modules such as edit_panel)
+# ---------------------------------------------------------------------------
+
+#: Ordered mapping of circuit-format ID → human-readable label.
+#: ``edit_panel`` imports this to populate its own format selector.
+input_circuit_formats: dict[str, str] = {
+    "openqasm": "OpenQASM",
+    "quipper":  "Quipper",
+}
+
+
+# ---------------------------------------------------------------------------
 # Tab: General
 # ---------------------------------------------------------------------------
 
@@ -170,8 +182,8 @@ class _GeneralTab(QWidget):
         cg_layout = QFormLayout(circuit_group)
 
         self.circuit_format = QComboBox()
-        self.circuit_format.addItem("OpenQASM", "openqasm")
-        self.circuit_format.addItem("Quipper", "quipper")
+        for fmt_id, fmt_label in input_circuit_formats.items():
+            self.circuit_format.addItem(fmt_label, fmt_id)
         fmt = str(settings.value("input-circuit-format", "openqasm"))
         self.circuit_format.setCurrentIndex(
             max(self.circuit_format.findData(fmt), 0))
