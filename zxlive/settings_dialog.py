@@ -115,6 +115,7 @@ startup_behavior_options = {
 
 general_settings: list[SettingsData] = [
     {"id": "startup-behavior", "label": "On startup", "type": FormInputType.Combo, "data": startup_behavior_options},
+    {"id": "tutorial/show-on-startup", "label": "Show tutorial on startup", "type": FormInputType.Bool},
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
@@ -137,8 +138,6 @@ general_settings: list[SettingsData] = [
 
 font_settings: list[SettingsData] = [
     {"id": "font/size", "label": "Font size", "type": FormInputType.Int},
-    # Font families can be loaded after a QGuiApplication is constructed.
-    # load_font_families needs to be called once a QGuiApplication is up.
     {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
 ]
 
@@ -217,7 +216,6 @@ class SettingsDialog(QDialog):
         self.add_settings_tab(tab_widget, "General", "General ZXLive settings", general_settings)
         self.add_settings_tab(tab_widget, "Font", "Font settings", font_settings)
 
-        # --- Begin TikZ nested tab structure ---
         tikz_tab = QWidget()
         tikz_tab_layout = QVBoxLayout()
         tikz_tab.setLayout(tikz_tab_layout)
@@ -230,7 +228,6 @@ class SettingsDialog(QDialog):
         self.add_settings_tab(tikz_subtab_widget, "Export", "These are the class names that will be used when exporting to tikz.", tikz_export_settings)
         self.add_settings_tab(tikz_subtab_widget, "Import", "These are the class names that are understood when importing from tikz.", tikz_import_settings)
         self.add_settings_tab(tikz_subtab_widget, "Layout", "Tikz layout settings", tikz_layout_settings)
-        # --- End TikZ nested tab structure ---
 
         self.init_okay_cancel_buttons(layout)
 
@@ -321,7 +318,6 @@ class SettingsDialog(QDialog):
         )
         action.setToolTip("Browse...")
         action.triggered.connect(browse)
-        # It would be nice to highlight the icon on hover
 
         return widget_line
 
@@ -354,7 +350,6 @@ class SettingsDialog(QDialog):
     def apply(self) -> None:
         self.update_global_settings()
         self.apply_global_settings()
-        # Update previous values after applying
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
         self.prev_dark_mode = self.get_settings_value("dark-mode", str)
