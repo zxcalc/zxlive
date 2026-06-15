@@ -1,3 +1,4 @@
 include zxlive/icons/*.svg
 include zxlive/tooltips/*.png
 include zxlive/sfx/*
+include zxlive/examples/*.json

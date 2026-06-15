@@ -269,15 +269,23 @@ class MainWindow(QMainWindow):
             "Check for &Updates...", self.check_for_updates, None,
             "Check for new versions of ZXLive")
         editor_tour_action = self._new_action(
-            "&Editor Tour", lambda: self.start_tutorial(), None,
-            "Guided tour of the editor (offers a quick-start option)")
+            "&Full Editor Tour", lambda: self.start_tutorial(), None,
+            "Guided tour of the editor (offers quick-start and learn-the-basics)")
+        quick_tour_action = self._new_action(
+            "&Quick Tour", lambda: self.start_tutorial(quick=True), None,
+            "Short functional tour of the editor")
+        learn_basics_action = self._new_action(
+            "&Learn the Basics", lambda: self.start_learn_basics_tutorial(), None,
+            "Interactive lesson: build 3 CNOTs and rewrite to SWAP")
         self.proof_tour_action = self._new_action(
             "&Proof Mode Tour", lambda: self.start_proof_tutorial(), None,
             "Guided tour of proof mode")
         help_menu = menu.addMenu("&Help")
         help_menu.addAction(user_guide)
         tutorial_menu = help_menu.addMenu("&Interactive Tutorial")
+        tutorial_menu.addAction(quick_tour_action)
         tutorial_menu.addAction(editor_tour_action)
+        tutorial_menu.addAction(learn_basics_action)
         tutorial_menu.addAction(self.proof_tour_action)
         help_menu.addAction(check_for_updates)
 
@@ -903,6 +911,11 @@ class MainWindow(QMainWindow):
         """Replay the proof-mode tutorial (from the Help menu)."""
         from .tutorial import start_proof_tutorial
         start_proof_tutorial(self)
+
+    def start_learn_basics_tutorial(self) -> None:
+        """Replay the interactive 3 CNOTs → SWAP lesson (from the Help menu)."""
+        from .tutorial import start_learn_basics_tutorial
+        start_learn_basics_tutorial(self)
 
     def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
         panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)

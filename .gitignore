@@ -10,6 +10,7 @@ dist
 .idea
 *.zxg
 *.json
+!zxlive/examples/*.json
 *.zxp
 *.qasm
 .env

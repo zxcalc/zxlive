@@ -19,16 +19,23 @@ The whole feature lives in this single module so that it can be enabled with
 only a handful of hooks in the rest of the code base (see ``mainwindow.py`` and
 ``app.py``).  The design is a *guided tour*: a translucent overlay dims the
 window, spotlights one widget at a time, and shows an explanatory card with
-``Back`` / ``Next`` / ``Skip`` buttons.  Nothing in the underlying UI is
-clicked for the user, so the tour can never get into an inconsistent state.
+``Back`` / ``Next`` / ``Skip`` buttons.
 
-Two tours are defined:
+Most steps are *passive*: the overlay is modal and swallows clicks so the tour
+cannot get into an inconsistent state.  Steps marked ``interactive`` let the
+user work in the spotlighted UI; ``Next`` stays disabled until an optional
+``completion_check`` passes (diagram built, rewrite applied, …).
+
+Three tours are defined:
 
 * :func:`editor_steps` walks through the edit-mode canvas, tools and sidebars.
   It auto-starts the first time ZXLive is launched and can be replayed from the
   Help menu.
 * :func:`proof_steps` walks through proof mode (magic wand, rewrites, proof
   steps).  It auto-starts the first time the user enters a derivation.
+* :func:`learn_basics_steps` is an interactive lesson where the user builds
+  three alternating CNOTs, enters proof mode, and rewrites the diagram to a
+  SWAP.  Reference diagrams live in ``zxlive/examples/``.
 
 Whether each tour has been seen is remembered in ``QSettings`` so returning
 users are not pestered.
@@ -40,15 +47,21 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional, cast
 
+import numpy as np
+from networkx.algorithms.isomorphism import (GraphMatcher,
+                                             categorical_edge_match,
+                                             categorical_node_match)
 from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QEvent, QObject,
-                            QPoint, QRect, QRectF, QVariantAnimation, Qt)
+                            QPoint, QRect, QRectF, QTimer, QVariantAnimation, Qt)
 from PySide6.QtGui import (QColor, QKeyEvent, QMouseEvent, QPainter,
                            QPainterPath, QPaintEvent, QPalette, QPen, QPolygon,
                            QResizeEvent)
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QToolButton, QVBoxLayout, QWidget)
 
-from .common import get_settings_value, set_settings_value
+from .common import GraphT, get_settings_value, set_settings_value
+from .construct import construct_swap, construct_three_cnots
+from .custom_rule import to_networkx
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
@@ -61,6 +74,7 @@ PROOF_TUTORIAL_SEEN = "tutorial/proof-seen"
 
 # Visual constants for the overlay.
 _DIM_ALPHA = 160          # 0-255, how strongly the rest of the UI is dimmed
+_DIM_ALPHA_INTERACTIVE = 90  # lighter dim when the user needs to click through
 _SPOTLIGHT_PAD = 8        # px of breathing room drawn around the target widget
 _SPOTLIGHT_RADIUS = 10    # px corner radius of the spotlight cut-out
 _CARD_WIDTH = 430         # px fixed width of the explanation card
@@ -73,6 +87,8 @@ _MIN_TARGET = 6           # px below which a target is treated as not visible
 # returns ``None`` to show a centred card with no spotlight (e.g. the welcome
 # step, or when the target happens to be unavailable).
 TargetResolver = Callable[["MainWindow"], Optional[QWidget]]
+CompletionCheck = Callable[["MainWindow"], bool]
+StepHook = Callable[["MainWindow"], None]
 
 
 @dataclass
@@ -80,14 +96,22 @@ class TutorialStep:
     """A single page of a tour.
 
     ``full_only`` steps are the educational/explanatory ones that the condensed
-    *Quick Start* tour skips. ``offer_quick`` marks the welcome step that lets
-    the user drop into Quick Start instead of the full tour.
+    *Quick Start* tour skips. ``offer_quick`` / ``offer_learn`` mark the welcome
+    step that lets the user drop into Quick Start or the interactive lesson.
+
+    When ``interactive`` is set the overlay passes mouse events through to the
+    UI beneath (except on the card).  If ``completion_check`` is also set,
+    ``Next`` stays disabled until the check returns ``True``.
     """
     title: str
     text: str  # rich text (a small subset of HTML is supported by QLabel)
     target: Optional[TargetResolver] = None
     full_only: bool = False
     offer_quick: bool = False
+    offer_learn: bool = False
+    interactive: bool = False
+    completion_check: Optional[CompletionCheck] = None
+    on_enter: Optional[StepHook] = None
 
 
 @dataclass
@@ -150,6 +174,79 @@ def _attr(mw: MainWindow, panel_resolver: TargetResolver, name: str) -> Optional
 
 
 # --------------------------------------------------------------------------- #
+# Graph helpers (used by the interactive "Learn the basics" lesson)
+# --------------------------------------------------------------------------- #
+
+def _active_graph(mw: MainWindow) -> Optional[GraphT]:
+    panel = mw.active_panel
+    scene = getattr(panel, "graph_scene", None)
+    if scene is None:
+        return None
+    return cast(GraphT, scene.g)
+
+
+def graphs_match_ocm(a: Optional[GraphT], b: Optional[GraphT]) -> bool:
+    """Return whether two diagrams match up to connectivity (OCM).
+
+    Vertex positions are ignored; spider types, phases, boundary wiring and
+    edge types must agree.
+    """
+    if a is None or b is None:
+        return False
+    Ga = to_networkx(a)
+    Gb = to_networkx(b)
+    node_match = categorical_node_match(["type", "phase", "boundary_index"], [1, 0, ""])
+    edge_match = categorical_edge_match("type", 1)
+    return bool(GraphMatcher(Ga, Gb, node_match=node_match, edge_match=edge_match).is_isomorphic())
+
+
+def graphs_match_semantics(a: Optional[GraphT], b: Optional[GraphT]) -> bool:
+    """Return whether two diagrams denote the same linear map."""
+    if a is None or b is None:
+        return False
+    try:
+        return bool(np.allclose(a.to_matrix(), b.to_matrix(), atol=1e-6))
+    except Exception:
+        return False
+
+
+def matches_three_cnots(graph: Optional[GraphT]) -> bool:
+    """Return whether *graph* is the three alternating CNOTs circuit."""
+    ref = construct_three_cnots()
+    return graphs_match_ocm(graph, ref) or graphs_match_semantics(graph, ref)
+
+
+def matches_swap(graph: Optional[GraphT]) -> bool:
+    """Return whether *graph* is the simplified SWAP reference diagram."""
+    return graphs_match_ocm(graph, construct_swap())
+
+
+def _canvas_cleared(mw: MainWindow) -> bool:
+    graph = _active_graph(mw)
+    return graph is not None and graph.num_vertices() == 0
+
+
+def _in_proof_mode(mw: MainWindow) -> bool:
+    from .proof_panel import ProofPanel
+    return isinstance(mw.active_panel, ProofPanel)
+
+
+def _proof_step_count(mw: MainWindow) -> int:
+    from .proof_panel import ProofPanel
+    panel = mw.active_panel
+    if not isinstance(panel, ProofPanel):
+        return 0
+    return len(panel.proof_model.steps)
+
+
+def _ensure_edit_panel(mw: MainWindow) -> None:
+    from .edit_panel import GraphEditPanel
+    if isinstance(mw.active_panel, GraphEditPanel):
+        return
+    mw.open_demo_graph()
+
+
+# --------------------------------------------------------------------------- #
 # Tour definitions
 # --------------------------------------------------------------------------- #
 
@@ -192,6 +289,7 @@ def editor_steps(quick: bool = False) -> TutorialSpec:
             "guided walk through the interface, or <b>Quick start</b> for a "
             "short functional overview. You can <b>Skip</b> at any time.",
             offer_quick=True,
+            offer_learn=True,
         ),
         TutorialStep(
             "The canvas",
@@ -331,6 +429,128 @@ def proof_steps() -> TutorialSpec:
     return TutorialSpec(steps, PROOF_TUTORIAL_SEEN)
 
 
+def learn_basics_steps() -> TutorialSpec:
+    """Interactive lesson: build three CNOTs and rewrite them to a SWAP."""
+
+    def graph_view(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _edit_panel, "graph_view")
+
+    def add_vertex(mw: MainWindow) -> Optional[QWidget]:
+        panel = _edit_panel(mw)
+        return _toolbar_button(panel, "add vertex") if panel else None
+
+    def add_edge(mw: MainWindow) -> Optional[QWidget]:
+        panel = _edit_panel(mw)
+        return _toolbar_button(panel, "add edge") if panel else None
+
+    def vertices_sidebar(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _edit_panel, "vertex_list")
+
+    def start_derivation(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _edit_panel, "start_derivation")
+
+    def proof_graph_view(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _proof_panel, "graph_view")
+
+    def proof_selection(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _proof_panel, "selection")
+
+    def proof_magic_wand(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _proof_panel, "magic_wand")
+
+    def proof_rewrites(mw: MainWindow) -> Optional[QWidget]:
+        return _attr(mw, _proof_panel, "rewrites_panel")
+
+    steps = [
+        TutorialStep(
+            "Learn the basics: 3 CNOTs = SWAP",
+            "In this hands-on lesson you will build the classic circuit of "
+            "<b>three alternating CNOTs</b> on two qubits, then enter proof "
+            "mode and rewrite it into a <b>SWAP</b>.<br><br>"
+            "Follow the spotlights — <b>Next</b> unlocks once each task is done.",
+        ),
+        TutorialStep(
+            "Clear the canvas",
+            "First, remove the demo diagram. Press <b>Ctrl+A</b> to select "
+            "everything, then <b>Delete</b>.",
+            graph_view,
+            interactive=True,
+            completion_check=_canvas_cleared,
+        ),
+        TutorialStep(
+            "Pick the Z spider",
+            "Open the <i>Vertices</i> sidebar and click the <b>Z spider</b> "
+            "type — new vertices you add will be green Z spiders.",
+            vertices_sidebar,
+            interactive=True,
+        ),
+        TutorialStep(
+            "Place Z spiders",
+            "Press <b>v</b> for the <b>Add Vertex</b> tool, then click the "
+            "canvas to drop the Z spiders for the circuit.",
+            add_vertex,
+            interactive=True,
+        ),
+        TutorialStep(
+            "Pick the X spider",
+            "Switch to the <b>X spider</b> type in the <i>Vertices</i> sidebar.",
+            vertices_sidebar,
+            interactive=True,
+        ),
+        TutorialStep(
+            "Wire the circuit",
+            "Press <b>e</b> for the <b>Add Edge</b> tool. Add X spiders and "
+            "boundary nodes, then connect them into <b>three alternating "
+            "CNOTs</b> (control/target/control on the two qubit lines).",
+            add_edge,
+            interactive=True,
+            completion_check=lambda mw: matches_three_cnots(_active_graph(mw)),
+        ),
+        TutorialStep(
+            "Start Derivation",
+            "Your circuit looks good! Click <b>Start Derivation</b> to enter "
+            "proof mode, where rewrites preserve the meaning of the diagram.",
+            start_derivation,
+            interactive=True,
+            completion_check=_in_proof_mode,
+        ),
+        TutorialStep(
+            "Apply bialgebra",
+            "Press <b>s</b> for Select mode, then <b>drag a Z spider onto a "
+            "neighbouring X spider</b>. ZXLive applies the bialgebra rule "
+            "automatically.",
+            proof_selection,
+            interactive=True,
+            completion_check=lambda mw: _proof_step_count(mw) >= 1,
+        ),
+        TutorialStep(
+            "Fuse and remove identities",
+            "Drag adjacent spiders of the same colour together to fuse them. "
+            "Remove degree-2 identity spiders with the <b>magic wand</b> "
+            "(<b>w</b>) or the <b>remove identity</b> rule in the rewrites "
+            "panel.",
+            proof_magic_wand,
+            interactive=True,
+            completion_check=lambda mw: _proof_step_count(mw) >= 2,
+        ),
+        TutorialStep(
+            "Reach the SWAP",
+            "Keep simplifying — merge spiders and remove identities until the "
+            "diagram is the compact <b>SWAP</b> on two qubits.",
+            proof_graph_view,
+            interactive=True,
+            completion_check=lambda mw: matches_swap(_active_graph(mw)),
+        ),
+        TutorialStep(
+            "Congratulations!",
+            "You built three alternating CNOTs and rewrote them to a SWAP "
+            "using the ZX-calculus. Replay this lesson any time from "
+            "<b>Help → Interactive Tutorial → Learn the Basics</b>.",
+        ),
+    ]
+    return TutorialSpec(steps, on_start=_ensure_edit_panel)
+
+
 # --------------------------------------------------------------------------- #
 # Overlay widget
 # --------------------------------------------------------------------------- #
@@ -348,6 +568,8 @@ class TutorialOverlay(QWidget):
         self._controller = controller
         self._spotlight: Optional[QRect] = None
         self._pulse = 1.0
+        self._interactive = False
+        self._dim_alpha = _DIM_ALPHA
 
         # Paint our own background; let mouse events stop here (modal feel).
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
@@ -369,19 +591,30 @@ class TutorialOverlay(QWidget):
         self.body_label = widgets.body
         self.progress_label = widgets.progress
         self.quick_button = widgets.quick
+        self.learn_button = widgets.learn
         self.skip_button = widgets.skip
         self.back_button = widgets.back
         self.next_button = widgets.next
 
         self.quick_button.clicked.connect(self._controller.start_quick)
+        self.learn_button.clicked.connect(self._controller.start_learn_basics)
         self.skip_button.clicked.connect(self._controller.skip)
         self.back_button.clicked.connect(self._controller.prev)
         self.next_button.clicked.connect(self._controller.next)
 
         self.setGeometry(parent.rect())
 
+    def set_interactive(self, interactive: bool) -> None:
+        """Toggle click-through mode for hands-on steps."""
+        self._interactive = interactive
+        self._dim_alpha = _DIM_ALPHA_INTERACTIVE if interactive else _DIM_ALPHA
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, interactive)
+        self._card.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.update()
+
     def set_step(self, title: str, body: str, spotlight: Optional[QRect],
-                 step_index: int, step_count: int, offer_quick: bool = False) -> None:
+                 step_index: int, step_count: int, *, offer_quick: bool = False,
+                 offer_learn: bool = False, can_advance: bool = True) -> None:
         """Update the card contents and reposition relative to the spotlight."""
         self.title_label.setText(title)
         self.body_label.setText(body)
@@ -393,6 +626,8 @@ class TutorialOverlay(QWidget):
         self.next_button.setText("Finish" if is_last else ("Full tour" if offer_quick else "Next"))
         self.skip_button.setVisible(not is_last)
         self.quick_button.setVisible(offer_quick)
+        self.learn_button.setVisible(offer_learn)
+        self.set_next_enabled(can_advance)
 
         self._spotlight = spotlight
         self._position_card(spotlight)
@@ -403,6 +638,13 @@ class TutorialOverlay(QWidget):
             self._pulse_anim.stop()
             self._pulse = 1.0
         self.update()
+
+    def set_next_enabled(self, enabled: bool) -> None:
+        self.next_button.setEnabled(enabled)
+        if not enabled and self._interactive:
+            self.next_button.setToolTip("Complete the highlighted task to continue.")
+        else:
+            self.next_button.setToolTip("")
 
     def _on_pulse(self, value: object) -> None:
         self._pulse = float(cast(float, value))
@@ -457,7 +699,7 @@ class TutorialOverlay(QWidget):
             hole.addRoundedRect(QRectF(spot), _SPOTLIGHT_RADIUS, _SPOTLIGHT_RADIUS)
             path = path.subtracted(hole)
 
-        painter.fillPath(path, QColor(0, 0, 0, _DIM_ALPHA))
+        painter.fillPath(path, QColor(0, 0, 0, self._dim_alpha))
 
         if spot.isValid():
             self._paint_beak(painter, spot)
@@ -501,6 +743,9 @@ class TutorialOverlay(QWidget):
         self._controller.reposition()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
+        if self._interactive:
+            event.ignore()
+            return
         # Swallow clicks on the dimmed area so the underlying UI stays inert.
         event.accept()
 
@@ -509,7 +754,8 @@ class TutorialOverlay(QWidget):
         if key == Qt.Key.Key_Escape:
             self._controller.skip()
         elif key in (Qt.Key.Key_Right, Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
-            self._controller.next()
+            if self.next_button.isEnabled():
+                self._controller.next()
         elif key in (Qt.Key.Key_Left, Qt.Key.Key_Backspace):
             self._controller.prev()
         else:
@@ -547,6 +793,7 @@ class _CardWidgets:
     body: QLabel
     progress: QLabel
     quick: QPushButton
+    learn: QPushButton
     skip: QPushButton
     back: QPushButton
     next: QPushButton
@@ -593,15 +840,16 @@ def _build_card(parent: QWidget) -> _CardWidgets:
     controls.addStretch()
 
     quick = QPushButton("Quick start", card)
+    learn = QPushButton("Learn the basics", card)
     skip = QPushButton("Skip", card)
     back = QPushButton("Back", card)
     nxt = QPushButton("Next", card)
     nxt.setDefault(True)
-    for btn in (quick, skip, back, nxt):
+    for btn in (quick, learn, skip, back, nxt):
         controls.addWidget(btn)
 
     layout.addLayout(controls)
-    return _CardWidgets(card, title, body, progress, quick, skip, back, nxt)
+    return _CardWidgets(card, title, body, progress, quick, learn, skip, back, nxt)
 
 
 # --------------------------------------------------------------------------- #
@@ -617,6 +865,9 @@ class Tutorial(QObject):
         self.spec = spec
         self.index = 0
         self.overlay: Optional[TutorialOverlay] = None
+        self._poll_timer = QTimer(self)
+        self._poll_timer.setInterval(400)
+        self._poll_timer.timeout.connect(self._poll_completion)
 
     def start(self) -> None:
         if not self.spec.steps:
@@ -657,6 +908,12 @@ class Tutorial(QObject):
         self.index = 0
         self._show_step()
 
+    def start_learn_basics(self) -> None:
+        """Switch from the welcome step into the interactive lesson."""
+        self.spec = learn_basics_steps()
+        self.index = 0
+        self._show_step()
+
     def reposition(self) -> None:
         """Re-resolve the current target and redraw (after a resize/move)."""
         if self.overlay is not None:
@@ -668,11 +925,47 @@ class Tutorial(QObject):
         if self.overlay is None:
             return
         step = self.spec.steps[self.index]
+        if step.on_enter is not None:
+            step.on_enter(self.main_window)
+        can_advance = self._can_advance(step)
+        if step.completion_check is not None and not can_advance:
+            self._poll_timer.start()
+        else:
+            self._poll_timer.stop()
+        self.overlay.set_interactive(step.interactive)
         spotlight = self._resolve_spotlight(step)
         self.overlay.setGeometry(self.main_window.rect())
         self.overlay.set_step(step.title, step.text, spotlight,
-                              self.index, len(self.spec.steps), step.offer_quick)
+                              self.index, len(self.spec.steps),
+                              offer_quick=step.offer_quick,
+                              offer_learn=step.offer_learn,
+                              can_advance=can_advance)
         self.overlay.raise_()
+        if step.interactive:
+            self.main_window.setFocus()
+        else:
+            self.overlay.setFocus()
+
+    def _can_advance(self, step: TutorialStep) -> bool:
+        if step.completion_check is None:
+            return True
+        try:
+            return step.completion_check(self.main_window)
+        except Exception:
+            logging.warning("Tutorial completion check for step %r failed; "
+                            "keeping Next disabled.", step.title, exc_info=True)
+            return False
+
+    def _poll_completion(self) -> None:
+        if self.overlay is None:
+            return
+        step = self.spec.steps[self.index]
+        if step.completion_check is None:
+            return
+        can_advance = self._can_advance(step)
+        self.overlay.set_next_enabled(can_advance)
+        if can_advance:
+            self._poll_timer.stop()
 
     def _resolve_spotlight(self, step: TutorialStep) -> Optional[QRect]:
         if step.target is None or self.overlay is None:
@@ -710,6 +1003,7 @@ class Tutorial(QObject):
     def _finish(self) -> None:
         if self.overlay is None:
             return  # already torn down (e.g. close + skip racing)
+        self._poll_timer.stop()
         if self.spec.seen_key is not None:
             set_settings_value(self.spec.seen_key, True, bool)
         self.main_window.removeEventFilter(self)
@@ -757,6 +1051,11 @@ def start_proof_tutorial(main_window: "MainWindow") -> None:
     _run(main_window, proof_steps())
 
 
+def start_learn_basics_tutorial(main_window: "MainWindow") -> None:
+    """Start (or replay) the interactive 3 CNOTs → SWAP lesson."""
+    _run(main_window, learn_basics_steps())
+
+
 def maybe_start_first_run(main_window: "MainWindow") -> None:
     """Auto-start the editor tour on startup when enabled.
 
@@ -772,5 +1071,7 @@ def maybe_start_first_run(main_window: "MainWindow") -> None:
 
 def maybe_start_proof_tutorial(main_window: "MainWindow") -> None:
     """Auto-start the proof tour the first time the user enters proof mode."""
+    if main_window._active_tutorial is not None:
+        return
     if not get_settings_value(PROOF_TUTORIAL_SEEN, bool, False):
         start_proof_tutorial(main_window)

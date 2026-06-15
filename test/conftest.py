@@ -33,6 +33,10 @@ def _probe_default_path(fmt: QSettings.Format) -> str:
             return str(probe_path.parent.parent)
         return str(probe_path.parent)
 
+    # macOS NativeFormat uses ``com.<org>.<app>.plist`` rather than ``<org>/<app>.plist``.
+    if probe_path.suffix == ".plist" and probe_path.stem == f"com.{probe_org}.{probe_app}":
+        return str(probe_path.parent)
+
     raise RuntimeError(
         f"Unable to derive QSettings base path for {fmt!r} from "
         f"{probe.fileName()!r}"

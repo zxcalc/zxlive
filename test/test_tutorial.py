@@ -13,18 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from copy import deepcopy
+from typing import cast
+
 import pytest
-from PySide6.QtCore import QEvent
+from PySide6.QtCore import QEvent, Qt
 from pytestqt.qtbot import QtBot
 
-from zxlive.common import get_settings_value, set_settings_value
+from zxlive.commands import AddRewriteStep, SetGraph
+from zxlive.common import GraphT, get_data, get_settings_value, new_graph, set_settings_value
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
 from zxlive.tutorial import (PROOF_TUTORIAL_SEEN, SHOW_ON_STARTUP, Tutorial,
-                             TutorialOverlay, editor_steps,
+                             TutorialOverlay, editor_steps, learn_basics_steps,
+                             graphs_match_ocm, matches_swap, matches_three_cnots,
                              maybe_start_first_run, maybe_start_proof_tutorial,
-                             proof_steps, start_editor_tutorial)
+                             proof_steps, start_editor_tutorial,
+                             start_learn_basics_tutorial)
+from zxlive.construct import construct_three_cnots, construct_swap
+from pyzx.utils import VertexType
 
 
 @pytest.fixture
@@ -204,8 +212,155 @@ def test_proof_tour_action_enabled_only_in_proof_mode(app: MainWindow) -> None:
 
 
 def test_step_specs_are_well_formed() -> None:
-    for spec in (editor_steps(), editor_steps(quick=True), proof_steps()):
+    for spec in (editor_steps(), editor_steps(quick=True), proof_steps(),
+                 learn_basics_steps()):
         assert spec.steps
         for step in spec.steps:
             assert step.title
             assert step.text
+
+
+def test_welcome_offers_learn_basics(app: MainWindow) -> None:
+    start_editor_tutorial(app, quick=False)
+    tut = active_tutorial(app)
+    ov = overlay_of(tut)
+    assert tut.spec.steps[0].offer_learn
+    assert ov.learn_button.isVisible()
+    tut.start_learn_basics()
+    assert len(tut.spec.steps) == len(learn_basics_steps().steps)
+    assert tut.spec.steps[0].title.startswith("Learn the basics")
+
+
+def test_learn_basics_from_menu(app: MainWindow) -> None:
+    start_learn_basics_tutorial(app)
+    tut = active_tutorial(app)
+    assert len(tut.spec.steps) == len(learn_basics_steps().steps)
+    ov = overlay_of(tut)
+    # Intro step has no completion gate.
+    assert ov.next_button.isEnabled()
+    tut.next()
+    assert tut.spec.steps[tut.index].interactive
+    assert tut.spec.steps[tut.index].completion_check is not None
+    assert not ov.next_button.isEnabled()
+    tut.skip()
+
+
+def test_graphs_match_ocm_ignores_layout() -> None:
+    ref = construct_three_cnots()
+    moved = ref.copy()
+    for v in moved.vertices():
+        if moved.type(v) != VertexType.BOUNDARY:
+            moved.set_row(v, moved.row(v) + 12.0)
+    assert graphs_match_ocm(ref, cast(GraphT, moved))
+
+
+def test_three_cnots_and_swap_references_differ() -> None:
+    cnots = construct_three_cnots()
+    swap = construct_swap()
+    assert matches_three_cnots(cnots)
+    assert not matches_swap(cnots)
+    assert matches_swap(swap)
+    assert not matches_three_cnots(swap)
+
+
+def test_proof_tutorial_skipped_during_active_tutorial(app: MainWindow) -> None:
+    start_learn_basics_tutorial(app)
+    assert app._active_tutorial is not None
+    maybe_start_proof_tutorial(app)
+    assert isinstance(app._active_tutorial, Tutorial)
+    active_tutorial(app).skip()
+
+
+def _poll_until_next_enabled(tut: Tutorial) -> None:
+    """Drive the completion poller until Next is enabled or fail."""
+    for _ in range(50):
+        tut._poll_completion()
+        if tut.overlay is not None and tut.overlay.next_button.isEnabled():
+            return
+    raise AssertionError(f"Next never enabled on step {tut.index!r}")
+
+
+def test_bundled_example_files_load() -> None:
+    for name in ("three_cnots", "swap"):
+        path = get_data(f"examples/{name}.json")
+        assert path.endswith(f"examples/{name}.json")
+        with open(path) as f:
+            g = GraphT.from_json(f.read())
+        assert g.num_vertices() > 0
+
+
+def test_learn_basics_end_to_end(app: MainWindow, qtbot: QtBot) -> None:
+    """Simulate the full Learn the Basics flow through every gated step."""
+    start_learn_basics_tutorial(app)
+    tut = active_tutorial(app)
+
+    # Intro
+    assert tut.index == 0
+    tut.next()
+
+    # Clear canvas
+    edit = app.active_panel
+    assert isinstance(edit, GraphEditPanel)
+    SetGraph(edit.graph_view, new_graph()).redo()
+    _poll_until_next_enabled(tut)
+    tut.next()
+
+    # Ungated build steps (Z type, place Z, X type)
+    for _ in range(3):
+        assert tut.spec.steps[tut.index].completion_check is None
+        tut.next()
+
+    # Wire three CNOTs
+    SetGraph(edit.graph_view, construct_three_cnots()).redo()
+    _poll_until_next_enabled(tut)
+    tut.next()
+
+    # Enter proof mode
+    qtbot.mouseClick(edit.start_derivation, Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+    _poll_until_next_enabled(tut)
+    tut.next()
+
+    proof = app.active_panel
+    assert isinstance(proof, ProofPanel)
+
+    # Bialgebra: one rewrite step
+    mid = deepcopy(proof.graph_scene.g)
+    AddRewriteStep(proof.graph_view, mid, proof.step_view, "bialgebra").redo()
+    _poll_until_next_enabled(tut)
+    tut.next()
+
+    # Fuse / remove identities: second rewrite step
+    AddRewriteStep(proof.graph_view, deepcopy(mid), proof.step_view, "fuse").redo()
+    _poll_until_next_enabled(tut)
+    tut.next()
+
+    # Reach SWAP
+    AddRewriteStep(proof.graph_view, construct_swap(), proof.step_view, "swap").redo()
+    _poll_until_next_enabled(tut)
+    tut.next()
+
+    # Finish
+    assert tut.index == len(tut.spec.steps) - 1
+    tut.next()
+    assert tut.overlay is None
+    assert app._active_tutorial is None
+
+
+def test_learn_basics_all_steps_resolve_spotlights(app: MainWindow) -> None:
+    """Every learn-basics step must resolve its spotlight without crashing."""
+    start_learn_basics_tutorial(app)
+    tut = active_tutorial(app)
+    for i in range(len(tut.spec.steps)):
+        tut.index = i
+        tut._show_step()
+    tut.skip()
+
+
+def test_interactive_overlay_passes_mouse_events(app: MainWindow) -> None:
+    start_learn_basics_tutorial(app)
+    tut = active_tutorial(app)
+    tut.next()  # move to clear-canvas interactive step
+    ov = overlay_of(tut)
+    assert ov._interactive
+    assert ov.testAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)

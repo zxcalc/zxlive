@@ -1,6 +1,24 @@
 from pyzx.utils import EdgeType, VertexType
 
-from .common import GraphT, new_graph
+from .common import GraphT, get_data, new_graph
+
+
+def _load_tutorial_example(name: str) -> GraphT:
+    """Load a bundled tutorial reference diagram from ``zxlive/examples/``."""
+    with open(get_data(f"examples/{name}.json")) as f:
+        g = GraphT.from_json(f.read())
+        g.set_auto_simplify(False)
+        return g
+
+
+def construct_three_cnots() -> GraphT:
+    """Reference diagram for three alternating CNOT gates on two qubits."""
+    return _load_tutorial_example("three_cnots")
+
+
+def construct_swap() -> GraphT:
+    """Reference diagram for a simplified SWAP on two qubits."""
+    return _load_tutorial_example("swap")
 
 
 def construct_circuit() -> GraphT:
