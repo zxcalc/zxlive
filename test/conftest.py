@@ -5,16 +5,26 @@ writes are sandboxed) and again per-test by an autouse fixture (so tests
 that build fresh QSettings don't leak state to each other). Module-level
 QSettings instances created during import keep using the session-scoped
 path for their whole lifetime.
+
+Qt's platform plugin defaults to ``offscreen`` so the suite doesn't open
+real windows on the desktop. To watch a failing test interactively, clear
+``QT_QPA_PLATFORM`` so Qt auto-detects the host's platform, e.g.,
+``env -u QT_QPA_PLATFORM pytest test/test_mainwindow.py -k some_test``.
 """
 
 from __future__ import annotations
 
+import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Iterator
 
 import pytest
-from PySide6.QtCore import QSettings
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PySide6.QtCore import QSettings  # noqa: E402
 
 
 def _probe_default_path(fmt: QSettings.Format) -> str:
@@ -60,6 +70,9 @@ QSettings.setDefaultFormat(QSettings.Format.IniFormat)
 _set_qsettings_paths(_QSETTINGS_TMPDIR.name)
 
 
+_exit_status: int = 0
+
+
 @pytest.fixture(autouse=True)
 def _isolated_qsettings(tmp_path: Path) -> Iterator[None]:
     """Redirect new QSettings instances to a per-test subdirectory."""
@@ -70,11 +83,21 @@ def _isolated_qsettings(tmp_path: Path) -> Iterator[None]:
         _set_qsettings_paths(_QSETTINGS_TMPDIR.name)
 
 
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    global _exit_status
+    _exit_status = exitstatus
+
+
 def pytest_unconfigure(config: pytest.Config) -> None:
-    """Restore the original QSettings state and remove the temp directory."""
+    """Restore the original QSettings state, remove the temp directory,
+    # then flush to exit cleanly while preserving the exit status."""
     QSettings.setDefaultFormat(_ORIGINAL_FORMAT)
     QSettings.setPath(QSettings.Format.NativeFormat, QSettings.Scope.UserScope,
                       _ORIGINAL_NATIVE_PATH)
     QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope,
                       _ORIGINAL_INI_PATH)
     _QSETTINGS_TMPDIR.cleanup()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(_exit_status)
