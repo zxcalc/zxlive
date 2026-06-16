@@ -14,45 +14,33 @@ Activate the magic wand by clicking its toolbar button or pressing `w`, then dra
 
 Drawing the wand across a plain wire inserts a new identity (phaseless) spider in the middle of that wire, splitting it in two. The color of the new spider (Z or X) is set by the spider-type toggle in the proof toolbar.
 
-```{figure} _static/wand_add_identity.gif
-:alt: Adding an identity spider by drawing over a wire
-:align: center
+![Adding an identity spider by drawing over a wire](_static/wand_add_identity.gif)
 
-Draw over a wire to insert an identity spider.
-```
+*Draw over a wire to insert an identity spider.*
 
 ### Draw over a 2-legged spider — remove identity
 
 Drawing over a phaseless spider that has exactly two legs removes it, fusing the two wires back into one.
 
-```{figure} _static/wand_remove_identity.gif
-:alt: Removing an identity spider by drawing over it
-:align: center
+![Removing an identity spider by drawing over it](_static/wand_remove_identity.gif)
 
-Draw over a phaseless 2-legged spider to remove it.
-```
+*Draw over a phaseless 2-legged spider to remove it.*
 
 ### Draw over a spider — unfuse
 
 Drawing across any other spider unfuses it into two connected spiders. The stroke determines the split: edges on one side of the stroke move to the new spider, edges on the other side stay. The phase remains on the side the stroke favors.
 
-```{figure} _static/wand_unfuse.gif
-:alt: Unfusing a spider by drawing across it
-:align: center
+![Unfusing a spider by drawing across it](_static/wand_unfuse.gif)
 
-Draw across a spider to unfuse it, splitting its edges left and right.
-```
+*Draw across a spider to unfuse it, splitting its edges left and right.*
 
 ### Shift + draw over a spider — unfuse with a custom phase
 
 Holding `Shift` while drawing across a spider unfuses it as above, but first prompts you for the phase to place on the split-off spider (in units of pi, or a complex value for a Z-box).
 
-```{figure} _static/wand_unfuse_phase.gif
-:alt: Unfusing with a custom phase prompt
-:align: center
+![Unfusing with a custom phase prompt](_static/wand_unfuse_phase.gif)
 
-Hold `Shift` and draw across a spider to unfuse with a chosen phase.
-```
+*Hold `Shift` and draw across a spider to unfuse with a chosen phase.*
 
 :::{warning}
 Hold `Shift` for the entire stroke. If you release it before lifting the mouse button, the wand falls back to a plain unfuse.
@@ -63,12 +51,9 @@ Hold `Shift` for the entire stroke. If you release it before lifting the mouse b
 
 Drawing across two or more parallel edges between complementary-colored spiders (a Z-like and an X spider, or a Hadamard edge between two Z-like spiders) applies the Hopf rule, removing the edges in pairs.
 
-```{figure} _static/wand_hopf.gif
-:alt: Applying the Hopf rule to parallel edges
-:align: center
+![Applying the Hopf rule to parallel edges](_static/wand_hopf.gif)
 
-Draw across parallel edges between complementary spiders to apply the Hopf rule.
-```
+*Draw across parallel edges between complementary spiders to apply the Hopf rule.*
 
 ## Drag-and-drop rewrites
 
@@ -78,23 +63,17 @@ In select mode (`s`), some rewrites are triggered by dragging one spider onto an
 
 Dragging a spider onto an adjacent spider of the same color fuses them into a single spider, adding their phases.
 
-```{figure} _static/drag_fuse.gif
-:alt: Fusing two spiders of the same color
-:align: center
+![Fusing two spiders of the same color](_static/drag_fuse.gif)
 
-Drag same-colored spiders together to fuse them.
-```
+*Drag same-colored spiders together to fuse them.*
 
 ### Drag a Z spider onto an X spider — bialgebra
 
 Dragging a Z spider onto a connected X spider (or vice versa) applies the bialgebra rule.
 
-```{figure} _static/drag_bialgebra.gif
-:alt: Applying the bialgebra rule by dragging a Z spider onto an X spider
-:align: center
+![Applying the bialgebra rule by dragging a Z spider onto an X spider](_static/drag_bialgebra.gif)
 
-Drag a Z spider onto a complementary X spider to apply bialgebra.
-```
+*Drag a Z spider onto a complementary X spider to apply bialgebra.*
 
 :::{note}
 ZXLive records this step as "Strong complementarity" in the rewrite history panel.
@@ -104,9 +83,6 @@ ZXLive records this step as "Strong complementarity" in the rewrite history pane
 
 Dragging a spider with a phase of 0 or π through its neighbor copies it through, applying the copy (pi-copy) rule.
 
-```{figure} _static/drag_pi_copy.gif
-:alt: Copying a 0 or pi spider through its neighbor
-:align: center
+![Copying a 0 or pi spider through its neighbor](_static/drag_pi_copy.gif)
 
-Drag a 0/π spider through its neighbor to copy it through.
-```
+*Drag a 0/π spider through its neighbor to copy it through.*
