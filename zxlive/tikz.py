@@ -2,7 +2,7 @@ from PySide6.QtCore import QSettings
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
 from .common import GraphT, get_settings_value
-from zxlive.proof import ProofModel
+from zxlive.proof import ProofModel, Rewrite
 
 
 def _escape_tex(s: str) -> str:
@@ -22,65 +22,88 @@ def _escape_tex(s: str) -> str:
     return "".join(out)
 
 
+def _normalise_graph(g: GraphT) -> tuple[GraphT, int, float, float]:
+    """Translate ``g`` so its vertices start at the origin.
+
+    Returns the translated graph, the maximum vertex ID, width and height.
+    Empty graphs are returned untouched with max vertex ID -1 and zero width
+    and height.
+    """
+    vertex_ids = list(g.vertices())
+    if not vertex_ids:
+        return g, -1, 0.0, 0.0
+    rows = [g.row(v) for v in vertex_ids]
+    qubits = [g.qubit(v) for v in vertex_ids]
+    min_x, max_x = min(rows), max(rows)
+    min_y, max_y = min(qubits), max(qubits)
+    g_t = g.translate(-min_x, -min_y)
+    assert isinstance(g_t, GraphT)
+    return g_t, max(vertex_ids), max_x - min_x, max_y - min_y
+
+
+def _eq_node(settings: QSettings, rewrite: Rewrite, idoffset: int, xoffset: float,
+             yoffset: float, hspace: float, eq_height: float) -> str:
+    """Format the equal-sign node that sits between two adjacent proof graphs."""
+    key = f"tikz/names/{rewrite.rule}"
+    name = settings.value(key) if settings.contains(key) else rewrite.rule
+    # Escape TeX-special characters since the name is interpolated into LaTeX.
+    name = _escape_tex(str(name))
+    return (f"\\node [style=none] ({idoffset}) at "
+            f"({xoffset - hspace/2:.2f}, {-yoffset - eq_height/2:.2f}) "
+            f"{{$\\mathrel{{\\mathop{{=}}\\limits^{{\\mathit{{{name}}}}}}}$}};")
+
+
 def proof_to_tikz(proof: ProofModel) -> str:
     settings = QSettings("zxlive", "zxlive")
     vspace = get_settings_value("tikz/layout/vspace", float, settings=settings)
     hspace = get_settings_value("tikz/layout/hspace", float, settings=settings)
     max_width = get_settings_value("tikz/layout/max-width", float, settings=settings)
-    draw_scalar = False
 
     xoffset = -max_width
-    yoffset = -10
+    yoffset = -10.0
     idoffset = 0
     total_verts, total_edges = [], []
-    for i, g in enumerate(proof.graphs()):
-        # Compute graph dimensions
-        width = max(g.row(v) for v in g.vertices()) - min(g.row(v) for v in g.vertices())
-        height = max(g.qubit(v) for v in g.vertices()) - min(g.qubit(v) for v in g.vertices())
+    prev_height = 0.0
+    row_max_height = 0.0
+    for i, g_in in enumerate(proof.graphs()):
+        g, max_vertex_id, width, height = _normalise_graph(g_in)
 
-        # Translate graph so that the first vertex starts at 0
-        min_x = min(g.row(v) for v in g.vertices())
-        g_t = g.translate(-min_x, 0)
-        assert isinstance(g_t, GraphT)
-        g = g_t
+        # Wrap before emitting the graph so it is never placed past max_width,
+        # and advance yoffset by the tallest graph in the row being closed (not
+        # just the last one) so the next row cannot overlap a taller neighbour.
+        wrapped = False
+        if i > 0 and xoffset + width > max_width:
+            xoffset = -max_width
+            yoffset += row_max_height + vspace
+            row_max_height = 0.0
+            wrapped = True
 
         if i > 0:
-            rewrite = proof.steps[i - 1]
-            # Try to look up name in settings
-            name = settings.value(f"tikz/names/{rewrite.rule}") if settings.contains(f"tikz/names/{rewrite.rule}") else rewrite.rule
-            # Escape TeX-special characters since the name is interpolated into LaTeX.
-            name = _escape_tex(str(name))
-            eq = f"\\node [style=none] ({idoffset}) at ({xoffset - hspace/2:.2f}, {-yoffset - height/2:.2f}) {{$\\mathrel{{\\mathop{{=}}\\limits^{{\\mathit{{{name}}}}}}}$}};"
-            total_verts.append(eq)
+            # Use the max of prev_height and current height to centre the equal
+            # sign. If wrapped to a new row, ignore prev_height since it is on
+            # a different row.
+            eq_height = height if wrapped else max(prev_height, height)
+            total_verts.append(_eq_node(settings, proof.steps[i - 1], idoffset,
+                                        xoffset, yoffset, hspace, eq_height))
             idoffset += 1
 
-        verts, edges = _to_tikz(g, draw_scalar, xoffset, yoffset, idoffset)
+        verts, edges = _to_tikz(g, False, xoffset, yoffset, idoffset)
         total_verts.extend(verts)
         total_edges.extend(edges)
 
-        if xoffset + hspace > max_width:
-            xoffset = -max_width
-            yoffset += height + vspace
-        else:
-            xoffset += width + hspace
+        row_max_height = max(row_max_height, height)
+        xoffset += width + hspace
 
-        max_index = max(g.vertices()) + 2 * g.num_inputs() + 2
-        idoffset += max_index
+        if max_vertex_id >= 0:
+            idoffset += max_vertex_id + 2 * g.num_inputs() + 2
+        prev_height = height
 
     return TIKZ_BASE.format(vertices="\n".join(total_verts), edges="\n".join(total_edges))
 
 
 def graph_to_tikz(graph: GraphT) -> str:
     """Convert a single graph to TikZ format."""
-    vertices = list(graph.vertices())
-    if vertices:
-        # Translate graph so that the leftmost vertex starts at 0.
-        min_x = min(graph.row(v) for v in vertices)
-        g_t = graph.translate(-min_x, 0)
-        assert isinstance(g_t, GraphT)
-    else:
-        g_t = graph
-
+    g_t, _, _, _ = _normalise_graph(graph)
     verts, edges = _to_tikz(g_t, draw_scalar=False, xoffset=0, yoffset=0, idoffset=0)
     return TIKZ_BASE.format(vertices="\n".join(verts), edges="\n".join(edges))
 
