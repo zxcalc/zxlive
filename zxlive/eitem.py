@@ -113,35 +113,31 @@ class EItem(QGraphicsPathItem):
             self.curve_distance = self.g.edata(self.e, f"curve_{self.index}", self.curve_distance)
 
         path = QPainterPath()
-        if self.s_item == self.t_item:  # self-loop
-            cd = self.curve_distance
-            cd = cd + 0.5 if cd >= 0 else cd - 0.5
-            s_pos = self.s_item.pos()
-            path.moveTo(s_pos)
-            path.cubicTo(s_pos + QPointF(1, -1) * cd * SCALE,
-                         s_pos + QPointF(-1, -1) * cd * SCALE,
-                         s_pos)
-            curve_midpoint = s_pos + QPointF(0, -0.75) * cd * SCALE
+        p0, p1, p2, p3 = calculate_control_points(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
+        path.moveTo(p0)
+        path.cubicTo(p1, p2, p3)
+        curve_midpoint = p0 * 0.125 + p1 * 0.375 + p2 * 0.375 + p3 * 0.125
 
+        if self.s_item == self.t_item:
             # we don't care about half-paths for self loops, since they won't be colored
             self.half_path_left = None
             self.half_path_right = None
         else:
-            control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
-            path.moveTo(self.s_item.pos())
-            path.quadTo(control_point, self.t_item.pos())
-            curve_midpoint = self.s_item.pos() * 0.25 + control_point * 0.5 + self.t_item.pos() * 0.25
+            # Split cubic bezier at midpoint using de Casteljau's algorithm for half-path colouring.
+            q0 = (p0 + p1) * 0.5
+            q1 = (p1 + p2) * 0.5
+            q2 = (p2 + p3) * 0.5
+            r0 = (q0 + q1) * 0.5
+            r1 = (q1 + q2) * 0.5
 
             half_path_left = QPainterPath()
-            half_control_left = (self.s_item.pos() + control_point) * 0.5
-            half_path_left.moveTo(self.s_item.pos())
-            half_path_left.quadTo(half_control_left, curve_midpoint)
+            half_path_left.moveTo(p0)
+            half_path_left.cubicTo(q0, r0, curve_midpoint)
             self.half_path_left = half_path_left
 
             half_path_right = QPainterPath()
-            half_control_right = (self.t_item.pos() + control_point) * 0.5
             half_path_right.moveTo(curve_midpoint)
-            half_path_right.quadTo(half_control_right, self.t_item.pos())
+            half_path_right.cubicTo(r1, q2, p3)
             self.half_path_right = half_path_right
 
         self.setPath(path)
@@ -333,14 +329,26 @@ class EDragItem(QGraphicsPathItem):
         self.setPath(path)
 
 
-def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float) -> QPointF:
-    """Calculate the control point for the curve"""
-    perpendicular = compute_perpendicular_direction(source_pos, target_pos)
-    source_plus_target = source_pos + target_pos
-    midpoint = QPointF(source_plus_target.x() / 2, source_plus_target.y() / 2)
-    offset = perpendicular * curve_distance * SCALE
-    control_point = midpoint + offset
-    return control_point
+def calculate_control_points(s_pos: QPointF, t_pos: QPointF,
+                             curve_distance: float) -> tuple[QPointF, QPointF, QPointF, QPointF]:
+    """Return the four control points (P0, P1, P2, P3) of the cubic Bezier for an edge."""
+    if s_pos == t_pos:
+        # Self-loop (or degenerate coincident endpoints): the perpendicular S-curve is undefined,
+        # so fall back to a loop arc rising above the vertex.
+        cd = curve_distance + 0.5 if curve_distance >= 0 else curve_distance - 0.5
+        return (s_pos,
+                s_pos + QPointF(1, -1) * cd * SCALE,
+                s_pos + QPointF(-1, -1) * cd * SCALE,
+                s_pos)
+    # Place inner control points along the source-to-target axis so the curve leaves
+    # each endpoint tangent to that axis (S-curve), offset perpendicular by curve_distance.
+    direction = t_pos - s_pos
+    length = sqrt(direction.x()**2 + direction.y()**2)
+    unit = QPointF(direction.x() / length, direction.y() / length)
+    perp = QPointF(-unit.y(), unit.x())
+    tangent = unit * (length / 3)
+    offset = perp * curve_distance * SCALE
+    return s_pos, s_pos + tangent + offset, t_pos - tangent + offset, t_pos
 
 
 def compute_perpendicular_direction(source_pos: QPointF, target_pos: QPointF) -> QPointF:
