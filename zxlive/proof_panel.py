@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
-                        set_z_box_label, vertex_is_z_like)
+                        vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
@@ -26,8 +26,10 @@ from .graphscene import EditGraphScene
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeView
+from .rewrite_data import rules_basic
 from .settings import display_setting
 from .sfx import SFXEnum
+from .unfusion_rewrite import apply_unfusion, compute_avg_neighbor_direction
 from .vitem import SCALE, W_INPUT_OFFSET, DragState, VItem
 
 
@@ -311,7 +313,32 @@ class ProofPanel(BasePanel):
         if self.graph.type(vertex) not in (VertexType.Z, VertexType.X, VertexType.Z_BOX, VertexType.W_OUTPUT):
             return False
 
-        if not trace.shift and pyzx.rewrite_rules.check_remove_id(self.graph, vertex):
+        start = trace.hit[item][0]
+        end = trace.hit[item][-1]
+        if start.y() > end.y():
+            start, end = end, start
+        pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
+        left, right = [], []
+        for edge in set(self.graph.incident_edges(vertex)):
+            eitems = self.graph_scene.edge_map[edge]
+            for eitem in eitems.values():
+                # we use the selection node to determine the center of the edge
+                epos = eitem.selection_node.pos()
+                # Compute whether each edge is inside the entry and exit points
+                i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
+                i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
+                inside = i1 and i2
+                if inside:
+                    left.append(eitem)
+                else:
+                    right.append(eitem)
+
+        # An identity spider can be removed by slicing fully across it, so that
+        # the slice separates its two edges. If the slice instead stays on one
+        # side of the edges, fall through to the unfusion logic below to create
+        # an arity-1 spider.
+        if not trace.shift and pyzx.rewrite_rules.check_remove_id(self.graph, vertex) \
+                and left and right:
             self._remove_id(vertex)
             return True
 
@@ -337,25 +364,6 @@ class ProofPanel(BasePanel):
             else:
                 phase = self.graph.phase(vertex)
 
-        start = trace.hit[item][0]
-        end = trace.hit[item][-1]
-        if start.y() > end.y():
-            start, end = end, start
-        pos = QPointF(*pos_to_view(self.graph.row(vertex), self.graph.qubit(vertex)))
-        left, right = [], []
-        for edge in set(self.graph.incident_edges(vertex)):
-            eitems = self.graph_scene.edge_map[edge]
-            for eitem in eitems.values():
-                # we use the selection node to determine the center of the edge
-                epos = eitem.selection_node.pos()
-                # Compute whether each edge is inside the entry and exit points
-                i1 = cross(start - pos, epos - pos) * cross(start - pos, end - pos) >= 0
-                i2 = cross(end - pos, epos - pos) * cross(end - pos, start - pos) >= 0
-                inside = i1 and i2
-                if inside:
-                    left.append(eitem)
-                else:
-                    right.append(eitem)
         mouse_dir = ((start + end) * (1 / 2)) - pos
 
         if self.graph.type(vertex) == VertexType.W_OUTPUT:
@@ -401,10 +409,9 @@ class ProofPanel(BasePanel):
                 new_g.remove_edge(edge)
 
     def _finalize_unfuse(self, v: VT, new_g: GraphT) -> None:
-        """Helper method to apply animation and push the unfuse command to the undo stack.
-        """
+        """Apply animation and push the unfuse command to the undo stack."""
         anim = anims.unfuse(self.graph, new_g, v, self.graph_scene)
-        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "unfuse")
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, rules_basic['unfuse']['text'])
         self.undo_stack.push(cmd, anim_after=anim)
 
     def _unfuse_w(self, v: VT, left_edge_items: list[EItem], mouse_dir: QPointF) -> None:
@@ -442,63 +449,41 @@ class ProofPanel(BasePanel):
         self._finalize_unfuse(v, new_g)
 
     def _unfuse(self, v: VT, left_edge_items: list[EItem], right_edge_items: list[EItem], mouse_dir: QPointF, phase: Union[FractionLike, complex]) -> None:
-        def snap_vector(v: QVector2D) -> None:
-            if abs(v.x()) > abs(v.y()):
-                v.setY(0.0)
-            else:
-                v.setX(0.0)
-            if not v.isNull():
-                v.normalize()
+        left_edges = [eitem.e for eitem in left_edge_items]
+        right_edges = [eitem.e for eitem in right_edge_items]
 
-        def compute_avg_vector(pos: QPointF, neighbors: list[EItem]) -> QVector2D:
-            avg_vector = QVector2D()
-            for eitem in neighbors:
-                eitem_pos = pos_from_view(eitem.selection_node.pos().x(), eitem.selection_node.pos().y())
-                npos = QPointF(eitem_pos[0], eitem_pos[1])
-                dir = QVector2D(npos - pos).normalized()
-                avg_vector += dir
-            avg_vector.normalize()
-            return avg_vector
+        # Use the same avg neighbour directions that `apply_unfusion` uses for
+        # placement, so the phase ends up on the side it visually belongs to.
+        avg_left = compute_avg_neighbor_direction(self.graph, v, left_edges)
+        avg_right = compute_avg_neighbor_direction(self.graph, v, right_edges)
+        if avg_right == (0.0, 0.0):
+            avg_right = (-avg_left[0], -avg_left[1])
+        elif avg_left == (0.0, 0.0):
+            avg_left = (-avg_right[0], -avg_right[1])
 
-        pos = QPointF(self.graph.row(v), self.graph.qubit(v))
-        avg_left = compute_avg_vector(pos, left_edge_items)
-        snap_vector(avg_left)
-        avg_right = compute_avg_vector(pos, right_edge_items)
-        snap_vector(avg_right)
+        # Associate the phase with the larger sliced area: the side whose average
+        # neighbour direction is closer to the mouse direction.
+        dot_left = mouse_dir.x() * avg_left[0] + mouse_dir.y() * avg_left[1]
+        dot_right = mouse_dir.x() * avg_right[0] + mouse_dir.y() * avg_right[1]
 
-        if avg_right.isNull():
-            avg_right = -avg_left
-        elif avg_left.isNull():
-            avg_left = -avg_right
-
-        dist = 0.25 if QVector2D.dotProduct(avg_left, avg_right) != 0 else 0.35
-        # Put the phase on the left hand side if the mouse direction is closer
-        # to the average direction of the left neighbours than the right, i.e.,
-        # associate the phase to the larger sliced area.
-        phase_left = QVector2D.dotProduct(QVector2D(mouse_dir), avg_left) \
-            >= QVector2D.dotProduct(QVector2D(mouse_dir), avg_right)
-
-        new_g: GraphT = copy.deepcopy(self.graph)
-        left_vert = new_g.add_vertex(self.graph.type(v),
-                                     qubit=self.graph.qubit(v) + dist * avg_left.y(),
-                                     row=self.graph.row(v) + dist * avg_left.x())
-        new_g.set_row(v, self.graph.row(v) + dist * avg_right.x())
-        new_g.set_qubit(v, self.graph.qubit(v) + dist * avg_right.y())
-        new_g.add_edge((v, left_vert))
-
-        # TODO: preserve the edge curve here once it is supported (see https://github.com/zxcalc/zxlive/issues/270)
-        self._reassign_edges_to_left_vertex(v, new_g, left_vert, left_edge_items)
-
-        first, second = (left_vert, v) if phase_left else (v, left_vert)
+        complement_phase: Union[FractionLike, complex]
         if self.graph.type(v) == VertexType.Z_BOX:
-            old_label = get_z_box_label(new_g, v)
-            set_z_box_label(new_g, first, old_label / phase)
-            set_z_box_label(new_g, second, phase)
+            complement_phase = get_z_box_label(self.graph, v) / phase
         else:
-            old_phase = new_g.phase(v)
-            new_g.set_phase(first, old_phase - phase)
-            new_g.set_phase(second, phase)
+            complement_phase = self.graph.phase(v) - phase
 
+        if dot_left >= dot_right:
+            left_phase, right_phase = complement_phase, phase
+        else:
+            left_phase, right_phase = phase, complement_phase
+
+        new_g = apply_unfusion(
+            self.graph, v,
+            node1_edges=left_edges,
+            node2_edges=right_edges,
+            num_connecting_edges=1,
+            phase1=left_phase, phase2=right_phase,
+        )
         self._finalize_unfuse(v, new_g)
 
     def _vert_double_clicked(self, v: VT) -> None:

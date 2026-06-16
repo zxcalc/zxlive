@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Union
 
-from pyzx.utils import VertexType, FractionLike
+from pyzx.utils import VertexType, FractionLike, set_z_box_label
 from pyzx.rewrite import RewriteSimpGraph
 from pyzx.graph.base import BaseGraph
 
@@ -13,6 +13,151 @@ from .eitem import EItem
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
+
+
+def compute_avg_neighbor_direction(graph: GraphT, origin: VT, edges: list[ET]) -> tuple[float, float]:
+    """Average normalized direction from ``origin`` toward each edge's other endpoint,
+    snapped to the dominant axis.
+
+    Returns ``(0, 0)`` if there are no (non-self-loop) edges or all directions cancel
+    out exactly.
+    """
+    origin_row = graph.row(origin)
+    origin_qubit = graph.qubit(origin)
+    sum_x = sum_y = 0.0
+    for edge in edges:
+        s, t = graph.edge_st(edge)
+        other = s if t == origin else t
+        if other == origin:
+            continue  # Self-loops have no meaningful direction.
+        dx = graph.row(other) - origin_row
+        dy = graph.qubit(other) - origin_qubit
+        length = (dx * dx + dy * dy) ** 0.5
+        if length > 0:
+            sum_x += dx / length
+            sum_y += dy / length
+    if sum_x == 0 and sum_y == 0:
+        return (0.0, 0.0)
+    if abs(sum_x) > abs(sum_y):
+        return (1.0 if sum_x > 0 else -1.0, 0.0)
+    return (0.0, 1.0 if sum_y > 0 else -1.0)
+
+
+def compute_unfusion_positions(
+    graph: GraphT,
+    original_vertex: VT,
+    node1_edges: list[ET],
+    node2_edges: list[ET],
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Compute default placements for the two new unfusion vertices.
+
+    Each new vertex is offset from the original in the average direction of its
+    assigned edges' neighbours (snapped to the dominant axis). If one side has no
+    edges, it is placed opposite to the other. If both sides are empty (e.g., an
+    isolated vertex), falls back to a symmetric diagonal offset. If both sides
+    snap to the same direction, the two vertices are nudged perpendicularly so
+    they don't end up on top of each other.
+    """
+    original_row = graph.row(original_vertex)
+    original_qubit = graph.qubit(original_vertex)
+
+    avg1 = compute_avg_neighbor_direction(graph, original_vertex, node1_edges)
+    avg2 = compute_avg_neighbor_direction(graph, original_vertex, node2_edges)
+
+    if avg1 == (0.0, 0.0) and avg2 == (0.0, 0.0):
+        offset = 0.3
+        return ((original_row - offset, original_qubit - offset),
+                (original_row + offset, original_qubit + offset))
+    if avg2 == (0.0, 0.0):
+        avg2 = (-avg1[0], -avg1[1])
+    elif avg1 == (0.0, 0.0):
+        avg1 = (-avg2[0], -avg2[1])
+
+    orthogonal = (avg1[0] * avg2[0] + avg1[1] * avg2[1]) == 0
+    dist = 0.35 if orthogonal else 0.25
+
+    pos1 = (original_row + dist * avg1[0], original_qubit + dist * avg1[1])
+    pos2 = (original_row + dist * avg2[0], original_qubit + dist * avg2[1])
+
+    if avg1 == avg2:
+        # Both partitions snap to the same direction (e.g., all neighbours on the
+        # same side); offset perpendicularly so the two new vertices stay distinct.
+        perp_dist = 0.15
+        perp = (-avg1[1], avg1[0])
+        pos1 = (pos1[0] - perp_dist * perp[0], pos1[1] - perp_dist * perp[1])
+        pos2 = (pos2[0] + perp_dist * perp[0], pos2[1] + perp_dist * perp[1])
+
+    return pos1, pos2
+
+
+def _reassign_edges_from_original(graph: GraphT, original_vertex: VT,
+                                  edges: list[ET], new_node: VT) -> None:
+    """Move ``edges`` from ``original_vertex`` to ``new_node`` in-place on ``graph``."""
+    # TODO: preserve the edge curve here once it is supported (see #270).
+    for edge in edges:
+        if edge not in graph.edges():
+            continue
+        s, t = graph.edge_st(edge)
+        other_vertex = s if t == original_vertex else t
+        if other_vertex == original_vertex:
+            other_vertex = new_node  # Self-loop case.
+        edge_type = graph.edge_type(edge)
+        graph.add_edge((other_vertex, new_node), edge_type)
+        graph.remove_edge(edge)
+
+
+def apply_unfusion(
+    graph: GraphT,
+    original_vertex: VT,
+    node1_edges: list[ET],
+    node2_edges: list[ET],
+    num_connecting_edges: int,
+    phase1: Union[FractionLike, complex],
+    phase2: Union[FractionLike, complex],
+    node1_pos: Optional[tuple[float, float]] = None,
+    node2_pos: Optional[tuple[float, float]] = None,
+) -> GraphT:
+    """Build a new graph in which ``original_vertex`` is unfused into two new vertices.
+
+    The two new vertices take the same type as the original. Edges incident on the
+    original are reassigned to the new vertices according to ``node1_edges`` and
+    ``node2_edges``, and ``num_connecting_edges`` regular edges are added between
+    the new vertices. The original vertex is then removed.
+
+    If ``node1_pos`` or ``node2_pos`` is omitted, the new vertex is placed via
+    :func:`compute_unfusion_positions`, which offsets it from the original in the
+    average direction of its assigned edges' neighbours.
+    """
+    if num_connecting_edges < 1:
+        raise ValueError("Number of connecting edges must be at least 1.")
+
+    new_g = copy.deepcopy(graph)
+    original_type = graph.type(original_vertex)
+
+    if node1_pos is None or node2_pos is None:
+        default_pos1, default_pos2 = compute_unfusion_positions(
+            graph, original_vertex, node1_edges, node2_edges)
+        node1_pos = node1_pos or default_pos1
+        node2_pos = node2_pos or default_pos2
+
+    node1 = new_g.add_vertex(original_type, row=node1_pos[0], qubit=node1_pos[1])
+    node2 = new_g.add_vertex(original_type, row=node2_pos[0], qubit=node2_pos[1])
+
+    if original_type in (VertexType.Z, VertexType.X):
+        new_g.set_phase(node1, phase1)
+        new_g.set_phase(node2, phase2)
+    elif original_type == VertexType.Z_BOX:
+        set_z_box_label(new_g, node1, phase1)
+        set_z_box_label(new_g, node2, phase2)
+
+    _reassign_edges_from_original(new_g, original_vertex, node1_edges, node1)
+    _reassign_edges_from_original(new_g, original_vertex, node2_edges, node2)
+
+    for _ in range(num_connecting_edges):
+        new_g.add_edge((node1, node2))
+
+    new_g.remove_vertex(original_vertex)
+    return new_g
 
 
 def match_unfuse_single_vertex(graph: GraphT, vertices: list[VT]) -> list[VT]:
@@ -101,72 +246,26 @@ class UnfusionRewriteAction:
         if not self.unfusion_manager:
             return
         node1_edges, node2_edges = self.unfusion_manager.get_edge_assignments()
-        self._apply_unfusion(self.unfusion_manager.target_vertex, node1_edges, node2_edges,
-                             num_connecting_edges, phase1, phase2)
+        self._record_unfusion_step(self.unfusion_manager.target_vertex, node1_edges, node2_edges,
+                                   num_connecting_edges, phase1, phase2)
         self._cleanup()
 
     def _on_cancelled(self) -> None:
         """Handle cancellation of the unfusion."""
         self._cleanup()
 
-    def _apply_unfusion(self, original_vertex: VT, node1_edges: list[ET],
-                        node2_edges: list[ET], num_connecting_edges: int,
-                        phase1: FractionLike, phase2: FractionLike) -> None:
-        """Apply the actual unfusion transformation."""
+    def _record_unfusion_step(self, original_vertex: VT, node1_edges: list[ET],
+                               node2_edges: list[ET], num_connecting_edges: int,
+                               phase1: FractionLike, phase2: FractionLike) -> None:
+        """Apply the unfusion to the graph and push it onto the undo stack as a proof step."""
         from .commands import AddRewriteStep
         from . import animations as anims
+        from .rewrite_data import rules_basic
 
         graph = self.proof_panel.graph_scene.g
-        new_g = copy.deepcopy(graph)
+        new_g = apply_unfusion(graph, original_vertex, node1_edges, node2_edges,
+                               num_connecting_edges, phase1, phase2)
 
-        original_type = graph.type(original_vertex)
-        original_row = graph.row(original_vertex)
-        original_qubit = graph.qubit(original_vertex)
-
-        # Create two new vertices
-        # Position them slightly apart from the original position
-        offset = 0.3
-        node1 = new_g.add_vertex(original_type,
-                                 qubit=original_qubit - offset,
-                                 row=original_row - offset)
-        node2 = new_g.add_vertex(original_type,
-                                 qubit=original_qubit + offset,
-                                 row=original_row + offset)
-
-        # Set phases for the new vertices
-        if original_type in (VertexType.Z, VertexType.X):
-            new_g.set_phase(node1, phase1)
-            new_g.set_phase(node2, phase2)
-        elif original_type == VertexType.Z_BOX:
-            from pyzx.utils import set_z_box_label
-            set_z_box_label(new_g, node1, phase1)
-            set_z_box_label(new_g, node2, phase2)
-
-        def reassign_edges(edges: list[ET], node: VT) -> None:
-            for edge in edges:
-                if edge not in new_g.edges():
-                    continue
-                s, t = new_g.edge_st(edge)
-                other_vertex = s if t == original_vertex else t
-                if other_vertex == original_vertex:
-                    other_vertex = node  # Self-loop case
-                edge_type = new_g.edge_type(edge)
-                new_g.add_edge((other_vertex, node), edge_type)
-                new_g.remove_edge(edge)
-
-        reassign_edges(node1_edges, node1)
-        reassign_edges(node2_edges, node2)
-
-        # Add connecting edges between the two new vertices
-        if num_connecting_edges < 1:
-            raise ValueError("Number of connecting edges must be at least 1.")
-        for _ in range(num_connecting_edges):
-            new_g.add_edge((node1, node2))
-
-        # Remove the original vertex
-        new_g.remove_vertex(original_vertex)
-
-        from .rewrite_data import rules_basic
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
                              self.proof_panel.step_view, rules_basic['unfuse']['text'])
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
