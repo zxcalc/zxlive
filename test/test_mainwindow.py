@@ -547,6 +547,45 @@ def test_auto_arrange_in_proof_mode(app: MainWindow, qtbot: QtBot) -> None:
     assert (proof_graph.row(spider_v), proof_graph.qubit(spider_v)) == spider_after
 
 
+def test_adjust_scalar_in_proof_mode(app: MainWindow, qtbot: QtBot,
+                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    # The "Adjust Scalar" toolbar action overwrites the current step's graph scalar with the
+    # values returned by the dialog. The proof model's stored graph must stay in sync with the
+    # view, and undo/redo must restore the prior scalar.
+    from fractions import Fraction
+    import zxlive.proof_panel
+
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    proof_panel = app.active_panel
+    assert isinstance(proof_panel, ProofPanel)
+
+    orig = copy.deepcopy(proof_panel.graph.scalar)
+    orig_step_count = len(proof_panel.proof_model.graphs())
+    step_index = proof_panel.step_view.currentIndex().row()
+
+    new_phase, new_power2, new_floatfactor = Fraction(1, 2), 3, complex(2, 0)
+    monkeypatch.setattr(
+        zxlive.proof_panel, "adjust_scalar_dialog",
+        lambda _parent, _graph: (new_phase, new_power2, new_floatfactor),
+    )
+
+    qtbot.mouseClick(proof_panel.set_scalar_button, QtCore.Qt.MouseButton.LeftButton)
+
+    # The action edits the current step's scalar in place rather than appending a new step.
+    assert len(proof_panel.proof_model.graphs()) == orig_step_count
+    for s in (proof_panel.graph.scalar, proof_panel.proof_model.get_graph(step_index).scalar):
+        assert (s.phase, s.power2, s.floatfactor) == (new_phase, new_power2, new_floatfactor)
+
+    app.undo_action.trigger()
+    for s in (proof_panel.graph.scalar, proof_panel.proof_model.get_graph(step_index).scalar):
+        assert (s.phase, s.power2, s.floatfactor) == (orig.phase, orig.power2, orig.floatfactor)
+
+    app.redo_action.trigger()
+    for s in (proof_panel.graph.scalar, proof_panel.proof_model.get_graph(step_index).scalar):
+        assert (s.phase, s.power2, s.floatfactor) == (new_phase, new_power2, new_floatfactor)
+
+
 def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
     # Regression test to check that the app doesn't crash when closing a proof tab with a derivation in progress,
     # due to accessing the graph after it has been deallocated.

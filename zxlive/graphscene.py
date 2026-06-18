@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Optional, Iterator, Iterable
 
 from PySide6.QtCore import Qt, Signal, QRectF
@@ -161,6 +162,8 @@ class GraphScene(QGraphicsScene):
         new_g = diff.apply_diff(self.g)
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert isinstance(new_g, GraphT)  # type: ignore
+        # GraphDiff does not track scalar changes, so propagate them manually.
+        new_g.scalar = copy.deepcopy(new.scalar)
         self.g = new_g
 
         self._add_new_vertices_from_diff(diff, selected_vertices, select_new)

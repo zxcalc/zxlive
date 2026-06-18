@@ -11,15 +11,17 @@ from PySide6.QtWidgets import QInputDialog, QToolButton
 
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.graph.scalar import Scalar
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
+from .commands import (AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve,
+                       MoveNode, SetGraph, UpdateGraph, ProofModeCommand)
 from .common import (ET, VT, GraphT, ToolType, get_data,
                      pos_from_view, pos_to_view)
-from .dialogs import show_error_msg, update_dummy_vertex_text
+from .dialogs import SCALAR_ZERO_TOL, adjust_scalar_dialog, show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
 from .graphscene import EditGraphScene
@@ -121,7 +123,34 @@ class ProofPanel(BasePanel):
         self.pauli_webs = QToolButton(self)
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
-        yield ToolbarSection(self.pauli_webs)
+        self.set_scalar_button = QToolButton(self)
+        self.set_scalar_button.setText("Adjust Scalar")
+        self.set_scalar_button.setToolTip("Manually adjust the global scalar of the current graph")
+        self.set_scalar_button.clicked.connect(self._set_scalar)
+        yield ToolbarSection(self.pauli_webs, self.set_scalar_button)
+
+    def _set_scalar(self) -> None:
+        result = adjust_scalar_dialog(self, self.graph)
+        if result is None:
+            return
+        phase, power2, floatfactor = result
+        new_scalar = Scalar()
+        new_scalar.phase = phase
+        new_scalar.power2 = power2
+        new_scalar.floatfactor = floatfactor
+        # The dialog only sets `phase`, `power2`, and `floatfactor`, so the magnitude of the
+        # resulting scalar is `|floatfactor| * sqrt(2)^power2`, which is zero iff `floatfactor`
+        # is zero. Set `is_zero` and clamp `floatfactor` to exactly zero so downstream code
+        # (e.g., the scalar label) treats it as zero and the stored state stays consistent.
+        if abs(floatfactor) < SCALAR_ZERO_TOL:
+            new_scalar.is_zero = True
+            new_scalar.floatfactor = 0j
+        if new_scalar == self.graph.scalar:
+            return
+        new_g = copy.deepcopy(self.graph)
+        new_g.scalar = new_scalar
+        cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)
+        self.undo_stack.push(cmd)
 
     def _start_pauliwebs(self) -> None:
         # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication
