@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
-from pyzx.utils import EdgeType, VertexType, get_w_io
+from pyzx.utils import EdgeType, VertexType, get_w_io, phase_is_pauli
 from shapely import Polygon
 from shapely.errors import ShapelyError
 
@@ -19,6 +19,8 @@ from pyzx.rewrite import RewriteSimpGraph
 from .common import ET, VT, GraphT
 
 NodeT = TypeVar("NodeT", bound=Hashable)
+ScalarPhase = Union[int, float, complex, Fraction]
+ParameterValue = Union[ScalarPhase, Poly]
 
 if TYPE_CHECKING:
     from .rewrite_data import RewriteData
@@ -238,7 +240,7 @@ def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:
     return True
 
 
-def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[Var], Union[int, float, complex, Fraction]]:
+def get_linear(v: Poly) -> tuple[ScalarPhase, Optional[Var], ScalarPhase]:
     if not isinstance(v, Poly):
         raise ValueError("Not a symbolic parameter")
     if len(v.terms) > 2 or len(v.free_vars()) > 1:
@@ -248,7 +250,7 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     elif len(v.terms) == 1:
         if len(v.terms[0][1].vars) > 0:
             var_term = v.terms[0]
-            const: Union[int, float, complex, Fraction] = 0
+            const: ScalarPhase = 0
         else:
             const = v.terms[0][0]
             return 1, None, const
@@ -266,33 +268,41 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     return coeff, var, const
 
 
-def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, Union[int, float, complex, Fraction]]:
-    params: Dict[Var, Union[int, float, complex, Fraction]] = {}
+def _is_valid_boolean_phase(phase: ParameterValue) -> bool:
+    if isinstance(phase, complex):
+        return False
+    if isinstance(phase, float):
+        return phase % 2 == 0 or phase % 2 == 1
+    return phase_is_pauli(phase)
+
+
+def _validate_symbolic_parameter(params: Dict[Var, ParameterValue], var: Var, value: ParameterValue) -> None:
+    current_value = params.get(var)
+    current_value = current_value % 2 if isinstance(current_value, Fraction) else current_value
+    value = value % 2 if isinstance(value, Fraction) else value
+    if var in params and current_value != value:
+        raise ValueError("Symbolic parameters do not match")
+    if var.is_bool and not _is_valid_boolean_phase(value):
+        raise ValueError("Boolean variable assigned non-boolean value")
+
+
+def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, ParameterValue]:
+    params: Dict[Var, ParameterValue] = {}
     left_phase = left.nodes.data('phase', default=0)  # type: ignore
     right_phase = right.nodes.data('phase', default=0)  # type: ignore
 
-    def check_phase_equality(v: VT) -> None:
-        if left_phase[v] != right_phase[match[v]]:
-            raise ValueError("Parameters do not match")
-
-    def update_params(v: VT, var: Var, coeff: Union[int, float, complex, Fraction], const: Union[int, float, complex, Fraction]) -> None:
-        var_value = (right_phase[match[v]] - const) / coeff
-        if var in params and params[var] != var_value:
-            raise ValueError("Symbolic parameters do not match")
-        if var.is_bool and var_value not in (0, 1):
-            raise ValueError("Boolean variable assigned non-boolean value")
-        params[var] = var_value
-
     for v in left.nodes():
-        if isinstance(left_phase[v], Poly):
-            coeff, var, const = get_linear(left_phase[v])
-            if var is None:
-                check_phase_equality(v)
+        rule_phase = left_phase[v]
+        target_phase = right_phase[match[v]]
+        if isinstance(rule_phase, Poly):
+            coeff, var, const = get_linear(rule_phase)
+            if var is not None:
+                var_value: ParameterValue = (target_phase - const) / coeff
+                _validate_symbolic_parameter(params, var, var_value)
+                params[var] = var_value
                 continue
-            update_params(v, var, coeff, const)
-        else:
-            check_phase_equality(v)
-
+        if rule_phase != target_phase:
+            raise ValueError("Parameters do not match")
     return params
 
 
