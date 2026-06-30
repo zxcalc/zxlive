@@ -7,7 +7,7 @@ import networkx as nx
 import numpy as np
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
-from pyzx.utils import EdgeType, VertexType, get_w_io
+from pyzx.utils import EdgeType, VertexType, get_w_io, phase_is_pauli
 from shapely import Polygon
 from shapely.errors import ShapelyError
 
@@ -19,6 +19,8 @@ from pyzx.rewrite import RewriteSimpGraph
 from .common import ET, VT, GraphT
 
 NodeT = TypeVar("NodeT", bound=Hashable)
+ScalarPhase = Union[int, float, complex, Fraction]
+ParameterValue = Union[ScalarPhase, Poly]
 
 if TYPE_CHECKING:
     from .rewrite_data import RewriteData
@@ -238,7 +240,7 @@ def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:
     return True
 
 
-def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[Var], Union[int, float, complex, Fraction]]:
+def get_linear(v: Poly) -> tuple[ScalarPhase, Optional[Var], ScalarPhase]:
     if not isinstance(v, Poly):
         raise ValueError("Not a symbolic parameter")
     if len(v.terms) > 2 or len(v.free_vars()) > 1:
@@ -248,7 +250,7 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     elif len(v.terms) == 1:
         if len(v.terms[0][1].vars) > 0:
             var_term = v.terms[0]
-            const: Union[int, float, complex, Fraction] = 0
+            const: ScalarPhase = 0
         else:
             const = v.terms[0][0]
             return 1, None, const
@@ -266,8 +268,8 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     return coeff, var, const
 
 
-def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, Union[int, float, complex, Fraction]]:
-    params: Dict[Var, Union[int, float, complex, Fraction]] = {}
+def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, ParameterValue]:
+    params: Dict[Var, ParameterValue] = {}
     left_phase = left.nodes.data('phase', default=0)  # type: ignore
     right_phase = right.nodes.data('phase', default=0)  # type: ignore
 
@@ -275,11 +277,19 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: n
         if left_phase[v] != right_phase[match[v]]:
             raise ValueError("Parameters do not match")
 
-    def update_params(v: VT, var: Var, coeff: Union[int, float, complex, Fraction], const: Union[int, float, complex, Fraction]) -> None:
-        var_value = (right_phase[match[v]] - const) / coeff
-        if var in params and params[var] != var_value:
+    def normalized_parameter(value: ParameterValue) -> ParameterValue:
+        if isinstance(value, Fraction):
+            return value % 2
+        return value
+
+    def parameters_match(current_value: ParameterValue, new_value: ParameterValue) -> bool:
+        return normalized_parameter(current_value) == normalized_parameter(new_value)
+
+    def update_params(v: VT, var: Var, coeff: ScalarPhase, const: ScalarPhase) -> None:
+        var_value: ParameterValue = (right_phase[match[v]] - const) / coeff
+        if var in params and not parameters_match(params[var], var_value):
             raise ValueError("Symbolic parameters do not match")
-        if var.is_bool and var_value not in (0, 1):
+        if var.is_bool and not phase_is_pauli(var_value):
             raise ValueError("Boolean variable assigned non-boolean value")
         params[var] = var_value
 
