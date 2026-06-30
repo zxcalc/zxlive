@@ -285,11 +285,18 @@ def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: n
     def parameters_match(current_value: ParameterValue, new_value: ParameterValue) -> bool:
         return normalized_parameter(current_value) == normalized_parameter(new_value)
 
+    def phase_is_pauli_custom(phase: ParameterValue) -> bool:
+        if isinstance(phase, complex):
+            return False
+        if isinstance(phase, float):
+            return phase % 2 == 0 or phase % 2 == 1
+        return phase_is_pauli(phase)
+
     def update_params(v: VT, var: Var, coeff: ScalarPhase, const: ScalarPhase) -> None:
         var_value: ParameterValue = (right_phase[match[v]] - const) / coeff
         if var in params and not parameters_match(params[var], var_value):
             raise ValueError("Symbolic parameters do not match")
-        if var.is_bool and not phase_is_pauli(var_value):
+        if var.is_bool and not phase_is_pauli_custom(var_value):
             raise ValueError("Boolean variable assigned non-boolean value")
         params[var] = var_value
 
