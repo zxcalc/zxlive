@@ -268,48 +268,41 @@ def get_linear(v: Poly) -> tuple[ScalarPhase, Optional[Var], ScalarPhase]:
     return coeff, var, const
 
 
+def _is_valid_boolean_phase(phase: ParameterValue) -> bool:
+    if isinstance(phase, complex):
+        return False
+    if isinstance(phase, float):
+        return phase % 2 == 0 or phase % 2 == 1
+    return phase_is_pauli(phase)
+
+
+def _validate_symbolic_parameter(params: Dict[Var, ParameterValue], var: Var, value: ParameterValue) -> None:
+    current_value = params.get(var)
+    current_value = current_value % 2 if isinstance(current_value, Fraction) else current_value
+    value = value % 2 if isinstance(value, Fraction) else value
+    if var in params and current_value != value:
+        raise ValueError("Symbolic parameters do not match")
+    if var.is_bool and not _is_valid_boolean_phase(value):
+        raise ValueError("Boolean variable assigned non-boolean value")
+
+
 def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, ParameterValue]:
     params: Dict[Var, ParameterValue] = {}
     left_phase = left.nodes.data('phase', default=0)  # type: ignore
     right_phase = right.nodes.data('phase', default=0)  # type: ignore
 
-    def check_phase_equality(v: VT) -> None:
-        if left_phase[v] != right_phase[match[v]]:
-            raise ValueError("Parameters do not match")
-
-    def normalized_parameter(value: ParameterValue) -> ParameterValue:
-        if isinstance(value, Fraction):
-            return value % 2
-        return value
-
-    def parameters_match(current_value: ParameterValue, new_value: ParameterValue) -> bool:
-        return normalized_parameter(current_value) == normalized_parameter(new_value)
-
-    def phase_is_pauli_custom(phase: ParameterValue) -> bool:
-        if isinstance(phase, complex):
-            return False
-        if isinstance(phase, float):
-            return phase % 2 == 0 or phase % 2 == 1
-        return phase_is_pauli(phase)
-
-    def update_params(v: VT, var: Var, coeff: ScalarPhase, const: ScalarPhase) -> None:
-        var_value: ParameterValue = (right_phase[match[v]] - const) / coeff
-        if var in params and not parameters_match(params[var], var_value):
-            raise ValueError("Symbolic parameters do not match")
-        if var.is_bool and not phase_is_pauli_custom(var_value):
-            raise ValueError("Boolean variable assigned non-boolean value")
-        params[var] = var_value
-
     for v in left.nodes():
-        if isinstance(left_phase[v], Poly):
-            coeff, var, const = get_linear(left_phase[v])
-            if var is None:
-                check_phase_equality(v)
+        rule_phase = left_phase[v]
+        target_phase = right_phase[match[v]]
+        if isinstance(rule_phase, Poly):
+            coeff, var, const = get_linear(rule_phase)
+            if var is not None:
+                var_value: ParameterValue = (target_phase - const) / coeff
+                _validate_symbolic_parameter(params, var, var_value)
+                params[var] = var_value
                 continue
-            update_params(v, var, coeff, const)
-        else:
-            check_phase_equality(v)
-
+        if rule_phase != target_phase:
+            raise ValueError("Parameters do not match")
     return params
 
 
