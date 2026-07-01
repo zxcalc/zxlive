@@ -27,7 +27,7 @@ from .common import (VT, GraphT, ToolType, get_data,
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
-from .graphscene import EditGraphScene
+from .graphscene import EditGraphScene, EdgeDragSpec
 from .settings import display_setting
 
 from . import animations
@@ -266,9 +266,10 @@ class EditorBasePanel(BasePanel):
         v_is_dummy = graph.type(v) == VertexType.DUMMY
         return bool(u_is_dummy != v_is_dummy)
 
-    def _build_snap_pairs(self, graph: GraphT, u: VT, v: VT,
+    def _build_snap_pairs(self, graph: GraphT, u: VT, v: Optional[VT],
                           verts: list[VItem]) -> list[tuple[VT, VT]]:
-        # Line was drawn from u to v, we want to order vs with the earlier items first.
+        # Line was drawn from u to v (or released without a target), so order
+        # crossed vertices from the source outward.
         ux, uy = graph.row(u), graph.qubit(u)
 
         def dist(vitem: VItem) -> float:
@@ -278,32 +279,72 @@ class EditorBasePanel(BasePanel):
         pairs = [(u, vs[0])]
         for i in range(1, len(vs)):
             pairs.append((vs[i - 1], vs[i]))
-        pairs.append((vs[-1], v))
+        if v is not None:
+            pairs.append((vs[-1], v))
         return pairs
+
+    def _valid_edge_pairs(self, graph: GraphT, pairs: list[tuple[VT, VT]]) -> bool:
+        return all(not self._is_invalid_edge(graph, u, v) for u, v in pairs)
+
+    def _edge_pairs_for_drag(self, graph: GraphT, u: VT, v: Optional[VT],
+                             verts: list[VItem]) -> tuple[list[tuple[VT, VT]], list[VItem]]:
+        if v is not None and self._is_invalid_edge(graph, u, v):
+            return [], []
+
+        # We will be adding two edges around each snapped-through vertex, which
+        # is not compatible with W_INPUT.
+        snap_verts = [vitem for vitem in verts if graph.type(vitem.v) != VertexType.W_INPUT]
+        if self.snap_vertex_edge and snap_verts:
+            pairs = self._build_snap_pairs(graph, u, v, snap_verts)
+            if self._valid_edge_pairs(graph, pairs):
+                return pairs, snap_verts
+            return [], []
+        if v is None:
+            return [], []
+        return [(u, v)], []
 
     def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
         """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
         If self.snap_vertex_edge is true, then we try to connect `u` through all the `vertices` in `verts`, and then to `v`.
         """
         graph = self.graph_view.graph_scene.g
-        if self._is_invalid_edge(graph, u, v):
+        pairs, snap_verts = self._edge_pairs_for_drag(graph, u, v, verts)
+        if not pairs:
             return None
 
-        # We will try to connect all the vertices together in order
-        # First we filter out the vertices that are not compatible with the edge.
-        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
-        # but first we check if there any vertices that we do want to additionally connect.
-        if not self.snap_vertex_edge or not verts:
+        if not snap_verts:
             self.undo_stack.push(AddEdge(self.graph_view, u, v, self._curr_ety))
             return
 
-        pairs = self._build_snap_pairs(graph, u, v, verts)
         self.undo_stack.push(AddEdges(self.graph_view, pairs, self._curr_ety))
         group = QParallelAnimationGroup()
-        for vitem in verts:
+        for vitem in snap_verts:
             anim = animations.scale(vitem, 1.0, 400, QEasingCurve(QEasingCurve.Type.InCubic), start=1.3)
             group.addAnimation(anim)
         self.undo_stack.set_anim(group)
+
+    def add_edges(self, specs: list[EdgeDragSpec]) -> None:
+        """Add multiple dragged edges as a single undoable operation."""
+        graph = self.graph_view.graph_scene.g
+        pairs: list[tuple[VT, VT]] = []
+        snapped_verts: dict[VT, VItem] = {}
+        for spec in specs:
+            spec_pairs, spec_snap_verts = self._edge_pairs_for_drag(
+                graph, spec.source, spec.target, list(spec.colliding_verts)
+            )
+            pairs.extend(spec_pairs)
+            for vitem in spec_snap_verts:
+                snapped_verts[vitem.v] = vitem
+        if not pairs:
+            return
+
+        self.undo_stack.push(AddEdges(self.graph_view, pairs, self._curr_ety))
+        if snapped_verts:
+            group = QParallelAnimationGroup()
+            for vitem in snapped_verts.values():
+                anim = animations.scale(vitem, 1.0, 400, QEasingCurve(QEasingCurve.Type.InCubic), start=1.3)
+                group.addAnimation(anim)
+            self.undo_stack.set_anim(group)
 
     def vert_moved(self, vs: list[tuple[VT, float, float]]) -> None:
         self.undo_stack.push(MoveNode(self.graph_view, vs))

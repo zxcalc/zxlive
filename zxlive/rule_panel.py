@@ -12,7 +12,7 @@ from .base_panel import ToolbarSection
 from .common import GraphT, ToolType, VT
 from .custom_rule import CustomRule
 from .editor_base_panel import EditorBasePanel
-from .graphscene import EditGraphScene
+from .graphscene import EditGraphScene, EdgeDragSpec
 from .graphview import RuleEditGraphView
 from .eitem import EItem
 from .vitem import VItem
@@ -50,6 +50,7 @@ class RulePanel(EditorBasePanel):
         self.graph_scene_left.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene_left.vertex_added.connect(self.add_vert)
         self.graph_scene_left.edge_added.connect(self.add_edge)
+        self.graph_scene_left.edges_added.connect(self.add_edges)
         self.graph_scene_left.edge_dragged.connect(self.change_edge_curves)
         self.graph_view_left.merge_triggered.connect(self.merge_vertices)
 
@@ -58,6 +59,7 @@ class RulePanel(EditorBasePanel):
         self.graph_scene_right.vertex_double_clicked.connect(self.vert_double_clicked)
         self.graph_scene_right.vertex_added.connect(self.add_vert)
         self.graph_scene_right.edge_added.connect(self.add_edge)
+        self.graph_scene_right.edges_added.connect(self.add_edges)
         self.graph_scene_right.edge_dragged.connect(self.change_edge_curves)
         self.graph_view_right.merge_triggered.connect(self.merge_vertices)
 
@@ -97,6 +99,10 @@ class RulePanel(EditorBasePanel):
 
     def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
         super().add_edge(u, v, verts)
+        self.update_io_labels(self.graph_scene)
+
+    def add_edges(self, specs: list[EdgeDragSpec]) -> None:
+        super().add_edges(specs)
         self.update_io_labels(self.graph_scene)
 
     def update_io_labels(self, scene: EditGraphScene) -> None:
