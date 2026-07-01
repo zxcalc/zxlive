@@ -11,6 +11,7 @@ Welcome to zxlive's documentation!
    :caption: Contents:
 
    gettingstarted
+   gestures-and-rewrites
    adding-rewrites
    tikz_export
 
