@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
@@ -14,6 +15,7 @@ from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
 from .common import GraphT, VT
+from .settings import get_settings_value
 from .custom_rule import CustomRule, check_rule
 from .proof import ProofModel
 
@@ -116,8 +118,10 @@ def create_circuit_dialog(explanation: str, example: str, parent: QWidget) -> Op
     return s if success else None
 
 
+# TODO: Fix code complexity
+# noqa: complexipy
 def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.All.filter, parent: Optional[QWidget] = None) -> \
-        Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:
+        Optional[ImportGraphOutput | ImportProofOutput | ImportRuleOutput]:  # noqa: PLR0912
     """Imports a diagram from a given file path.
 
     Returns the imported graph or `None` if the import failed."""
@@ -227,7 +231,7 @@ def get_file_path_and_format(parent: QWidget, filter: str, default_input: str = 
             show_error_msg("Unable to determine file format.", parent=parent)
             return None
 
-    # Add file extension if it's not already there
+    # Add file extension if missing
     if file_path.split(".")[-1].lower() != selected_format.extension:
         file_path += "." + selected_format.extension
 
@@ -278,7 +282,14 @@ def save_proof_dialog(proof_model: ProofModel, parent: QWidget) -> Optional[tupl
 
 
 def save_rule_dialog(rule: CustomRule, parent: QWidget, filename: str = "") -> Optional[tuple[str, FileFormat]]:
-    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, filename)
+    rules_folder = get_settings_value("path/custom-rules", str)
+    if filename:
+        default_path = os.path.join(rules_folder, filename)
+    elif rule.name:
+        default_path = os.path.join(rules_folder, rule.name + ".zxr")
+    else:
+        default_path = rules_folder
+    return _save_rule_or_proof_dialog(rule.to_json(), parent, FileFormat.ZXRule.filter, default_path)
 
 
 def export_proof_dialog(parent: QWidget) -> Optional[str]:
@@ -365,7 +376,10 @@ def update_dummy_vertex_text(parent: QWidget, graph: GraphT, v: VT) -> Optional[
         show_error_msg("Invalid Vertex Type", "This function can only be used on dummy vertices.", parent=parent)
         return None
     current_text = graph.vdata(v, 'text', '')
-    input_, ok = QInputDialog.getText(parent, "Set Text", "Enter text for dummy node:", text=current_text)
+    input_, ok = QInputDialog.getText(
+        parent, "Set Text",
+        "Enter text (LaTeX supported, e.g. $\\alpha$, x^2, \\frac{1}{2}):",
+        text=current_text)
     if not ok:
         return None
     new_g = copy.deepcopy(graph)

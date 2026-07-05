@@ -18,14 +18,14 @@ from __future__ import annotations
 from enum import IntEnum
 from typing import TYPE_CHECKING, Dict, Any
 
-from PySide6.QtGui import QIcon, QFontDatabase
+from PySide6.QtGui import QColor, QIcon, QFontDatabase
 from typing_extensions import TypedDict, NotRequired
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
-    QComboBox, QApplication, QCheckBox, QMessageBox
+    QComboBox, QApplication, QCheckBox, QMessageBox, QColorDialog, QStyle
 )
 
 from .common import get_settings_value, T, get_data
@@ -37,6 +37,35 @@ if TYPE_CHECKING:
     from .mainwindow import MainWindow
 
 
+class ColorButton(QPushButton):
+    """A button that shows a color and opens a QColorDialog on click."""
+
+    def __init__(self, color_str: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.color_value = ""
+        self.clicked.connect(self._pick_color)
+        self.set_color(color_str)
+
+    def set_color(self, color_str: str) -> None:
+        self.color_value = color_str
+        color = QColor(color_str)
+        if color.isValid():
+            text_color = "#000" if color.lightness() > 128 else "#fff"
+            self.setStyleSheet(f"QPushButton {{ background-color: {color.name()}; color: {text_color}; }}")
+            self.setText(color.name())
+        else:
+            self.setStyleSheet("")
+            self.setText("Default")
+
+    def _pick_color(self) -> None:
+        current = QColor(self.color_value)
+        if not current.isValid():
+            current = display_setting.effective_colors["outline"]
+        selected = QColorDialog.getColor(current, self.window(), "Select color")
+        if selected.isValid():
+            self.set_color(selected.name())
+
+
 class FormInputType(IntEnum):
     Str = 0
     Int = 1
@@ -44,6 +73,7 @@ class FormInputType(IntEnum):
     Folder = 3
     Combo = 4
     Bool = 5
+    Color = 6
 
 
 class SettingsData(TypedDict):
@@ -78,19 +108,30 @@ dark_mode_options = {
     'dark': "Dark"
 }
 
+startup_behavior_options = {
+    'blank': "Open a blank instance",
+    'restore': "Continue where you left off"
+}
+
 general_settings: list[SettingsData] = [
+    {"id": "startup-behavior", "label": "On startup", "type": FormInputType.Combo, "data": startup_behavior_options},
     {"id": "auto-save", "label": "Auto Save", "type": FormInputType.Bool},
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
+    {"id": "rewrite-animations", "label": "Rewrite animations", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
+    {"id": "swap-pauli-web-colors", "label": "Swap Pauli web colors", "type": FormInputType.Bool},
+    {"id": "blue-y-pauli-web", "label": "Use Blue for Y Pauli web", "type": FormInputType.Bool},
     {"id": "tab-bar-location", "label": "Tab bar location", "type": FormInputType.Combo, "data": tab_positioning_data},
     {"id": "path/custom-rules", "label": "Custom rules path", "type": FormInputType.Folder},
     {"id": "patterns-folder", "label": "Patterns folder", "type": FormInputType.Folder},
     {"id": "snap-granularity", "label": "Snap-to-grid granularity", "type": FormInputType.Combo, "data": snap_to_grid_data},
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
+    {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Color},
+    {"id": "show-vertex-indices", "label": "Show vertex indices", "type": FormInputType.Bool},
 ]
 
 
@@ -233,6 +274,22 @@ class SettingsDialog(QDialog):
         widget.setChecked(self.get_settings_from_data(data, bool))
         return widget
 
+    def make_color_form_input(self, data: SettingsData) -> QWidget:
+        container = QWidget()
+        hlayout = QHBoxLayout()
+        hlayout.setContentsMargins(0, 0, 0, 0)
+        container.setLayout(hlayout)
+        btn = ColorButton(self.get_settings_from_data(data, str))
+        reset_btn = QPushButton()
+        reset_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogResetButton))
+        reset_btn.setToolTip("Reset to default")
+        reset_btn.setFixedWidth(30)
+        reset_btn.clicked.connect(lambda: btn.set_color(""))
+        hlayout.addWidget(btn)
+        hlayout.addWidget(reset_btn)
+        container.color_button = btn  # type: ignore[attr-defined]
+        return container
+
     def make_str_form_input(self, data: SettingsData) -> QLineEdit:
         widget = QLineEdit()
         widget.setText(self.get_settings_from_data(data, str))
@@ -286,9 +343,10 @@ class SettingsDialog(QDialog):
             FormInputType.Folder: self.make_folder_form_input,
             FormInputType.Combo: self.make_combo_form_input,
             FormInputType.Bool: self.make_bool_form_input,
+            FormInputType.Color: self.make_color_form_input,
         }
         setting_widget_maker = setting_maker[settings_data["type"]]
-        widget: QWidget = setting_widget_maker(settings_data)
+        widget = setting_widget_maker(settings_data)
 
         form.addRow(settings_data["label"], widget)
         self.value_dict[settings_data["id"]] = widget
@@ -307,7 +365,9 @@ class SettingsDialog(QDialog):
 
     def update_global_settings(self) -> None:
         for name, widget in self.value_dict.items():
-            if isinstance(widget, QLineEdit):
+            if hasattr(widget, 'color_button'):
+                self.settings.setValue(name, widget.color_button.color_value)  # type: ignore[attr-defined]
+            elif isinstance(widget, QLineEdit):
                 self.settings.setValue(name, widget.text())
             elif isinstance(widget, QSpinBox):
                 self.settings.setValue(name, widget.value())

@@ -178,7 +178,9 @@ class GraphView(QGraphicsView):
         else:
             super().keyPressEvent(e)
 
-    def mouseMoveEvent(self, e: QMouseEvent) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def mouseMoveEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
         super().mouseMoveEvent(e)
         if self.tool == GraphTool.Selection:
             if self.rubberband.isVisible():
@@ -212,7 +214,9 @@ class GraphView(QGraphicsView):
         else:
             e.ignore()
 
-    def mouseReleaseEvent(self, e: QMouseEvent) -> None:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def mouseReleaseEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
         if e.button() == Qt.MouseButton.RightButton and self.graph_scene.selectedItems():
             return
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
@@ -249,6 +253,12 @@ class GraphView(QGraphicsView):
                     e.ignore()
         else:
             e.ignore()
+
+    def scrollContentsBy(self, dx: int, dy: int) -> None:
+        """Override to fix visual tearing on background grid during diagonal scrolling."""
+        super().scrollContentsBy(dx, dy)
+        if dx and dy:
+            self.resetCachedContent()
 
     def wheelEvent(self, event: QWheelEvent) -> None:
         # This event captures mousewheel scrolls
@@ -305,6 +315,13 @@ class GraphView(QGraphicsView):
                 self.scale(MAX_ZOOM / current_zoom, MAX_ZOOM / current_zoom)
 
     def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
+        # Expand the rect so grid line endpoints land 2 view pixels outside
+        # the painter's clip region. This hides the visible seams when the
+        # cached background is repainted during scrolling.
+        scale = abs(painter.transform().m11()) or 1.0
+        margin = 2.0 / scale
+        rect = QRectF(rect).adjusted(-margin, -margin, margin, margin)
+
         # Use dark or light background based on dark mode
         if display_setting.dark_mode:
             bg_color = QColor(30, 30, 30, 255)

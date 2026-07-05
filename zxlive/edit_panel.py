@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 from typing import Iterator
 
@@ -25,6 +26,7 @@ class GraphEditPanel(EditorBasePanel):
 
     graph_scene: EditGraphScene
     start_derivation_signal = Signal(object)
+    start_pauliwebs_signal = Signal(object)
 
     _curr_ety: EdgeType
     _curr_vty: VertexType
@@ -64,12 +66,33 @@ class GraphEditPanel(EditorBasePanel):
         self.start_derivation.clicked.connect(self._start_derivation)
         yield ToolbarSection(self.start_derivation)
 
+        self.pauli_webs = QToolButton(self)
+        self.pauli_webs.setText("Pauli Webs")
+        self.pauli_webs.clicked.connect(self._start_pauliwebs)
+        yield ToolbarSection(self.pauli_webs)
+
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():
             show_error_msg("Graph is not well-formed", parent=self)
             return
         new_g: GraphT = copy.deepcopy(self.graph_scene.g)
         self.start_derivation_signal.emit(new_g)
+
+    def _start_pauliwebs(self) -> None:
+        if not self.graph_scene.g.is_well_formed():
+            show_error_msg("Graph is not well-formed", parent=self)
+            return
+
+        graph_json = json.loads(self.graph_scene.g.to_json())
+        edge_pairs = [tuple(sorted(edge[:2])) for edge in graph_json.get("edges", [])]
+        unique_pairs = set(edge_pairs)
+        has_duplicate_edges = len(edge_pairs) != len(unique_pairs)
+        if has_duplicate_edges:
+            show_error_msg("Graph is a multigraph", parent=self)
+            return
+
+        new_g: GraphT = copy.deepcopy(self.graph_scene.g)
+        self.start_pauliwebs_signal.emit(new_g)
 
     def _input_circuit(self) -> None:
         settings = QSettings("zxlive", "zxlive")

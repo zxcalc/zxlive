@@ -34,8 +34,6 @@ from .settings import display_setting
 class GraphScene(QGraphicsScene):
     """The main class responsible for drawing/editing graphs"""
 
-    g: GraphT
-
     # Signals to handle double-clicking and moving of vertices.
     # Note that we have to set the argument types to `object`,
     # otherwise it doesn't work for some reason...
@@ -52,6 +50,7 @@ class GraphScene(QGraphicsScene):
     # Triggers when an edge is dragged. Actual types: EItem, float (old curve_distance), float (new curve_distance)
     edge_dragged = Signal(object, object, object)
     edge_double_clicked = Signal(object)  # Actual type: ET
+    background_double_clicked = Signal()
 
     selection_changed_custom = Signal()
     add_selection_as_pattern_signal = Signal()
@@ -62,12 +61,30 @@ class GraphScene(QGraphicsScene):
         self.update_background_brush()
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
+        self.g: GraphT
+        # True while update_graph is running; suppresses per-item refresh
+        # cascades in VItem.itemChange so that refreshes can be deduplicated.
+        self._bulk_updating: bool = False
 
     def update_background_brush(self) -> None:
         if display_setting.dark_mode:
             self.setBackgroundBrush(QBrush(QColor(30, 30, 30)))
         else:
             self.setBackgroundBrush(QBrush(QColor(255, 255, 255)))
+
+    @property
+    def is_bulk_updating(self) -> bool:
+        """Whether the scene is currently applying a bulk graph update."""
+        return self._bulk_updating
+
+    def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
+        # 1. Check if there is an item at the position of the click
+        item = self.itemAt(e.scenePos(), self.views()[0].transform())
+
+        if item is None:
+            self.background_double_clicked.emit()
+
+        super().mouseDoubleClickEvent(e)
 
     @property
     def selected_vertices(self) -> Iterator[VT]:
@@ -82,10 +99,9 @@ class GraphScene(QGraphicsScene):
         """Selects the given collection of vertices."""
         self.clearSelection()
         vs = set(vs)
-        for it in self.items():
-            if isinstance(it, VItem) and it.v in vs:
-                it.setSelected(True)
-                vs.remove(it.v)
+        for v in vs:
+            if v in self.vertex_map:
+                self.vertex_map[v].setSelected(True)
         self.selection_changed_custom.emit()
 
     def set_graph(self, g: GraphT) -> None:
@@ -102,7 +118,7 @@ class GraphScene(QGraphicsScene):
         self.add_items()
         self.invalidate()
 
-    def update_graph(self, new: GraphT, select_new: bool = False) -> None:
+    def update_graph(self, new: GraphT, select_new: bool = False) -> None:  # noqa: PLR0912
         """Update the PyZX graph for the scene.
         This will update the scene to match the given graph. It will
         try to reuse existing QGraphicsItem's as much as possible.
@@ -112,10 +128,49 @@ class GraphScene(QGraphicsScene):
         :param new: The new graph to update to.
         :param select_new: If True, add all new vertices to the selection set."""
 
-        selected_vertices = set(self.selected_vertices)
+        self._bulk_updating = True
+        views = self.views()
+        for view in views:
+            view.setUpdatesEnabled(False)
+        try:
+            self._update_graph_inner(new, select_new)
+        finally:
+            self._bulk_updating = False
+            for view in views:
+                view.setUpdatesEnabled(True)
 
+    def _update_graph_inner(self, new: GraphT, select_new: bool) -> None:
+        """Inner implementation of update_graph.
+
+        Runs with ``_bulk_updating=True`` and view updates disabled so that:
+        - VItem.itemChange does not cascade refresh() on every setPos/setSelected
+        - Qt defers all repaints until the outer method re-enables updates
+        """
+
+        selected_vertices = set(self.selected_vertices)
         diff = GraphDiff(self.g, new)
 
+        # Update order:
+        # 1) Remove scene items using the old graph state (removed edges/verts still exist there)
+        # 2) Apply the graph diff and swap to the new graph state
+        # 3) Add scene items using the new graph data
+        # 4) Refresh all "dirty" items that changed in some way (position, type, etc.)
+        self._remove_diff_vertices(diff, selected_vertices)
+        self._remove_diff_edges(diff)
+
+        new_g = diff.apply_diff(self.g)
+        # Mypy issue: https://github.com/python/mypy/issues/11673
+        assert isinstance(new_g, GraphT)  # type: ignore
+        self.g = new_g
+
+        self._add_new_vertices_from_diff(diff, selected_vertices, select_new)
+        self._add_new_edges_from_diff(diff)
+
+        dirty_vertices, dirty_edges = self._collect_dirty_items(diff)
+        self._refresh_dirty_items(dirty_vertices, dirty_edges)
+        self.select_vertices(selected_vertices)
+
+    def _remove_diff_vertices(self, diff: GraphDiff, selected_vertices: set[VT]) -> None:
         for v in diff.removed_verts:
             v_item = self.vertex_map[v]
             if v_item.phase_item:
@@ -126,6 +181,7 @@ class GraphScene(QGraphicsScene):
             self.removeItem(v_item)
             del self.vertex_map[v]
 
+    def _remove_diff_edges(self, diff: GraphDiff) -> None:
         for e in diff.removed_edges:
             edge_idx = len(self.edge_map[e]) - 1
             e_item = self.edge_map[e][edge_idx]
@@ -143,14 +199,7 @@ class GraphScene(QGraphicsScene):
             if len(self.edge_map[e]) == 0:
                 del self.edge_map[e]
 
-        new_g = diff.apply_diff(self.g)
-        # Mypy issue: https://github.com/python/mypy/issues/11673
-        assert isinstance(new_g, GraphT)  # type: ignore
-        self.g = new_g
-        # g now contains the new graph,
-        # but we still need to update the scene
-        # However, the new vertices and edges automatically follow the new graph structure
-
+    def _add_new_vertices_from_diff(self, diff: GraphDiff, selected_vertices: set[VT], select_new: bool) -> None:
         for v in diff.new_verts:
             v_item = VItem(self, v)
             self.vertex_map[v] = v_item
@@ -159,6 +208,12 @@ class GraphScene(QGraphicsScene):
             if select_new:
                 selected_vertices.add(v)
 
+        # Recompute rotations after all new vertices exist in vertex_map,
+        # so W-partner lookups succeed for pairs added in the same update.
+        for v in diff.new_verts:
+            self.vertex_map[v].set_vitem_rotation()
+
+    def _add_new_edges_from_diff(self, diff: GraphDiff) -> None:
         for (s, t), typ in diff.new_edges:
             e = (s, t, typ)
             if e not in self.edge_map:
@@ -171,35 +226,41 @@ class GraphScene(QGraphicsScene):
             self.addItem(e_item)
             self.addItem(e_item.selection_node)
 
-        for v in diff.new_verts:
-            self.vertex_map[v].set_vitem_rotation()
-
-        for v in diff.changed_vertex_types:
-            self.vertex_map[v].refresh()
-
-        for v in diff.changed_phases:
-            self.vertex_map[v].refresh()
-
-        for v in diff.changed_vdata:
-            self.vertex_map[v].refresh()
-
-        for e in diff.changed_edata:
-            for i in self.edge_map[e]:
-                self.edge_map[e][i].refresh()
+    def _collect_dirty_items(self, diff: GraphDiff) -> tuple[set[VT], set[ET]]:
+        # Refresh each item once, even if it appears in multiple diff categories.
+        dirty_vertices = set(diff.changed_vertex_types) | set(diff.changed_phases) | set(diff.changed_vdata)
+        dirty_edges = set(diff.changed_edata)
 
         for v in diff.changed_pos:
             v_item = self.vertex_map[v]
             for anim in v_item.active_animations.copy():
                 anim.stop()
             v_item.set_pos_from_graph()
-            v_item.set_vitem_rotation()
+            dirty_vertices.add(v)
 
         for e in diff.changed_edge_types:
             for i in self.edge_map[e]:
                 self.edge_map[e][i].reset_color()
-                self.edge_map[e][i].refresh()
+            dirty_edges.add(e)
 
-        self.select_vertices(selected_vertices)
+        # Edges adjacent to dirty vertices must also be refreshed (their
+        # geometry depends on endpoint positions/types).
+        for v in dirty_vertices:
+            v_item = self.vertex_map[v]
+            for e_item in v_item.adj_items:
+                dirty_edges.add(e_item.e)
+
+        return dirty_vertices, dirty_edges
+
+    def _refresh_dirty_items(self, dirty_vertices: set[VT], dirty_edges: set[ET]) -> None:
+        for v in dirty_vertices:
+            if v in self.vertex_map:
+                self.vertex_map[v].refresh(cascade_edges=False)
+
+        for e in dirty_edges:
+            if e in self.edge_map:
+                for i in self.edge_map[e]:
+                    self.edge_map[e][i].refresh()
 
     def update_edge_curves(self, s: VT, t: VT) -> None:
         edges = []

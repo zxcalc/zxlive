@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import random
 from typing import Iterator, Optional, Union, cast
 
@@ -17,7 +18,8 @@ from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
 from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
-from .common import ET, VT, GraphT, ToolType, get_data, pos_from_view, pos_to_view
+from .common import (ET, VT, GraphT, ToolType, get_data,
+                     pos_from_view, pos_to_view)
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
@@ -35,6 +37,7 @@ class ProofPanel(BasePanel):
 
     graph_scene: EditGraphScene
     fault_equivalent_weight_value: Optional[int] = None
+    start_pauliwebs_signal = Signal(object)
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
         super().__init__(*actions)
@@ -107,8 +110,13 @@ class ProofPanel(BasePanel):
         self.identity_choice[0].setText("Z")
         self.identity_choice[0].setCheckable(True)
         self.identity_choice[0].setChecked(True)
+        self.identity_choice[0].setShortcut("z")
+        self.identity_choice[0].setToolTip("Z spider (Z)")
         self.identity_choice[1].setText("X")
         self.identity_choice[1].setCheckable(True)
+        self.identity_choice[1].setShortcut("x")
+        self.identity_choice[1].setToolTip("X spider (X)")
+
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
         self.fault_equivalent_mode = QToolButton(self)
@@ -191,6 +199,28 @@ class ProofPanel(BasePanel):
         return
     
 
+        self.pauli_webs = QToolButton(self)
+        self.pauli_webs.setText("Pauli Webs")
+        self.pauli_webs.clicked.connect(self._start_pauliwebs)
+        yield ToolbarSection(self.pauli_webs)
+
+    def _start_pauliwebs(self) -> None:
+        # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication
+        if not self.graph_scene.g.is_well_formed():
+            show_error_msg("Graph is not well-formed", parent=self)
+            return
+
+        graph_json = json.loads(self.graph_scene.g.to_json())
+        edge_pairs = [tuple(sorted(edge[:2])) for edge in graph_json.get("edges", [])]
+        unique_pairs = set(edge_pairs)
+        has_duplicate_edges = len(edge_pairs) != len(unique_pairs)
+        if has_duplicate_edges:
+            show_error_msg("Graph is a multigraph", parent=self)
+            return
+
+        new_g: GraphT = copy.deepcopy(self.graph_scene.g)
+        self.start_pauliwebs_signal.emit(new_g)
+
     def update_font(self) -> None:
         self.rewrites_panel.setFont(display_setting.font)
         self.rewrites_panel.reset_rewrite_panel_style()
@@ -231,7 +261,7 @@ class ProofPanel(BasePanel):
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
             elif pyzx.rewrite_rules.check_copy(self.graph, v):  # TODO: Should check if copy can be applied between v and w
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
-            elif pyzx.rewrite_rules.check_pauli(self.graph, w, v): # Second parameter is the Pauli
+            elif pyzx.rewrite_rules.check_pauli(self.graph, w, v):  # Second parameter is the Pauli
                 anims.anticipate_strong_comp(self.graph_scene.vertex_map[w])
         else:
             anims.back_to_default(self.graph_scene.vertex_map[w])
@@ -310,12 +340,17 @@ class ProofPanel(BasePanel):
             # Remove even number of edges
             if num_edges % 2 != 0:
                 num_edges -= 1
+            if num_edges == 0:
+                return False
+            # Collect edge items for animation before removing edges. The diff removes the
+            # highest-indexed items, so animate the same ones from the end of the dict.
+            edge_items = [eitem for eitem in self.graph_scene.edge_map[edges[0]].values()]
             for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
                 new_g.remove_edge(edges[0])
-            # TODO: Add animation for Hopf
-            # anim = anims.hopf(edges, self.graph_scene)
+            # Animate edges fading out
+            anim = anims.hopf(edge_items[-num_edges:])
             cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
-            self.undo_stack.push(cmd)
+            self.undo_stack.push(cmd, anim_before=anim)
             return True
         return False
 
@@ -349,7 +384,9 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd, anim_after=anim)
         return True
 
-    def _magic_slice(self, trace: WandTrace) -> bool:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def _magic_slice(self, trace: WandTrace) -> bool:  # noqa: PLR0912
         def cross(a: QPointF, b: QPointF) -> float:
             return float(a.y() * b.x() - a.x() * b.y())
         filtered = [item for item in trace.hit if isinstance(item, VItem)]
@@ -628,7 +665,7 @@ class ProofPanel(BasePanel):
         dummy_vertices = [v for v in graph.vertices() if graph.type(v) == VertexType.DUMMY]
         if not dummy_vertices:
             return
-        dummy_graph = graph.subgraph_from_vertices(dummy_vertices)
+        dummy_graph = cast(GraphT, graph.subgraph_from_vertices(dummy_vertices))
         new_g = copy.deepcopy(self.graph_scene.g)
         new_verts, new_edges = new_g.merge(dummy_graph.translate(0.5, 0.5))
         cmd = ProofModeCommand(UpdateGraph(self.graph_view, new_g), self.step_view)

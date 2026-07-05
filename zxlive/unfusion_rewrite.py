@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
-import pyzx
 from pyzx.utils import VertexType, FractionLike
-from pyzx.rewrite import Rewrite, RewriteSimpGraph
+from pyzx.rewrite import RewriteSimpGraph
+from pyzx.graph.base import BaseGraph
 
 from .common import VT, ET, GraphT
 from .unfusion_dialog import UnfusionDialog, UnfusionModeManager
@@ -26,16 +26,28 @@ def match_unfuse_single_vertex(graph: GraphT, vertices: list[VT]) -> list[VT]:
     return []
 
 
-def apply_unfuse_rule(graph: GraphT, vertices: list[VT]) -> pyzx.rewrite_rules.rules.RewriteOutputType[VT, ET]:
-    """Apply the unfusion rule to a single vertex."""
-    # This function should not be called directly for the interactive unfusion
-    # It's here for compatibility with the rewrite system structure
-    # The actual unfusion logic is handled by the UnfusionRewriteAction
-    raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
-    return True
+class UnfusionRewrite(RewriteSimpGraph[VT, ET]):
+    """RewriteSimpGraph subclass with an is_match method for unfusion.
 
-unfusion_rewrite = RewriteSimpGraph(apply_unfuse_rule, apply_unfuse_rule)
-unfusion_rewrite.is_match = match_unfuse_single_vertex
+    The actual unfusion logic is handled interactively by UnfusionRewriteAction,
+    so apply/simp just raise NotImplementedError.
+    """
+
+    def __init__(self) -> None:
+        def _no_op_applier(graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:
+            raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+
+        def _no_op_simp(graph: BaseGraph[VT, ET]) -> bool:
+            raise NotImplementedError("Interactive unfusion should be handled by UnfusionRewriteAction.")
+
+        super().__init__(_no_op_applier, _no_op_simp)
+
+    def is_match(self, graph: GraphT, vertices: list[VT]) -> bool:  # type: ignore[override]
+        return bool(match_unfuse_single_vertex(graph, vertices))
+
+
+unfusion_rewrite: UnfusionRewrite = UnfusionRewrite()
+
 
 class UnfusionRewriteAction:
     """Special rewrite action that handles the interactive unfusion process."""
@@ -48,8 +60,7 @@ class UnfusionRewriteAction:
     def can_unfuse(self, vertex: VT) -> bool:
         """Check if a vertex can be unfused."""
         graph = self.proof_panel.graph_scene.g
-        return (graph.type(vertex) != VertexType.BOUNDARY and
-                len(list(graph.incident_edges(vertex))) >= 2)
+        return bool(graph.type(vertex) != VertexType.BOUNDARY)
 
     def start_unfusion(self, vertex: VT) -> bool:
         """Start the unfusion process for a vertex."""
@@ -155,8 +166,9 @@ class UnfusionRewriteAction:
         # Remove the original vertex
         new_g.remove_vertex(original_vertex)
 
+        from .rewrite_data import rules_basic
         cmd = AddRewriteStep(self.proof_panel.graph_view, new_g,
-                             self.proof_panel.step_view, "unfuse")
+                             self.proof_panel.step_view, rules_basic['unfuse']['text'])
         anim = anims.unfuse(graph, new_g, original_vertex, self.proof_panel.graph_scene)
         self.proof_panel.undo_stack.push(cmd, anim_after=anim)
 

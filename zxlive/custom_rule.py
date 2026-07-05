@@ -1,28 +1,32 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Callable, Optional, Sequence, Dict, Union, Any
+from typing import TYPE_CHECKING, Hashable, Optional, Sequence, Dict, TypeVar, Union, Any
 
 import networkx as nx
 import numpy as np
-import pyzx
 from networkx.algorithms.isomorphism import (GraphMatcher,
                                              categorical_node_match, categorical_edge_match)
-from networkx.classes.reportviews import NodeView
-from pyzx.utils import EdgeType, VertexType, get_w_io
+from pyzx.utils import EdgeType, VertexType, get_w_io, phase_is_pauli
 from shapely import Polygon
+from shapely.errors import ShapelyError
 
 from pyzx.symbolic import Poly, Var
 from pyzx.graph import jsonparser
+from pyzx.graph.base import BaseGraph
 from pyzx.rewrite import RewriteSimpGraph
 
 from .common import ET, VT, GraphT
+
+NodeT = TypeVar("NodeT", bound=Hashable)
+ScalarPhase = Union[int, float, complex, Fraction]
+ParameterValue = Union[ScalarPhase, Poly]
 
 if TYPE_CHECKING:
     from .rewrite_data import RewriteData
 
 
-class CustomRule(RewriteSimpGraph[VT,ET]):
+class CustomRule(RewriteSimpGraph[VT, ET]):
     def __init__(self, lhs_graph: GraphT, rhs_graph: GraphT, name: str, description: str) -> None:
         lhs_graph.auto_detect_io()
         rhs_graph.auto_detect_io()
@@ -38,7 +42,10 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
                 [v for v in self.lhs_graph_nx.nodes() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]))
 
-    def applier(self, graph: GraphT, vertices: list[VT]) -> bool:
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def applier(self, graph: BaseGraph[VT, ET], vertices: list[VT]) -> bool:  # noqa: PLR0912
+        assert isinstance(graph, GraphT)
         if self.is_rewrite_unfusable:
             self.unfuse_subgraph_for_rewrite(graph, vertices)
 
@@ -58,7 +65,7 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
             if subgraph_nx.nodes()[matching[v]]['type'] != VertexType.BOUNDARY:
                 vertices_to_remove.append(matching[v])
 
-        boundary_vertex_map: dict[NodeView, int] = {}
+        boundary_vertex_map: dict[Hashable, int] = {}
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] == VertexType.BOUNDARY:
                 for x, data in self.lhs_graph_nx.nodes(data=True):
@@ -68,7 +75,10 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
                         break
 
         vertex_positions = get_vertex_positions(graph, self.rhs_graph_nx, boundary_vertex_map)
-        self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+        if boundary_vertex_map:
+            self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+        else:
+            self.last_rewrite_center = None
         vertex_map = dict(boundary_vertex_map)
         for v in self.rhs_graph_nx.nodes():
             if self.rhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY:
@@ -98,33 +108,47 @@ class CustomRule(RewriteSimpGraph[VT,ET]):
         graph.remove_vertices(vertices_to_remove)
         return True
 
-    def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
-        def get_adjacent_boundary_vertices(g: nx.MultiGraph, v: VT) -> Sequence[VT]:
-            return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
+    @staticmethod
+    def _adjacent_boundary_vertices(g: nx.MultiGraph, v: Hashable) -> Sequence[Hashable]:
+        # Node IDs may be VT for source graphs or str (e.g., 'b0') for subgraphs from create_subgraph.
+        return [n for n in g.neighbors(v) if g.nodes()[n]['type'] == VertexType.BOUNDARY]
 
+    def _compute_unfuse_matching(self, graph: GraphT, vertices: list[VT]) -> Dict[VT, VT]:
         subgraph_nx_without_boundaries = nx.MultiGraph(to_networkx(graph).subgraph(vertices))
-        lhs_vertices = [v for v in self.lhs_graph.vertices() if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
+        lhs_vertices = [v for v in self.lhs_graph.vertices()
+                        if self.lhs_graph_nx.nodes()[v]['type'] != VertexType.BOUNDARY]
         lhs_graph_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(lhs_vertices))
         graph_matcher = GraphMatcher(lhs_graph_nx, subgraph_nx_without_boundaries,
                                      node_match=categorical_node_match('type', 1))
-        matching = list(graph_matcher.match())[0]
+        matching: Dict[VT, VT] = list(graph_matcher.match())[0]
+        return matching
 
+    def _should_skip_unfuse(self, subgraph_nx: nx.MultiGraph, matched_v: VT, vtype: VertexType) -> bool:
+        outside_verts = self._adjacent_boundary_vertices(subgraph_nx, matched_v)
+        if len(outside_verts) != 1:
+            return False
+        edge_type = subgraph_nx.get_edge_data(matched_v, outside_verts[0])[0]['type']
+        return edge_type == EdgeType.SIMPLE and vtype != VertexType.W_INPUT
+
+    def _dispatch_unfuse(self, graph: GraphT, subgraph_nx: nx.MultiGraph,
+                         matched_v: VT, vtype: VertexType) -> None:
+        if vtype in (VertexType.Z, VertexType.X, VertexType.Z_BOX):
+            self.unfuse_zx_vertex(graph, subgraph_nx, matched_v, vtype)
+        elif vtype == VertexType.H_BOX:
+            self.unfuse_h_box_vertex(graph, subgraph_nx, matched_v)
+        elif vtype in (VertexType.W_OUTPUT, VertexType.W_INPUT):
+            self.unfuse_w_vertex(graph, subgraph_nx, matched_v, vtype)
+
+    def unfuse_subgraph_for_rewrite(self, graph: GraphT, vertices: list[VT]) -> None:
+        matching = self._compute_unfuse_matching(graph, vertices)
         subgraph_nx, _ = create_subgraph(graph, vertices)
         for v in matching:
-            if len(get_adjacent_boundary_vertices(self.lhs_graph_nx, v)) != 1:
+            if len(self._adjacent_boundary_vertices(self.lhs_graph_nx, v)) != 1:
                 continue
             vtype = self.lhs_graph_nx.nodes()[v]['type']
-            outside_verts = get_adjacent_boundary_vertices(subgraph_nx, matching[v])
-            if len(outside_verts) == 1 and \
-                    subgraph_nx.get_edge_data(matching[v], outside_verts[0])[0]['type'] == EdgeType.SIMPLE and \
-                    vtype != VertexType.W_INPUT:
+            if self._should_skip_unfuse(subgraph_nx, matching[v], vtype):
                 continue
-            if vtype == VertexType.Z or vtype == VertexType.X or vtype == VertexType.Z_BOX:
-                self.unfuse_zx_vertex(graph, subgraph_nx, matching[v], vtype)
-            elif vtype == VertexType.H_BOX:
-                self.unfuse_h_box_vertex(graph, subgraph_nx, matching[v])
-            elif vtype == VertexType.W_OUTPUT or vtype == VertexType.W_INPUT:
-                self.unfuse_w_vertex(graph, subgraph_nx, matching[v], vtype)
+            self._dispatch_unfuse(graph, subgraph_nx, matching[v], vtype)
 
     def unfuse_update_edges(self, graph: GraphT, subgraph_nx: nx.MultiGraph, old_v: VT, new_v: VT) -> None:
         for e in graph.incident_edges(old_v):
@@ -216,7 +240,7 @@ def is_rewrite_unfusable(lhs_graph: GraphT) -> bool:
     return True
 
 
-def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[Var], Union[int, float, complex, Fraction]]:
+def get_linear(v: Poly) -> tuple[ScalarPhase, Optional[Var], ScalarPhase]:
     if not isinstance(v, Poly):
         raise ValueError("Not a symbolic parameter")
     if len(v.terms) > 2 or len(v.free_vars()) > 1:
@@ -226,7 +250,7 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     elif len(v.terms) == 1:
         if len(v.terms[0][1].vars) > 0:
             var_term = v.terms[0]
-            const: Union[int, float, complex, Fraction] = 0
+            const: ScalarPhase = 0
         else:
             const = v.terms[0][0]
             return 1, None, const
@@ -244,33 +268,41 @@ def get_linear(v: Poly) -> tuple[Union[int, float, complex, Fraction], Optional[
     return coeff, var, const
 
 
-def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, Union[int, float, complex, Fraction]]:
-    params: Dict[Var, Union[int, float, complex, Fraction]] = {}
+def _is_valid_boolean_phase(phase: ParameterValue) -> bool:
+    if isinstance(phase, complex):
+        return False
+    if isinstance(phase, float):
+        return phase % 2 == 0 or phase % 2 == 1
+    return phase_is_pauli(phase)
+
+
+def _validate_symbolic_parameter(params: Dict[Var, ParameterValue], var: Var, value: ParameterValue) -> None:
+    current_value = params.get(var)
+    current_value = current_value % 2 if isinstance(current_value, Fraction) else current_value
+    value = value % 2 if isinstance(value, Fraction) else value
+    if var in params and current_value != value:
+        raise ValueError("Symbolic parameters do not match")
+    if var.is_bool and not _is_valid_boolean_phase(value):
+        raise ValueError("Boolean variable assigned non-boolean value")
+
+
+def match_symbolic_parameters(match: Dict[VT, VT], left: nx.MultiGraph, right: nx.MultiGraph) -> Dict[Var, ParameterValue]:
+    params: Dict[Var, ParameterValue] = {}
     left_phase = left.nodes.data('phase', default=0)  # type: ignore
     right_phase = right.nodes.data('phase', default=0)  # type: ignore
 
-    def check_phase_equality(v: VT) -> None:
-        if left_phase[v] != right_phase[match[v]]:
-            raise ValueError("Parameters do not match")
-
-    def update_params(v: VT, var: Var, coeff: Union[int, float, complex, Fraction], const: Union[int, float, complex, Fraction]) -> None:
-        var_value = (right_phase[match[v]] - const) / coeff
-        if var in params and params[var] != var_value:
-            raise ValueError("Symbolic parameters do not match")
-        if var.is_bool and var_value not in (0, 1):
-            raise ValueError("Boolean variable assigned non-boolean value")
-        params[var] = var_value
-
     for v in left.nodes():
-        if isinstance(left_phase[v], Poly):
-            coeff, var, const = get_linear(left_phase[v])
-            if var is None:
-                check_phase_equality(v)
+        rule_phase = left_phase[v]
+        target_phase = right_phase[match[v]]
+        if isinstance(rule_phase, Poly):
+            coeff, var, const = get_linear(rule_phase)
+            if var is not None:
+                var_value: ParameterValue = (target_phase - const) / coeff
+                _validate_symbolic_parameter(params, var, var_value)
+                params[var] = var_value
                 continue
-            update_params(v, var, coeff, const)
-        else:
-            check_phase_equality(v)
-
+        if rule_phase != target_phase:
+            raise ValueError("Parameters do not match")
     return params
 
 
@@ -319,29 +351,62 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.MultiGraph, dict
     return subgraph_nx, boundary_mapping
 
 
-def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_vertex_map: dict[NodeView, int]) -> dict[NodeView, tuple[float, float]]:
-    pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
-    coords = np.array(list(pos_dict.values()))
-    center = np.mean(coords, axis=0)
-    angles = np.arctan2(coords[:, 1] - center[1], coords[:, 0] - center[0])
-    coords = coords[np.argsort(-angles)]
+def _boundary_layout_scale(coords: np.ndarray) -> float:
+    # Approximate area enclosed by the boundary points; falls back to the
+    # squared maximum inter-point distance when the polygon is degenerate
+    # (collinear or coincident points).
     try:
         area = float(Polygon(coords).area)
-    except BaseException:
+    except (ShapelyError, ValueError):
+        area = 0.
+    if area >= 1e-9:
+        return area
+    max_dist = 0.
+    for i in range(len(coords)):
+        for j in range(i + 1, len(coords)):
+            max_dist = max(max_dist, float(np.linalg.norm(coords[i] - coords[j])))
+    return max_dist ** 2 if max_dist > 0 else 1.
+
+
+def _w_output_partner(rhs_graph: nx.MultiGraph, v: NodeT) -> Optional[NodeT]:
+    for n in rhs_graph.neighbors(v):
+        if rhs_graph.nodes()[n]['type'] != VertexType.W_OUTPUT:
+            continue
+        edges = rhs_graph[v][n]
+        if any(rhs_graph.get_edge_data(v, n, k)['type'] == EdgeType.W_IO for k in edges):
+            return n  # type: ignore[no-any-return]
+    return None
+
+
+def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_vertex_map: dict[NodeT, int]) -> dict[NodeT, tuple[float, float]]:
+    if len(rhs_graph) == 0:
+        return {}
+    pos_dict = {v: (graph.row(m), graph.qubit(m)) for v, m in boundary_vertex_map.items()}
+    if pos_dict:
+        coords = np.array(list(pos_dict.values()))
+        center = np.mean(coords, axis=0)
+        angles = np.arctan2(coords[:, 1] - center[1], coords[:, 0] - center[0])
+        area = _boundary_layout_scale(coords[np.argsort(-angles)])
+    else:
         area = 1.
+
     k = (area ** 0.5) / len(rhs_graph)
-    ret: dict[NodeView, tuple[float, float]] = dict(nx.spring_layout(rhs_graph, k=k, pos=pos_dict, fixed=boundary_vertex_map.keys()))
-    # if the node type in ret is W_INPUT, move it next to the W_OUTPUT node
+    layout = nx.spring_layout(rhs_graph, k=k, pos=pos_dict or None,
+                              fixed=boundary_vertex_map.keys() or None)
+    ret: dict[NodeT, tuple[float, float]] = {v: (float(pos[0]), float(pos[1]))
+                                             for v, pos in layout.items()}
+    # Snap each W_INPUT next to its W_OUTPUT partner.
     for v in ret:
-        if rhs_graph.nodes()[v]['type'] == VertexType.W_INPUT:
-            w_out = next((n for n in rhs_graph.neighbors(v) if
-                          any(rhs_graph.get_edge_data(v, n, k)['type'] == EdgeType.W_IO for k in rhs_graph[v][n])
-                          and rhs_graph.nodes()[n]['type'] == VertexType.W_OUTPUT), None)
-            if w_out:
-                ret[v] = (ret[w_out][0] - 0.3, ret[w_out][1])
+        if rhs_graph.nodes()[v]['type'] != VertexType.W_INPUT:
+            continue
+        w_out = _w_output_partner(rhs_graph, v)
+        if w_out is not None:
+            ret[v] = (ret[w_out][0] - 0.3, ret[w_out][1])
     return ret
 
 
+# TODO: Fix code complexity
+# noqa: complexipy
 def check_rule(rule: CustomRule) -> None:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()

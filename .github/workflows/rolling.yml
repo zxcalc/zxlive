@@ -1,8 +1,7 @@
-name: Deploy Official Release
-
+name: Rolling Release
 on:
   push:
-    tags: [ "v*.*.*" ]
+    branches: [ master ]
 
   # Allows you to run this workflow manually from the GitHub Actions tab
   workflow_dispatch:
@@ -11,8 +10,12 @@ permissions:
   contents: write
   actions: read
 
+concurrency:
+  group: rolling-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build_and_deploy:
+  build_rolling:
     strategy:
       fail-fast: false
       matrix:
@@ -41,9 +44,38 @@ jobs:
           artifact-path: zxlive_windows.exe
           require-valid-signature: "false"
 
-      - name: Release
-        uses: softprops/action-gh-release@v3
+      - name: Upload Binary Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: zxlive_*
-          draft: true
-          fail_on_unmatched_files: true
+          name: compiled-binaries-${{ matrix.os }}
+          path: zxlive_*
+          if-no-files-found: error
+
+  publish_rolling:
+    needs: build_rolling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update Rolling Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f rolling
+          git push origin -f rolling
+
+      - name: Download release artifacts only
+        uses: actions/download-artifact@v4
+        with:
+          pattern: compiled-binaries-*
+          path: release_assets
+          merge-multiple: true
+
+      - name: Show release assets
+        run: ls -la release_assets
+
+      - name: Publish rolling release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: rolling
+          prerelease: true
+          files: release_assets/*

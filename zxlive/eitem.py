@@ -18,14 +18,14 @@ from math import sqrt
 from typing import Optional, Any, TYPE_CHECKING, Union
 from enum import Enum
 
-from PySide6.QtCore import QPointF, QVariantAnimation, QAbstractAnimation
+from PySide6.QtCore import QPointF, QVariantAnimation, QAbstractAnimation, Qt
 from PySide6.QtWidgets import QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsItem, \
     QGraphicsSceneMouseEvent, QStyleOptionGraphicsItem, QWidget, QStyle
 from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStroker
 
 from pyzx.utils import EdgeType, VertexType
 
-from .common import SCALE, ET, GraphT
+from .common import SCALE, ET, GraphT, get_settings_value
 from .settings import display_setting
 from .vitem import VItem, EITEM_Z
 
@@ -44,6 +44,7 @@ class EItem(QGraphicsPathItem):
     class Properties(Enum):
         """Properties of an EItem that can be animated."""
         Thickness = 1
+        Opacity = 2
 
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
@@ -70,7 +71,7 @@ class EItem(QGraphicsPathItem):
         self.is_mouse_pressed = False
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
-        self.thickness: float = 3
+        self.thickness: float = 3.0
         self.color: QColor = QColor()
         self.reset_color()
 
@@ -106,7 +107,7 @@ class EItem(QGraphicsPathItem):
         if self.g.edge_type(self.e) == EdgeType.HADAMARD:
             pen.setDashPattern([4.0, 2.0])
         pen.setColor(self.color)
-        self.setPen(QPen(pen))
+        self.setPen(pen)
 
         if not self.is_dragging:
             self.curve_distance = self.g.edata(self.e, f"curve_{self.index}", self.curve_distance)
@@ -121,22 +122,123 @@ class EItem(QGraphicsPathItem):
                          s_pos + QPointF(-1, -1) * cd * SCALE,
                          s_pos)
             curve_midpoint = s_pos + QPointF(0, -0.75) * cd * SCALE
+
+            # we don't care about half-paths for self loops, since they won't be colored
+            self.half_path_left = None
+            self.half_path_right = None
         else:
             control_point = calculate_control_point(self.s_item.pos(), self.t_item.pos(), self.curve_distance)
             path.moveTo(self.s_item.pos())
             path.quadTo(control_point, self.t_item.pos())
             curve_midpoint = self.s_item.pos() * 0.25 + control_point * 0.5 + self.t_item.pos() * 0.25
+
+            half_path_left = QPainterPath()
+            half_control_left = (self.s_item.pos() + control_point) * 0.5
+            half_path_left.moveTo(self.s_item.pos())
+            half_path_left.quadTo(half_control_left, curve_midpoint)
+            self.half_path_left = half_path_left
+
+            half_path_right = QPainterPath()
+            half_control_right = (self.t_item.pos() + control_point) * 0.5
+            half_path_right.moveTo(curve_midpoint)
+            half_path_right.quadTo(half_control_right, self.t_item.pos())
+            self.half_path_right = half_path_right
+
         self.setPath(path)
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
+    # TODO: Fix code complexity
+    # noqa: complexipy
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
+        # The type stub is missing the 'state' attribute, so there is a
+        # false positive mypy error if we set the usual way.
         assert hasattr(option, "state")
-        option.state &= ~QStyle.StateFlag.State_Selected
+        state = getattr(option, "state")
+        setattr(option, "state", state & ~QStyle.StateFlag.State_Selected)
+
+        webs: list[tuple[bool, bool, QColor]] = []
+
+        swap = get_settings_value("swap-pauli-web-colors", bool)
+        zweb0 = self.g.edata(self.e, "xweb0" if swap else "zweb0")
+        zweb1 = self.g.edata(self.e, "xweb1" if swap else "zweb1")
+        xweb0 = self.g.edata(self.e, "zweb0" if swap else "xweb0")
+        xweb1 = self.g.edata(self.e, "zweb1" if swap else "xweb1")
+
+        highlight = self.g.edata(self.e, "highlight")
+        webs.append((highlight, highlight, QColor("#FFC107")))  # highlight web
+
+        zcolor = display_setting.effective_colors["z_pauli_web"]
+        xcolor = display_setting.effective_colors["x_pauli_web"]
+        ycolor = display_setting.effective_colors["y_pauli_web"]
+
+        # only draw y webs if the setting is enabled
+        if get_settings_value("blue-y-pauli-web", bool):
+            yweb0 = zweb0 and xweb0
+            yweb1 = zweb1 and xweb1
+
+            # if we're drawing y webs, we shouldn't draw the corresponding x and z webs
+            zweb0 = zweb0 and not yweb0
+            zweb1 = zweb1 and not yweb1
+            xweb0 = xweb0 and not yweb0
+            xweb1 = xweb1 and not yweb1
+
+            webs.append((yweb0, yweb1, ycolor))
+
+        webs.append((zweb0, zweb1, zcolor))
+        webs.append((xweb0, xweb1, xcolor))
+
+        # determine thicknesses for each web
+        thicknesses: list[float] = []
+        left_thickness = 2.5
+        right_thickness = 2.5
+        for left, right, _ in reversed(webs):
+            if left and right:
+                thickness = max(left_thickness, right_thickness)
+                thicknesses.append(thickness)
+                left_thickness = right_thickness = thickness + 1
+            elif left:
+                thicknesses.append(left_thickness)
+                left_thickness += 1
+            elif right:
+                thicknesses.append(right_thickness)
+                right_thickness += 1
+            else:
+                thicknesses.append(0)
+        thicknesses.reverse()
+
+        # draw webs from outermost to innermost
+        for (left, right, color), thickness in zip(webs, thicknesses):
+            self._paint_pauli_web(painter, option, widget, color, thickness, left=left, right=right)
+
         super().paint(painter, option, widget)
+
+    def _paint_pauli_web(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget],
+                         color: QColor, thickness: float, *, left: bool, right: bool) -> None:
+        """Draws a colored Pauli web on the edge if specified by the flags."""
+
+        if not (left or right):
+            return
+
+        old_path = self.path()
+        old_pen = self.pen()
+
+        path = old_path if left and right else (self.half_path_left if left else self.half_path_right)
+        path = path or old_path  # fallback if half paths are not defined (self-loops)
+
+        pen = QPen(old_pen)
+        pen.setWidthF(self.thickness * thickness)
+        pen.setColor(color)
+        pen.setStyle(Qt.PenStyle.SolidLine)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        self.setPen(pen)
+        self.setPath(path)
+        super().paint(painter, option, widget)
+        self.setPen(old_pen)
+        self.setPath(old_path)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Intercept selection- and position-has-changed events to call `refresh`.
@@ -283,21 +385,24 @@ class EItemAnimation(QVariantAnimation):
         self.stateChanged.connect(self._on_state_changed)
 
     @property
-    def it(self) -> EItem:
+    def it(self) -> Optional[EItem]:
+        # Returns ``None`` if the edge is no longer in the scene.
         if self._it is None and self.scene is not None and self.e is not None:
-            self._it = self.scene.edge_map[self.e][0]
-        assert self._it is not None
+            if mapping := self.scene.edge_map.get(self.e):
+                self._it = mapping[0]
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        if (item := self.it) is None:
+            return
+        if state == QAbstractAnimation.State.Running and self not in item.active_animations:
             # Stop all animations that target the same property
-            for anim in self.it.active_animations.copy():
+            for anim in item.active_animations.copy():
                 if anim.prop == self.prop:
                     anim.stop()
-            self.it.active_animations.add(self)
+            item.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
-            self.it.active_animations.remove(self)
+            item.active_animations.discard(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
             #   Note that we cannot just remove ourselves from the set since the garbage
@@ -306,11 +411,13 @@ class EItemAnimation(QVariantAnimation):
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
-        if self.state() != QAbstractAnimation.State.Running:
+        if self.state() != QAbstractAnimation.State.Running or (item := self.it) is None:
             return
 
         if self.prop == EItem.Properties.Thickness:
-            self.it.thickness = value
+            item.thickness = value
+        elif self.prop == EItem.Properties.Opacity:
+            item.setOpacity(value)
 
         if self.refresh:
-            self.it.refresh()
+            item.refresh()

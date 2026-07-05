@@ -22,7 +22,8 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import VT, GraphT, ToolType, get_data, pos_from_view, get_settings_value
+from .common import (VT, GraphT, ToolType, get_data,
+                     pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
 from .vitem import VItem, BLACK
@@ -188,6 +189,8 @@ class EditorBasePanel(BasePanel):
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
+        for name in new_g.var_registry.vars():
+            self.variable_viewer.add_item(name)
 
     def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
         """Insert a pattern into the current graph view."""
@@ -253,32 +256,20 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(AddNode(self.graph_view, x, y, self._curr_vty))
         self.play_sound_signal.emit(SFXEnum.THATS_A_SPIDER)
 
-    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
-        """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
-        If self.snap_vertex_edge is true, then we try to connect `u` through all the `vertices` in `verts`, and then to `v`.
-        """
-        cmd: BaseCommand
-        graph = self.graph_view.graph_scene.g
+    def _is_invalid_edge(self, graph: GraphT, u: VT, v: VT) -> bool:
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
-            return None
+            return True
         if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
                 graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
-            return None
-        if (graph.type(u) == VertexType.DUMMY and graph.type(v) != VertexType.DUMMY) or \
-                (graph.type(u) != VertexType.DUMMY and graph.type(v) == VertexType.DUMMY):
-            return None
+            return True
+        u_is_dummy = graph.type(u) == VertexType.DUMMY
+        v_is_dummy = graph.type(v) == VertexType.DUMMY
+        return bool(u_is_dummy != v_is_dummy)
 
-        # We will try to connect all the vertices together in order
-        # First we filter out the vertices that are not compatible with the edge.
-        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
-        # but first we check if there any vertices that we do want to additionally connect.
-        if not self.snap_vertex_edge or not verts:
-            cmd = AddEdge(self.graph_view, u, v, self._curr_ety)
-            self.undo_stack.push(cmd)
-            return
-
-        ux, uy = graph.row(u), graph.qubit(u)
+    def _build_snap_pairs(self, graph: GraphT, u: VT, v: VT,
+                          verts: list[VItem]) -> list[tuple[VT, VT]]:
         # Line was drawn from u to v, we want to order vs with the earlier items first.
+        ux, uy = graph.row(u), graph.qubit(u)
 
         def dist(vitem: VItem) -> float:
             return (graph.row(vitem.v) - ux)**2 + (graph.qubit(vitem.v) - uy)**2  # type: ignore
@@ -288,8 +279,26 @@ class EditorBasePanel(BasePanel):
         for i in range(1, len(vs)):
             pairs.append((vs[i - 1], vs[i]))
         pairs.append((vs[-1], v))
-        cmd = AddEdges(self.graph_view, pairs, self._curr_ety)
-        self.undo_stack.push(cmd)
+        return pairs
+
+    def add_edge(self, u: VT, v: VT, verts: list[VItem]) -> None:
+        """Add an edge between vertices u and v. `verts` is a list of VItems that collide with the edge.
+        If self.snap_vertex_edge is true, then we try to connect `u` through all the `vertices` in `verts`, and then to `v`.
+        """
+        graph = self.graph_view.graph_scene.g
+        if self._is_invalid_edge(graph, u, v):
+            return None
+
+        # We will try to connect all the vertices together in order
+        # First we filter out the vertices that are not compatible with the edge.
+        verts = [vitem for vitem in verts if not graph.type(vitem.v) == VertexType.W_INPUT]  # we will be adding two edges, which is not compatible with W_INPUT
+        # but first we check if there any vertices that we do want to additionally connect.
+        if not self.snap_vertex_edge or not verts:
+            self.undo_stack.push(AddEdge(self.graph_view, u, v, self._curr_ety))
+            return
+
+        pairs = self._build_snap_pairs(graph, u, v, verts)
+        self.undo_stack.push(AddEdges(self.graph_view, pairs, self._curr_ety))
         group = QParallelAnimationGroup()
         for vitem in verts:
             anim = animations.scale(vitem, 1.0, 400, QEasingCurve(QEasingCurve.Type.InCubic), start=1.3)
@@ -325,7 +334,7 @@ class EditorBasePanel(BasePanel):
         else:
             prompt = "Enter desired phase value (non-variables are multiples of pi):"
             error_msg = "Please enter a valid input. (e.g. pi/2, 1/2, 0.25, a+b)."
-            current_phase = phase_to_s(graph.phase(v), graph.type(v))
+            current_phase = phase_to_s(graph.phase(v), graph.type(v), limit_denominator=False)
 
         input_, ok = QInputDialog.getText(
             self, "Change Phase", prompt, text=current_phase
@@ -389,6 +398,7 @@ class VariableViewer(QScrollArea):
 
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 2, 2)
 
+        self._type_boxes: dict[str, QComboBox] = {}
         for name in self.parent_panel.graph.var_registry.vars():
             self.add_item(name)
 
@@ -408,6 +418,11 @@ class VariableViewer(QScrollArea):
             return super().sizeHint()
 
     def add_item(self, name: str) -> None:
+        if name in self._type_boxes:
+            is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
+            self._type_boxes[name].setCurrentIndex(1 if is_bool else 0)
+            return
+
         combobox = QComboBox()
         combobox.insertItems(0, ["Parametric", "Boolean"])
         is_bool = self.parent_panel.graph.var_registry.get_type(name, default=False)
@@ -418,6 +433,7 @@ class VariableViewer(QScrollArea):
         self._layout.removeItem(item)
         self._layout.addWidget(QLabel(f"<pre>{name}</pre>"), 2 + self._items, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
         self._layout.addWidget(combobox, 2 + self._items, 2, Qt.AlignmentFlag.AlignCenter)
+        self._type_boxes[name] = combobox
         self._layout.setRowStretch(2 + self._items, 0)
         self._layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding), 3 + self._items, 2)
         self._layout.setRowStretch(3 + self._items, 1)

@@ -16,41 +16,50 @@
 from __future__ import annotations
 
 import copy
+import json
+import logging
+import os
 import random
 from typing import Callable, Optional, cast
 
+import networkx as nx
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QSettings, QTextStream, QUrl)
+                            QMimeData, QSettings, QTextStream, QTimer, QUrl,
+                            Qt)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
-from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QTabBar,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QMessageBox,
+                               QTabBar, QTabWidget, QVBoxLayout, QWidget)
 from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
+from pyzx.utils import VertexType
 
 from .base_panel import BasePanel
-from .common import (GraphT, from_tikz, get_data, get_settings_value,
-                     new_graph, set_settings_value, to_tikz)
+from .common import (VT, GraphT, from_tikz, get_custom_rules_path, get_data,
+                     get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
-from .custom_rule import CustomRule, check_rule
+from .commands import MoveNode, ProofModeCommand
+from .custom_rule import CustomRule, check_rule, to_networkx
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite, export_gif_dialog,
                       export_proof_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
-                      show_error_msg)
+                      show_error_msg, write_to_file)
 from .edit_panel import GraphEditPanel
 from .proof_panel import ProofPanel
+from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel
 from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
-from .tikz import proof_to_tikz
+from .tikz import proof_to_tikz, proof_steps_to_tikz
 
 
 class MainWindow(QMainWindow):
     """The main window of the ZXLive application."""
+    CLIPBOARD_MIME = "application/vnd.zxlive-graph+json"
 
     def __init__(self) -> None:
         super().__init__()
@@ -80,6 +89,7 @@ class MainWindow(QMainWindow):
         tab_widget.currentChanged.connect(self.tab_changed)
         tab_widget.tabCloseRequested.connect(self.close_tab)
         tab_widget.setMovable(True)
+        tab_widget.setUsesScrollButtons(True)
         tab_position = self.settings.value("tab-bar-location", QTabWidget.TabPosition.North)
         assert isinstance(tab_position, QTabWidget.TabPosition)
         tab_widget.setTabPosition(tab_position)
@@ -125,6 +135,9 @@ class MainWindow(QMainWindow):
         self.export_gif_proof = self._new_action(
             "Export proof to gif", self.handle_export_gif_proof_action,
             None, "Exports the proof to gif")
+        self.export_tikz_series = self._new_action(
+            "Export proof steps to tikz files", self.handle_export_tikz_series_action,
+            None, "Exports each proof step to a separate tikz file")
         self.auto_save_action = self._new_action(
             "Auto Save", self.toggle_auto_save, None,
             "Automatically save the file after every edit"
@@ -142,22 +155,28 @@ class MainWindow(QMainWindow):
         file_menu.addAction(self.save_file)
         file_menu.addAction(self.save_as)
         file_menu.addAction(self.export_tikz_proof)
+        file_menu.addAction(self.export_tikz_series)
         file_menu.addAction(self.export_gif_proof)
         file_menu.addSeparator()
         file_menu.addAction(self.auto_save_action)
 
+        def native_shortcut(key: QKeySequence.StandardKey) -> str:
+            return QKeySequence(key).toString(QKeySequence.SequenceFormat.NativeText)
+
         self.undo_action = self._new_action(
             "Undo", self.undo, QKeySequence.StandardKey.Undo,
-            "Undoes the last action", "undo.svg")
+            f"Undo ({native_shortcut(QKeySequence.StandardKey.Undo)})",
+            "undo.svg")
         self.redo_action = self._new_action(
             "Redo", self.redo, QKeySequence.StandardKey.Redo,
-            "Redoes the last action", "redo.svg")
+            f"Redo ({native_shortcut(QKeySequence.StandardKey.Redo)})",
+            "redo.svg")
         self.cut_action = self._new_action(
             "Cut", self.cut_graph, QKeySequence.StandardKey.Cut,
-            "Cut the selected part of the diagram")
+            f"Cut ({native_shortcut(QKeySequence.StandardKey.Cut)})")
         self.copy_action = self._new_action(
             "&Copy", self.copy_graph, QKeySequence.StandardKey.Copy,
-            "Copy the selected part of the diagram")
+            f"Copy ({native_shortcut(QKeySequence.StandardKey.Copy)})")
         self.copy_clipboard_action = self._new_action(
             "Copy tikz to clipboard", self.copy_graph_to_clipboard,
             QKeySequence("Ctrl+Shift+C"),
@@ -165,7 +184,7 @@ class MainWindow(QMainWindow):
             "as tikz")
         self.paste_action = self._new_action(
             "Paste", self.paste_graph, QKeySequence.StandardKey.Paste,
-            "Paste the copied part of the diagram")
+            f"Paste ({native_shortcut(QKeySequence.StandardKey.Paste)})")
         self.paste_clipboard_action = self._new_action(
             "Paste tikz from clipboard", self.paste_graph_from_clipboard,
             QKeySequence("Ctrl+Shift+V"),
@@ -212,11 +231,15 @@ class MainWindow(QMainWindow):
         self.fit_view_action = self._new_action(
             "Fit view", self.fit_view, QKeySequence("C"),
             "Fits the view to the diagram")
+        self.auto_arrange_action = self._new_action(
+            "Auto arrange", self.auto_arrange, QKeySequence("Ctrl+L"),
+            "Automatically arrange vertices using spring layout")
 
         view_menu = menu.addMenu("&View")
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
+        view_menu.addAction(self.auto_arrange_action)
 
         new_rewrite_from_file = self._new_action(
             "New rewrite from file", lambda: create_new_rewrite(self),
@@ -250,14 +273,22 @@ class MainWindow(QMainWindow):
 
         QShortcut(QKeySequence("Ctrl+B"), self).activated.connect(
             self._toggle_sfx)
+        QApplication.clipboard().dataChanged.connect(self._on_clipboard_changed)
+
+        # Set up periodic session state saving for crash protection
+        # Auto-save session state every minute if there are open tabs
+        self.session_save_timer = QTimer(self)
+        self.session_save_timer.timeout.connect(self._save_session_state)
+        self.session_save_timer.start(60000)  # 1 minute in milliseconds
 
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
         self.new_graph(graph)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
-        self.save_file.setEnabled(has_active_tab)
-        self.save_as.setEnabled(has_active_tab)
+        is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
+        self.save_file.setEnabled(is_saveable)
+        self.save_as.setEnabled(is_saveable)
         self.cut_action.setEnabled(has_active_tab)
         self.copy_action.setEnabled(has_active_tab)
         self.delete_action.setEnabled(has_active_tab)
@@ -266,13 +297,15 @@ class MainWindow(QMainWindow):
         self.zoom_in_action.setEnabled(has_active_tab)
         self.zoom_out_action.setEnabled(has_active_tab)
         self.fit_view_action.setEnabled(has_active_tab)
+        self.auto_arrange_action.setEnabled(has_active_tab)
 
         # Export to tikz and gif are enabled only if there is a proof in the active tab.
         self.export_tikz_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
+        self.export_tikz_series.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
         self.export_gif_proof.setEnabled(has_active_tab and isinstance(self.active_panel, ProofPanel))
 
         # Paste is enabled only if there is something in the clipboard.
-        self.paste_action.setEnabled(has_active_tab and self.copied_graph is not None)
+        self.paste_action.setEnabled(has_active_tab and self._has_pasteable_clipboard_data())
 
         # Undo and redo are always disabled whether on a new tab or closing the last tab.
         self.undo_action.setEnabled(False)
@@ -292,7 +325,7 @@ class MainWindow(QMainWindow):
         action = QAction(name, self)
         if icon_file:
             action.setIcon(QIcon(get_data(f"icons/{icon_file}")))
-        action.setStatusTip(tooltip)
+        action.setToolTip(tooltip)
         action.triggered.connect(trigger)
         if shortcut:
             action.setShortcut(shortcut)
@@ -302,6 +335,19 @@ class MainWindow(QMainWindow):
                 elif alt_shortcut not in action.shortcuts():
                     action.setShortcuts([shortcut, alt_shortcut])  # type: ignore
         return action
+
+    def _has_pasteable_clipboard_data(self) -> bool:
+        if self.copied_graph is not None:
+            return True
+        mime = QApplication.clipboard().mimeData()
+        if mime is None:
+            return False
+        if mime.hasFormat(self.CLIPBOARD_MIME):
+            return True
+        return bool(mime.text().strip())
+
+    def _on_clipboard_changed(self) -> None:
+        self.paste_action.setEnabled(self.active_panel is not None and self._has_pasteable_clipboard_data())
 
     @property
     def active_panel(self) -> Optional[BasePanel]:
@@ -317,16 +363,142 @@ class MainWindow(QMainWindow):
         new_window.show()
 
     def closeEvent(self, e: QCloseEvent) -> None:
-        # We close all the tabs and ask the user if they want to save progress
-        while self.active_panel is not None:
-            success = self.handle_close_action()
-            if not success:
-                e.ignore()  # Abort the closing
-                return
+        # Save session state before closing tabs for potential restoration on next startup
+        self._save_session_state()
+        startup_behavior = get_settings_value("startup-behavior", str, "restore")
+        if startup_behavior != "restore":
+            # We close all the tabs and ask the user if they want to save progress
+            while self.active_panel is not None:
+                success = self.handle_close_action()
+                if not success:
+                    e.ignore()  # Abort the closing
+                    return
+        # Note: In "restore" mode we intentionally skip the save-to-file prompts
+        # because the full in-memory state is preserved in the session.  If the
+        # user later switches the setting to "blank", any work not explicitly
+        # saved to disk will be lost since the session won't be restored.
 
         # save the shape/size of this window on close
         self.settings.setValue("main_window_geometry", self.saveGeometry())
+
         e.accept()
+
+    def _save_session_state(self) -> None:
+        """Save the current state of all open tabs for restoration on next startup."""
+        try:
+            # If there are no tabs open, clear any previously saved session state
+            if self.tab_widget.count() == 0:
+                self.settings.remove("session_state")
+                return
+
+            tabs_state = []
+            for i in range(self.tab_widget.count()):
+                panel = self.tab_widget.widget(i)
+                assert isinstance(panel, BasePanel)
+                tab_name = self.tab_widget.tabText(i)
+
+                tab_data: dict = {
+                    'name': tab_name,
+                    'file_path': panel.file_path,
+                    'file_type': panel.file_type.value if panel.file_type else None,
+                }
+                if isinstance(panel, GraphEditPanel):
+                    tab_data.update({'type': 'graph', 'data': panel.graph.to_json()})
+                elif isinstance(panel, ProofPanel):
+                    tab_data.update({'type': 'proof', 'data': panel.proof_model.to_json()})
+                elif isinstance(panel, RulePanel):
+                    tab_data.update({'type': 'rule', 'data': panel.get_rule().to_json()})
+                elif isinstance(panel, PauliWebsPanel):
+                    tab_data.update({'type': 'pauliwebs', 'data': panel.graph.to_json()})
+                else:
+                    continue  # Unknown panel type, skip
+
+                tabs_state.append(tab_data)
+
+            # Save active tab index
+            active_index = self.tab_widget.currentIndex()
+            session_data = {
+                'tabs': tabs_state,
+                'active_tab': active_index
+            }
+
+            self.settings.setValue("session_state", json.dumps(session_data))
+        except Exception as e:
+            logging.warning(f"Failed to save session state: {e}")
+
+    # TODO: Fix code complexity
+    # noqa: complexipy
+    def _restore_session_state(self) -> bool:  # noqa: PLR0912
+        """Restore previously saved tabs. Returns True if any tabs were restored."""
+        # Check if user wants to restore session
+        startup_behavior = get_settings_value("startup-behavior", str, "restore")
+        if startup_behavior != "restore":
+            return False
+
+        session_json = self.settings.value("session_state")
+        if not session_json:
+            return False
+
+        try:
+            session_data = json.loads(str(session_json))
+            tabs_state = session_data.get('tabs', [])
+            active_tab = session_data.get('active_tab', 0)
+
+            if not tabs_state:
+                return False
+
+            # Restore each tab
+            for tab_data in tabs_state:
+                tab_type = tab_data.get('type')
+                tab_name = tab_data.get('name', 'Untitled')
+                file_path = tab_data.get('file_path')
+                file_type_value = tab_data.get('file_type')
+
+                try:
+                    if tab_type == 'graph':
+                        graph: GraphT = BaseGraph.from_json(tab_data['data'])  # type: ignore
+                        self.new_graph(graph, tab_name)
+                    elif tab_type == 'proof':
+                        from .proof import ProofModel
+                        proof_model = ProofModel.from_json(tab_data['data'])
+                        # Extract the initial graph from the proof
+                        graphs_list = proof_model.graphs()
+                        initial_graph: GraphT = graphs_list[0] if graphs_list else new_graph()
+                        panel = ProofPanel(initial_graph, self.undo_action, self.redo_action)
+                        # Replace the proof model with the loaded one
+                        panel.step_view.set_model(proof_model)
+                        panel.step_view.move_to_step(len(proof_model.steps))  # Move to the end of the proof
+                        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
+                        self._new_panel(panel, tab_name)
+                    elif tab_type == 'rule':
+                        rule = CustomRule.from_json(tab_data['data'])
+                        self.new_rule_editor(rule, tab_name)
+                    elif tab_type == 'pauliwebs':
+                        pauli_graph: GraphT = BaseGraph.from_json(tab_data['data'])  # type: ignore
+                        self.new_pauli_webs(pauli_graph, tab_name)
+
+                    # Restore file path and file type if available
+                    if file_path and self.active_panel:
+                        self.active_panel.file_path = file_path
+                        if file_type_value:
+                            # Find the FileFormat enum by its value
+                            for fmt in FileFormat:
+                                if fmt.value == file_type_value:
+                                    self.active_panel.file_type = fmt
+                                    break
+                except Exception as e:
+                    # If a tab fails to restore, log it but continue with others
+                    logging.warning(f"Failed to restore tab '{tab_name}': {e}")
+                    continue
+
+            # Restore active tab
+            if 0 <= active_tab < self.tab_widget.count():
+                self.tab_widget.setCurrentIndex(active_tab)
+
+            return True
+        except Exception as e:
+            logging.error(f"Failed to restore session state: {e}")
+            return False
 
     def undo(self, e: QEvent) -> None:
         if self.active_panel is None:
@@ -341,13 +513,16 @@ class MainWindow(QMainWindow):
         self.active_panel.undo_stack.redo()
 
     def update_tab_name(self, clean: bool) -> None:
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return
         i = self.tab_widget.currentIndex()
         name = self.tab_widget.tabText(i)
-        if name.endswith("*"):
-            name = name[:-1]
+        if name.startswith("*"):
+            name = name[1:]
         if not clean:
-            name += "*"
+            name = "*" + name
         self.tab_widget.setTabText(i, name)
+        self.tab_widget.setTabToolTip(i, name)
 
     def tab_changed(self, i: int) -> None:
         if isinstance(self.active_panel, ProofPanel):
@@ -410,7 +585,8 @@ class MainWindow(QMainWindow):
             return False
         widget = self.tab_widget.widget(i)
         assert isinstance(widget, BasePanel)
-        if not widget.undo_stack.isClean():
+        if not isinstance(widget, PauliWebsPanel) and (
+                not widget.undo_stack.isClean() or widget.file_path is None):
             name = self.tab_widget.tabText(i).replace("*", "")
             button = QMessageBox.StandardButton
             answer = QMessageBox.question(
@@ -434,6 +610,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_file_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if self.active_panel.file_path is None:
             return self.handle_save_as_action()
         if self.active_panel.file_type == FileFormat.QASM:
@@ -464,7 +642,7 @@ class MainWindow(QMainWindow):
             show_error_msg("Could not write to file", parent=self)
             return False
         out = QTextStream(file)
-        out << data
+        _ = out << data
         file.close()
         self.active_panel.undo_stack.setClean()
         if random.random() < 0.1:
@@ -473,6 +651,8 @@ class MainWindow(QMainWindow):
 
     def handle_save_as_action(self) -> bool:
         assert self.active_panel is not None
+        if isinstance(self.active_panel, PauliWebsPanel):
+            return False
         if isinstance(self.active_panel, ProofPanel):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
@@ -492,6 +672,7 @@ class MainWindow(QMainWindow):
         name = QFileInfo(file_path).baseName()
         i = self.tab_widget.currentIndex()
         self.tab_widget.setTabText(i, name)
+        self.tab_widget.setTabToolTip(i, name)
         return True
 
     def handle_export_tikz_proof_action(self) -> bool:
@@ -514,15 +695,41 @@ class MainWindow(QMainWindow):
         graphs_to_gif(graphs, path, 1000)  # 1000ms per frame
         return True
 
+    def handle_export_tikz_series_action(self) -> bool:
+        """Export each proof step to a separate TikZ file in a chosen directory."""
+        assert isinstance(self.active_panel, ProofPanel)
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select folder for TikZ files",
+            options=QFileDialog.Option.ShowDirsOnly)
+        if not directory:
+            return False
+
+        steps = proof_steps_to_tikz(self.active_panel.proof_model)
+        padding_width = max(3, len(str(max(len(steps) - 1, 0))))
+        for i, (name, tikz) in enumerate(steps):
+            # Create a safe filename from the step name.
+            safe_name = "".join(c if c.isalnum() or c in "._-" else "_" for c in name)
+            filename = f"{i:0{padding_width}d}_{safe_name}.tikz"
+            file_path = os.path.join(directory, filename)
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(tikz)
+            except OSError as e:
+                show_error_msg("Export failed", f"Could not write to {file_path}: {e}", parent=self)
+                return False
+        return True
+
     def cut_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self._copy_graph_to_system_clipboard(self.copied_graph)
         self.paste_action.setEnabled(True)
         self.active_panel.delete_selection()
 
     def copy_graph(self) -> None:
         assert self.active_panel is not None
         self.copied_graph = self.active_panel.copy_selection()
+        self._copy_graph_to_system_clipboard(self.copied_graph)
         self.paste_action.setEnabled(True)
 
     def copy_graph_to_clipboard(self) -> None:
@@ -530,27 +737,86 @@ class MainWindow(QMainWindow):
         that can be understood by Tikzit."""
         assert self.active_panel is not None
         copied_graph = self.active_panel.copy_selection()
-        tikz = to_tikz(copied_graph)
-        pyperclip.copy(tikz)
+        self._copy_graph_to_system_clipboard(copied_graph, include_internal=False)
 
     def paste_graph(self) -> None:
         assert self.active_panel is not None
-        if self.copied_graph is not None:
-            self.active_panel.paste_graph(self.copied_graph)
+        copied_graph = self._read_graph_from_system_clipboard()
+        if copied_graph is None and self.copied_graph is not None:
+            copied_graph = self.copied_graph
+        if copied_graph is not None:
+            self.active_panel.paste_graph(copied_graph)
 
     def paste_graph_from_clipboard(self) -> None:
         assert self.active_panel is not None
-        tikz = pyperclip.paste()
-        copied_graph = from_tikz(tikz)
+        copied_graph = self._read_graph_from_system_clipboard(include_internal=False)
         if copied_graph is not None:
             self.active_panel.paste_graph(copied_graph)
+
+    def _copy_graph_to_system_clipboard(self, graph: GraphT, include_internal: bool = True) -> None:
+        mime = QMimeData()
+        tikz = to_tikz(graph)
+        mime.setText(tikz)
+
+        if include_internal:
+            payload = json.dumps({"graph_json": graph.to_json()}).encode("utf-8")
+            mime.setData(self.CLIPBOARD_MIME, QByteArray(payload))
+        QApplication.clipboard().setMimeData(mime)
+
+    def _read_graph_from_system_clipboard(self, include_internal: bool = True) -> Optional[GraphT]:
+        mime = QApplication.clipboard().mimeData()
+        if include_internal and mime is not None and mime.hasFormat(self.CLIPBOARD_MIME):
+            try:
+                raw = bytes(mime.data(self.CLIPBOARD_MIME).data())
+                payload = json.loads(raw.decode("utf-8"))
+                graph_json = payload.get("graph_json")
+                if isinstance(graph_json, str):  # type: ignore
+                    g = GraphT.from_json(graph_json)
+                    assert isinstance(g, GraphT)  # type: ignore[misc]
+                    g.rebind_variables_to_registry()
+                    g.set_auto_simplify(False)
+                    return g
+            except Exception:
+                pass
+
+        tikz = QApplication.clipboard().text()
+        if not tikz:
+            tikz = pyperclip.paste()
+        if not tikz:
+            return None
+        try:
+            return from_tikz(tikz)
+        except Exception as e:
+            from .common import find_unknown_tikz_styles
+            unknown = find_unknown_tikz_styles(tikz)
+            detail = str(e)
+            if unknown:
+                detail += "\n\nUnknown styles: " + ", ".join(unknown)
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setText("TikZ import error")
+            msg.setInformativeText(detail)
+            retry_btn = msg.addButton("Retry ignoring errors",
+                                      QMessageBox.ButtonRole.AcceptRole)
+            msg.addButton(QMessageBox.StandardButton.Cancel)
+            msg.exec()
+            if msg.clickedButton() != retry_btn:
+                return None
+        try:
+            return from_tikz(tikz, ignore_errors=True)
+        except Exception as e:
+            show_error_msg("TikZ import error",
+                           f"Error while importing TikZ: {e}",
+                           parent=self)
+            return None
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
         self.active_panel.delete_selection()
 
     def _new_panel(self, panel: BasePanel, name: str) -> None:
-        self.tab_widget.addTab(panel, name)
+        idx = self.tab_widget.addTab(panel, name)
+        self.tab_widget.setTabToolTip(idx, name)
         self.tab_widget.setCurrentWidget(panel)
 
         self._reset_menus(True)
@@ -563,33 +829,34 @@ class MainWindow(QMainWindow):
 
     def _auto_save_if_needed(self) -> None:
         panel = self.active_panel
-        if (panel and getattr(panel, 'file_path', None) and
-                get_settings_value("auto-save", bool, False)):
+        if (panel and not isinstance(panel, PauliWebsPanel)
+                and getattr(panel, 'file_path', None)
+                and get_settings_value("auto-save", bool, False)):
             self.handle_save_file_action()
 
     def new_graph(self, graph: Optional[GraphT] = None, name: Optional[str] = None) -> None:
         _graph = graph or new_graph()
         panel = GraphEditPanel(_graph, self.undo_action, self.redo_action)
         panel.start_derivation_signal.connect(self.new_deriv)
+        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
         if name is None:
             name = "New Graph"
         self._new_panel(panel, name)
 
-    def open_graph_from_notebook(self, graph: GraphT, name: str) -> None:
-        """Opens a ZXLive window from within a Jupyter notebook to
-        edit a graph.
+    def open_graph_for_editing(self, graph: GraphT, name: str) -> None:
+        """Open a graph for interactive editing.
 
         Replaces the graph in an existing tab if it has the same name."""
 
         # The graph we are given is not a MultiGraph
-        if not isinstance(graph, GraphT):
+        if not isinstance(graph, GraphT):  # type: ignore
             graph = graph.copy(backend='multigraph')
             graph.set_auto_simplify(False)
 
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             tab_text = self.tab_widget.tabText(i)
-            if tab_text == name or tab_text == name + "*":
+            if tab_text == name or tab_text == "*" + name:
                 self.tab_widget.setCurrentIndex(i)
                 assert self.active_panel is not None
                 self.active_panel.replace_graph(graph)
@@ -600,7 +867,7 @@ class MainWindow(QMainWindow):
         # TODO: handle multiple tabs with the same name somehow
         for i in range(self.tab_widget.count()):
             tab_text = self.tab_widget.tabText(i)
-            if tab_text == name or tab_text == name + "*":
+            if tab_text == name or tab_text == "*" + name:
                 panel = cast(BasePanel, self.tab_widget.widget(i))
                 return cast(GraphT, copy.deepcopy(panel.graph_scene.g))
         return None
@@ -628,6 +895,13 @@ class MainWindow(QMainWindow):
         panel = ProofPanel(graph, self.undo_action, self.redo_action)
         if name is None:
             name = "New Proof"
+        panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
+        self._new_panel(panel, name)
+
+    def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
+        panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)
+        if name is None:
+            name = "New Pauli Webs"
         self._new_panel(panel, name)
 
     def select_all(self) -> None:
@@ -650,16 +924,77 @@ class MainWindow(QMainWindow):
         assert self.active_panel is not None
         self.active_panel.graph_view.fit_view()
 
+    def auto_arrange(self) -> None:
+        """Automatically arrange vertices using `networkx` spring layout.
+
+        If the active panel has selected vertices, only those are repositioned and their
+        connections to non-selected neighbours are treated as fixed anchor points. Otherwise,
+        all non-boundary vertices are repositioned with the boundary vertices as anchors.
+        W-input vertices are always kept at their original offset relative to their W-output
+        partner, irrespective of selection.
+        """
+        assert self.active_panel is not None
+        g = self.active_panel.graph_view.graph_scene.g
+
+        if g.num_vertices() == 0:
+            return
+
+        movable_set, fixed_set = _auto_arrange_partition(g,
+            set(self.active_panel.graph_view.graph_scene.selected_vertices))
+        w_input_offsets = _auto_arrange_extract_w_inputs(g, movable_set, fixed_set)
+        if not movable_set:
+            return
+
+        pos = _auto_arrange_layout(g, movable_set, fixed_set)
+        moves = _auto_arrange_build_moves(g, movable_set, w_input_offsets, pos)
+        if moves:
+            self._auto_arrange_push(moves)
+
+    def _auto_arrange_push(self, moves: list[tuple[VT, float, float]]) -> None:
+        assert self.active_panel is not None
+        move_cmd = MoveNode(self.active_panel.graph_view, moves)
+        # In proof mode, wrap the move so that the `ProofModel` for the current step is kept in
+        # sync with the view's graph (otherwise serialization and undo/redo become inconsistent).
+        cmd: MoveNode | ProofModeCommand
+        if isinstance(self.active_panel, ProofPanel):
+            cmd = ProofModeCommand(move_cmd, self.active_panel.step_view)
+        else:
+            cmd = move_cmd
+        self.active_panel.undo_stack.push(cmd)
+
     def proof_as_lemma(self) -> None:
         assert self.active_panel is not None
         assert isinstance(self.active_panel, ProofPanel)
         name, description = get_lemma_name_and_description(self)
         if name is None or description is None:
             return
+        if not name:
+            show_error_msg("Invalid lemma name",
+                           "The lemma name must not be empty.", self)
+            return
+        # Reject path separators to prevent writing outside the custom rules folder.
+        if os.path.basename(name) != name:
+            show_error_msg("Invalid lemma name",
+                           "The lemma name must not contain path separators.", self)
+            return
+
         lhs_graph = self.active_panel.proof_model.graphs()[0]
         rhs_graph = self.active_panel.proof_model.graphs()[-1]
         rule = CustomRule(lhs_graph, rhs_graph, name, description)
-        save_rule_dialog(rule, self, name + ".zxr" if name else "")
+        file_name = name + ".zxr"
+        custom_rules_path = get_custom_rules_path()
+        os.makedirs(custom_rules_path, exist_ok=True)
+        file_path = os.path.join(custom_rules_path, file_name)
+        if os.path.exists(file_path):
+            reply = QMessageBox.question(
+                self, "Overwrite rule?",
+                f"A rule file '{file_name}' already exists. Overwrite it?")
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        if not write_to_file(file_path, rule.to_json(), self):
+            return
+
+        self.active_panel.rewrites_panel.refresh_rewrites_model()
 
     def update_colors(self) -> None:
         """Update app theme using reliable Qt native methods
@@ -684,7 +1019,7 @@ class MainWindow(QMainWindow):
                 padding: 10px 24px;
                 margin-right: 2px;
                 min-width: 100px;
-                max-width: 200px;
+                max-width: 250px;
             }}
 
             CustomTabBar::tab:selected {{
@@ -806,6 +1141,7 @@ class CustomTabBar(QTabBar):
         super().__init__(parent)
         self.hovered_tab: int = -1
         self.setMouseTracking(True)
+        self.setElideMode(Qt.TextElideMode.ElideRight)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Track which tab is being hovered."""
@@ -830,3 +1166,99 @@ class CustomTabBar(QTabBar):
             if button:
                 # Show button only for hovered tab
                 button.setVisible(i == self.hovered_tab)
+
+
+def _auto_arrange_partition(g: GraphT, selected: set[VT]) -> tuple[set[VT], set[VT]]:
+    """Split graph vertices into movable and fixed (anchor) sets for auto-arrange."""
+    if selected:
+        movable_set = set(selected)
+        fixed_set = {n for v in selected for n in g.neighbors(v) if n not in selected}
+    else:
+        movable_set = {v for v in g.vertices() if g.type(v) != VertexType.BOUNDARY}
+        fixed_set = {v for v in g.vertices() if g.type(v) == VertexType.BOUNDARY}
+    return movable_set, fixed_set
+
+
+def _auto_arrange_extract_w_inputs(g: GraphT, movable_set: set[VT],
+                                   fixed_set: set[VT]) -> dict[VT, tuple[VT, float, float]]:
+    """Detach each W-input from its movable W-output partner and record their offset.
+
+    A W-input must follow its W-output partner regardless of how the user selection partitions
+    them: if either half is movable, the W-output is laid out and the W-input is re-snapped
+    afterwards (rather than being a free node, an anchor, or stuck while its partner moves).
+    The remaining W-inputs whose partner is also fixed are left as-is.
+    """
+    w_input_offsets: dict[VT, tuple[VT, float, float]] = {}
+    candidates = [v for v in (movable_set | fixed_set) if g.type(v) == VertexType.W_INPUT]
+    for v in candidates:
+        partner = next((n for n in g.neighbors(v) if g.type(n) == VertexType.W_OUTPUT), None)
+        if partner is None:
+            continue
+        # If the W-input itself is movable, ensure the W-output partner is laid out too.
+        if v in movable_set and partner not in movable_set:
+            movable_set.add(partner)
+            fixed_set.discard(partner)
+        # The W-input follows its partner only if the partner is being laid out.
+        if partner in movable_set:
+            w_input_offsets[v] = (partner,
+                                  g.row(v) - g.row(partner),
+                                  g.qubit(v) - g.qubit(partner))
+            movable_set.discard(v)
+            fixed_set.discard(v)
+    return w_input_offsets
+
+
+def _auto_arrange_layout(g: GraphT, movable_set: set[VT],
+                         fixed_set: set[VT]) -> dict[VT, tuple[float, float]]:
+    """Run spring layout on the relevant subgraph and return positions."""
+    # Lay out only the relevant vertices (movable + their fixed neighbours), so that unrelated
+    # parts of the diagram don't influence (or get influenced by) the result.
+    subgraph_nodes = movable_set | fixed_set
+    G_sub = to_networkx(g).subgraph(subgraph_nodes)
+
+    # Seed every node in the subgraph with its current position so disconnected vertices
+    # stay near where they were.
+    initial_pos = {v: (g.row(v), g.qubit(v)) for v in subgraph_nodes}
+
+    # The optimal edge length `k` is derived from the span of the anchor nodes (or the movable
+    # nodes if there are no anchors) so that misplaced internal vertices don't inflate the
+    # layout area and push everything farther apart.
+    anchor_pos = [initial_pos[v] for v in (fixed_set or movable_set)]
+    rows = [r for r, _ in anchor_pos]
+    qubits = [q for _, q in anchor_pos]
+    width = max(max(rows) - min(rows), 1)
+    height = max(max(qubits) - min(qubits), 1)
+    k = (width * height / max(len(G_sub), 1)) ** 0.5
+
+    if fixed_set:
+        return dict(nx.spring_layout(G_sub, k=k, pos=initial_pos, fixed=fixed_set,
+                                     iterations=50, seed=0))
+    # No anchors to constrain the layout; explicitly preserve the current bounding box
+    # so the diagram isn't squashed into `networkx`'s default unit-scaled output.
+    scale = max(width, height) / 2
+    center = ((max(rows) + min(rows)) / 2, (max(qubits) + min(qubits)) / 2)
+    return dict(nx.spring_layout(G_sub, k=k, pos=initial_pos, iterations=50,
+                                 scale=scale, center=center, seed=0))
+
+
+def _auto_arrange_build_moves(g: GraphT, movable_set: set[VT],
+                              w_input_offsets: dict[VT, tuple[VT, float, float]],
+                              pos: dict[VT, tuple[float, float]]
+                              ) -> list[tuple[VT, float, float]]:
+    """Translate layout positions into a list of (vertex, row, qubit) moves."""
+    moves: list[tuple[VT, float, float]] = []
+    for v in movable_set:
+        if v in pos:
+            _append_move_if_changed(g, moves, v, pos[v])
+    # Re-snap each W-input relative to its partner after the partner's layout position is known.
+    for v, (partner, row_offset, qubit_offset) in w_input_offsets.items():
+        partner_row, partner_qubit = pos.get(partner, (g.row(partner), g.qubit(partner)))
+        _append_move_if_changed(g, moves, v, (partner_row + row_offset, partner_qubit + qubit_offset))
+    return moves
+
+
+def _append_move_if_changed(g: GraphT, moves: list[tuple[VT, float, float]],
+                            v: VT, new_pos: tuple[float, float]) -> None:
+    new_row, new_qubit = new_pos
+    if abs(new_row - g.row(v)) > 0.001 or abs(new_qubit - g.qubit(v)) > 0.001:
+        moves.append((v, new_row, new_qubit))

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+import re
 from enum import IntEnum
-from typing import Final, Optional, TypeVar, Type
+from typing import Final, TypeVar, Type, cast
 
 from pyzx.graph import EdgeType
 from pyzx.graph.multigraph import Multigraph
@@ -29,6 +30,8 @@ def set_settings_value(arg: str, val: T, _type: Type[T], settings: QSettings | N
     _settings.setValue(arg, val)
 
 
+# TODO: Fix code complexity
+# noqa: complexipy
 def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
     _settings = settings or QSettings("zxlive", "zxlive")
     try:
@@ -110,15 +113,46 @@ def view_to_length(width: float, height: float) -> tuple[float, float]:
 
 
 def to_tikz(g: GraphT) -> str:
+    """Export graph to TikZ; PyZX includes variable type metadata when present."""
     return pyzx.tikz.to_tikz(g)  # type: ignore
 
 
-def from_tikz(s: str) -> Optional[GraphT]:
-    try:
-        g = pyzx.tikz.tikz_to_graph(s, backend='multigraph')
-        assert isinstance(g, GraphT)
-        return g
-    except Exception as e:
-        from . import dialogs
-        dialogs.show_error_msg("Tikz import error", f"Error while importing tikz: {e}")
-        return None
+def find_unknown_tikz_styles(tikz: str) -> list[str]:
+    """Return vertex style names in *tikz* that PyZX does not recognise.
+
+    Only node (vertex) styles are checked; edge styles are ignored.
+    """
+    known: set[str] = set()
+    for syn_list in (pyzx.tikz.synonyms_z, pyzx.tikz.synonyms_x,
+                     pyzx.tikz.synonyms_boundary, pyzx.tikz.synonyms_hadamard,
+                     pyzx.tikz.synonyms_w_input, pyzx.tikz.synonyms_w_output,
+                     pyzx.tikz.synonyms_z_box, pyzx.tikz.synonyms_none,
+                     pyzx.tikz.synonyms_dummy):
+        known.update(name.lower() for name in syn_list)
+
+    unknown: list[str] = []
+    seen: set[str] = set()
+    for m in re.finditer(r'\\node\s*\[style\s*=\s*([^\],]+)', tikz):
+        style = m.group(1).strip()
+        if style.lower() not in known and style.lower() not in seen:
+            unknown.append(style)
+            seen.add(style.lower())
+    return unknown
+
+
+def from_tikz(s: str, ignore_errors: bool = False) -> GraphT:
+    """Import a graph from a TikZ string.
+
+    When *ignore_errors* is ``True``, invalid phases, unparseable
+    nodes/edges, unknown styles, and overlapping vertices are silently
+    tolerated instead of raising.
+    """
+    extra_kwargs = dict(
+        ignore_invalid_phases=True,
+        ignore_parse_errors=True,
+        ignore_nonzx=True,
+        warn_overlap=False,
+    ) if ignore_errors else {}
+    g = cast(GraphT, pyzx.tikz.tikz_to_graph(s, backend='multigraph', **extra_kwargs))
+    g.set_auto_simplify(False)
+    return g

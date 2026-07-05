@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import os
 from typing import Callable, Literal, cast, Optional
 from typing_extensions import TypedDict, NotRequired
@@ -10,7 +9,7 @@ from pyzx import simplify, extract_circuit
 from pyzx.graph import VertexType
 from pyzx.rewrite import Rewrite, RewriteSimpGraph
 
-from .common import ET, GraphT, VT, get_custom_rules_path
+from .common import GraphT, VT, get_custom_rules_path
 from .custom_rule import CustomRule
 from .unfusion_rewrite import unfusion_rewrite
 
@@ -37,6 +36,7 @@ class RewriteData(TypedDict):
     file_path: NotRequired[str]
     supports_weight_parameter: NotRequired[bool]
     max_fault_equivalence: NotRequired[int]
+    auto_simplify_multigraph: NotRequired[bool]
 
 
 def is_rewrite_data(d: dict) -> bool:
@@ -56,6 +56,61 @@ def read_custom_rules() -> list[RewriteData]:
                     custom_rules.append(rule)
     return custom_rules
 
+
+rewrites_graph_theoretic: dict[str, RewriteData] = {
+    "lcomp": {
+        "text": "local complementation",
+        "tooltip": "Deletes a spider with a pi/2 phase by performing a local complementation on its neighbors",
+        "rule": pyzx.simplify.lcomp_simp,
+        "type": MATCH_SINGLE,
+        "copy_first": True,
+        "picture": "lcomp.png",
+        "auto_simplify_multigraph": True,
+    },
+    "pivot": {
+        "text": "pivot",
+        "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
+        "rule": pyzx.simplify.pivot_simp,
+        "type": MATCH_DOUBLE,
+        "copy_first": True,
+        "picture": "pivot_regular.png",
+        "auto_simplify_multigraph": True,
+    },
+    "pivot_boundary": {
+        "text": "boundary pivot",
+        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
+        "rule": pyzx.simplify.pivot_boundary_simp,
+        "type": MATCH_DOUBLE,
+        "copy_first": True,
+        "auto_simplify_multigraph": True,
+    },
+    "pivot_gadget": {
+        "text": "gadget pivot",
+        "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
+        "rule": pyzx.simplify.pivot_gadget_simp,
+        "type": MATCH_DOUBLE,
+        "copy_first": True,
+        "picture": "pivot_gadget.png",
+        "auto_simplify_multigraph": True,
+    },
+    "phase_gadget_fuse": {
+        "text": "Fuse phase gadgets",
+        "tooltip": "Fuses two phase gadgets with the same connectivity.",
+        "rule": pyzx.simplify.gadget_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": True,
+        "picture": "gadget_fuse.png",
+        "auto_simplify_multigraph": True,
+    },
+    "supplementarity": {
+        "text": "Supplementarity",
+        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
+        "rule": pyzx.simplify.supplementarity_simp,
+        "type": MATCH_COMPOUND,
+        "copy_first": False,
+        "auto_simplify_multigraph": True,
+    },
+}
 
 
 def selection_or_all_matcher(graph: GraphT, matches: Callable[[VT], bool]) -> list[VT]:
@@ -86,7 +141,12 @@ def rewrite_strategy_to_rewrite(strategy: Callable[[GraphT], Optional[int]]) -> 
         simplified = cast(GraphT, subgraph.copy())
         strategy(simplified)
         return CustomRule(subgraph, simplified, "", "").applier(g, matches)
-    return RewriteSimpGraph(rule, rule)
+
+    def simp_rule(g: GraphT) -> bool:
+        strategy(g)
+        return True
+    return RewriteSimpGraph(rule, simp_rule)  # type: ignore[arg-type]
+
 
 def create_subgraph_with_boundary(graph: GraphT, verts: list[VT]) -> GraphT:
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
@@ -104,56 +164,6 @@ def _extract_circuit(graph: GraphT) -> GraphT:
     graph.auto_detect_io()
     simplify.full_reduce(graph)
     return cast(GraphT, extract_circuit(graph).to_graph())
-
-
-rewrites_graph_theoretic: dict[str, RewriteData] = {
-    "lcomp": {
-        "text": "local complementation",
-        "tooltip": "Deletes a spider with a pi/2 phase by performing a local complementation on its neighbors",
-        "rule": pyzx.simplify.lcomp_simp,
-        "type": MATCH_SINGLE,
-        "copy_first": True,
-        "picture": "lcomp.png"
-    },
-    "pivot": {
-        "text": "pivot",
-        "tooltip": "Deletes a pair of spiders with 0/pi phases by performing a pivot",
-        "rule": pyzx.simplify.pivot_simp,
-        "type": MATCH_DOUBLE,
-        "copy_first": True,
-        "picture": "pivot_regular.png"
-    },
-    "pivot_boundary": {
-        "text": "boundary pivot",
-        "tooltip": "Performs a pivot between a Pauli spider and a spider on the boundary.",
-        "rule": pyzx.simplify.pivot_boundary_simp,
-        "type": MATCH_DOUBLE,
-        "copy_first": True
-    },
-    "pivot_gadget": {
-        "text": "gadget pivot",
-        "tooltip": "Performs a pivot between a Pauli spider and a spider with an arbitrary phase, creating a phase gadget.",
-        "rule": pyzx.simplify.pivot_gadget_simp,
-        "type": MATCH_DOUBLE,
-        "copy_first": True,
-        "picture": "pivot_gadget.png"
-    },
-    "phase_gadget_fuse": {
-        "text": "Fuse phase gadgets",
-        "tooltip": "Fuses two phase gadgets with the same connectivity.",
-        "rule": pyzx.simplify.gadget_simp,
-        "type": MATCH_COMPOUND,
-        "copy_first": True,
-        "picture": "gadget_fuse.png"
-    },
-    "supplementarity": {
-        "text": "Supplementarity",
-        "tooltip": "Looks for a pair of internal spiders with the same connectivity and supplementary angles and removes them.",
-        "rule": pyzx.simplify.supplementarity_simp,
-        "type": MATCH_COMPOUND,
-        "copy_first": False
-    },
-}
 
 
 simplifications: dict[str, RewriteData] = {
@@ -175,41 +185,47 @@ simplifications: dict[str, RewriteData] = {
         "tooltip": "pivot_simp",
         "rule": simplify.pivot_simp,
         "type": MATCH_DOUBLE,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "auto_simplify_multigraph": True,
     },
     'pivot_gadget_simp': {
         "text": "pivot gadget",
         "tooltip": "pivot_gadget_simp",
         "rule": simplify.pivot_gadget_simp,
         "type": MATCH_COMPOUND,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "auto_simplify_multigraph": True,
     },
     'pivot_boundary_simp': {
         "text": "pivot boundary",
         "tooltip": "pivot_boundary_simp",
         "rule": simplify.pivot_boundary_simp,
         "type": MATCH_COMPOUND,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "auto_simplify_multigraph": True,
     },
     'gadget_simp': {
         "text": "gadget",
         "tooltip": "gadget_simp",
         "rule": simplify.gadget_simp,
         "type": MATCH_COMPOUND,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "auto_simplify_multigraph": True,
     },
     'lcomp_simp': {
         "text": "local complementation",
         "tooltip": "lcomp_simp",
         "rule": simplify.lcomp_simp,
         "type": MATCH_SINGLE,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "auto_simplify_multigraph": True,
     },
     'clifford_simp': {
         "text": "clifford simplification",
         "tooltip": "clifford_simp",
         "rule": rewrite_strategy_to_rewrite(simplify.clifford_simp),
         "type": MATCH_COMPOUND,
+        "auto_simplify_multigraph": True,
     },
     'to_gh': {
         "text": "to green-hadamard form",
@@ -228,19 +244,22 @@ simplifications: dict[str, RewriteData] = {
         "tooltip": "full_reduce",
         "rule": rewrite_strategy_to_rewrite(simplify.full_reduce),
         "type": MATCH_COMPOUND,
+        "auto_simplify_multigraph": True,
     },
     'supplementarity_simp': {
         "text": "supplementarity",
         "tooltip": "supplementarity_simp",
         "rule": simplify.supplementarity_simp,
         "type": MATCH_COMPOUND,
-        "repeat_rule_application": True
+        "repeat_rule_application": True,
+        "auto_simplify_multigraph": True
     },
     'to_clifford_normal_form_graph': {
         "text": "to clifford normal form",
         "tooltip": "to_clifford_normal_form_graph",
         "rule": rewrite_strategy_to_rewrite(simplify.to_clifford_normal_form_graph),
         "type": MATCH_COMPOUND,
+        "auto_simplify_multigraph": True,
     },
     # 'extract_circuit': {
     #     "text": "circuit extraction",
@@ -257,6 +276,7 @@ simplifications: dict[str, RewriteData] = {
 # This can be used to make repositioning the vertices an explicit proof step.
 def ocm_rule(_graph: GraphT) -> int:
     return 1
+
 
 rules_basic: dict[str, RewriteData] = {
     'id_simp': {
@@ -300,14 +320,14 @@ rules_basic: dict[str, RewriteData] = {
         "type": MATCH_COMPOUND,
     },
     'copy': {
-        "text": "Copy 0/pi spider through its neighbour", 
+        "text": "Copy 0/pi spider through its neighbour",
         "tooltip": "Copies a single-legged spider with a 0/pi phase through its neighbor",
         "picture": "copy_pi.png",
         "rule": simplify.copy_simp,
         "type": MATCH_SINGLE,
     },
     "pauli": {
-        "text": "Push Pauli", 
+        "text": "Push Pauli",
         "tooltip": "Pushes an arity 2 pi-phase through a selected neighbor",
         "picture": "push_pauli.png",
         "rule": simplify.push_pauli_rewrite,
@@ -335,7 +355,7 @@ rules_basic: dict[str, RewriteData] = {
         "type": MATCH_COMPOUND,
     },
     "euler": {
-        "text": "Decompose Hadamard", 
+        "text": "Decompose Hadamard",
         "tooltip": "Expands a Hadamard-edge into its component spiders using its Euler decomposition",
         "rule": simplify.euler_expansion_rewrite,
         "type": MATCH_DOUBLE,
@@ -446,9 +466,8 @@ rewrites_fault_tolerant: dict[str, RewriteData] = {
 
 # rules_zh = ["had2edge", "fuse_hbox", "mult_hbox"]
 
-
-action_groups: dict[str, dict[str, RewriteData]] = {
-    "Basic rules": rules_basic, #{'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
+action_groups = {
+    "Basic rules": rules_basic,  # {'ocm': ocm_action} | {key: operations[key] for key in rules_basic},
     "Custom rules": {},
     "Graph-like rules": rewrites_graph_theoretic,
     # "ZXW rules": {key: operations[key] for key in rules_zxw},

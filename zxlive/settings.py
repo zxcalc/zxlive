@@ -30,21 +30,30 @@ class ColorScheme(TypedDict):
     dummy_pressed: QColor
     edge: QColor
     dummy_edge: QColor
+    z_pauli_web: QColor
+    x_pauli_web: QColor
+    y_pauli_web: QColor
 
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "path/custom-rules": "rules/",
     "color-scheme": "modern-red-green",
+    "swap-pauli-web-colors": False,
+    "blue-y-pauli-web": False,
     "tab-bar-location": QTabWidget.TabPosition.North,
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
     "previews-show": True,
+    "rewrite-animations": True,
     "sparkle-mode": True,
     'sound-effects': False,
     "matrix/precision": 4,
     "dark-mode": "system",
     "auto-save": False,
     "patterns-folder": "patterns/",
+    "startup-behavior": "restore",
+    "phase-label-color": "",
+    "show-vertex-indices": False,
 }
 
 font_defaults: dict[str, str | int | None] = {
@@ -124,6 +133,9 @@ modern_red_green: ColorScheme = {
     "dummy_pressed": QColor("#808080"),
     "edge": QColor("#000000"),
     "dummy_edge": QColor("#808080"),
+    "z_pauli_web": QColor("#ccffcc"),
+    "x_pauli_web": QColor("#ff8888"),
+    "y_pauli_web": QColor("#6688ff"),
 }
 
 classic_red_green: ColorScheme = {
@@ -134,6 +146,9 @@ classic_red_green: ColorScheme = {
     "z_spider_pressed": QColor("#00dd00"),
     "x_spider": QColor("#ff0d00"),
     "x_spider_pressed": QColor("#dd0b00"),
+    "z_pauli_web": QColor("#00ff00"),
+    "x_pauli_web": QColor("#ff0d00"),
+    "y_pauli_web": QColor("#0000ff"),
 }
 
 white_gray: ColorScheme = {
@@ -172,10 +187,10 @@ def load_tikz_classes() -> dict[str, str]:
         'X': str(settings.value('tikz/X-spider-export', pyzx.settings.tikz_classes['X'])),
         'Z phase': str(settings.value('tikz/Z-phase-export', pyzx.settings.tikz_classes['Z phase'])),
         'X phase': str(settings.value('tikz/X-phase-export', pyzx.settings.tikz_classes['X phase'])),
-        'Z box': str(settings.value('tikz/Z-box-export', pyzx.settings.tikz_classes['Z box'])),
+        'Z box': str(settings.value('tikz/z-box-export', pyzx.settings.tikz_classes['Z box'])),
         'H': str(settings.value('tikz/Hadamard-export', pyzx.settings.tikz_classes['H'])),
-        'W': str(settings.value('tikz/W-output-export', pyzx.settings.tikz_classes['W'])),
-        'W input': str(settings.value('tikz/W-input-export', pyzx.settings.tikz_classes['W input'])),
+        'W': str(settings.value('tikz/w-output-export', pyzx.settings.tikz_classes['W'])),
+        'W input': str(settings.value('tikz/w-input-export', pyzx.settings.tikz_classes['W input'])),
         'dummy': str(settings.value('tikz/dummy-export', pyzx.settings.tikz_classes['dummy'])),
         'edge': str(settings.value('tikz/edge-export', pyzx.settings.tikz_classes['edge'])),
         'H-edge': str(settings.value('tikz/edge-H-export', pyzx.settings.tikz_classes['H-edge'])),
@@ -195,9 +210,9 @@ def refresh_pyzx_tikz_settings() -> None:
     pyzx.tikz.synonyms_z = _get_synonyms('tikz/Z-spider-import', pyzx.tikz.synonyms_z)
     pyzx.tikz.synonyms_x = _get_synonyms('tikz/X-spider-import', pyzx.tikz.synonyms_x)
     pyzx.tikz.synonyms_hadamard = _get_synonyms('tikz/Hadamard-import', pyzx.tikz.synonyms_hadamard)
-    pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/W-input-import', pyzx.tikz.synonyms_w_input)
-    pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/W-output-import', pyzx.tikz.synonyms_w_output)
-    pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/Z-box-import', pyzx.tikz.synonyms_z_box)
+    pyzx.tikz.synonyms_w_input = _get_synonyms('tikz/w-input-import', pyzx.tikz.synonyms_w_input)
+    pyzx.tikz.synonyms_w_output = _get_synonyms('tikz/w-output-import', pyzx.tikz.synonyms_w_output)
+    pyzx.tikz.synonyms_z_box = _get_synonyms('tikz/z-box-import', pyzx.tikz.synonyms_z_box)
     pyzx.tikz.synonyms_dummy = _get_synonyms('tikz/dummy-import', pyzx.tikz.synonyms_dummy)
     pyzx.tikz.synonyms_edge = _get_synonyms('tikz/edge-import', pyzx.tikz.synonyms_edge)
     pyzx.tikz.synonyms_hedge = _get_synonyms('tikz/edge-H-import', pyzx.tikz.synonyms_hedge)
@@ -209,10 +224,18 @@ class DisplaySettings:
 
     def __init__(self) -> None:
         self.colors = color_schemes[str(settings.value("color-scheme"))]
+        self._cached_dark_mode: bool | None = None
+        self._cached_effective_colors: dict[str, QColor] | None = None
         self.update()
+
+    def _invalidate_color_cache(self) -> None:
+        """Invalidate cached dark_mode and effective_colors."""
+        self._cached_dark_mode = None
+        self._cached_effective_colors = None
 
     def set_color_scheme(self, scheme_id: str) -> None:
         self.colors = color_schemes[scheme_id]
+        self._invalidate_color_cache()
 
     def update(self) -> None:
         self.SNAP_DIVISION = int(get_settings_value("snap-granularity", str))
@@ -221,6 +244,16 @@ class DisplaySettings:
             get_settings_value("font/size", int)
         )
         self.SNAP = SCALE / self.SNAP_DIVISION
+        self._invalidate_color_cache()
+
+    @property
+    def text_color(self) -> str:
+        """Standard text colour for labels, adapted for dark/light mode."""
+        return "#e0e0e0" if self.dark_mode else "#222222"
+
+    @property
+    def show_vertex_indices(self) -> bool:
+        return get_settings_value("show-vertex-indices", bool)
 
     @property
     def previews_show(self) -> bool:
@@ -232,6 +265,8 @@ class DisplaySettings:
 
     @property
     def dark_mode(self) -> bool:
+        if self._cached_dark_mode is not None:
+            return self._cached_dark_mode
         dark_mode_setting = str(settings.value("dark-mode", "system"))
         if dark_mode_setting == "system":
             # Check if we can detect system theme
@@ -240,14 +275,18 @@ class DisplaySettings:
                 try:
                     # Try Qt 6.5+ ColorScheme API
                     color_scheme = app.styleHints().colorScheme()
-                    return color_scheme == Qt.ColorScheme.Dark
+                    self._cached_dark_mode = (color_scheme == Qt.ColorScheme.Dark)
+                    return self._cached_dark_mode
                 except AttributeError:
                     # Fallback for older Qt versions
                     pass
+            self._cached_dark_mode = False
             return False  # Default to light mode if can't detect
         elif dark_mode_setting == "dark":
+            self._cached_dark_mode = True
             return True
         else:  # "light"
+            self._cached_dark_mode = False
             return False
 
     @dark_mode.setter
@@ -255,9 +294,12 @@ class DisplaySettings:
         if isinstance(value, bool):
             value = "dark" if value else "light"
         settings.setValue("dark-mode", value)
+        self._invalidate_color_cache()
 
     @property
     def effective_colors(self) -> dict[str, QColor]:
+        if self._cached_effective_colors is not None:
+            return self._cached_effective_colors
         # Return a color scheme adapted for dark mode (subtle adjustment), no change for light mode
 
         def adjust_for_dark(color: QColor) -> QColor:
@@ -274,10 +316,11 @@ class DisplaySettings:
         if self.dark_mode:
             for k in base:
                 if k in ("outline", "edge", "boundary", "boundary_pressed", "w_input", "w_input_pressed", "w_output", "w_output_pressed"):
-                    base[k] = QColor("#dbdbdb") if k != "outline" else QColor("#dbdbdb")
+                    base[k] = QColor("#dbdbdb")
                 else:
                     base[k] = adjust_for_dark(base[k])
         # else: do not adjust for light mode
+        self._cached_effective_colors = base
         return base
 
 
