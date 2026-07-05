@@ -5,11 +5,10 @@ import json
 import random
 from typing import Iterator, Optional, Union, cast
 
-from PySide6.QtCore import QPointF, QSize
+from PySide6.QtCore import QPointF, QSize, Signal
 from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator, QValidator
 from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit, QLabel, QHBoxLayout, QWidget, QSizePolicy
 
-from matplotlib import text
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
@@ -148,6 +147,11 @@ class ProofPanel(BasePanel):
 
         yield ToolbarSection(*self.actions())
     
+        self.pauli_webs = QToolButton(self)
+        self.pauli_webs.setText("Pauli Webs")
+        self.pauli_webs.clicked.connect(self._start_pauliwebs)
+        yield ToolbarSection(self.pauli_webs)
+    
     def toggle_FE_mode(self) -> None:
         selected_vertices, _ = self.parse_selection()
         self.rewrites_panel.refresh_rewrites_model()
@@ -197,12 +201,6 @@ class ProofPanel(BasePanel):
         self.undo_stack.push(cmd)
         self.rewrites_panel.refresh_rewrites_model()
         return
-    
-
-        self.pauli_webs = QToolButton(self)
-        self.pauli_webs.setText("Pauli Webs")
-        self.pauli_webs.clicked.connect(self._start_pauliwebs)
-        yield ToolbarSection(self.pauli_webs)
 
     def _start_pauliwebs(self) -> None:
         # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication

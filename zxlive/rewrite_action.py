@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast, Union, Optional
 from concurrent.futures import ThreadPoolExecutor
 
+from pyzx.ft_rewrite import RewriteSingleVertex_ft
 from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
@@ -80,7 +81,7 @@ class RewriteAction:
             is_custom_rule=d.get('custom_rule', False),
             file_path=d.get('file_path', None),
             supports_weight_parameter=d.get('supports_weight_parameter', False),
-            max_fault_equivalence=d.get('max_fault_equivalence', None)
+            max_fault_equivalence=d.get('max_fault_equivalence', None),
             auto_simplify_multigraph=d.get('auto_simplify_multigraph', False),
         )
 
@@ -135,19 +136,12 @@ class RewriteAction:
                 applied = False
                 for m in matches:
                     if self.supports_weight_parameter:
-                        if self.match_type == MATCH_DOUBLE: # keeping in case future w-FE rules are added that use MATCH_DOUBLE
-                            rule_dv = cast(RewriteDoubleVertex, self.rule)
-                            v1, v2 = cast(tuple[VT, VT], m)
-                            if rule_dv.apply(g, v1, v2, weight=weight):
-                                applied = True
-                        elif self.match_type == MATCH_SINGLE:
-                            rule_sv = cast(RewriteSingleVertex, self.rule)
-                            if rule_sv.apply(g, cast(VT, m), weight=weight):
+                        if self.match_type == MATCH_SINGLE:
+                            rule_sv_ft = cast(RewriteSingleVertex_ft, self.rule)
+                            if rule_sv_ft.apply(g, cast(VT, m), weight=weight):
                                 applied = True
                         else:
-                            rule_sg = cast(RewriteSimpGraph, self.rule)
-                            if rule_sg.apply(g, cast(list[VT], m), weight=weight):
-                                applied = True
+                            raise ValueError('Unknown fault-tolerant match type. Currently, only MATCH_SINGLE is supported.')
                     else:
                         if self.match_type == MATCH_DOUBLE:
                             rule_dv = cast(RewriteDoubleVertex, self.rule)
