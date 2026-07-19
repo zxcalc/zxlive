@@ -11,7 +11,7 @@ from PySide6.QtGui import QUndoCommand
 from PySide6.QtWidgets import QListView
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
+from pyzx.utils import EdgeType, FractionLike, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .settings import display_setting
@@ -449,15 +449,15 @@ class MergeNodes(BaseCommand):
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
-    new_phase: Union[Fraction, Poly, complex]
+    new_phase: FractionLike | complex
 
-    _old_phase: Optional[Union[Fraction, Poly, complex]] = field(default=None, init=False)
+    _old_phase: FractionLike | complex | None = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_phase is not None
         if self.g.type(self.v) == VertexType.Z_BOX:
             set_z_box_label(self.g, self.v, self._old_phase)
-        else:
+        elif isinstance(self._old_phase, (Fraction, int, Poly)):
             self.g.set_phase(self.v, self._old_phase)
         self.update_graph_view()
 
@@ -465,11 +465,10 @@ class ChangePhase(BaseCommand):
         if self.g.type(self.v) == VertexType.Z_BOX:
             self._old_phase = get_z_box_label(self.g, self.v)
             set_z_box_label(self.g, self.v, self.new_phase)
-        else:
+        elif isinstance(self.new_phase, (Fraction, int, Poly)):
             self._old_phase = self.g.phase(self.v)
             self.g.set_phase(self.v, self.new_phase)
         self.update_graph_view()
-
 
 @dataclass
 class AddRewriteStep(UpdateGraph):

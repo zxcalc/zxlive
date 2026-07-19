@@ -242,7 +242,7 @@ class EditorBasePanel(BasePanel):
                 self.undo_stack.push(cmd)
                 g = cmd.g
                 group = QParallelAnimationGroup()
-                for e in [next(g.edges(cmd.s, cmd.added_vert)), next(g.edges(cmd.t, cmd.added_vert))]:
+                for e in [next(iter(g.edges(cmd.s, cmd.added_vert))), next(iter(g.edges(cmd.t, cmd.added_vert)))]:
                     eitem = self.graph_scene.edge_map[e][0]
                     anim = animations.edge_thickness(eitem, 3, 400,
                                                      QEasingCurve(QEasingCurve.Type.InCubic), start=7)
@@ -259,8 +259,12 @@ class EditorBasePanel(BasePanel):
     def _is_invalid_edge(self, graph: GraphT, u: VT, v: VT) -> bool:
         if vertex_is_w(graph.type(u)) and get_w_partner(graph, u) == v:
             return True
-        if graph.type(u) == VertexType.W_INPUT and len(graph.neighbors(u)) >= 2 or \
-                graph.type(v) == VertexType.W_INPUT and len(graph.neighbors(v)) >= 2:
+        # TODO: pyzx types .neighbors too generally, preventing us from using len without upsetting mypy
+        # this code should be updated once pyzx updates its type annotations
+        lenu = sum(1 for _ in graph.neighbors(u))
+        lenv = sum(1 for _ in graph.neighbors(v))
+        if graph.type(u) == VertexType.W_INPUT and lenu >= 2 or \
+                graph.type(v) == VertexType.W_INPUT and lenv >= 2:
             return True
         u_is_dummy = graph.type(u) == VertexType.DUMMY
         v_is_dummy = graph.type(v) == VertexType.DUMMY
