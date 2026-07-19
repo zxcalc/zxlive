@@ -27,8 +27,8 @@ classifiers = [
     "Topic :: Scientific/Engineering"
 ]
 dependencies = [
-    "PySide6 >= 6.7.2",
-    "pyzx >= 0.10.0",
+    "PySide6>=6.7.2",
+    "pyzx>=0.10.4",
     "networkx",
     "numpy",
     "shapely",
@@ -40,7 +40,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "mypy==1.19.1",
+    "mypy>=2.3.0",
     "ruff",
     "pytest-qt",
     "complexipy",
