@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QMessageB
 from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 from pyzx.utils import VertexType
+from shiboken6 import isValid
 
 from .base_panel import BasePanel
 from .common import (VT, GraphT, from_tikz, get_custom_rules_path, get_data,
@@ -351,6 +352,8 @@ class MainWindow(QMainWindow):
 
     @property
     def active_panel(self) -> Optional[BasePanel]:
+        if not isValid(self.tab_widget):
+            return None
         current_widget = self.tab_widget.currentWidget()
         if current_widget is not None:
             assert isinstance(current_widget, BasePanel)
