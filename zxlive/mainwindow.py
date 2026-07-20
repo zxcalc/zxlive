@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QMessageB
 from pyzx.drawing import graphs_to_gif
 from pyzx.graph.base import BaseGraph
 from pyzx.utils import VertexType
+from shiboken6 import isValid
 
 from .base_panel import BasePanel
 from .common import (VT, GraphT, from_tikz, get_custom_rules_path, get_data,
@@ -55,6 +56,7 @@ from .settings import display_setting
 from .settings_dialog import open_settings_dialog
 from .sfx import SFXEnum, load_sfx
 from .tikz import proof_to_tikz, proof_steps_to_tikz
+from . import tutorial
 
 
 class MainWindow(QMainWindow):
@@ -262,12 +264,18 @@ class MainWindow(QMainWindow):
         check_for_updates = self._new_action(
             "Check for &Updates...", self.check_for_updates, None,
             "Check for new versions of ZXLive")
+        replay_tutorial = self._new_action(
+            "&Tutorial", self.start_tutorial, None,
+            "Replay the interactive tutorial")
         help_menu = menu.addMenu("&Help")
         help_menu.addAction(user_guide)
+        help_menu.addAction(replay_tutorial)
         help_menu.addAction(check_for_updates)
 
         menu.setStyleSheet("QMenu::item:disabled { color: gray }")
         self._reset_menus(False)
+
+        self.tutorial_controller = tutorial.TutorialController(self)
 
         self.effects = {e: load_sfx(e) for e in SFXEnum}
 
@@ -284,6 +292,14 @@ class MainWindow(QMainWindow):
     def open_demo_graph(self) -> None:
         graph = construct_circuit()
         self.new_graph(graph)
+
+    def start_tutorial(self) -> None:
+        """Launch (or replay) the interactive tutorial overlay."""
+        tutorial.start_main_tutorial(self)
+
+    def maybe_show_tutorial_on_first_run(self) -> None:
+        """Auto-start the tutorial on the very first launch."""
+        tutorial.maybe_show_tutorial_on_first_run(self)
 
     def _reset_menus(self, has_active_tab: bool) -> None:
         is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
@@ -351,6 +367,8 @@ class MainWindow(QMainWindow):
 
     @property
     def active_panel(self) -> Optional[BasePanel]:
+        if not isValid(self.tab_widget):
+            return None
         current_widget = self.tab_widget.currentWidget()
         if current_widget is not None:
             assert isinstance(current_widget, BasePanel)
@@ -897,6 +915,7 @@ class MainWindow(QMainWindow):
             name = "New Proof"
         panel.start_pauliwebs_signal.connect(self.new_pauli_webs)
         self._new_panel(panel, name)
+        tutorial.maybe_start_proof_tutorial(self)
 
     def new_pauli_webs(self, graph: GraphT, name: Optional[str] = None) -> None:
         panel = PauliWebsPanel(graph, self.undo_action, self.redo_action)

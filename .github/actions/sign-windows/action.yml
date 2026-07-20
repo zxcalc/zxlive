@@ -34,8 +34,8 @@ inputs:
 
   require-valid-signature:
     description: "Set to true once using the production certificate. Keep false for the self-signed test certificate."
-    required: false
-    default: "false"
+    required: true
+    default: "true"
 
 outputs:
   signing-request-id:

@@ -16,7 +16,7 @@ This project is in a pretty early stage, with lots more to come. Have a look at 
 
 To install the latest stable release, you can download the binaries from the [releases page](https://github.com/zxcalc/zxlive/releases).
 
-To install from source, you need Python >= 3.9 and pip. If you have those, just run:
+To install from source, you need Python >= 3.12 and pip. If you have those, just run:
 
     git clone https://github.com/zxcalc/zxlive.git
     cd zxlive
@@ -54,3 +54,14 @@ The documentation can be built with
 
 # Overview of the files
 ![ZXLive File Overview](ZXLive-file-overview.svg)
+
+# Code signing policy
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
+
+Approvers: [@RazinShaikh](https://github.com/RazinShaikh) and [@jvdwetering](https://github.com/jvdwetering)
+
+
+# Privacy
+
+This application does not collect user data. It connects to GitHub only to check for new releases; see [GitHub’s Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+

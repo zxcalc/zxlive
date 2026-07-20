@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from fractions import Fraction
 import json
 import random
 from typing import Iterator, Optional, Union, cast
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit, QLabel, QHBo
 
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.symbolic import Poly
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
@@ -330,27 +332,36 @@ class ProofPanel(BasePanel):
         source, target = self.graph.edge_st(edges[0])
         source_type, target_type = self.graph.type(source), self.graph.type(target)
         edge_type = self.graph.edge_type(edges[0])
-        if (edge_type == EdgeType.HADAMARD and vertex_is_z_like(source_type) and vertex_is_z_like(target_type)) or \
-           (edge_type == EdgeType.SIMPLE and vertex_is_z_like(source_type) and target_type == VertexType.X) or \
-           (edge_type == EdgeType.SIMPLE and source_type == VertexType.X and vertex_is_z_like(target_type)):
-            new_g = copy.deepcopy(self.graph)
-            num_edges = len(edges)
-            # Remove even number of edges
-            if num_edges % 2 != 0:
-                num_edges -= 1
-            if num_edges == 0:
-                return False
-            # Collect edge items for animation before removing edges. The diff removes the
-            # highest-indexed items, so animate the same ones from the end of the dict.
-            edge_items = [eitem for eitem in self.graph_scene.edge_map[edges[0]].values()]
-            for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
-                new_g.remove_edge(edges[0])
-            # Animate edges fading out
-            anim = anims.hopf(edge_items[-num_edges:])
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
-            self.undo_stack.push(cmd, anim_before=anim)
-            return True
-        return False
+        
+        # vertices should be different types, or edge should be hadamard
+        match edge_type:
+            case EdgeType.HADAMARD:
+                is_match = (vertex_is_z_like(source_type) and vertex_is_z_like(target_type))
+            case EdgeType.SIMPLE:
+                is_match = (vertex_is_z_like(source_type) and target_type == VertexType.X) or (source_type == VertexType.X and vertex_is_z_like(target_type))
+            case _:
+                is_match = False
+        
+        # we also need at least two edges
+        num_edges = len(edges)
+        if is_match and (num_edges >= 2):
+            return False
+        
+        new_g = copy.deepcopy(self.graph)
+        # Remove even number of edges
+        if num_edges % 2 != 0:
+            num_edges -= 1
+        # Collect edge items for animation before removing edges. The diff removes the
+        # highest-indexed items, so animate the same ones from the end of the dict.
+        edge_items = [eitem for eitem in self.graph_scene.edge_map[edges[0]].values()]
+        for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
+            new_g.remove_edge(edges[0])
+        # Animate edges fading out
+        anim = anims.hopf(edge_items[-num_edges:])
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
+        self.undo_stack.push(cmd, anim_before=anim)
+        
+        return True
 
     def _magic_identity(self, trace: WandTrace) -> bool:
         if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
@@ -578,11 +589,11 @@ class ProofPanel(BasePanel):
             old_label = get_z_box_label(new_g, v)
             set_z_box_label(new_g, first, old_label / phase)
             set_z_box_label(new_g, second, phase)
-        else:
+        elif isinstance(phase, (int, Fraction, Poly)):
             old_phase = new_g.phase(v)
             new_g.set_phase(first, old_phase - phase)
             new_g.set_phase(second, phase)
-
+    
         self._finalize_unfuse(v, new_g)
 
     def _vert_double_clicked(self, v: VT) -> None:

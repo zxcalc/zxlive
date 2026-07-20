@@ -36,7 +36,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
         self.rhs_graph_nx = to_networkx(rhs_graph)
         self.name = name
         self.description = description
-        self.last_rewrite_center = None
+        self.last_rewrite_center: tuple[int, int] | None = None
         self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
         if self.is_rewrite_unfusable:
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
@@ -76,7 +76,8 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
 
         vertex_positions = get_vertex_positions(graph, self.rhs_graph_nx, boundary_vertex_map)
         if boundary_vertex_map:
-            self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+            mean = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+            self.last_rewrite_center = (int(mean[0]), int(mean[1]))
         else:
             self.last_rewrite_center = None
         vertex_map = dict(boundary_vertex_map)
@@ -273,7 +274,9 @@ def _is_valid_boolean_phase(phase: ParameterValue) -> bool:
         return False
     if isinstance(phase, float):
         return phase % 2 == 0 or phase % 2 == 1
-    return phase_is_pauli(phase)
+    # TODO: bool() call is required here because mypy incorrectly infers return type of phase_is_pauli
+    # it can be removed once pyzx is updated with the proper annotation
+    return bool(phase_is_pauli(phase))
 
 
 def _validate_symbolic_parameter(params: Dict[Var, ParameterValue], var: Var, value: ParameterValue) -> None:
@@ -321,7 +324,7 @@ def filter_matchings_if_symbolic_compatible(matchings: list[Dict], left: nx.Mult
 
 def to_networkx(graph: GraphT) -> nx.MultiGraph:
     G = nx.MultiGraph()
-    v_data = {v: {"type": graph.type(v),
+    v_data: dict[int, dict[str, object]] = {v: {"type": graph.type(v),
                   "phase": graph.phase(v), }
               for v in graph.vertices()}
     for i, input_vertex in enumerate(graph.inputs()):
@@ -337,7 +340,7 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.MultiGraph, dict
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.MultiGraph(graph_nx.subgraph(verts))
-    boundary_mapping = {}
+    boundary_mapping: dict[str, int] = {}
     i = 0
     for v in verts:
         for e in graph.incident_edges(v):
