@@ -54,3 +54,14 @@ The documentation can be built with
 
 # Overview of the files
 ![ZXLive File Overview](ZXLive-file-overview.svg)
+
+# Code signing policy
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
+
+Approvers: [@RazinShaikh](https://github.com/RazinShaikh) and [@jvdwetering](https://github.com/jvdwetering)
+
+
+# Privacy
+
+This application does not collect user data. It connects to GitHub only to check for new releases; see [GitHub’s Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+
