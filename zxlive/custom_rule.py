@@ -36,7 +36,7 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
         self.rhs_graph_nx = to_networkx(rhs_graph)
         self.name = name
         self.description = description
-        self.last_rewrite_center = None
+        self.last_rewrite_center: tuple[int, int] | None = None
         self.is_rewrite_unfusable = is_rewrite_unfusable(lhs_graph)
         if self.is_rewrite_unfusable:
             self.lhs_graph_without_boundaries_nx = nx.MultiGraph(self.lhs_graph_nx.subgraph(
@@ -76,7 +76,8 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
 
         vertex_positions = get_vertex_positions(graph, self.rhs_graph_nx, boundary_vertex_map)
         if boundary_vertex_map:
-            self.last_rewrite_center = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+            mean = np.mean([(graph.row(m), graph.qubit(m)) for m in boundary_vertex_map.values()], axis=0)
+            self.last_rewrite_center = (int(mean[0]), int(mean[1]))
         else:
             self.last_rewrite_center = None
         vertex_map = dict(boundary_vertex_map)
