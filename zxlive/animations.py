@@ -153,9 +153,9 @@ def _morph_graph_to_or_from_center(to_center: bool,
     group = QParallelAnimationGroup()
     for v in moves:
         if to_center:
-            start_pos, end_pos = (graph.row(v), graph.qubit(v)), center
+            start_pos, end_pos = (int(graph.row(v)), int(graph.qubit(v))), center
         else:
-            start_pos, end_pos = center, (graph.row(v), graph.qubit(v))
+            start_pos, end_pos = center, (int(graph.row(v)), int(graph.qubit(v)))
         anim = VItemAnimation(v, VItem.Properties.Position, scene, refresh=True)
         anim.setDuration(duration)
         anim.setStartValue(QPointF(*pos_to_view(*start_pos)))
@@ -376,7 +376,7 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
         if all_matched_verts:
             center_row = sum(panel.graph.row(v) for v in all_matched_verts) / len(all_matched_verts)
             center_qubit = sum(panel.graph.qubit(v) for v in all_matched_verts) / len(all_matched_verts)
-            center = (center_row, center_qubit)
+            center = (int(center_row), int(center_qubit))
         else:
             center = (0, 0)
         duration = ANIMATION_DURATION // 2

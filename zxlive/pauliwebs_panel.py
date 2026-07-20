@@ -90,8 +90,8 @@ class PauliWebsPanel(BasePanel):
         # Store the webs
         self._pauli_webs = stabs + regions
 
-        inputs = ()
-        outputs = ()
+        inputs: tuple[int, ...] = ()
+        outputs: tuple[int, ...] = ()
         try:
             self.graph.auto_detect_io()
             inputs = self.graph.inputs()

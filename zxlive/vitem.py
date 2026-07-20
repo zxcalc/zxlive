@@ -298,41 +298,43 @@ class VItem(QGraphicsPathItem):
         super().paint(painter, option, widget)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
-        # Snap items to grid on movement by intercepting the position-change
-        # event and returning a new position
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and not self.is_animated:
-            assert isinstance(value, QPointF)
-            if self.ty == VertexType.W_INPUT:
-                x = value.x()
-                y = value.y()
-            else:
-                x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
-                y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
-            return QPointF(x, y)
-
-        # When selecting/deselecting items, we move them to the front/back
-        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
-            assert isinstance(value, int)  # 0 or 1
-            self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
-            return value
-
-        # Intercept selection- and position-has-changed events to call `refresh`.
-        # Note that the position and selected values are already updated when
-        # this event fires.
-        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
-            # Skip refresh when the scene is performing a bulk graph update
-            # (it will refresh all affected items in a single pass afterwards).
-            if not self.is_animated and not self.graph_scene.is_bulk_updating:
-                self.refresh()
-
-            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+        match change:
+            # Snap items to grid on movement by intercepting the position-change
+            # event and returning a new position
+            case QGraphicsItem.GraphicsItemChange.ItemPositionChange if not self.is_animated:
+                assert isinstance(value, QPointF)
+                if self.ty == VertexType.W_INPUT:
+                    x = value.x()
+                    y = value.y()
+                else:
+                    x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
+                    y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
+                return QPointF(x, y)
+            
+            # When selecting/deselecting items, we move them to the front/back
+            case QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
+                assert isinstance(value, int)  # 0 or 1
+                self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
+                return value
+            
+            # Intercept selection- and position-has-changed events to call `refresh`.
+            # Note that the position and selected values are already updated when
+            # this event fires.
+            case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged | QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+                # Skip refresh when the scene is performing a bulk graph update
+                # (it will refresh all affected items in a single pass afterwards).
+                if not self.is_animated and not self.graph_scene.is_bulk_updating:
+                    self.refresh()
+                
                 scene = self.scene()
-                if TYPE_CHECKING:
-                    assert isinstance(scene, GraphScene)
-                scene.selection_changed_custom.emit()
-
-        return super().itemChange(change, value)
-
+                if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                    if TYPE_CHECKING:
+                        assert isinstance(scene, GraphScene)
+                    scene.selection_changed_custom.emit()
+            
+            case _:
+                return super().itemChange(change, value)
+    
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(e)
         if self.is_animated:

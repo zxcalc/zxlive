@@ -274,7 +274,9 @@ def _is_valid_boolean_phase(phase: ParameterValue) -> bool:
         return False
     if isinstance(phase, float):
         return phase % 2 == 0 or phase % 2 == 1
-    return phase_is_pauli(phase)
+    # TODO: bool() call is required here because mypy incorrectly infers return type of phase_is_pauli
+    # it can be removed once pyzx is updated with the proper annotation
+    return bool(phase_is_pauli(phase))
 
 
 def _validate_symbolic_parameter(params: Dict[Var, ParameterValue], var: Var, value: ParameterValue) -> None:
@@ -322,7 +324,7 @@ def filter_matchings_if_symbolic_compatible(matchings: list[Dict], left: nx.Mult
 
 def to_networkx(graph: GraphT) -> nx.MultiGraph:
     G = nx.MultiGraph()
-    v_data = {v: {"type": graph.type(v),
+    v_data: dict[int, dict[str, object]] = {v: {"type": graph.type(v),
                   "phase": graph.phase(v), }
               for v in graph.vertices()}
     for i, input_vertex in enumerate(graph.inputs()):
@@ -338,7 +340,7 @@ def create_subgraph(graph: GraphT, verts: list[VT]) -> tuple[nx.MultiGraph, dict
     verts = [v for v in verts if graph.type(v) != VertexType.BOUNDARY]
     graph_nx = to_networkx(graph)
     subgraph_nx = nx.MultiGraph(graph_nx.subgraph(verts))
-    boundary_mapping = {}
+    boundary_mapping: dict[str, int] = {}
     i = 0
     for v in verts:
         for e in graph.incident_edges(v):
