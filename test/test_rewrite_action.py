@@ -53,6 +53,9 @@ class _UndoStack:
     def push(self, _cmd: object, *, anim_before: object, anim_after: object) -> None:
         self.push_called = True
 
+class _RewriteActionTreeView:
+    def __init__(self) -> None:
+        self.refresh_rewrites_model = None
 
 class _Panel:
     def __init__(self, graph: object, verts: list[int], edges: list[tuple[int, int, EdgeType]]) -> None:
@@ -62,14 +65,16 @@ class _Panel:
         self.undo_stack = _UndoStack()
         self._verts = verts
         self._edges = edges
+        self.fault_equivalent_weight_value = None
+        self.rewrites_panel = _RewriteActionTreeView()
 
     def parse_selection(self) -> tuple[list[int], list[tuple[int, int, EdgeType]]]:
         return self._verts.copy(), self._edges.copy()
 
 
 def _patch_rewrite_side_effects(monkeypatch: Any) -> None:
-    monkeypatch.setattr(rewrite_action_module, "AddRewriteStep", lambda *_args: object())
-    monkeypatch.setattr(rewrite_action_module, "make_animation", lambda *_args: (None, None))
+    monkeypatch.setattr(rewrite_action_module, "AddRewriteStep", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(rewrite_action_module, "make_animation", lambda *_args, **_kwargs: (None, None))
 
 
 def _make_chain_graph() -> tuple[object, int, int, tuple[int, int, EdgeType], tuple[int, int, EdgeType]]:
