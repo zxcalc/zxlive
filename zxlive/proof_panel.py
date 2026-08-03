@@ -336,7 +336,7 @@ class ProofPanel(BasePanel):
         # vertices should be different types, or edge should be hadamard
         match edge_type:
             case EdgeType.HADAMARD:
-                is_match = (vertex_is_z_like(source_type) and vertex_is_z_like(target_type))
+                is_match = (vertex_is_z_like(source_type) == vertex_is_z_like(target_type))
             case EdgeType.SIMPLE:
                 is_match = (vertex_is_z_like(source_type) and target_type == VertexType.X) or (source_type == VertexType.X and vertex_is_z_like(target_type))
             case _:
@@ -344,7 +344,7 @@ class ProofPanel(BasePanel):
         
         # we also need at least two edges
         num_edges = len(edges)
-        if is_match and (num_edges >= 2):
+        if not is_match or num_edges < 2:
             return False
         
         new_g = copy.deepcopy(self.graph)
