@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import copy
+from fractions import Fraction
 import json
 import random
 from typing import Iterator, Optional, Union, cast
 
-from PySide6.QtCore import Signal, QPointF, QSize
-from PySide6.QtGui import QAction, QIcon, QVector2D
-from PySide6.QtWidgets import QInputDialog, QToolButton
+from PySide6.QtCore import QPointF, QSize, Signal
+from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator, QValidator
+from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit, QLabel, QHBoxLayout, QWidget, QSizePolicy
 
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
+from pyzx.symbolic import Poly
 from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z_box_label,
                         set_z_box_label, vertex_is_z_like)
 
@@ -35,6 +37,7 @@ class ProofPanel(BasePanel):
     """Panel for the proof mode of ZXLive."""
 
     graph_scene: EditGraphScene
+    fault_equivalent_weight_value: Optional[int] = None
     start_pauliwebs_signal = Signal(object)
 
     def __init__(self, graph: GraphT, *actions: QAction) -> None:
@@ -116,12 +119,90 @@ class ProofPanel(BasePanel):
         self.identity_choice[1].setToolTip("X spider (X)")
 
         yield ToolbarSection(*self.identity_choice, exclusive=True)
-        yield ToolbarSection(*self.actions())
 
+        self.fault_equivalent_mode = QToolButton(self)
+        self.fault_equivalent_mode.setToolTip("Fault Equivalent Mode")
+        self.fault_equivalent_mode.setText("FE")
+        self.fault_equivalent_mode.setCheckable(True)
+        self.fault_equivalent_mode.toggled.connect(self.toggle_FE_mode)
+
+        self.weight_layout = QHBoxLayout()
+        self.weight_layout.setSpacing(2)
+
+        self.weight_label = QLabel("w = ")
+        self.weight_label.setMaximumWidth(40)
+        self.weight_layout.addWidget(self.weight_label)
+
+        self.fault_equivalent_weight = QLineEdit(self)
+        self.fault_equivalent_weight.setToolTip("Fault Weight Considered")
+        self.fault_equivalent_weight.setPlaceholderText("∞")
+        self.fault_equivalent_weight.setFixedWidth(50)
+        self.fault_equivalent_weight.setValidator(self.WeightInputValidator(0, 100, self))
+        self.fault_equivalent_weight.editingFinished.connect(self.update_weight)
+        self.weight_layout.addWidget(self.fault_equivalent_weight)
+
+        weight_widget = QWidget(self)
+        weight_widget.setLayout(self.weight_layout)
+        weight_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+
+        yield ToolbarSection(self.fault_equivalent_mode, weight_widget)
+
+        yield ToolbarSection(*self.actions())
+    
         self.pauli_webs = QToolButton(self)
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
+    
+    def toggle_FE_mode(self) -> None:
+        selected_vertices, _ = self.parse_selection()
+        self.rewrites_panel.refresh_rewrites_model()
+        self.graph_scene.select_vertices(selected_vertices)
+        self.graph_scene.selection_changed_custom.emit()
+
+
+    class WeightInputValidator(QIntValidator):
+        def validate(self, input_str: str, pos: int) -> tuple[QValidator.State, str, int]:
+            if input_str == "":
+                return QValidator.State.Acceptable, input_str, pos
+            result: tuple[QValidator.State, str, int] = super().validate(input_str, pos) # type: ignore # Pylance stub says return object, actually returns (State, str, int)
+            return result[0], input_str, pos
+
+    def update_weight(self) -> None:
+        new_weight: int | None = (
+            int(self.fault_equivalent_weight.text())
+            if self.fault_equivalent_weight.text() != ""
+            else None
+        )
+        old_weight: int | None = self.fault_equivalent_weight_value
+
+        if new_weight == old_weight:
+            return
+        
+        self.fault_equivalent_weight_value = new_weight
+
+        def set_weight(w: int | None) -> None:
+            self.fault_equivalent_weight_value = w
+            if self.fault_equivalent_weight:
+                self.fault_equivalent_weight.blockSignals(True)
+                self.fault_equivalent_weight.setText("" if w is None else str(w))
+                self.fault_equivalent_weight.blockSignals(False)
+
+        new_g = copy.deepcopy(self.graph)
+        cmd = AddRewriteStep(
+            graph_view=self.graph_view,
+            new_g=new_g,
+            step_view=self.step_view,
+            name=f"w = {new_weight}" if new_weight is not None else "w = ∞",
+            saved_weight=new_weight,
+            old_weight=old_weight,
+            weight_callback=set_weight,
+            refresh_rules_callback=self.rewrites_panel.refresh_rewrites_model
+        )
+
+        self.undo_stack.push(cmd)
+        self.rewrites_panel.refresh_rewrites_model()
+        return
 
     def _start_pauliwebs(self) -> None:
         # note: this code is copied from edit_panel.py - consider refactoring to avoid duplication
@@ -195,7 +276,7 @@ class ProofPanel(BasePanel):
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Fuse spiders")
             self.play_sound_signal.emit(SFXEnum.THATS_SPIDER_FUSION)
             self.undo_stack.push(cmd, anim_before=anim)
-        elif pyzx.rewrite_rules.check_copy(g, v):
+        elif pyzx.rewrite_rules.check_copy(g, v) and w in self.graph.neighbors(v):
             pyzx.rewrite_rules.copy(g, v)
             # copy_match = pyzx.hrules.match_copy(g, lambda x: x in (v, w))
             # etab, rem_verts, rem_edges, check_isolated_vertices = pyzx.hrules.apply_copy(g, copy_match)
@@ -205,7 +286,12 @@ class ProofPanel(BasePanel):
             anim = anims.strong_comp(self.graph, g, w, self.graph_scene)
             cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
             self.undo_stack.push(cmd, anim_after=anim)
-        elif pyzx.rewrite_rules.check_pauli(g, w, v):  # Second parameter is the Pauli
+        elif pyzx.rewrite_rules.check_copy(g, w) and v in self.graph.neighbors(w):
+            pyzx.rewrite_rules.copy(g, w)
+            anim = anims.strong_comp(self.graph, g, v, self.graph_scene)
+            cmd = AddRewriteStep(self.graph_view, g, self.step_view, "Copy spider through other spider")
+            self.undo_stack.push(cmd, anim_after=anim)
+        elif pyzx.rewrite_rules.check_pauli(g, w, v): # Second parameter is the Pauli
             # Check if we can push a Pauli spider through the other vertex
             pyzx.rewrite_rules.pauli_push(g, w, v)
             # Determine which vertex is the target (the one being pushed through)
@@ -246,22 +332,36 @@ class ProofPanel(BasePanel):
         source, target = self.graph.edge_st(edges[0])
         source_type, target_type = self.graph.type(source), self.graph.type(target)
         edge_type = self.graph.edge_type(edges[0])
-        if (edge_type == EdgeType.HADAMARD and vertex_is_z_like(source_type) and vertex_is_z_like(target_type)) or \
-           (edge_type == EdgeType.SIMPLE and vertex_is_z_like(source_type) and target_type == VertexType.X) or \
-           (edge_type == EdgeType.SIMPLE and source_type == VertexType.X and vertex_is_z_like(target_type)):
-            new_g = copy.deepcopy(self.graph)
-            num_edges = len(edges)
-            # Remove even number of edges
-            if num_edges % 2 != 0:
-                num_edges -= 1
-            for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
-                new_g.remove_edge(edges[0])
-            # TODO: Add animation for Hopf
-            # anim = anims.hopf(edges, self.graph_scene)
-            cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
-            self.undo_stack.push(cmd)
-            return True
-        return False
+        
+        # vertices should be different types, or edge should be hadamard
+        match edge_type:
+            case EdgeType.HADAMARD:
+                is_match = (vertex_is_z_like(source_type) and vertex_is_z_like(target_type))
+            case EdgeType.SIMPLE:
+                is_match = (vertex_is_z_like(source_type) and target_type == VertexType.X) or (source_type == VertexType.X and vertex_is_z_like(target_type))
+            case _:
+                is_match = False
+        
+        # we also need at least two edges
+        num_edges = len(edges)
+        if is_match and (num_edges >= 2):
+            return False
+        
+        new_g = copy.deepcopy(self.graph)
+        # Remove even number of edges
+        if num_edges % 2 != 0:
+            num_edges -= 1
+        # Collect edge items for animation before removing edges. The diff removes the
+        # highest-indexed items, so animate the same ones from the end of the dict.
+        edge_items = [eitem for eitem in self.graph_scene.edge_map[edges[0]].values()]
+        for _ in range(num_edges):  # TODO: This doesn't take into account the global scalar factor.
+            new_g.remove_edge(edges[0])
+        # Animate edges fading out
+        anim = anims.hopf(edge_items[-num_edges:])
+        cmd = AddRewriteStep(self.graph_view, new_g, self.step_view, "Remove parallel edges")
+        self.undo_stack.push(cmd, anim_before=anim)
+        
+        return True
 
     def _magic_identity(self, trace: WandTrace) -> bool:
         if len(trace.hit) != 1 or not all(isinstance(item, EItem) for item in trace.hit):
@@ -489,11 +589,11 @@ class ProofPanel(BasePanel):
             old_label = get_z_box_label(new_g, v)
             set_z_box_label(new_g, first, old_label / phase)
             set_z_box_label(new_g, second, phase)
-        else:
+        elif isinstance(phase, (int, Fraction, Poly)):
             old_phase = new_g.phase(v)
             new_g.set_phase(first, old_phase - phase)
             new_g.set_phase(second, phase)
-
+    
         self._finalize_unfuse(v, new_g)
 
     def _vert_double_clicked(self, v: VT) -> None:

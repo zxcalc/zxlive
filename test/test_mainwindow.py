@@ -14,16 +14,23 @@
 # limitations under the License.
 
 
+import copy
 import pytest
 import os
 from pathlib import Path
+from typing import Optional
 from PySide6 import QtCore
 from pytestqt.qtbot import QtBot
 
+import pyzx
+from pyzx.utils import EdgeType, VertexType
+
+from zxlive.commands import AddRewriteStep
 from zxlive.dialogs import import_diagram_from_file
-from zxlive.common import new_graph
+from zxlive.common import GraphT, W_INPUT_OFFSET, new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
+from zxlive.rewrite_action import RewriteActionTree, RewriteActionTreeModel
 from zxlive.pauliwebs_panel import PauliWebsPanel
 from zxlive.proof_panel import ProofPanel
 from zxlive.settings_dialog import SettingsDialog
@@ -80,25 +87,56 @@ def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     assert app.active_panel is not None
     assert isinstance(app.active_panel, GraphEditPanel)
     assert not app.export_tikz_proof.isEnabled()
+    assert not app.export_tikz_series.isEnabled()
 
     # Start a derivation. Export to tikz is enabled.
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     assert app.tab_widget.count() == 2
     assert isinstance(app.active_panel, ProofPanel)
     assert app.export_tikz_proof.isEnabled()
+    assert app.export_tikz_series.isEnabled()
 
     # Switch to the demo graph tab. Export to tikz is disabled.
     app.tab_widget.setCurrentIndex(0)
     assert not app.export_tikz_proof.isEnabled()
+    assert not app.export_tikz_series.isEnabled()
 
     # Switch back to the proof tab. Export to tikz is enabled.
     app.tab_widget.setCurrentIndex(1)
     assert app.export_tikz_proof.isEnabled()
+    assert app.export_tikz_series.isEnabled()
 
     # Close the proof tab. Export to tikz is disabled.
     app.close_action.trigger()
     assert app.tab_widget.count() == 1
     assert not app.export_tikz_proof.isEnabled()
+    assert not app.export_tikz_series.isEnabled()
+
+
+def test_export_tikz_series(app: MainWindow, qtbot: QtBot, tmp_path: Path,
+                            monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exporting proof steps writes one .tikz file per step into the chosen directory."""
+    from PySide6.QtWidgets import QFileDialog
+
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: str(tmp_path))
+    assert app.handle_export_tikz_series_action()
+
+    files = sorted(p.name for p in tmp_path.iterdir())
+    num_steps = len(list(app.active_panel.proof_model.graphs()))
+    assert len(files) == num_steps
+    # Filenames have a zero-padded numeric prefix (minimum 3 digits) and a safe step name.
+    padding_width = max(3, len(str(max(num_steps - 1, 0))))
+    assert files[0] == f"{0:0{padding_width}d}_START.tikz"
+    for i, filename in enumerate(files):
+        prefix, _, rest = filename.partition("_")
+        assert prefix == f"{i:0{padding_width}d}"
+        assert rest.endswith(".tikz")
+        stem = rest[:-len(".tikz")]
+        assert all(c.isalnum() or c in "._-" for c in stem)
 
 
 def test_settings_dialog(app: MainWindow) -> None:
@@ -157,6 +195,534 @@ def test_proof_as_lemma(app: MainWindow, qtbot: QtBot, tmp_path: Path, monkeypat
     app.proof_as_lemma()
     with open(expected, encoding="utf-8") as f:
         assert f.read() == "sentinel"
+
+
+def test_save_proof_as_lemma_then_reapply(
+    app: MainWindow, qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Saving a proof as a lemma, going back to the start, and reapplying the
+    saved rule must not crash. Regression test for #482."""
+    import zxlive.mainwindow
+    import zxlive.rewrite_data
+
+    rules_dir = str(tmp_path)
+    monkeypatch.setattr(zxlive.mainwindow, "get_custom_rules_path", lambda: rules_dir)
+    monkeypatch.setattr(zxlive.rewrite_data, "get_custom_rules_path", lambda: rules_dir)
+    monkeypatch.setattr(zxlive.mainwindow, "get_lemma_name_and_description",
+                        lambda _parent: ("issue482", "regression"))
+
+    # A Z-Z chain so the lemma's lhs matches the start graph exactly.
+    g, z1, z2 = _new_two_spider_chain_graph()
+    app.new_graph(g)
+
+    proof_panel = _start_derivation(app, qtbot)
+
+    fused = copy.deepcopy(proof_panel.graph)
+    pyzx.simplify.spider_simp(fused)
+    expected_vertex_count = len(list(fused.vertices()))
+    proof_panel.undo_stack.push(
+        AddRewriteStep(proof_panel.graph_view, fused, proof_panel.step_view, "fuse")
+    )
+    app.proof_as_lemma()
+    proof_panel.rewrites_panel.refresh_rewrites_model()
+    proof_panel.step_view.move_to_step(0)
+
+    rewrite_model = proof_panel.rewrites_panel.model()
+    assert isinstance(rewrite_model, RewriteActionTreeModel)
+    rule_node = _find_rewrite_node(rewrite_model.root_item, "issue482")
+    assert rule_node is not None
+
+    proof_panel.graph_scene.clearSelection()
+    for v in (z1, z2):
+        proof_panel.graph_scene.vertex_map[v].setSelected(True)
+
+    # Before #482's fix, this raised KeyError once the animation started.
+    rule_node.rewrite_action.enabled = True
+    rule_node.rewrite_action.do_rewrite(proof_panel)
+
+    # The rewrite is committed when anim_before finishes; wait for the graph
+    # to reflect the post-rewrite state instead of using a fixed delay.
+    qtbot.waitUntil(
+        lambda: len(list(proof_panel.graph.vertices())) == expected_vertex_count,
+        timeout=2000,
+    )
+
+    # Vertex IDs are reassigned each application, so check the structural
+    # shape: the saved lemma collapses the two Z spiders into a single one.
+    final = proof_panel.graph
+    internal = [v for v in final.vertices() if final.type(v) != VertexType.BOUNDARY]
+    assert len(internal) == 1 and final.type(internal[0]) == VertexType.Z
+
+
+def test_move_to_step_emits_selection_changed_for_rewrite_refresh(app: MainWindow, qtbot: QtBot) -> None:
+    g, _, _ = _new_two_spider_chain_graph()
+    app.new_graph(g)
+
+    proof_panel = _start_derivation(app, qtbot)
+
+    fused = copy.deepcopy(proof_panel.graph)
+    pyzx.simplify.spider_simp(fused)
+    proof_panel.undo_stack.push(
+        AddRewriteStep(proof_panel.graph_view, fused, proof_panel.step_view, "fuse")
+    )
+
+    rewrite_model = proof_panel.rewrites_panel.model()
+    assert isinstance(rewrite_model, RewriteActionTreeModel)
+    fuse_node = _find_rewrite_node(rewrite_model.root_item, "Fuse spiders")
+    assert fuse_node is not None
+
+    proof_panel.step_view.move_to_step(1)
+    qtbot.waitUntil(lambda: not fuse_node.rewrite_action.enabled, timeout=1000)
+    with qtbot.waitSignal(proof_panel.graph_scene.selection_changed_custom, timeout=1000):
+        proof_panel.step_view.move_to_step(0)
+    qtbot.waitUntil(lambda: fuse_node.rewrite_action.enabled, timeout=1000)
+
+
+def _new_two_spider_chain_graph() -> tuple[GraphT, int, int]:
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    z1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    z2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    for s, t in ((inp, z1), (z1, z2), (z2, out)):
+        g.add_edge((s, t), EdgeType.SIMPLE)
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    return g, z1, z2
+
+
+def _start_derivation(app: MainWindow, qtbot: QtBot) -> ProofPanel:
+    edit_panel = app.active_panel
+    assert isinstance(edit_panel, GraphEditPanel)
+    qtbot.mouseClick(edit_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    proof_panel = app.active_panel
+    assert isinstance(proof_panel, ProofPanel)
+    return proof_panel
+
+
+def _find_rewrite_node(node: RewriteActionTree, name: str) -> Optional[RewriteActionTree]:
+    if node.is_rewrite and node.rewrite_action.name == name:
+        return node
+    for child in node.child_items:
+        if (found := _find_rewrite_node(child, name)) is not None:
+            return found
+    return None
+
+
+def test_auto_arrange(app: MainWindow) -> None:
+    # The auto arrange action should be enabled when there is an active tab.
+    assert app.auto_arrange_action.isEnabled()
+
+    # Closing all tabs should disable the action (and triggering it would otherwise crash).
+    app.close_action.trigger()
+    assert app.tab_widget.count() == 0
+    assert not app.auto_arrange_action.isEnabled()
+
+    # Re-open a graph with the internal spider placed far from where spring_layout will put it,
+    # so that triggering auto_arrange is guaranteed to push a MoveNode regardless of randomization.
+    app.new_graph(new_graph_with_internal_vertex())
+    assert app.active_panel is not None
+    g_before = app.active_panel.graph_view.graph_scene.g
+    boundary_positions = {v: (g_before.row(v), g_before.qubit(v)) for v in g_before.vertices()
+                          if g_before.type(v) == VertexType.BOUNDARY}
+    spider_v = next(v for v in g_before.vertices() if g_before.type(v) != VertexType.BOUNDARY)
+    spider_orig = (g_before.row(spider_v), g_before.qubit(spider_v))
+    assert not app.undo_action.isEnabled()
+
+    app.auto_arrange_action.trigger()
+    assert app.undo_action.isEnabled()
+
+    # MoveNode applies a graph diff and swaps graph_scene.g to a new instance, so re-fetch.
+    g_after = app.active_panel.graph_view.graph_scene.g
+    for v, (r, q) in boundary_positions.items():
+        assert g_after.row(v) == r
+        assert g_after.qubit(v) == q
+    assert (g_after.row(spider_v), g_after.qubit(spider_v)) != spider_orig
+
+    # Undo should restore the spider's original position.
+    app.undo_action.trigger()
+    g_undone = app.active_panel.graph_view.graph_scene.g
+    assert (g_undone.row(spider_v), g_undone.qubit(spider_v)) == spider_orig
+
+
+def new_graph_with_internal_vertex() -> GraphT:
+    # Two boundary vertices connected via an internal Z spider, with the spider placed far from
+    # where spring_layout will put it so that auto_arrange is guaranteed to produce a move.
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    spider = g.add_vertex(VertexType.Z, qubit=100, row=100)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=2)
+    g.add_edge((inp, spider))
+    g.add_edge((spider, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    return g
+
+
+def test_auto_arrange_disconnected_vertex(app: MainWindow) -> None:
+    # An isolated spider (with no edges) shouldn't crash auto_arrange; its position is
+    # unconstrained by any edge, so we just check that the action runs successfully.
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    spider = g.add_vertex(VertexType.Z, qubit=1, row=1)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=2)
+    g.add_edge((inp, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    isolated = g.add_vertex(VertexType.Z, qubit=5, row=5)
+
+    app.new_graph(g)
+    assert app.active_panel is not None
+    app.auto_arrange_action.trigger()
+    # Boundaries are still anchored at their original positions.
+    g_after = app.active_panel.graph_view.graph_scene.g
+    assert (g_after.row(inp), g_after.qubit(inp)) == (0, 0)
+    assert (g_after.row(out), g_after.qubit(out)) == (2, 0)
+    # The connected spider and isolated spider should both still exist.
+    assert spider in list(g_after.vertices())
+    assert isolated in list(g_after.vertices())
+
+
+def test_auto_arrange_overlapping_boundaries(app: MainWindow) -> None:
+    # Two boundary vertices placed at exactly the same position. Since they are fixed,
+    # spring_layout cannot separate them; we just check that auto_arrange doesn't crash
+    # and that the boundaries stay where they were.
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    spider = g.add_vertex(VertexType.Z, qubit=10, row=10)
+    g.add_edge((inp, spider))
+    g.add_edge((spider, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+
+    app.new_graph(g)
+    assert app.active_panel is not None
+    app.auto_arrange_action.trigger()
+    g_after = app.active_panel.graph_view.graph_scene.g
+    assert (g_after.row(inp), g_after.qubit(inp)) == (0, 0)
+    assert (g_after.row(out), g_after.qubit(out)) == (0, 0)
+
+
+def test_auto_arrange_w_pair_preserved(app: MainWindow) -> None:
+    # A W_INPUT must remain at its original offset relative to its W_OUTPUT partner after
+    # auto_arrange (i.e., it follows the partner instead of being laid out independently).
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    w_out = g.add_vertex(VertexType.W_OUTPUT, qubit=100, row=100)
+    w_in = g.add_vertex(VertexType.W_INPUT, qubit=100 - W_INPUT_OFFSET, row=100)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=2)
+    g.add_edge((w_in, w_out), edgetype=EdgeType.W_IO)
+    g.add_edge((inp, w_in))
+    g.add_edge((w_out, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    orig_offset = (g.row(w_in) - g.row(w_out), g.qubit(w_in) - g.qubit(w_out))
+
+    app.new_graph(g)
+    assert app.active_panel is not None
+    app.auto_arrange_action.trigger()
+    g_after = app.active_panel.graph_view.graph_scene.g
+    new_offset = (g_after.row(w_in) - g_after.row(w_out),
+                  g_after.qubit(w_in) - g_after.qubit(w_out))
+    assert abs(new_offset[0] - orig_offset[0]) < 1e-6
+    assert abs(new_offset[1] - orig_offset[1]) < 1e-6
+
+
+def test_auto_arrange_selection_only(app: MainWindow) -> None:
+    # When a subset of vertices is selected, auto_arrange should reposition only the selected
+    # vertices; non-selected internal vertices should remain at their original positions.
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    s1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    s2 = g.add_vertex(VertexType.Z, qubit=50, row=50)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    g.add_edge((inp, s1))
+    g.add_edge((s1, s2))
+    g.add_edge((s2, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+
+    app.new_graph(g)
+    assert app.active_panel is not None
+    s1_orig = (g.row(s1), g.qubit(s1))
+    app.active_panel.graph_scene.select_vertices([s2])
+    app.auto_arrange_action.trigger()
+
+    g_after = app.active_panel.graph_view.graph_scene.g
+    # The unselected internal spider should not have moved.
+    assert (g_after.row(s1), g_after.qubit(s1)) == s1_orig
+    # The selected spider should have moved (it was placed far from any sensible spring position).
+    assert (g_after.row(s2), g_after.qubit(s2)) != (50, 50)
+
+
+def _new_w_pair_graph() -> tuple[GraphT, int, int, int, int]:
+    # Builds: boundary_in -> W_INPUT -- W_OUTPUT -> boundary_out, with the W pair placed far
+    # from where spring_layout will put it (so auto_arrange is guaranteed to move them).
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    w_out = g.add_vertex(VertexType.W_OUTPUT, qubit=100, row=100)
+    w_in = g.add_vertex(VertexType.W_INPUT, qubit=100 - W_INPUT_OFFSET, row=100)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=2)
+    g.add_edge((w_in, w_out), edgetype=EdgeType.W_IO)
+    g.add_edge((inp, w_in))
+    g.add_edge((w_out, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    return g, inp, out, w_out, w_in
+
+
+def test_auto_arrange_select_w_output_only(app: MainWindow) -> None:
+    # Selecting only the W_OUTPUT must still drag the W_INPUT along (the partner can't be
+    # treated as a fixed anchor just because it's a neighbour of the selection).
+    g, _inp, _out, w_out, w_in = _new_w_pair_graph()
+    orig_offset = (g.row(w_in) - g.row(w_out), g.qubit(w_in) - g.qubit(w_out))
+    w_out_orig = (g.row(w_out), g.qubit(w_out))
+
+    app.new_graph(g)
+    assert app.active_panel is not None
+    app.active_panel.graph_scene.select_vertices([w_out])
+    app.auto_arrange_action.trigger()
+
+    g_after = app.active_panel.graph_view.graph_scene.g
+    assert (g_after.row(w_out), g_after.qubit(w_out)) != w_out_orig
+    new_offset = (g_after.row(w_in) - g_after.row(w_out),
+                  g_after.qubit(w_in) - g_after.qubit(w_out))
+    assert abs(new_offset[0] - orig_offset[0]) < 1e-6
+    assert abs(new_offset[1] - orig_offset[1]) < 1e-6
+
+
+def test_auto_arrange_select_w_input_only(app: MainWindow) -> None:
+    # Selecting only the W_INPUT must promote the W_OUTPUT to also be laid out, so the pair
+    # actually moves rather than being stuck (W_INPUT removed from layout, partner anchored).
+    g, _inp, _out, w_out, w_in = _new_w_pair_graph()
+    orig_offset = (g.row(w_in) - g.row(w_out), g.qubit(w_in) - g.qubit(w_out))
+    w_out_orig = (g.row(w_out), g.qubit(w_out))
+
+    app.new_graph(g)
+    assert app.active_panel is not None
+    app.active_panel.graph_scene.select_vertices([w_in])
+    app.auto_arrange_action.trigger()
+
+    g_after = app.active_panel.graph_view.graph_scene.g
+    assert (g_after.row(w_out), g_after.qubit(w_out)) != w_out_orig
+    new_offset = (g_after.row(w_in) - g_after.row(w_out),
+                  g_after.qubit(w_in) - g_after.qubit(w_out))
+    assert abs(new_offset[0] - orig_offset[0]) < 1e-6
+    assert abs(new_offset[1] - orig_offset[1]) < 1e-6
+
+
+def test_auto_arrange_in_proof_mode(app: MainWindow, qtbot: QtBot) -> None:
+    # Auto-arrange in a ProofPanel must keep the ProofModel's graph for the current step in
+    # sync with the view, and undo/redo must restore positions on both.
+    app.close_action.trigger()
+    app.new_graph(new_graph_with_internal_vertex())
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+
+    g_before = app.active_panel.graph_view.graph_scene.g
+    spider_v = next(v for v in g_before.vertices() if g_before.type(v) != VertexType.BOUNDARY)
+    spider_orig = (g_before.row(spider_v), g_before.qubit(spider_v))
+    step_index = app.active_panel.step_view.currentIndex().row()
+
+    app.auto_arrange_action.trigger()
+    g_after = app.active_panel.graph_view.graph_scene.g
+    spider_after = (g_after.row(spider_v), g_after.qubit(spider_v))
+    assert spider_after != spider_orig
+    # The proof step's stored graph must match the view's graph.
+    proof_graph = app.active_panel.proof_model.get_graph(step_index)
+    assert (proof_graph.row(spider_v), proof_graph.qubit(spider_v)) == spider_after
+
+    app.undo_action.trigger()
+    g_undone = app.active_panel.graph_view.graph_scene.g
+    assert (g_undone.row(spider_v), g_undone.qubit(spider_v)) == spider_orig
+    proof_graph = app.active_panel.proof_model.get_graph(step_index)
+    assert (proof_graph.row(spider_v), proof_graph.qubit(spider_v)) == spider_orig
+
+    app.redo_action.trigger()
+    g_redone = app.active_panel.graph_view.graph_scene.g
+    assert (g_redone.row(spider_v), g_redone.qubit(spider_v)) == spider_after
+    proof_graph = app.active_panel.proof_model.get_graph(step_index)
+    assert (proof_graph.row(spider_v), proof_graph.qubit(spider_v)) == spider_after
+
+
+def _new_two_spider_proof_panel(app: MainWindow, qtbot: QtBot) -> tuple[ProofPanel, int, int]:
+    # Open a proof panel on a small graph with two internal Z spiders and return their ids.
+    app.close_action.trigger()
+    g = new_graph()
+    inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
+    s1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    s2 = g.add_vertex(VertexType.Z, qubit=0, row=2)
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    g.add_edge((inp, s1))
+    g.add_edge((s1, s2))
+    g.add_edge((s2, out))
+    g.set_inputs((inp,))
+    g.set_outputs((out,))
+    app.new_graph(g)
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    assert isinstance(app.active_panel, ProofPanel)
+    return app.active_panel, s1, s2
+
+
+def test_proof_mode_command_preserves_selection(app: MainWindow, qtbot: QtBot) -> None:
+    # `ProofModeCommand` calls `move_to_step` (which rebuilds the scene) and may wrap commands
+    # like `SetGraph` that also rebuild the scene; both paths previously wiped the selection.
+    # The snapshotted selection should survive both undo and redo regardless of the wrapped
+    # command. Also, on the first redo the view is already on the target step, so the scene
+    # rebuild should be skipped (verified via `VItem` instance reuse).
+    import copy
+    from zxlive.commands import ProofModeCommand, SetGraph
+    panel, s1, s2 = _new_two_spider_proof_panel(app, qtbot)
+    panel.graph_scene.select_vertices([s1, s2])
+    vitem_s1_before = panel.graph_scene.vertex_map[s1]
+
+    panel._vert_moved([(s1, 5.0, 0.0)])
+    assert panel.graph_scene.vertex_map[s1] is vitem_s1_before
+    for action in (app.undo_action, app.redo_action, app.undo_action):
+        action.trigger()
+        assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+
+    new_g = copy.deepcopy(panel.graph_scene.g)
+    extra_v = new_g.add_vertex(VertexType.Z, qubit=2, row=2)
+    step_index = panel.step_view.currentIndex().row()
+    # Track sidebar refreshes via `selection_changed_custom`; the rewrites sidebar listens to
+    # this signal to re-evaluate rule applicability, and a stale sidebar can let the user
+    # apply a rule that no longer matches.
+    sidebar_refreshes: list[int] = []
+    panel.graph_scene.selection_changed_custom.connect(lambda: sidebar_refreshes.append(1))
+
+    panel.undo_stack.push(ProofModeCommand(SetGraph(panel.graph_view, new_g), panel.step_view))
+    # The proof model's stored graph for the step must stay in sync with the view (regardless
+    # of whether the wrapped command keeps its own `self.g` updated, since `ProofModeCommand`
+    # syncs from the scene's live graph).
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    assert extra_v in panel.proof_model.get_graph(step_index).vertices()
+    assert sidebar_refreshes, "expected sidebar refresh after redo"
+
+    sidebar_refreshes.clear()
+    app.undo_action.trigger()
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    assert extra_v not in panel.proof_model.get_graph(step_index).vertices()
+    assert sidebar_refreshes, "expected sidebar refresh after undo"
+
+    sidebar_refreshes.clear()
+    app.redo_action.trigger()
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    assert extra_v in panel.proof_model.get_graph(step_index).vertices()
+    assert sidebar_refreshes, "expected sidebar refresh after redo"
+
+
+def test_proof_mode_command_refreshes_sidebar_applicability(app: MainWindow, qtbot: QtBot) -> None:
+    # End-to-end check that a `ProofModeCommand` whose wrapped command changes graph connectivity
+    # without changing the selection still causes the rewrites sidebar to re-evaluate rule
+    # applicability. Uses `AddEdge`, where the selection ({s1, s2}) is identical before and after
+    # the operation. A stale sidebar would let the user click a rule that no longer matches; the
+    # refresh path is via `update_graph_view → select_vertices → selection_changed_custom`, with
+    # `_finalize`'s emit as a defensive backstop.
+    from zxlive.commands import AddEdge, ProofModeCommand
+    panel, s1, s2 = _new_two_spider_proof_panel(app, qtbot)
+    # Remove the edge between `s1` and `s2` directly on the underlying graph so "Fuse spiders"
+    # starts off disabled (no edge between selected spiders → no match).
+    panel.graph_scene.g.remove_edge(panel.graph_scene.g.edge(s1, s2))
+    panel.graph_scene.set_graph(panel.graph_scene.g)
+    panel.graph_scene.select_vertices([s1, s2])
+
+    rewrite_model = panel.rewrites_panel.model()
+    assert isinstance(rewrite_model, RewriteActionTreeModel)
+    fuse_node = _find_rewrite_node(rewrite_model.root_item, "Fuse spiders")
+    assert fuse_node is not None
+    qtbot.waitUntil(lambda: not fuse_node.rewrite_action.enabled, timeout=1000)
+
+    # Add the edge back via a `ProofModeCommand`-wrapped `AddEdge`. Selection stays {s1, s2},
+    # but the sidebar should re-evaluate "Fuse spiders" against the new graph and enable it.
+    panel.undo_stack.push(ProofModeCommand(AddEdge(panel.graph_view, s1, s2, EdgeType.SIMPLE), panel.step_view))
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    qtbot.waitUntil(lambda: fuse_node.rewrite_action.enabled, timeout=1000)
+
+    app.undo_action.trigger()
+    assert set(panel.graph_view.graph_scene.selected_vertices) == {s1, s2}
+    qtbot.waitUntil(lambda: not fuse_node.rewrite_action.enabled, timeout=1000)
+
+
+def test_rewrite_selects_replacement_nodes(app: MainWindow, qtbot: QtBot) -> None:
+    # A rewrite that removes a selected node and adds new ones should leave the replacements
+    # selected, so the user can keep working on the result of the rewrite without having to
+    # reselect. This covers Push Pauli (one selected node removed, two new added) and Strong
+    # complementarity (both selected nodes removed, four new added).
+    import copy
+    from fractions import Fraction
+    from zxlive.commands import AddRewriteStep
+
+    # Push Pauli: pauli + non-pauli selected; pauli removed, two new pauli spiders added.
+    app.close_action.trigger()
+    g = new_graph()
+    inp1 = g.add_vertex(VertexType.BOUNDARY, qubit=-1, row=0)
+    inp2 = g.add_vertex(VertexType.BOUNDARY, qubit=1, row=0)
+    non_pauli = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    pauli = g.add_vertex(VertexType.X, qubit=0, row=2, phase=Fraction(1))
+    out = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3)
+    g.add_edge((inp1, non_pauli))
+    g.add_edge((inp2, non_pauli))
+    g.add_edge((non_pauli, pauli))
+    g.add_edge((pauli, out))
+    g.set_inputs((inp1, inp2))
+    g.set_outputs((out,))
+    app.new_graph(g)
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    panel = app.active_panel
+    assert isinstance(panel, ProofPanel)
+
+    panel.graph_scene.select_vertices([pauli, non_pauli])
+    new_g = copy.deepcopy(panel.graph)
+    from pyzx.rewrite_rules import pauli_push
+    assert pauli_push(new_g, non_pauli, pauli)
+    panel.undo_stack.push(AddRewriteStep(panel.graph_view, new_g, panel.step_view, "Push Pauli"))
+
+    selected = set(panel.graph_scene.selected_vertices)
+    new_pauli_verts = set(new_g.vertices()) - {inp1, inp2, non_pauli, out}
+    # The non-pauli (still present) and the two new pauli spiders (replacements) should be
+    # selected. The old pauli is gone.
+    assert non_pauli in selected
+    assert pauli not in selected
+    assert new_pauli_verts.issubset(selected)
+
+    # Strong complementarity: z + x selected; both removed, four new spiders added.
+    from pyzx.rewrite_rules import bialgebra
+    app.close_action.trigger()
+    g = new_graph()
+    inp1 = g.add_vertex(VertexType.BOUNDARY, qubit=-1, row=0)
+    inp2 = g.add_vertex(VertexType.BOUNDARY, qubit=1, row=0)
+    z = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    x = g.add_vertex(VertexType.X, qubit=0, row=2)
+    out1 = g.add_vertex(VertexType.BOUNDARY, qubit=-1, row=3)
+    out2 = g.add_vertex(VertexType.BOUNDARY, qubit=1, row=3)
+    g.add_edge((inp1, z))
+    g.add_edge((inp2, z))
+    g.add_edge((z, x))
+    g.add_edge((x, out1))
+    g.add_edge((x, out2))
+    g.set_inputs((inp1, inp2))
+    g.set_outputs((out1, out2))
+    app.new_graph(g)
+    assert isinstance(app.active_panel, GraphEditPanel)
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+    panel = app.active_panel
+    assert isinstance(panel, ProofPanel)
+
+    panel.graph_scene.select_vertices([z, x])
+    new_g = copy.deepcopy(panel.graph)
+    assert bialgebra(new_g, z, x)
+    panel.undo_stack.push(AddRewriteStep(panel.graph_view, new_g, panel.step_view, "Strong complementarity"))
+
+    selected = set(panel.graph_scene.selected_vertices)
+    new_spiders = set(new_g.vertices()) - {inp1, inp2, out1, out2}
+    # Both originally selected spiders are gone; the four new replacements should be selected.
+    assert z not in selected and x not in selected
+    assert new_spiders.issubset(selected)
 
 
 def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:

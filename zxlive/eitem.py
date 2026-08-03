@@ -44,6 +44,7 @@ class EItem(QGraphicsPathItem):
     class Properties(Enum):
         """Properties of an EItem that can be animated."""
         Thickness = 1
+        Opacity = 2
 
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
@@ -70,7 +71,7 @@ class EItem(QGraphicsPathItem):
         self.is_mouse_pressed = False
         self.is_dragging = False
         self._old_pos: Optional[QPointF] = None
-        self.thickness: float = 3
+        self.thickness: float = 3.0
         self.color: QColor = QColor()
         self.reset_color()
 
@@ -384,21 +385,24 @@ class EItemAnimation(QVariantAnimation):
         self.stateChanged.connect(self._on_state_changed)
 
     @property
-    def it(self) -> EItem:
+    def it(self) -> Optional[EItem]:
+        # Returns ``None`` if the edge is no longer in the scene.
         if self._it is None and self.scene is not None and self.e is not None:
-            self._it = self.scene.edge_map[self.e][0]
-        assert self._it is not None
+            if mapping := self.scene.edge_map.get(self.e):
+                self._it = mapping[0]
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        if (item := self.it) is None:
+            return
+        if state == QAbstractAnimation.State.Running and self not in item.active_animations:
             # Stop all animations that target the same property
-            for anim in self.it.active_animations.copy():
+            for anim in item.active_animations.copy():
                 if anim.prop == self.prop:
                     anim.stop()
-            self.it.active_animations.add(self)
+            item.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
-            self.it.active_animations.remove(self)
+            item.active_animations.discard(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
             #   Note that we cannot just remove ourselves from the set since the garbage
@@ -407,11 +411,13 @@ class EItemAnimation(QVariantAnimation):
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
-        if self.state() != QAbstractAnimation.State.Running:
+        if self.state() != QAbstractAnimation.State.Running or (item := self.it) is None:
             return
 
         if self.prop == EItem.Properties.Thickness:
-            self.it.thickness = value
+            item.thickness = value
+        elif self.prop == EItem.Properties.Opacity:
+            item.setOpacity(value)
 
         if self.refresh:
-            self.it.refresh()
+            item.refresh()

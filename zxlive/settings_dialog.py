@@ -131,6 +131,7 @@ general_settings: list[SettingsData] = [
     {"id": "input-circuit-format", "label": "Input Circuit as", "type": FormInputType.Combo, "data": input_circuit_formats},
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
     {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Color},
+    {"id": "show-vertex-indices", "label": "Show vertex indices", "type": FormInputType.Bool},
 ]
 
 

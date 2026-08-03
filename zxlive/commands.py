@@ -4,13 +4,13 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Iterable, Optional, Set, Union
+from typing import Callable, Iterable, Optional, Set
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
 from pyzx.graph.diff import GraphDiff
 from pyzx.symbolic import Poly
-from pyzx.utils import EdgeType, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
+from pyzx.utils import EdgeType, FractionLike, VertexType, get_w_partner, vertex_is_w, get_w_io, get_z_box_label, set_z_box_label
 
 from .common import ET, VT, W_INPUT_OFFSET, GraphT
 from .settings import display_setting
@@ -67,17 +67,67 @@ class ProofModeCommand(QUndoCommand):
         super().__init__()
         self.command = command
         self.step_view = step_view
-        self.proof_step_index = int(step_view.currentIndex().row())
+        current = step_view.currentIndex()
+        if current.parent().isValid():
+            # Editing a sub-step inside a grouped rewrite.
+            self.proof_step_index = current.parent().row()
+            self.sub_step: Optional[tuple[int, int]] = (current.parent().row() - 1, current.row())
+        else:
+            self.proof_step_index = int(current.row())
+            self.sub_step = None
+        # Snapshot the selection at construction so we can restore it after operations that
+        # would otherwise drop it (`move_to_step`, and wrapped commands like `SetGraph` that
+        # rebuild the scene).
+        self._initial_selection = set(command.graph_view.graph_scene.selected_vertices)
+
+    def _ensure_on_step(self) -> None:
+        # On the first `redo` after construction the view is already on the target step, so
+        # skip navigation to avoid an unnecessary scene rebuild.
+        current = self.step_view.currentIndex()
+        if self.sub_step is not None:
+            on_sub = (
+                current.parent().isValid()
+                and current.parent().row() - 1 == self.sub_step[0]
+                and current.row() == self.sub_step[1]
+            )
+            if not on_sub:
+                self.step_view.navigate_to_sub_step(self.sub_step[0], self.sub_step[1])
+        elif current.parent().isValid() or int(current.row()) != self.proof_step_index:
+            self.step_view.move_to_step(self.proof_step_index)
+
+    def _restore_selection_if_lost(self) -> None:
+        # Only restore when the selection is gone, so we don't clobber wrapped commands like
+        # `UpdateGraph(select_new=True)` that intentionally manage the selection themselves
+        # (e.g. selecting the replacements when a rewrite removes selected nodes).
+        if not self._initial_selection:
+            return
+        scene = self.command.graph_view.graph_scene
+        if not set(scene.selected_vertices):
+            scene.select_vertices(self._initial_selection)
+
+    def _finalize(self) -> None:
+        # Sync the proof model from the live scene graph rather than `self.command.g`, so
+        # the model stays correct even if a wrapped command doesn't keep its own `g` in
+        # lockstep with what it pushes to the view.
+        scene = self.command.graph_view.graph_scene
+        if self.sub_step is not None:
+            self.step_view.model().set_sub_graph(self.sub_step[0], self.sub_step[1], scene.g)
+        else:
+            self.step_view.model().set_graph(self.proof_step_index, scene.g)
+        self._restore_selection_if_lost()
+        # Always re-emit so the rewrites sidebar re-evaluates rule applicability against
+        # the new graph state, even if the selection content is unchanged.
+        scene.selection_changed_custom.emit()
 
     def undo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
+        self._ensure_on_step()
         self.command.undo()
-        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
+        self._finalize()
 
     def redo(self) -> None:
-        self.step_view.move_to_step(self.proof_step_index)
+        self._ensure_on_step()
         self.command.redo()
-        self.step_view.model().set_graph(self.proof_step_index, self.command.g)
+        self._finalize()
 
 
 @dataclass
@@ -88,10 +138,12 @@ class SetGraph(BaseCommand):
 
     def undo(self) -> None:
         assert self.old_g is not None
+        self.g = self.old_g
         self.graph_view.set_graph(self.old_g)
 
     def redo(self) -> None:
         self.old_g = self.graph_view.graph_scene.g
+        self.g = self.new_g
         self.graph_view.set_graph(self.new_g)
 
 
@@ -415,15 +467,15 @@ class MergeNodes(BaseCommand):
 class ChangePhase(BaseCommand):
     """Updates the phase of a spider."""
     v: VT
-    new_phase: Union[Fraction, Poly, complex]
+    new_phase: FractionLike | complex
 
-    _old_phase: Optional[Union[Fraction, Poly, complex]] = field(default=None, init=False)
+    _old_phase: FractionLike | complex | None = field(default=None, init=False)
 
     def undo(self) -> None:
         assert self._old_phase is not None
         if self.g.type(self.v) == VertexType.Z_BOX:
             set_z_box_label(self.g, self.v, self._old_phase)
-        else:
+        elif isinstance(self._old_phase, (Fraction, int, Poly)):
             self.g.set_phase(self.v, self._old_phase)
         self.update_graph_view()
 
@@ -431,11 +483,10 @@ class ChangePhase(BaseCommand):
         if self.g.type(self.v) == VertexType.Z_BOX:
             self._old_phase = get_z_box_label(self.g, self.v)
             set_z_box_label(self.g, self.v, self.new_phase)
-        else:
+        elif isinstance(self.new_phase, (Fraction, int, Poly)):
             self._old_phase = self.g.phase(self.v)
             self.g.set_phase(self.v, self.new_phase)
         self.update_graph_view()
-
 
 @dataclass
 class AddRewriteStep(UpdateGraph):
@@ -447,6 +498,10 @@ class AddRewriteStep(UpdateGraph):
     step_view: ProofStepView
     name: str
     diff: Optional[GraphDiff] = None
+    saved_weight: int | None = None
+    old_weight: int | None = None
+    weight_callback: Callable[[int | None], None] | None = None
+    refresh_rules_callback: Callable[[], None] | None = None
 
     _old_selected: Optional[int] = field(default=None, init=False)
     _old_steps: list[tuple[Rewrite, GraphT]] = field(default_factory=list, init=False)
@@ -458,6 +513,12 @@ class AddRewriteStep(UpdateGraph):
         model = self.step_view.model()
         assert isinstance(model, ProofModel)
         return model
+    
+    def _apply_weight(self, w: int | None) -> None:
+        if self.weight_callback:
+            self.weight_callback(w)
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
 
     def redo(self) -> None:
         self._old_steps = []
@@ -489,11 +550,17 @@ class AddRewriteStep(UpdateGraph):
 
         self.proof_model.add_rewrite(Rewrite(self.name, self.name, self.new_g))
 
+        self._apply_weight(self.saved_weight)
+
         # Select the added step
         idx = self.step_view.model().index(self.proof_model.rowCount() - 1, 0, QModelIndex())
         self.step_view.selectionModel().blockSignals(True)
         self.step_view.setCurrentIndex(idx)
         self.step_view.selectionModel().blockSignals(False)
+
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
+
         super().redo()
 
     def undo(self) -> None:
@@ -529,7 +596,14 @@ class AddRewriteStep(UpdateGraph):
             self.step_view.selectionModel().blockSignals(True)
             self.step_view.setCurrentIndex(idx)
             self.step_view.selectionModel().blockSignals(False)
+
+        self._apply_weight(self.old_weight)
+
+        if self.refresh_rules_callback:
+            self.refresh_rules_callback()
+
         super().undo()
+
 
 
 @dataclass

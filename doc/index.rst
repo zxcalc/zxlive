@@ -11,9 +11,11 @@ Welcome to zxlive's documentation!
    :caption: Contents:
 
    gettingstarted
+   gestures-and-rewrites
    adding-rewrites
    tikz_export
-
+   fault-equivalent-rewrites
+   shortcuts-list
 
 Indices and tables
 ==================

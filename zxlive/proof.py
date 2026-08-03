@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional, Union, Dict
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, Union, cast
 
 if TYPE_CHECKING:
     from .proof_panel import ProofPanel
@@ -78,13 +78,13 @@ class ProofModel(QAbstractItemModel):
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
         if not parent.isValid():
-            return self.createIndex(row, column, 0)
-        return self.createIndex(row, column, parent.row() + 1)
+            return cast(QModelIndex, self.createIndex(row, column, 0))
+        return cast(QModelIndex, self.createIndex(row, column, parent.row() + 1))
 
     def parent(self, child: Union[QModelIndex, QPersistentModelIndex]) -> QModelIndex:  # type: ignore[override]
         if not child.isValid() or child.internalId() == 0:
             return QModelIndex()
-        return self.createIndex(child.internalId() - 1, 0, 0)
+        return cast(QModelIndex, self.createIndex(child.internalId() - 1, 0, 0))
 
     def rowCount(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> int:
         if not parent.isValid():
@@ -147,6 +147,20 @@ class ProofModel(QAbstractItemModel):
             self.steps[index - 1] = Rewrite(old.display_name, old.rule, graph, old.grouped_rewrites)
             mi = self.createIndex(index, 0, 0)
             self.dataChanged.emit(mi, mi, [])
+
+    def set_sub_graph(self, step_idx: int, sub_idx: int, graph: GraphT) -> None:
+        """Update the graph of a sub-step inside a grouped rewrite."""
+        old = self.steps[step_idx]
+        grouped = old.grouped_rewrites
+        if grouped is None or sub_idx >= len(grouped):
+            return
+        old_sub = grouped[sub_idx]
+        new_grouped = list(grouped)
+        new_grouped[sub_idx] = Rewrite(old_sub.display_name, old_sub.rule, graph, old_sub.grouped_rewrites)
+        self.steps[step_idx] = Rewrite(old.display_name, old.rule, old.graph, new_grouped)
+        parent_mi = self.index(step_idx + 1, 0)
+        child_mi = self.index(sub_idx, 0, parent_mi)
+        self.dataChanged.emit(child_mi, child_mi, [])
 
     def graphs(self) -> list[GraphT]:
         return [self.initial_graph] + [step.graph for step in self.steps]
@@ -269,6 +283,7 @@ class ProofModel(QAbstractItemModel):
         """Restore a previously truncated / ungrouped step to its original group."""
         self.pop_rewrite(step_index)
         self.add_rewrite(original, step_index)
+
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the model to Python dict."""
         return {
@@ -353,9 +368,32 @@ class ProofStepView(QTreeView):
 
     def move_to_step(self, index: int) -> None:
         idx = self.model().index(index, 0, QModelIndex())
+        self.clearSelection()
+        self.selectionModel().blockSignals(True)
         self.setCurrentIndex(idx)
+        self.selectionModel().blockSignals(False)
+        self.update(idx)
+        g = self.model().get_graph(index)
+        self.graph_view.set_graph(g)
+        self.graph_view.graph_scene.selection_changed_custom.emit()
+
+    def navigate_to_sub_step(self, step_idx: int, sub_idx: int) -> None:
+        """Select a sub-step inside a grouped rewrite and show its graph."""
+        parent_idx = self.model().index(step_idx + 1, 0)
+        self.expand(parent_idx)
+        child_idx = self.model().index(sub_idx, 0, parent_idx)
+        self.selectionModel().blockSignals(True)
+        self.setCurrentIndex(child_idx)
+        self.selectionModel().blockSignals(False)
+        step = self.model().steps[step_idx]
+        if step.grouped_rewrites and sub_idx < len(step.grouped_rewrites):
+            graph = step.grouped_rewrites[sub_idx].graph.copy()
+            assert isinstance(graph, GraphT)
+            self.graph_view.set_graph(graph)
+            self.graph_view.graph_scene.selection_changed_custom.emit()
 
     def proof_step_selected(self, selected: QItemSelection, deselected: QItemSelection) -> None:
+        del deselected  # unused; required by selectionChanged signature
         if not selected:
             return
         index = selected.first().topLeft()
@@ -370,8 +408,10 @@ class ProofStepView(QTreeView):
                 graph = step.grouped_rewrites[sub_idx].graph.copy()
                 assert isinstance(graph, GraphT)
                 self.graph_view.set_graph(graph)
+                self.graph_view.graph_scene.selection_changed_custom.emit()
         else:
             self.graph_view.set_graph(self.model().get_graph(index.row()))
+            self.graph_view.graph_scene.selection_changed_custom.emit()
 
     # Context menu
 
@@ -385,13 +425,13 @@ class ProofStepView(QTreeView):
         if index.parent().isValid():
             # Right-clicked on a sub-step
             rename_action = context_menu.addAction("Rename Sub-step")
-            action_map[rename_action] = lambda: self.edit(index)
+            action_map[rename_action] = lambda idx=index: self.edit(idx)
         else:
             top_level = [i for i in self.selectedIndexes() if not i.parent().isValid()]
             if len(top_level) > 1:
                 action_map[context_menu.addAction("Group Steps")] = self.group_selected_steps
             elif index.row() != 0:
-                action_map[context_menu.addAction("Rename Step")] = lambda: self.edit(index)
+                action_map[context_menu.addAction("Rename Step")] = lambda idx=index: self.edit(idx)
                 step_idx = index.row() - 1
                 if step_idx < len(self.model().steps) and self.model().steps[step_idx].grouped_rewrites is not None:
                     action_map[context_menu.addAction("Ungroup Steps")] = self.ungroup_selected_step
@@ -467,6 +507,23 @@ class ProofStepItemDelegate(QStyledItemDelegate):
     triangle_size = 5
     sub_indent = 20
 
+    # Horizontal offset where the text/editor begins (just past the circular step symbol).
+    # Shared between paint() and updateEditorGeometry() so they cannot drift apart.
+    text_left_offset = line_width + 2 * line_padding
+
+    # Item rendering colours. Defined here so paint() and the editor stylesheet
+    # in createEditor() reference the same values and stay visually consistent.
+    bg_selected_dark = QColor(60, 80, 120)
+    bg_hover_dark = QColor(50, 60, 80)
+    bg_default_dark = QColor(35, 39, 46)
+    text_color_dark = QColor(224, 224, 224)
+    line_color_dark = QColor(180, 180, 180)
+    editor_border_dark = QColor(80, 128, 192)
+
+    bg_selected_light = QColor(204, 232, 255)
+    bg_hover_light = QColor(229, 243, 255)
+    editor_border_light = QColor(128, 176, 224)
+
     def editorEvent(self, event: QEvent, model: QAbstractItemModel,
                     option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> bool:
         """Handle triangle clicks natively within the delegate's event flow without view coordinate tracking."""
@@ -479,7 +536,7 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                 text_x = rect.x() + self.line_width + 2 * self.line_padding
                 cy = rect.y() + row_h / 2
                 s = self.triangle_size
-                
+
                 pos = event.pos()
                 # Check hit test using native option rect properties
                 if text_x <= pos.x() <= text_x + s * 2 and cy - s <= pos.y() <= cy + s:
@@ -489,15 +546,28 @@ class ProofStepItemDelegate(QStyledItemDelegate):
                         return True
         return super().editorEvent(event, model, option, index)
 
-    @staticmethod
-    def _bg_color(selected: bool, hovered: bool) -> QColor:
+    def _bg_color(self, selected: bool, hovered: bool, child_selected: bool = False) -> QColor:
         """Return background color for the given state."""
         dark = display_setting.dark_mode
         if selected:
-            return QColor(60, 80, 120) if dark else QColor(204, 232, 255)
-        if hovered:
-            return QColor(50, 60, 80) if dark else QColor(229, 243, 255)
-        return QColor(35, 39, 46) if dark else QColor(255, 255, 255)
+            return self.bg_selected_dark if dark else self.bg_selected_light
+        if child_selected or hovered:
+            return self.bg_hover_dark if dark else self.bg_hover_light
+        return self.bg_default_dark if dark else QColor(255, 255, 255)
+
+    def _has_selected_child(self, index: Union[QModelIndex, QPersistentModelIndex]) -> bool:
+        """True when a child of this top-level index is the current selection."""
+        view = self.parent()
+        model = index.model()
+        if not isinstance(view, QTreeView) or model is None:
+            return False
+        sel = view.selectionModel()
+        if sel is None:
+            return False
+        for i in range(model.rowCount(index)):
+            if sel.isSelected(model.index(i, 0, index)):
+                return True
+        return False
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem,
               index: Union[QModelIndex, QPersistentModelIndex]) -> None:
@@ -506,17 +576,18 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
         is_selected = bool(option.state & QStyle.StateFlag.State_Selected)  # type: ignore[attr-defined]
         is_hovered = bool(option.state & QStyle.StateFlag.State_MouseOver)  # type: ignore[attr-defined]
+        child_selected = (not index.parent().isValid()) and self._has_selected_child(index)
 
         # Background
         painter.setPen(Qt.GlobalColor.transparent)
-        painter.setBrush(self._bg_color(is_selected, is_hovered))
+        painter.setBrush(self._bg_color(is_selected, is_hovered, child_selected))
         painter.drawRect(option.rect)  # type: ignore[attr-defined]
 
         font = QFont(option.font)  # type: ignore[attr-defined]
         text_h = QFontMetrics(font).height()
         row_h = text_h + 2 * self.vert_padding
-        fg = QColor(224, 224, 224) if display_setting.dark_mode else QColor(0, 0, 0)
-        line_clr = QColor(180, 180, 180) if display_setting.dark_mode else QColor(0, 0, 0)
+        fg = self.text_color_dark if display_setting.dark_mode else QColor(0, 0, 0)
+        line_clr = self.line_color_dark if display_setting.dark_mode else QColor(0, 0, 0)
 
         if index.parent().isValid():
             self._paint_child(painter, option, index, font, text_h, row_h, fg, line_clr)
@@ -654,7 +725,55 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem,
                      index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
-        return QLineEdit(parent)
+        editor = QLineEdit(parent)
+        # Match the editor font to the painted item font so it stays consistent on HiDPI.
+        # The painted text is bold when the item is selected, and items being edited are
+        # typically selected, so apply the same weight here.
+        font = QFont(option.font)  # type: ignore[attr-defined]
+        if option.state & QStyle.StateFlag.State_Selected:  # type: ignore[attr-defined]
+            font.setWeight(QFont.Weight.Bold)
+        editor.setFont(font)
+        # Style the editor to match the item appearance. Colours are derived from the same
+        # QColors used by paint() so the painted selection and editor cannot drift apart.
+        if display_setting.dark_mode:
+            bg = self.bg_selected_dark.name()
+            border = self.editor_border_dark.name()
+            text = self.text_color_dark.name()
+        else:
+            bg = self.bg_selected_light.name()
+            border = self.editor_border_light.name()
+            text = "black"
+        editor.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {bg};
+                color: {text};
+                border: 1px solid {border};
+                padding: 2px;
+            }}
+        """)
+        return editor
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem,
+                             index: Union[QModelIndex, QPersistentModelIndex]) -> None:
+        # Position the editor after the circular symbol, using sizeHint so the height
+        # accounts for the stylesheet padding and border rather than hard-coding overhead.
+        # If the row is too narrow to fit after the symbol, fall back to the full row so
+        # renaming remains possible in narrow layouts.
+        editor_height = editor.sizeHint().height()
+        available_width = int(option.rect.width() - self.text_left_offset)  # type: ignore[attr-defined]
+        if available_width > 0:
+            editor_x = int(option.rect.x() + self.text_left_offset)  # type: ignore[attr-defined]
+            editor_width = available_width
+        else:
+            editor_x = int(option.rect.x())  # type: ignore[attr-defined]
+            editor_width = int(option.rect.width())  # type: ignore[attr-defined]
+        editor_rect = QRect(
+            editor_x,
+            int(option.rect.y() + (option.rect.height() - editor_height) / 2),  # type: ignore[attr-defined]
+            editor_width,
+            editor_height
+        )
+        editor.setGeometry(editor_rect)
 
     def setEditorData(self, editor: QWidget,
                       index: Union[QModelIndex, QPersistentModelIndex]) -> None:

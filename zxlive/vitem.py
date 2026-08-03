@@ -20,7 +20,7 @@ import math
 from typing import Optional, Set, Any, TYPE_CHECKING, Union
 
 from PySide6.QtCore import Qt, QPointF, QVariantAnimation, QAbstractAnimation, QRectF
-from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QPainterPath
+from PySide6.QtGui import QPen, QBrush, QPainter, QColor, QFont, QPainterPath
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
 from PySide6.QtWidgets import QWidget, QGraphicsPathItem, QGraphicsTextItem, QGraphicsItem, \
@@ -86,8 +86,9 @@ class VItem(QGraphicsPathItem):
     dummy_svg_item: Optional[QGraphicsSvgItem] = None
     _dummy_svg_renderer: Optional[QSvgRenderer] = None
     _cached_dummy_text: str = ""
-    _cached_dark_mode: bool = False
+    _cached_text_color: str = ""
     _cached_font_key: str = ""
+    index_text_item: Optional[QGraphicsTextItem] = None
 
     halftone = "1000100010001000"  # QPixmap("images/halftone.png")
 
@@ -122,9 +123,10 @@ class VItem(QGraphicsPathItem):
         self.dummy_svg_item = None
         self._dummy_svg_renderer = None
         self._cached_dummy_text = ""
-        self._cached_dark_mode = False
+        self._cached_text_color = ""
         self._cached_font_key = ""
         self._last_type: Optional[VertexType] = None
+        self.index_text_item = None
 
         self._old_pos = None
         self._dragged_on = None
@@ -215,7 +217,43 @@ class VItem(QGraphicsPathItem):
         if w_out:
             w_out.refresh(cascade_edges=cascade_edges)
 
+    def _refresh_index_label(self) -> None:
+        """Show or hide the vertex index label based on settings."""
+        show_indices = display_setting.show_vertex_indices
+        if show_indices:
+            if self.index_text_item is None:
+                self.index_text_item = QGraphicsTextItem(self)
+                self._apply_index_label_style()
+            offset = 0.25 * SCALE
+            rect = self.index_text_item.boundingRect()
+            shift_x = -rect.width() / 2
+            if self.ty == VertexType.W_OUTPUT and self.rotation():
+                self.index_text_item.setRotation(-self.rotation())
+                angle = math.radians(self.rotation())
+                cos_a = math.cos(angle)
+                sin_a = math.sin(angle)
+                self.index_text_item.setPos(
+                    shift_x * cos_a + offset * sin_a,
+                    -shift_x * sin_a + offset * cos_a)
+            else:
+                self.index_text_item.setRotation(0)
+                self.index_text_item.setPos(shift_x, offset)
+            self.index_text_item.setVisible(True)
+        elif self.index_text_item is not None:
+            self.index_text_item.setVisible(False)
+
+    def _apply_index_label_style(self) -> None:
+        """Update font, colour and text of the index label."""
+        if self.index_text_item is None:
+            return
+        font = QFont(display_setting.font)
+        font.setPointSize(max(8, font.pointSize() - 2))
+        self.index_text_item.setFont(font)
+        self.index_text_item.setDefaultTextColor(QColor(display_setting.text_color))
+        self.index_text_item.setPlainText(str(self.v))
+
     def _refresh_adjacent_edges(self) -> None:
+        self._refresh_index_label()
         for e_item in self.adj_items:
             e_item.refresh()
 
@@ -260,41 +298,43 @@ class VItem(QGraphicsPathItem):
         super().paint(painter, option, widget)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
-        # Snap items to grid on movement by intercepting the position-change
-        # event and returning a new position
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and not self.is_animated:
-            assert isinstance(value, QPointF)
-            if self.ty == VertexType.W_INPUT:
-                x = value.x()
-                y = value.y()
-            else:
-                x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
-                y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
-            return QPointF(x, y)
-
-        # When selecting/deselecting items, we move them to the front/back
-        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
-            assert isinstance(value, int)  # 0 or 1
-            self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
-            return value
-
-        # Intercept selection- and position-has-changed events to call `refresh`.
-        # Note that the position and selected values are already updated when
-        # this event fires.
-        if change in (QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged, QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged):
-            # Skip refresh when the scene is performing a bulk graph update
-            # (it will refresh all affected items in a single pass afterwards).
-            if not self.is_animated and not self.graph_scene.is_bulk_updating:
-                self.refresh()
-
-            if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+        match change:
+            # Snap items to grid on movement by intercepting the position-change
+            # event and returning a new position
+            case QGraphicsItem.GraphicsItemChange.ItemPositionChange if not self.is_animated:
+                assert isinstance(value, QPointF)
+                if self.ty == VertexType.W_INPUT:
+                    x = value.x()
+                    y = value.y()
+                else:
+                    x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
+                    y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
+                return QPointF(x, y)
+            
+            # When selecting/deselecting items, we move them to the front/back
+            case QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
+                assert isinstance(value, int)  # 0 or 1
+                self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
+                return value
+            
+            # Intercept selection- and position-has-changed events to call `refresh`.
+            # Note that the position and selected values are already updated when
+            # this event fires.
+            case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged | QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+                # Skip refresh when the scene is performing a bulk graph update
+                # (it will refresh all affected items in a single pass afterwards).
+                if not self.is_animated and not self.graph_scene.is_bulk_updating:
+                    self.refresh()
+                
                 scene = self.scene()
-                if TYPE_CHECKING:
-                    assert isinstance(scene, GraphScene)
-                scene.selection_changed_custom.emit()
-
-        return super().itemChange(change, value)
-
+                if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                    if TYPE_CHECKING:
+                        assert isinstance(scene, GraphScene)
+                    scene.selection_changed_custom.emit()
+            
+            case _:
+                return super().itemChange(change, value)
+    
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(e)
         if self.is_animated:
@@ -439,7 +479,7 @@ class VItem(QGraphicsPathItem):
         if self.dummy_svg_item is not None:
             self.dummy_svg_item.setVisible(False)
         self._cached_dummy_text = ""
-        self._cached_dark_mode = False
+        self._cached_text_color = ""
         self._cached_font_key = ""
 
     def update_font(self) -> None:
@@ -450,6 +490,10 @@ class VItem(QGraphicsPathItem):
         self._cached_font_key = ""
         if self.ty == VertexType.DUMMY:
             self._update_dummy_display(self.g.vdata(self.v, 'text', ''))
+        # Update index label style before refreshing so position uses
+        # the updated bounding rect.
+        self._apply_index_label_style()
+        self._refresh_index_label()
 
     def _update_dummy_display(self, text: str) -> None:
         """Render dummy node label. Detects LaTeX and renders to SVG.
@@ -459,17 +503,16 @@ class VItem(QGraphicsPathItem):
             self.remove_dummy_label()
             return
 
-        dark = display_setting.dark_mode
+        text_color = display_setting.text_color
         font_key = display_setting.font.toString()
         if (text == self._cached_dummy_text
-                and dark == self._cached_dark_mode
+                and text_color == self._cached_text_color
                 and font_key == self._cached_font_key):
             return
 
         self._cached_dummy_text = text
-        self._cached_dark_mode = dark
+        self._cached_text_color = text_color
         self._cached_font_key = font_key
-        text_color = "#e0e0e0" if dark else "#222222"
 
         from .latex_render import is_latex, latex_to_svg
 
@@ -546,21 +589,23 @@ class VItemAnimation(QVariantAnimation):
         self.stateChanged.connect(self._on_state_changed)
 
     @property
-    def it(self) -> VItem:
+    def it(self) -> Optional[VItem]:
+        # Returns ``None`` if the vertex is no longer in the scene.
         if self._it is None and self.scene is not None and self.v is not None:
-            self._it = self.scene.vertex_map[self.v]
-        assert self._it is not None
+            self._it = self.scene.vertex_map.get(self.v)
         return self._it
 
     def _on_state_changed(self, state: QAbstractAnimation.State) -> None:
-        if state == QAbstractAnimation.State.Running and self not in self.it.active_animations:
+        if (item := self.it) is None:
+            return
+        if state == QAbstractAnimation.State.Running and self not in item.active_animations:
             # Stop all animations that target the same property
-            for anim in self.it.active_animations.copy():
+            for anim in item.active_animations.copy():
                 if anim.prop == self.prop:
                     anim.stop()
-            self.it.active_animations.add(self)
+            item.active_animations.add(self)
         elif state == QAbstractAnimation.State.Stopped:
-            self.it.active_animations.remove(self)
+            item.active_animations.discard(self)
         elif state == QAbstractAnimation.State.Paused:
             # TODO: Once we use pausing, we should decide what to do here.
             #   Note that we cannot just remove ourselves from the set since the garbage
@@ -569,18 +614,18 @@ class VItemAnimation(QVariantAnimation):
             pass
 
     def updateCurrentValue(self, value: Any) -> None:
-        if self.state() != QAbstractAnimation.State.Running:
+        if self.state() != QAbstractAnimation.State.Running or (item := self.it) is None:
             return
 
         if self.prop == VItem.Properties.Position:
-            self.it.setPos(value)
+            item.setPos(value)
         elif self.prop == VItem.Properties.Scale:
-            self.it.setScale(value)
+            item.setScale(value)
         elif self.prop == VItem.Properties.Rect:
-            self.it.setPath(value)
+            item.setPath(value)
 
         if self.refresh:
-            self.it.refresh()
+            item.refresh()
 
 
 class PhaseItem(QGraphicsTextItem):
@@ -590,6 +635,10 @@ class PhaseItem(QGraphicsTextItem):
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
         self.v_item = v_item
+        # Persistent label for boundary vertices (e.g. I/O labels set by the
+        # rule editor). Survives refresh() calls so it is not wiped by
+        # selection/position changes.
+        self._boundary_label: str = ""
         self.update_text_color()
         self.refresh()
 
@@ -606,14 +655,32 @@ class PhaseItem(QGraphicsTextItem):
         else:
             self.setDefaultTextColor(QColor("#006bb3"))
 
+    def set_boundary_label(self, text: str) -> None:
+        """Set a persistent label for a boundary vertex (e.g. I/O labels).
+
+        Unlike a raw ``setPlainText`` call, labels set through this method
+        survive ``refresh()`` calls, so they are not wiped by selection or
+        position changes."""
+        self._boundary_label = text
+        self.setPlainText(text)
+
     def refresh(self) -> None:
-        """Call this when a vertex moves or its phase changes"""
+        """Call this when a vertex moves or its phase changes."""
         vertex_type = self.v_item.ty
-        if vertex_type == VertexType.Z_BOX:
-            self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
-        elif vertex_type != VertexType.BOUNDARY:
-            phase = self.v_item.g.phase(self.v_item.v)
-            self.setPlainText(phase_to_s(phase, vertex_type))
+        if vertex_type == VertexType.BOUNDARY:
+            # Re-apply the stored boundary label (defaults to ""), clearing
+            # any stale phase text while preserving intentional labels like
+            # I/O indicators set by the rule editor (see #462).
+            self.setPlainText(self._boundary_label)
+        else:
+            # Drop any stored boundary label so it isn't resurrected if the
+            # vertex later transitions back to BOUNDARY.
+            self._boundary_label = ""
+            if vertex_type == VertexType.Z_BOX:
+                self.setPlainText(str(get_z_box_label(self.v_item.g, self.v_item.v)))
+            else:
+                phase = self.v_item.g.phase(self.v_item.v)
+                self.setPlainText(phase_to_s(phase, vertex_type))
         p = self.v_item.pos()
         self.setPos(p.x(), p.y() - 0.6 * SCALE)
 

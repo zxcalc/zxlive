@@ -1,11 +1,22 @@
+# ZXLive
+
+[![Tests](https://github.com/zxcalc/zxlive/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/zxcalc/zxlive/actions/workflows/test.yml)
+[![Lint](https://github.com/zxcalc/zxlive/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/zxcalc/zxlive/actions/workflows/lint.yml)
+[![Rolling Release](https://github.com/zxcalc/zxlive/actions/workflows/rolling.yml/badge.svg?branch=master)](https://github.com/zxcalc/zxlive/actions/workflows/rolling.yml)
+[![Rolling Binaries](https://img.shields.io/badge/download-rolling%20binaries-blue)](https://github.com/zxcalc/zxlive/releases/tag/rolling)
+
 The [ZX-calculus](http://zxcalculus.com) gives us a handy way to represent and work with quantum computations. ZXLive is an interactive tool for working with ZX. Draw graphs or load circuits and apply ZX rules. Intended for experimenting, building proofs, helping to write papers, showing off, or simply learning about ZX and quantum computing. It is powered by the [pyzx](https://github.com/zxcalc/pyzx) open source library under the hood. The documentation is available at https://zxlive.readthedocs.io/
+
+![Main window](doc/_static/zxlive-main-window.png)
 
 This project is in a pretty early stage, with lots more to come. Have a look at the [Issue Tracker](https://github.com/zxcalc/zxlive/issues) to see what's in the pipeline.
 
 
 ## Instructions
 
-To install from source, you need Python >= 3.9 and pip. If you have those, just run:
+To install the latest stable release, you can download the binaries from the [releases page](https://github.com/zxcalc/zxlive/releases).
+
+To install from source, you need Python >= 3.12 and pip. If you have those, just run:
 
     git clone https://github.com/zxcalc/zxlive.git
     cd zxlive
@@ -43,3 +54,14 @@ The documentation can be built with
 
 # Overview of the files
 ![ZXLive File Overview](ZXLive-file-overview.svg)
+
+# Code signing policy
+Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
+
+Approvers: [@RazinShaikh](https://github.com/RazinShaikh) and [@jvdwetering](https://github.com/jvdwetering)
+
+
+# Privacy
+
+This application does not collect user data. It connects to GitHub only to check for new releases; see [GitHub’s Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+
