@@ -322,18 +322,20 @@ class ProofPanel(BasePanel):
             return
 
     def _magic_hopf(self, trace: WandTrace) -> bool:
-        if not all(isinstance(item, EItem) for item in trace.hit):
+        # Check that all traced items are edges
+        edges: list[ET] = [item.e for item in trace.hit if isinstance(item, EItem)]
+        if len(edges) != len(trace.hit):
             return False
-        edges: list[ET] = [item.e for item in trace.hit]  # type: ignore  # We know that the type of `item` is `EItem` because of the check above
-        if len(edges) == 0:
+        
+        # Check that we traced 2+ edges of identical types
+        num_edges = len(edges)
+        if num_edges < 2 or not all(edge == edges[0] for edge in edges):
             return False
-        if not all(edge == edges[0] for edge in edges):
-            return False
+        
+        # Check that vertices are the same type if the edge is Hadamard, or different types if edge is simple
         source, target = self.graph.edge_st(edges[0])
         source_type, target_type = self.graph.type(source), self.graph.type(target)
         edge_type = self.graph.edge_type(edges[0])
-        
-        # vertices should be different types, or edge should be hadamard
         match edge_type:
             case EdgeType.HADAMARD:
                 is_match = (vertex_is_z_like(source_type) == vertex_is_z_like(target_type))
@@ -342,9 +344,7 @@ class ProofPanel(BasePanel):
             case _:
                 is_match = False
         
-        # we also need at least two edges
-        num_edges = len(edges)
-        if not is_match or num_edges < 2:
+        if not is_match:
             return False
         
         new_g = copy.deepcopy(self.graph)
