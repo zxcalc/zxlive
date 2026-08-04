@@ -370,8 +370,7 @@ class EditGraphScene(GraphScene):
         super().mouseMoveEvent(e)
         if self._drag:
             mouse_pos = e.scenePos()
-            if len(self._drag.starts) > 1:
-                _, mouse_pos = self._edge_drag_target_and_end_pos(mouse_pos)
+            _, mouse_pos = self._edge_drag_target_and_end_pos(mouse_pos)
             self._drag.mouse_pos = mouse_pos
             self._drag.refresh()
         else:
@@ -461,7 +460,7 @@ class EditGraphScene(GraphScene):
         self._drag = None
         target, end_pos = self._edge_drag_target_and_end_pos(e.scenePos())
         if len(drag.starts) == 1 and target is not None:
-            colliding_verts = self._colliding_vertices_for_edge_path(drag.start, e.scenePos(), target)
+            colliding_verts = self._colliding_vertices_for_edge_path(drag.start, end_pos, target)
             self.edge_added.emit(drag.start.v, target.v, colliding_verts)
             return
         # Landing on a vertex fixes the translation to its centre. Otherwise,
