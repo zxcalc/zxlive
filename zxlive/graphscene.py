@@ -369,7 +369,10 @@ class EditGraphScene(GraphScene):
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseMoveEvent(e)
         if self._drag:
-            self._drag.mouse_pos = e.scenePos()
+            mouse_pos = e.scenePos()
+            if len(self._drag.starts) > 1:
+                _, mouse_pos = self._edge_drag_target_and_end_pos(mouse_pos)
+            self._drag.mouse_pos = mouse_pos
             self._drag.refresh()
         else:
             e.ignore()
@@ -404,6 +407,11 @@ class EditGraphScene(GraphScene):
             if isinstance(it, VItem):
                 return it
         return None
+
+    def _edge_drag_target_and_end_pos(self, cursor_pos: QPointF) -> tuple[Optional[VItem], QPointF]:
+        """Return the hovered primary target and the endpoint shown for the drag."""
+        target = self._vertex_at(cursor_pos)
+        return target, target.pos() if target is not None else cursor_pos
 
     def _drag_sources_for_press(self, start: VItem, selected_vertices: set[VT]) -> list[VItem]:
         if self.curr_tool != ToolType.EDGE or start.v not in selected_vertices or len(selected_vertices) <= 1:
@@ -451,16 +459,15 @@ class EditGraphScene(GraphScene):
         drag = self._drag
         self.removeItem(self._drag)
         self._drag = None
-        target = self._vertex_at(e.scenePos())
+        target, end_pos = self._edge_drag_target_and_end_pos(e.scenePos())
         if len(drag.starts) == 1 and target is not None:
             colliding_verts = self._colliding_vertices_for_edge_path(drag.start, e.scenePos(), target)
             self.edge_added.emit(drag.start.v, target.v, colliding_verts)
             return
         # Landing on a vertex fixes the translation to its centre. Otherwise,
         # paths may end at the last vertex they cross before the release point.
-        end_pos = target.pos() if target is not None else e.scenePos()
         specs = self._build_edge_specs(drag.start, end_pos, drag.starts)
-        if specs:
+        if any(spec.source == drag.start.v for spec in specs):
             self.edges_added.emit(specs)
         else:
             e.ignore()

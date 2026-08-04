@@ -58,7 +58,7 @@ def _release_multi_drag(scene: EditGraphScene, sources: list[int],
 
 
 def test_multi_edge_drag_uses_target_centres(qtbot: QtBot) -> None:
-    """An off-centre drop on a large node still finds a smaller parallel target."""
+    """An off-centre drag previews and commits the same centred translation."""
     g = new_graph()
     source = g.add_vertex(VertexType.Z, qubit=0, row=0)
     parallel_source = g.add_vertex(VertexType.DUMMY, qubit=1, row=0)
@@ -67,11 +67,27 @@ def test_multi_edge_drag_uses_target_centres(qtbot: QtBot) -> None:
     scene = EditGraphScene()
     scene.set_graph(g)
 
-    emitted, _ = _release_multi_drag(
-        scene,
-        [source, parallel_source],
-        scene.vertex_map[target].pos() + QPointF(0.1 * SCALE, 0),
-    )
+    source_items = [scene.vertex_map[source], scene.vertex_map[parallel_source]]
+    drag = EDragItem(scene.g, EdgeType.SIMPLE, source_items[0], source_items[0].pos(), starts=source_items)
+    scene._drag = drag
+    scene.addItem(drag)
+    cursor_pos = scene.vertex_map[target].pos() + QPointF(0.1 * SCALE, 0)
+
+    move_event = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseMove)
+    move_event.setScenePos(cursor_pos)
+    scene.mouseMoveEvent(move_event)
+
+    preview = drag.path()
+    primary_end = preview.elementAt(1)
+    parallel_end = preview.elementAt(3)
+    assert QPointF(primary_end.x, primary_end.y) == scene.vertex_map[target].pos()
+    assert QPointF(parallel_end.x, parallel_end.y) == scene.vertex_map[parallel_target].pos()
+
+    release_event = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseRelease)
+    release_event.setScenePos(cursor_pos)
+    emitted: list[list[EdgeDragSpec]] = []
+    scene.edges_added.connect(emitted.append)
+    scene.add_edge(release_event)
 
     specs = emitted[0]
     assert [(spec.source, spec.target) for spec in specs] == [
@@ -152,6 +168,26 @@ def test_multi_edge_drag_to_empty_space_without_collisions_is_ignored(qtbot: QtB
 
     assert emitted == []
     assert not accepted
+
+
+def test_multi_edge_drag_primary_miss_cancels_secondary_hit(qtbot: QtBot) -> None:
+    g = new_graph()
+    source = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    parallel_source = g.add_vertex(VertexType.Z, qubit=1, row=0)
+    parallel_target = g.add_vertex(VertexType.Z, qubit=1, row=2)
+    panel = GraphEditPanel(g)
+    qtbot.addWidget(panel)
+
+    emitted, accepted = _release_multi_drag(
+        panel.graph_scene,
+        [source, parallel_source],
+        panel.graph_scene.vertex_map[source].pos() + QPointF(2 * SCALE, 0),
+    )
+
+    assert emitted == []
+    assert not accepted
+    assert panel.undo_stack.count() == 0
+    assert _edge_count(panel.graph, parallel_source, parallel_target) == 0
 
 
 def test_multi_edge_specs_skip_missing_parallel_target(qtbot: QtBot) -> None:
