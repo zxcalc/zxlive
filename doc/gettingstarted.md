@@ -28,6 +28,8 @@ This is the ***editor mode***. In this mode you can freely edit the diagram. The
 
 With the Select tool active you can select any part of the graph by dragging a box, or directly clicking on vertices or edges, using the left mouse button. Control- or shift-clicking adds to the selection.
 
+To add several edges at once, select their source vertices, switch to the Add edge tool, and drag from any one selected source toward its target. ZXLive repeats that drag from every selected source and connects each path through the vertices it crosses. The batch can be undone in one step.
+
 ## Demo: Three alternating CNOTs make a SWAP
 
 Let's suppose we want to show that three alternating CNOTs are equivalent to a SWAP gate.

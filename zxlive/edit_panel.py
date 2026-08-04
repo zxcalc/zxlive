@@ -40,6 +40,7 @@ class GraphEditPanel(EditorBasePanel):
         self.graph_scene.vertex_added.connect(self.add_vert)
         self.graph_scene.vertex_dropped_onto.connect(self._vertex_dropped_onto)
         self.graph_scene.edge_added.connect(self.add_edge)
+        self.graph_scene.edges_added.connect(self.add_edges)
         self.graph_scene.edge_dragged.connect(self.change_edge_curves)
 
         self._curr_vty = VertexType.Z
