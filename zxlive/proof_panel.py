@@ -338,7 +338,7 @@ class ProofPanel(BasePanel):
         edge_type = self.graph.edge_type(edges[0])
         match edge_type:
             case EdgeType.HADAMARD:
-                is_match = (vertex_is_z_like(source_type) == vertex_is_z_like(target_type))
+                is_match = (vertex_is_z_like(source_type) and vertex_is_z_like(target_type)) or (source_type == target_type == VertexType.X)
             case EdgeType.SIMPLE:
                 is_match = (vertex_is_z_like(source_type) and target_type == VertexType.X) or (source_type == VertexType.X and vertex_is_z_like(target_type))
             case _:
