@@ -291,6 +291,7 @@ class EditorBasePanel(BasePanel):
         snap_verts = [vitem for vitem in verts if graph.type(vitem.v) != VertexType.W_INPUT]
         if self.snap_vertex_edge and snap_verts:
             pairs = self._build_snap_pairs(graph, u, v, snap_verts)
+            # Reject the whole path rather than creating a partial snap chain.
             if any(self._is_invalid_edge(graph, *pair) for pair in pairs):
                 return [], []
             return pairs, snap_verts
@@ -328,6 +329,8 @@ class EditorBasePanel(BasePanel):
         Such batches are validated on a copy that is updated as edges are accepted.
         """
         graph = self.graph_view.graph_scene.g
+        # Crossed W_INPUTs are filtered by _edge_pairs_for_drag, so only endpoints
+        # can make validation order-dependent.
         needs_planning = any(
             graph.type(spec.source) == VertexType.W_INPUT
             or (spec.target is not None and graph.type(spec.target) == VertexType.W_INPUT)

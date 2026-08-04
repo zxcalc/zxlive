@@ -34,7 +34,8 @@ from .settings import display_setting
 
 @dataclass
 class EdgeDragSpec:
-    """A dragged path; target is absent when it ends at its last collision."""
+    """A translated drag path and the vertices it crosses;
+    target is None for a release in empty space."""
     source: VT
     target: Optional[VT]
     colliding_verts: list[VItem]
@@ -337,7 +338,6 @@ class EditGraphScene(GraphScene):
     curr_ety: EdgeType
     curr_tool: ToolType
 
-    # The vertex a right mouse button drag was initiated on
     _drag: Optional[EDragItem]
 
     def __init__(self) -> None:
@@ -415,6 +415,7 @@ class EditGraphScene(GraphScene):
     def _drag_sources_for_press(self, start: VItem, selected_vertices: set[VT]) -> list[VItem]:
         if self.curr_tool != ToolType.EDGE or start.v not in selected_vertices or len(selected_vertices) <= 1:
             return [start]
+        # Put the primary path first, then sort the rest so batch validation is deterministic.
         other_vertices = sorted(selected_vertices - {start.v})
         return [start] + [self.vertex_map[v] for v in other_vertices if v in self.vertex_map]
 
@@ -437,7 +438,7 @@ class EditGraphScene(GraphScene):
 
     def _build_edge_specs(self, primary_source: VItem, end_pos: QPointF,
                           sources: list[VItem]) -> list[EdgeDragSpec]:
-        """Build translated paths, retaining paths that cross a vertex."""
+        """Build one translated spec per source, omitting paths that hit nothing."""
         offset = end_pos - primary_source.pos()
         specs: list[EdgeDragSpec] = []
         for source in sources:
@@ -466,6 +467,7 @@ class EditGraphScene(GraphScene):
         # Landing on a vertex fixes the translation to its centre. Otherwise,
         # paths may end at the last vertex they cross before the release point.
         specs = self._build_edge_specs(drag.start, end_pos, drag.starts)
+        # Do not create secondary edges when the path under the cursor hit nothing.
         if any(spec.source == drag.start.v for spec in specs):
             self.edges_added.emit(specs)
         else:

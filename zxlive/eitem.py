@@ -330,7 +330,7 @@ class EDragItem(QGraphicsPathItem):
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""
 
-        # set path as straight parallel lines from source vertices to target offset
+        # Apply the primary drag offset to every selected source.
         offset = self.mouse_pos - self.start.pos()
         path = QPainterPath()
         paths_by_style: dict[bool, QPainterPath] = {}
@@ -345,6 +345,8 @@ class EDragItem(QGraphicsPathItem):
             paths_by_style.setdefault(is_dummy, QPainterPath()).addPath(subpath)
 
         primary_is_dummy = self.ety != EdgeType.HADAMARD and self.start.ty == VertexType.DUMMY
+        # Qt uses the combined path and pen width to calculate the item's geometry;
+        # paint() controls how the individual preview lines look.
         self.setPen(self._preview_pen(primary_is_dummy))
         self._preview_paths = [
             (style_path, self._preview_pen(is_dummy))
