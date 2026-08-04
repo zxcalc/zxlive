@@ -10,6 +10,8 @@ input_file = main.py
 exec_directory = ./build/
 # path to .pyproject project file
 project_file = 
+# path to the application icon
+icon = ./zxlive/icons/logo.png
 
 [python]
 # python path
@@ -46,7 +48,9 @@ extra_args =
     --nofollow-import-to=ipywidgets
     --nofollow-import-to=tkinter
     --noinclude-numba-mode=nofollow
-    --include-package-data=zxlive.icons
+    --include-data-dir=zxlive/icons=zxlive/icons
+    --include-data-dir=zxlive/sfx=zxlive/sfx
+    --include-data-dir=zxlive/tooltips=zxlive/tooltips
     --macos-create-app-bundle
 
 [buildozer]
