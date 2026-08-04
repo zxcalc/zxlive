@@ -311,30 +311,56 @@ class EDragItem(QGraphicsPathItem):
         self.start = start
         self.starts = [start] if starts is None else starts
         self.mouse_pos = mouse_pos
+        self._preview_paths: list[tuple[QPainterPath, QPen]] = []
         self.refresh()
 
-    def refresh(self) -> None:
-        """Call whenever source or target moves or edge data changes"""
-
-        # set color/style according to edge type
+    def _preview_pen(self, is_dummy: bool) -> QPen:
+        """Return the pen for one group of preview paths."""
         pen = QPen()
         pen.setWidthF(3)
         if self.ety == EdgeType.HADAMARD:
             pen.setColor(QColor(HAD_EDGE_BLUE))
             pen.setDashPattern([4.0, 2.0])
-        elif self.start.ty == VertexType.DUMMY:
+        elif is_dummy:
             pen.setColor(display_setting.effective_colors["dummy_edge"])
         else:
             pen.setColor(display_setting.effective_colors["edge"])
-        self.setPen(QPen(pen))
+        return pen
+
+    def refresh(self) -> None:
+        """Call whenever source or target moves or edge data changes"""
 
         # set path as straight parallel lines from source vertices to target offset
         offset = self.mouse_pos - self.start.pos()
         path = QPainterPath()
+        paths_by_style: dict[bool, QPainterPath] = {}
         for start in self.starts:
-            path.moveTo(start.pos())
-            path.lineTo(start.pos() + offset)
+            subpath = QPainterPath(start.pos())
+            subpath.lineTo(start.pos() + offset)
+            path.addPath(subpath)
+
+            # Hadamard styling takes precedence for every source. For other
+            # edge types, dummy and ordinary previews need distinct colors.
+            is_dummy = self.ety != EdgeType.HADAMARD and start.ty == VertexType.DUMMY
+            paths_by_style.setdefault(is_dummy, QPainterPath()).addPath(subpath)
+
+        primary_is_dummy = self.ety != EdgeType.HADAMARD and self.start.ty == VertexType.DUMMY
+        self.setPen(self._preview_pen(primary_is_dummy))
+        self._preview_paths = [
+            (style_path, self._preview_pen(is_dummy))
+            for is_dummy, style_path in paths_by_style.items()
+        ]
         self.setPath(path)
+
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem,
+              widget: Optional[QWidget] = None) -> None:
+        """Paint preview subpaths with the pen for their source style."""
+        painter.save()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for path, pen in self._preview_paths:
+            painter.setPen(pen)
+            painter.drawPath(path)
+        painter.restore()
 
 
 def calculate_control_point(source_pos: QPointF, target_pos: QPointF, curve_distance: float) -> QPointF:
