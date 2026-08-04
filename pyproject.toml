@@ -63,6 +63,13 @@ packages = [
     "zxlive"
 ]
 
+[tool.setuptools.package-data]
+zxlive = [
+    "icons/*",
+    "sfx/*",
+    "tooltips/*",
+]
+
 [project.gui-scripts]
 zxlive = "zxlive.app:main"
 
