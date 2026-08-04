@@ -309,13 +309,9 @@ class EDragItem(QGraphicsPathItem):
         self.g = g
         self.ety = ety
         self.start = start
-        self.starts = starts or [start]
+        self.starts = [start] if starts is None else starts
         self.mouse_pos = mouse_pos
         self.refresh()
-
-    @property
-    def is_multi(self) -> bool:
-        return len(self.starts) > 1
 
     def refresh(self) -> None:
         """Call whenever source or target moves or edge data changes"""

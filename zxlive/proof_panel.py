@@ -16,13 +16,13 @@ from pyzx.utils import (EdgeType, VertexType, FractionLike, get_w_partner, get_z
 
 from . import animations as anims
 from .base_panel import BasePanel, ToolbarSection
-from .commands import AddEdge, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
+from .commands import AddEdge, AddEdges, AddNode, AddRewriteStep, ChangeEdgeCurve, MoveNode, SetGraph, UpdateGraph, ProofModeCommand
 from .common import (ET, VT, GraphT, ToolType, get_data,
                      pos_from_view, pos_to_view)
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
-from .graphscene import EditGraphScene
+from .graphscene import EditGraphScene, EdgeDragSpec
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
 from .rewrite_action import RewriteActionTreeView
@@ -57,6 +57,7 @@ class ProofPanel(BasePanel):
 
         self.graph_scene.vertex_added.connect(self._add_dummy_node)
         self.graph_scene.edge_added.connect(self._add_dummy_edge)
+        self.graph_scene.edges_added.connect(self._add_dummy_edges)
 
         self.step_view = ProofStepView(self)
 
@@ -555,6 +556,21 @@ class ProofPanel(BasePanel):
         if g.type(u) != VertexType.DUMMY or g.type(v) != VertexType.DUMMY:
             return
         cmd = ProofModeCommand(AddEdge(self.graph_view, u, v, EdgeType.SIMPLE), self.step_view)
+        self.undo_stack.push(cmd)
+
+    def _add_dummy_edges(self, specs: list[EdgeDragSpec]) -> None:
+        if self.graph_scene.curr_tool != ToolType.EDGE:
+            return
+        g = self.graph_scene.g
+        pairs = [
+            (spec.source, spec.target) for spec in specs
+            if spec.target is not None
+            and g.type(spec.source) == VertexType.DUMMY
+            and g.type(spec.target) == VertexType.DUMMY
+        ]
+        if not pairs:
+            return
+        cmd = ProofModeCommand(AddEdges(self.graph_view, pairs, EdgeType.SIMPLE), self.step_view)
         self.undo_stack.push(cmd)
 
     def delete_selection(self) -> None:

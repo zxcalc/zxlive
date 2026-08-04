@@ -32,6 +32,8 @@ The editing tools are: 1. Select (s), 2. Add vertex (v), and 3. Add edge (e), 4.
 ```
 With the Select tool active you can select any part of the graph by dragging a box, or directly clicking on vertices or edges, using the left mouse button. Control- or shift-clicking adds to the selection.
 
+To add several edges at once, select their source vertices, switch to the Add edge tool, and drag from any selected source across the intended targets. Each translated drag line connects to the vertices it crosses, so the targets need not be perfectly aligned. The whole gesture can be undone in one step.
+
 ## Demo: Three alternating CNOTs make a SWAP
 
 Let's suppose we want to show that three alternating CNOTs are equivalent to a SWAP gate.

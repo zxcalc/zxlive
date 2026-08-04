@@ -34,7 +34,7 @@ from .settings import display_setting
 
 @dataclass
 class EdgeDragSpec:
-    """A dragged edge path, optionally ending on a target vertex."""
+    """A dragged path; target is absent when it ends at its last collision."""
     source: VT
     target: Optional[VT]
     colliding_verts: list[VItem]
@@ -408,7 +408,8 @@ class EditGraphScene(GraphScene):
     def _drag_sources_for_press(self, start: VItem, selected_vertices: set[VT]) -> list[VItem]:
         if self.curr_tool != ToolType.EDGE or start.v not in selected_vertices or len(selected_vertices) <= 1:
             return [start]
-        return [self.vertex_map[v] for v in sorted(selected_vertices) if v in self.vertex_map]
+        other_vertices = sorted(selected_vertices - {start.v})
+        return [start] + [self.vertex_map[v] for v in other_vertices if v in self.vertex_map]
 
     def _set_drag_sources_movable(self, movable: bool) -> None:
         if self._drag is None:
@@ -427,47 +428,40 @@ class EditGraphScene(GraphScene):
                 colliding_verts.append(it)
         return colliding_verts
 
-    def _edge_spec_for_path(self, source: VItem, end_pos: QPointF) -> EdgeDragSpec:
-        target = self._vertex_at(end_pos)
-        return EdgeDragSpec(
-            source.v,
-            target.v if target is not None else None,
-            self._colliding_vertices_for_edge_path(source, end_pos, target),
-        )
-
-    def _build_parallel_edge_specs_to_pos(self, primary_source: VItem, end_pos: QPointF,
-                                          sources: list[VItem]) -> list[EdgeDragSpec]:
+    def _build_edge_specs(self, primary_source: VItem, end_pos: QPointF,
+                          sources: list[VItem]) -> list[EdgeDragSpec]:
+        """Build translated paths, retaining paths that cross a vertex."""
         offset = end_pos - primary_source.pos()
         specs: list[EdgeDragSpec] = []
         for source in sources:
-            spec = self._edge_spec_for_path(source, source.pos() + offset)
-            if spec.target is not None or spec.colliding_verts:
-                specs.append(spec)
+            path_end = source.pos() + offset
+            target = self._vertex_at(path_end)
+            collision_end = target.pos() if target is not None else path_end
+            colliding_verts = self._colliding_vertices_for_edge_path(source, collision_end, target)
+            if target is not None or colliding_verts:
+                specs.append(EdgeDragSpec(
+                    source.v,
+                    target.v if target is not None else None,
+                    colliding_verts,
+                ))
         return specs
-
-    def _build_parallel_edge_specs(self, primary_source: VItem, primary_target: VItem,
-                                   sources: list[VItem]) -> list[EdgeDragSpec]:
-        return self._build_parallel_edge_specs_to_pos(primary_source, primary_target.pos(), sources)
 
     def add_edge(self, e: QGraphicsSceneMouseEvent) -> None:
         assert self._drag is not None
         drag = self._drag
         self.removeItem(self._drag)
-        v1 = drag.start
         self._drag = None
-        if drag.is_multi:
-            specs = self._build_parallel_edge_specs_to_pos(v1, e.scenePos(), drag.starts)
-            if specs:
-                self.edges_added.emit(specs)
-            else:
-                e.ignore()
+        target = self._vertex_at(e.scenePos())
+        if len(drag.starts) == 1 and target is not None:
+            colliding_verts = self._colliding_vertices_for_edge_path(drag.start, e.scenePos(), target)
+            self.edge_added.emit(drag.start.v, target.v, colliding_verts)
             return
-        spec = self._edge_spec_for_path(v1, e.scenePos())
-        if spec.target is None and spec.colliding_verts:
-            self.edges_added.emit([spec])
-            return
-        if spec.target is not None:
-            self.edge_added.emit(spec.source, spec.target, spec.colliding_verts)
+        # Landing on a vertex fixes the translation to its centre. Otherwise,
+        # paths may end at the last vertex they cross before the release point.
+        end_pos = target.pos() if target is not None else e.scenePos()
+        specs = self._build_edge_specs(drag.start, end_pos, drag.starts)
+        if specs:
+            self.edges_added.emit(specs)
         else:
             e.ignore()
 
