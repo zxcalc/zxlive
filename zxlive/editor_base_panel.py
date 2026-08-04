@@ -322,20 +322,30 @@ class EditorBasePanel(BasePanel):
         self._animate_snapped_vertices(snap_verts)
 
     def add_edges(self, specs: list[EdgeDragSpec]) -> None:
-        """Add the valid edges from one drag as a single undoable operation."""
+        """Add the valid edges from one drag as a single undoable operation.
+
+        Only W_INPUT degree checks depend on edges accepted earlier in the batch.
+        Such batches are validated on a copy that is updated as edges are accepted.
+        """
         graph = self.graph_view.graph_scene.g
-        planned_graph = copy.deepcopy(graph)
+        needs_planning = any(
+            graph.type(spec.source) == VertexType.W_INPUT
+            or (spec.target is not None and graph.type(spec.target) == VertexType.W_INPUT)
+            for spec in specs
+        )
+        validation_graph = copy.deepcopy(graph) if needs_planning else graph
         pairs: list[tuple[VT, VT]] = []
         snapped_verts: dict[VT, VItem] = {}
         for spec in specs:
             spec_pairs, spec_snap_verts = self._edge_pairs_for_drag(
-                planned_graph, spec.source, spec.target, list(spec.colliding_verts)
+                validation_graph, spec.source, spec.target, list(spec.colliding_verts)
             )
             if not spec_pairs:
                 continue
             pairs.extend(spec_pairs)
-            for pair in spec_pairs:
-                planned_graph.add_edge(pair, self._curr_ety)
+            if needs_planning:
+                for pair in spec_pairs:
+                    validation_graph.add_edge(pair, self._curr_ety)
             snapped_verts.update((vitem.v, vitem) for vitem in spec_snap_verts)
         if not pairs:
             return
