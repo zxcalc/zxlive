@@ -103,7 +103,7 @@ class ProofModel(QAbstractItemModel):
     def hasChildren(self, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> bool:
         return self.rowCount(parent) > 0
 
-    def _display_name(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Any:
+    def _display_name(self, index: Union[QModelIndex, QPersistentModelIndex]) -> Optional[str]:
         """Return the display name for a model index."""
         if index.internalId() == 0:
             if index.row() == 0:
