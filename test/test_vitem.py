@@ -22,30 +22,36 @@ from zxlive.settings import display_setting
 from zxlive.vitem import VItem, VItemAnimation
 
 
-def _drag(scene: GraphScene, start: QPointF, end: QPointF, modifiers: Qt.KeyboardModifier) -> None:
+def _drag(
+    scene: GraphScene,
+    start: QPointF,
+    end: QPointF,
+    modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier,
+    button: Qt.MouseButton = Qt.MouseButton.LeftButton,
+) -> None:
     press = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMousePress)
     press.setScenePos(start)
-    press.setButton(Qt.MouseButton.LeftButton)
-    press.setButtons(Qt.MouseButton.LeftButton)
+    press.setButton(button)
+    press.setButtons(button)
     press.setModifiers(modifiers)
-    press.setButtonDownScenePos(Qt.MouseButton.LeftButton, start)
+    press.setButtonDownScenePos(button, start)
     scene.mousePressEvent(press)
 
     move = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseMove)
     move.setScenePos(end)
     move.setLastScenePos(start)
-    move.setButtons(Qt.MouseButton.LeftButton)
+    move.setButtons(button)
     move.setModifiers(modifiers)
-    move.setButtonDownScenePos(Qt.MouseButton.LeftButton, start)
+    move.setButtonDownScenePos(button, start)
     scene.mouseMoveEvent(move)
 
     release = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseRelease)
     release.setScenePos(end)
     release.setLastScenePos(end)
-    release.setButton(Qt.MouseButton.LeftButton)
+    release.setButton(button)
     release.setButtons(Qt.MouseButton.NoButton)
     release.setModifiers(modifiers)
-    release.setButtonDownScenePos(Qt.MouseButton.LeftButton, start)
+    release.setButtonDownScenePos(button, start)
     scene.mouseReleaseEvent(release)
 
 
@@ -85,6 +91,24 @@ def test_selected_vertices_share_snapped_drag_offset(qtbot: QtBot, grabber_selec
 
     panel.undo_stack.undo()
     assert [item.pos() for item in items] == positions_before
+
+
+@pytest.mark.parametrize("button", [Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton])
+def test_noop_mouse_gesture_does_not_leave_item_dragging(qtbot: QtBot, button: Qt.MouseButton) -> None:
+    g = new_graph()
+    vertex = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    scene = GraphScene()
+    scene.set_graph(g)
+    item = scene.vertex_map[vertex]
+    position = QPointF(item.pos())
+    moved = []
+    scene.vertices_moved.connect(moved.append)
+
+    _drag(scene, position, position, Qt.KeyboardModifier.NoModifier, button)
+
+    assert item.pos() == position
+    assert not item.is_dragging
+    assert moved == []
 
 
 def test_dummy_label_position(qtbot: QtBot) -> None:

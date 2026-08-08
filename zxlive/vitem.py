@@ -95,10 +95,7 @@ class VItem(QGraphicsPathItem):
     # Set of animations that are currently running on this vertex
     active_animations: set[VItemAnimation]
 
-    # Position before starting a drag-move
-    _old_pos: Optional[QPointF]
-
-    # Position at the start of the current drag, used to snap drag offsets.
+    # Position at the start of the current drag.
     _drag_start_pos: Optional[QPointF]
 
     # Shared snapped offset for the current drag.
@@ -137,7 +134,6 @@ class VItem(QGraphicsPathItem):
         self._last_type: Optional[VertexType] = None
         self.index_text_item = None
 
-        self._old_pos = None
         self._drag_start_pos = None
         self._drag_offset = None
         self._drag_items = set()
@@ -161,7 +157,7 @@ class VItem(QGraphicsPathItem):
 
     @property
     def is_dragging(self) -> bool:
-        return self._old_pos is not None
+        return bool(self._drag_items)
 
     @property
     def is_animated(self) -> bool:
@@ -370,20 +366,19 @@ class VItem(QGraphicsPathItem):
         if self.is_animated:
             e.ignore()
             return
-        self._old_pos = self.pos()
         if e.button() == Qt.MouseButton.LeftButton:
             self._drag_items = {
                 it for it in self.graph_scene.selectedItems()
                 if isinstance(it, VItem)
             }
             self._drag_items.add(self)
-            if len(self._drag_items) > 1:
-                for it in self._drag_items:
-                    it._drag_start_pos = QPointF(it.pos())
+            for it in self._drag_items:
+                it._drag_start_pos = QPointF(it.pos())
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         """Handle drag-time behavior for partner syncing and hover targets."""
-        if not self.is_animated and self._drag_start_pos is not None:
+        # Single vertices keep their existing absolute-position snapping.
+        if not self.is_animated and len(self._drag_items) > 1:
             offset = e.scenePos() - e.buttonDownScenePos(Qt.MouseButton.LeftButton)
             snap = display_setting.SNAP
             drag_offset = QPointF(
@@ -462,6 +457,7 @@ class VItem(QGraphicsPathItem):
         Qt does not expose a dedicated move-finished event, so release is used
         to decide whether this was a drop-onto action or a move action.
         """
+        drag_start_pos = self._drag_start_pos
         super().mouseReleaseEvent(e)
         for it in self._drag_items:
             it._drag_start_pos = None
@@ -473,7 +469,7 @@ class VItem(QGraphicsPathItem):
         if e.button() != Qt.MouseButton.LeftButton:
             e.ignore()
             return
-        if self._old_pos is not None and self._old_pos == self.pos():
+        if drag_start_pos is None or drag_start_pos == self.pos():
             e.ignore()
             return
 
@@ -489,7 +485,6 @@ class VItem(QGraphicsPathItem):
             scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
 
         self._dragged_on = None
-        self._old_pos = None
 
     def _snap_w_input_partner_position(self) -> None:
         """If this is W_INPUT, snap it to the rotated offset of its partner."""
