@@ -148,17 +148,13 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
-    # TODO: Fix code complexity
+    # TODO: Fix code complexity and move expensive machinery out of this function (potentially move to refresh and cache values?)
     # noqa: complexipy
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
-        # The type stub is missing the 'state' attribute, so there is a
-        # false positive mypy error if we set the usual way.
-        assert hasattr(option, "state")
-        state = getattr(option, "state")
-        setattr(option, "state", state & ~QStyle.StateFlag.State_Selected)
+        option.state &= ~QStyle.StateFlag.State_Selected
 
         webs: list[tuple[bool, bool, QColor]] = []
 
@@ -234,11 +230,11 @@ class EItem(QGraphicsPathItem):
         pen.setColor(color)
         pen.setStyle(Qt.PenStyle.SolidLine)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        self.setPen(pen)
-        self.setPath(path)
-        super().paint(painter, option, widget)
-        self.setPen(old_pen)
-        self.setPath(old_path)
+        painter.save()
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(path)
+        painter.restore()
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Intercept selection- and position-has-changed events to call `refresh`.
