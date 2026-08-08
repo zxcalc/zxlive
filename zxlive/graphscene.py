@@ -22,6 +22,7 @@ from PySide6.QtCore import Qt, Signal, QRectF, QPointF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent, QMenu
 
+from decorator import contextmanager
 from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
 
@@ -87,6 +88,24 @@ class GraphScene(QGraphicsScene):
         """Whether the scene is currently applying a bulk graph update."""
         return self._bulk_updating
 
+    @contextmanager
+    def bulk_update(self):
+        """Creates a bulk update context which suppresses scene view updates."""
+        
+        self._bulk_updating, old_bulk_updating = True, self._bulk_updating
+        views = [(view, view.isEnabled()) for view in self.views()]
+        try:
+            for view, is_enabled in views:
+                if is_enabled:
+                    view.setUpdatesEnabled(False)
+            yield # runs the inner code
+        finally:
+            self._bulk_updating = old_bulk_updating
+            for view, is_enabled in views:
+                if is_enabled:
+                    view.setUpdatesEnabled(True)
+                    view.viewport().update()
+
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         # 1. Check if there is an item at the position of the click
         item = self.itemAt(e.scenePos(), self.views()[0].transform())
@@ -107,12 +126,23 @@ class GraphScene(QGraphicsScene):
 
     def select_vertices(self, vs: Iterable[VT]) -> None:
         """Selects the given collection of vertices."""
-        self.clearSelection()
+
         vs = set(vs)
-        for v in vs:
-            if v in self.vertex_map:
-                self.vertex_map[v].setSelected(True)
-        self.selection_changed_custom.emit()
+        # Suppress vertex updates for performance reasons
+        with self.bulk_update():
+            self.clearSelection()
+            for v in vs:
+                if v in self.vertex_map:
+                    self.vertex_map[v].setSelected(True)
+            
+            # Manually updates all the vertices we selected
+            # This avoids cascading updates to adjacent edges
+            self._refresh_dirty_items(vs, set())
+            self.selection_changed_custom.emit()
+
+    def select_all_vertices(self) -> None:
+        """Selects all vertices in the scene."""
+        self.select_vertices(self.vertex_map.keys())
 
     def set_graph(self, g: GraphT) -> None:
         """Set the PyZX graph for the scene.
@@ -138,16 +168,8 @@ class GraphScene(QGraphicsScene):
         :param new: The new graph to update to.
         :param select_new: If True, add all new vertices to the selection set."""
 
-        self._bulk_updating = True
-        views = self.views()
-        for view in views:
-            view.setUpdatesEnabled(False)
-        try:
+        with self.bulk_update():
             self._update_graph_inner(new, select_new)
-        finally:
-            self._bulk_updating = False
-            for view in views:
-                view.setUpdatesEnabled(True)
 
     def _update_graph_inner(self, new: GraphT, select_new: bool) -> None:
         """Inner implementation of update_graph.
@@ -315,12 +337,6 @@ class GraphScene(QGraphicsScene):
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
             self.update_edge_curves(s, t)
-
-    def select_all(self) -> None:
-        """Selects all vertices and edges in the scene."""
-        for it in self.items():
-            it.setSelected(True)
-        self.selection_changed_custom.emit()
 
 
 class EditGraphScene(GraphScene):

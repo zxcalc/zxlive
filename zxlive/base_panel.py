@@ -104,7 +104,7 @@ class BasePanel(QWidget):
         self.undo_stack.push(cmd)
 
     def select_all(self) -> None:
-        self.graph_scene.select_all()
+        self.graph_scene.select_all_vertices()
 
     def deselect_all(self) -> None:
         self.graph_scene.clearSelection()
