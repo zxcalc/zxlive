@@ -318,16 +318,7 @@ class VItem(QGraphicsPathItem):
                 not self.is_animated and not self.graph_scene.is_bulk_updating
             ):
                 assert isinstance(value, QPointF)
-                if self._drag_start_pos is not None and self._drag_offset is not None:
-                    x = self._drag_start_pos.x() + self._drag_offset.x()
-                    y = self._drag_start_pos.y() + self._drag_offset.y()
-                elif self.ty == VertexType.W_INPUT:
-                    x = value.x()
-                    y = value.y()
-                else:
-                    x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
-                    y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
-                return QPointF(x, y)
+                return self._constrain_position(value)
             
             # When selecting/deselecting items, we move them to the front/back
             case QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
@@ -352,7 +343,18 @@ class VItem(QGraphicsPathItem):
             
             case _:
                 return super().itemChange(change, value)
-    
+
+    def _constrain_position(self, value: QPointF) -> QPointF:
+        if self._drag_start_pos is not None and self._drag_offset is not None:
+            return self._drag_start_pos + self._drag_offset
+        if self.ty == VertexType.W_INPUT:
+            return value
+        snap = display_setting.SNAP
+        return QPointF(
+            round(value.x() / snap) * snap,
+            round(value.y() / snap) * snap,
+        )
+
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(e)
         if self.is_animated:
