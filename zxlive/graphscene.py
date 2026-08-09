@@ -73,7 +73,7 @@ class GraphScene(QGraphicsScene):
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
         self.g: GraphT
-        # True while update_graph is running; suppresses per-item refresh
+        # True while many updates are being applied at once; suppresses per-item refresh
         # cascades in VItem.itemChange so that refreshes can be deduplicated.
         self._bulk_updating: bool = False
 
