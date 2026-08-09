@@ -49,6 +49,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
                       show_error_msg, write_to_file)
 from .edit_panel import GraphEditPanel
+from .features import FEATURES, is_feature_enabled, set_feature_enabled
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel
@@ -242,6 +243,21 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
         view_menu.addAction(self.auto_arrange_action)
+        view_menu.addSeparator()
+
+        features_menu = view_menu.addMenu("&Features")
+        features_menu.setToolTipsVisible(True)
+        self.feature_actions: dict[str, QAction] = {}
+        for feature in FEATURES:
+            feature_id = feature["id"]
+            action = self._new_action(
+                feature["label"],
+                lambda checked=False, fid=feature_id: self._toggle_feature(fid, checked),
+                None, feature["tooltip"])
+            action.setCheckable(True)
+            action.setChecked(is_feature_enabled(feature_id))
+            features_menu.addAction(action)
+            self.feature_actions[feature_id] = action
 
         new_rewrite_from_file = self._new_action(
             "New rewrite from file", lambda: create_new_rewrite(self),
@@ -838,6 +854,7 @@ class MainWindow(QMainWindow):
         self.tab_widget.setCurrentWidget(panel)
 
         self._reset_menus(True)
+        panel.refresh_feature_visibility()
 
         panel.undo_stack.cleanChanged.connect(self.update_tab_name)
         panel.undo_stack.canUndoChanged.connect(self._undo_changed)
@@ -1108,6 +1125,12 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
+
+    def _toggle_feature(self, feature_id: str, enabled: bool) -> None:
+        """Toggle an optional feature from the View menu and update the open tabs."""
+        set_feature_enabled(feature_id, enabled)
+        for i in range(self.tab_widget.count()):
+            cast(BasePanel, self.tab_widget.widget(i)).refresh_feature_visibility()
 
     def check_for_updates(self) -> None:
         """Manually check for updates."""

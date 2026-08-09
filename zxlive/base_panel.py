@@ -78,18 +78,26 @@ class BasePanel(QWidget):
         return self.graph_scene.g
 
     def _populate_toolbar(self) -> None:
+        self._toolbar_actions: dict[QWidget, QAction] = {}
         for section in self._toolbar_sections():
             group = QButtonGroup(self)
             group.setExclusive(section.exclusive)
             for btn in section.buttons:
                 if isinstance(btn, QAbstractButton):
-                    self.toolbar.addWidget(btn)
+                    self._toolbar_actions[btn] = self.toolbar.addWidget(btn)
                     group.addButton(btn)
                 elif isinstance(btn, QAction):
                     self.toolbar.addAction(btn)
                 else:
-                    self.toolbar.addWidget(btn)
+                    self._toolbar_actions[btn] = self.toolbar.addWidget(btn)
             self.toolbar.addSeparator()
+
+    def set_toolbar_widget_visible(self, widget: QWidget, visible: bool) -> None:
+        """Toolbar widgets are wrapped in a QWidgetAction, whose visibility governs them."""
+        self._toolbar_actions[widget].setVisible(visible)
+
+    def is_toolbar_widget_visible(self, widget: QWidget) -> bool:
+        return self._toolbar_actions[widget].isVisible()
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         raise NotImplementedError
@@ -127,6 +135,10 @@ class BasePanel(QWidget):
 
     def update_colors(self) -> None:
         self.graph_scene.update_colors()
+
+    def refresh_feature_visibility(self) -> None:
+        """Show or hide the optional features that are toggled in the View menu."""
+        pass
 
     def sync_splitter_sizes(self) -> None:
         self.splitter_sizes[self.__class__] = self.splitter.sizes()

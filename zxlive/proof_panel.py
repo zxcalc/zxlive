@@ -8,7 +8,8 @@ from typing import Iterator, Optional, Union, cast
 
 from PySide6.QtCore import QPointF, QSize, Signal
 from PySide6.QtGui import QAction, QIcon, QVector2D, QIntValidator, QValidator
-from PySide6.QtWidgets import QInputDialog, QToolButton, QLineEdit, QLabel, QHBoxLayout, QWidget, QSizePolicy
+from PySide6.QtWidgets import (QInputDialog, QToolButton, QLineEdit, QLabel, QHBoxLayout, QVBoxLayout,
+                               QWidget, QSizePolicy)
 
 import pyzx
 from pyzx.graph.jsonparser import string_to_phase
@@ -24,6 +25,7 @@ from .common import (ET, VT, GraphT, ToolType, get_data,
 from .dialogs import show_error_msg, update_dummy_vertex_text
 from .editor_base_panel import string_to_complex
 from .eitem import EItem
+from .features import FAULT_EQUIVALENCE, PAULI_WEBS, is_feature_enabled
 from .graphscene import EditGraphScene, EdgeDragSpec
 from .graphview import GraphTool, ProofGraphView, WandTrace
 from .proof import ProofModel, ProofStepView
@@ -48,7 +50,16 @@ class ProofPanel(BasePanel):
         self.graph_view.set_graph(graph)
 
         self.rewrites_panel = RewriteActionTreeView(self)
-        self.splitter.insertWidget(0, self.rewrites_panel)
+        self.fe_banner = QLabel(
+            "Fault-equivalent mode: only fault-equivalent rewrites can be applied.")
+        self.fe_banner.setWordWrap(True)
+        self.fe_banner.setVisible(False)
+        rewrites_container = QWidget(self)
+        rewrites_layout = QVBoxLayout(rewrites_container)
+        rewrites_layout.setContentsMargins(0, 0, 0, 0)
+        rewrites_layout.addWidget(self.fe_banner)
+        rewrites_layout.addWidget(self.rewrites_panel)
+        self.splitter.insertWidget(0, rewrites_container)
 
         self.graph_view.wand_trace_finished.connect(self._wand_trace_finished)
         self.graph_scene.vertex_dragged.connect(self._vertex_dragged)
@@ -122,40 +133,59 @@ class ProofPanel(BasePanel):
         yield ToolbarSection(*self.identity_choice, exclusive=True)
 
         self.fault_equivalent_mode = QToolButton(self)
-        self.fault_equivalent_mode.setToolTip("Fault Equivalent Mode")
-        self.fault_equivalent_mode.setText("FE")
+        self.fault_equivalent_mode.setToolTip(
+            "Fault-equivalent mode\n\n"
+            "Restricts the rewrite list to fault-equivalent rewrites, which are guaranteed "
+            "to preserve the fault tolerance of the diagram. All other rewrites are greyed out.")
+        self.fault_equivalent_mode.setText("Fault-equivalent")
         self.fault_equivalent_mode.setCheckable(True)
         self.fault_equivalent_mode.toggled.connect(self.toggle_FE_mode)
 
         self.weight_layout = QHBoxLayout()
         self.weight_layout.setSpacing(2)
 
-        self.weight_label = QLabel("w = ")
-        self.weight_label.setMaximumWidth(40)
+        weight_tooltip = (
+            "Maximum fault weight to consider.\n\n"
+            "Only rewrites that stay fault-equivalent up to this weight are shown. "
+            "Leave empty for ∞, i.e. fully fault-equivalent rewrites only.")
+        self.weight_label = QLabel("Fault weight w ≤")
+        self.weight_label.setToolTip(weight_tooltip)
         self.weight_layout.addWidget(self.weight_label)
 
         self.fault_equivalent_weight = QLineEdit(self)
-        self.fault_equivalent_weight.setToolTip("Fault Weight Considered")
+        self.fault_equivalent_weight.setToolTip(weight_tooltip)
         self.fault_equivalent_weight.setPlaceholderText("∞")
         self.fault_equivalent_weight.setFixedWidth(50)
         self.fault_equivalent_weight.setValidator(self.WeightInputValidator(0, 100, self))
         self.fault_equivalent_weight.editingFinished.connect(self.update_weight)
         self.weight_layout.addWidget(self.fault_equivalent_weight)
 
-        weight_widget = QWidget(self)
-        weight_widget.setLayout(self.weight_layout)
-        weight_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
+        self.fe_weight_widget = QWidget(self)
+        self.fe_weight_widget.setLayout(self.weight_layout)
+        self.fe_weight_widget.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Preferred)
 
-        yield ToolbarSection(self.fault_equivalent_mode, weight_widget)
+        yield ToolbarSection(self.fault_equivalent_mode, self.fe_weight_widget)
 
         yield ToolbarSection(*self.actions())
-    
+
         self.pauli_webs = QToolButton(self)
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
-    
+
+    def refresh_feature_visibility(self) -> None:
+        fe_enabled = is_feature_enabled(FAULT_EQUIVALENCE)
+        if not fe_enabled and self.fault_equivalent_mode.isChecked():
+            self.fault_equivalent_mode.setChecked(False)  # also triggers toggle_FE_mode
+        self.set_toolbar_widget_visible(self.fault_equivalent_mode, fe_enabled)
+        self.set_toolbar_widget_visible(self.fe_weight_widget, fe_enabled and self.fault_equivalent_mode.isChecked())
+        self.set_toolbar_widget_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
+        self.rewrites_panel.refresh_rewrites_model()
+
     def toggle_FE_mode(self) -> None:
+        fe_mode = self.fault_equivalent_mode.isChecked()
+        self.set_toolbar_widget_visible(self.fe_weight_widget, fe_mode)
+        self.fe_banner.setVisible(fe_mode)
         selected_vertices, _ = self.parse_selection()
         self.rewrites_panel.refresh_rewrites_model()
         self.graph_scene.select_vertices(selected_vertices)
