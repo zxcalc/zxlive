@@ -419,10 +419,12 @@ class RewriteActionTreeModel(QAbstractItemModel):
             )
 
     def update_on_selection(self) -> None:
-        selection, edges = self.proof_panel.parse_selection()
-        g = self.proof_panel.graph_scene.g
-        self.root_item.update_on_selection(g, selection, edges)
-        QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
+        try:
+            selection, edges = self.proof_panel.parse_selection()
+            g = self.proof_panel.graph_scene.g
+            self.root_item.update_on_selection(g, selection, edges)
+        finally:
+            QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)
 
 
 class RewriteActionTreeView(QTreeView):
