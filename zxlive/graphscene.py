@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Optional, Iterator, Iterable
 
@@ -22,7 +23,6 @@ from PySide6.QtCore import Qt, Signal, QRectF, QPointF
 from PySide6.QtGui import QBrush, QColor, QTransform, QPainterPath
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsSceneMouseEvent, QGraphicsItem, QGraphicsSceneContextMenuEvent, QMenu
 
-from decorator import contextmanager
 from pyzx.utils import EdgeType
 from pyzx.graph.diff import GraphDiff
 
@@ -89,7 +89,7 @@ class GraphScene(QGraphicsScene):
         return self._bulk_updating
 
     @contextmanager
-    def bulk_update(self):
+    def bulk_update(self) -> Iterator[None]:
         """Creates a bulk update context which suppresses scene view updates."""
         
         self._bulk_updating, old_bulk_updating = True, self._bulk_updating
