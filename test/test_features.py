@@ -10,6 +10,8 @@ from pyzx.utils import VertexType
 
 import zxlive.features
 import zxlive.mainwindow
+import zxlive.tutorial
+from zxlive.common import new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.editor_base_panel import vertices_data
 from zxlive.features import (FAULT_EQUIVALENCE, FEATURES, PAULI_WEBS, ZH_CALCULUS, ZW_CALCULUS,
@@ -285,3 +287,22 @@ def test_picker_waits_for_a_follow_on_tutorial_section(
     monkeypatch.setattr(TutorialController, "active", property(lambda _self: True))
     app._offer_feature_picker()
     assert calls == []
+
+
+def test_opening_a_proof_on_first_run_does_not_pre_empt_the_main_tutorial(
+    app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Mirrors passing a proof file on the command line: the proof-mode section is
+    # scheduled before the first-run tutorial, but the intro tour must win.
+    tutorial_store: dict[str, bool] = {}
+    monkeypatch.setattr(zxlive.tutorial, "get_settings_value",
+                        lambda key, _type, default=None, settings=None: tutorial_store.get(key, default))
+    monkeypatch.setattr(zxlive.tutorial, "set_settings_value",
+                        lambda key, value, _type, settings=None: tutorial_store.__setitem__(key, value))
+    started: list[str] = []
+    monkeypatch.setattr(TutorialController, "start",
+                        lambda _self, _steps, seen_key: started.append(seen_key))
+
+    app.new_deriv(new_graph())
+    app.maybe_show_tutorial_on_first_run()
+    qtbot.waitUntil(lambda: started == ["tutorial/main-seen"], timeout=2000)

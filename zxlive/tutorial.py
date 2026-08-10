@@ -347,6 +347,8 @@ class TutorialController(QObject):
         self._seen_key = _MAIN_SEEN
         self._awaiting = False
         self._await_signal: Optional[SignalInstance] = None
+        # Set while the first-run main tour is scheduled but has not started yet.
+        self.main_tour_pending = False
         self.overlay = _SpotlightOverlay(win)
         self.coachmark = _Coachmark(win, self._prev, self._next, self._skip)
         self.ghost = _GhostPointer(win)
@@ -859,6 +861,7 @@ def _prepare_canvas(win: MainWindow) -> None:
 def start_main_tutorial(win: MainWindow) -> None:
     """Start (or replay) the full tutorial. Wired to Help -> Tutorial."""
     controller = win.tutorial_controller
+    controller.main_tour_pending = False
     if controller.active:
         return
     # Replaying the main tour also re-arms the proof-mode section.
@@ -876,6 +879,7 @@ def maybe_show_tutorial_on_first_run(win: MainWindow) -> bool:
         return False
     if win.active_panel is None:
         return False
+    win.tutorial_controller.main_tour_pending = True
     QTimer.singleShot(400, lambda: start_main_tutorial(win))
     return True
 
@@ -888,6 +892,10 @@ def maybe_start_proof_tutorial(win: MainWindow) -> None:
     def go() -> None:
         controller = win.tutorial_controller
         if not isinstance(win.active_panel, ProofPanel):
+            return
+        if controller.main_tour_pending:
+            # Opening a proof on first launch must not pre-empt the intro tour,
+            # which hands over to this section at its end anyway.
             return
         if controller.active:
             # The user clicked Start Derivation from the main tour's last step;
