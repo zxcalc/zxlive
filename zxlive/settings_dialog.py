@@ -81,6 +81,7 @@ class SettingsData(TypedDict):
     label: str
     type: FormInputType
     data: NotRequired[dict[Any, str]]
+    special_value_text: NotRequired[str]
 
 
 color_scheme_data = {
@@ -136,16 +137,26 @@ general_settings: list[SettingsData] = [
 
 
 font_settings: list[SettingsData] = [
-    {"id": "font/size", "label": "Font size", "type": FormInputType.Int},
+    {"id": "font/size", "label": "Application font size", "type": FormInputType.Int},
     # Font families can be loaded after a QGuiApplication is constructed.
     # load_font_families needs to be called once a QGuiApplication is up.
-    {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "font/family", "label": "Application font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "phase-font/size", "label": "Phase font size", "type": FormInputType.Int,
+     "special_value_text": "Same as app"},
+    {"id": "phase-font/family", "label": "Phase font family", "type": FormInputType.Combo,
+     "data": {"": "Same as app", "Arial": "Arial"}},
+    {"id": "dummy-font/size", "label": "Dummy label font size", "type": FormInputType.Int,
+     "special_value_text": "Same as app"},
+    {"id": "dummy-font/family", "label": "Dummy label font family", "type": FormInputType.Combo,
+     "data": {"": "Same as app", "Arial": "Arial"}},
 ]
 
 
 def load_font_families() -> None:
-    index = next(i for i, d in enumerate(font_settings) if d["id"] == "font/family")
-    font_settings[index]["data"] |= {f: f for f in QFontDatabase.families()}
+    families = {f: f for f in QFontDatabase.families()}
+    for setting in font_settings:
+        if setting["id"].endswith("/family"):
+            setting["data"] |= families
 
 
 tikz_export_settings: list[SettingsData] = [
@@ -297,6 +308,8 @@ class SettingsDialog(QDialog):
 
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
         widget = QSpinBox()
+        if special_value_text := data.get("special_value_text"):
+            widget.setSpecialValueText(special_value_text)
         widget.setValue(self.get_settings_from_data(data, int))
         return widget
 

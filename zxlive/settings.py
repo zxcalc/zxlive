@@ -59,6 +59,10 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
 font_defaults: dict[str, str | int | None] = {
     "font/size": 11,
     "font/family": "Arial",
+    "phase-font/size": 0,
+    "phase-font/family": "",
+    "dummy-font/size": 0,
+    "dummy-font/family": "",
 }
 
 # Optional features that can be toggled from the View > Features menu.
@@ -253,8 +257,18 @@ class DisplaySettings:
             get_settings_value("font/family", str),
             get_settings_value("font/size", int)
         )
+        self.phase_font = self._get_inherited_font("phase-font")
+        self.dummy_font = self._get_inherited_font("dummy-font")
         self.SNAP = SCALE / self.SNAP_DIVISION
         self._invalidate_color_cache()
+
+    def _get_inherited_font(self, prefix: str) -> QFont:
+        font = QFont(self.font)
+        if family := get_settings_value(f"{prefix}/family", str):
+            font.setFamily(family)
+        if size := get_settings_value(f"{prefix}/size", int):
+            font.setPointSize(size)
+        return font
 
     @property
     def text_color(self) -> str:

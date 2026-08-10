@@ -9,6 +9,7 @@ from fractions import Fraction
 
 import pytest
 from PySide6.QtCore import QAbstractAnimation, QEvent, QPointF, Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from pyzx.utils import VertexType
 from pytestqt.qtbot import QtBot
@@ -18,7 +19,7 @@ from zxlive.eitem import EItem, EItemAnimation
 from zxlive.graphscene import GraphScene
 from zxlive.common import SCALE, new_graph
 from zxlive.rule_panel import RulePanel
-from zxlive.settings import display_setting
+from zxlive.settings import DisplaySettings, display_setting
 from zxlive.vitem import VItem, VItemAnimation
 
 
@@ -154,6 +155,58 @@ def test_dummy_label_position(qtbot: QtBot) -> None:
     svg_rect = vitem_latex._dummy_svg_renderer.viewBoxF()
     expected_svg_y = node_top - gap - svg_rect.height()
     assert vitem_latex.dummy_svg_item.pos().y() == pytest.approx(expected_svg_y)
+
+
+def test_graph_label_fonts_are_independent(qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from zxlive import latex_render
+
+    phase_font = QFont("Courier", 18)
+    dummy_font = QFont("Times", 20)
+    monkeypatch.setattr(display_setting, "phase_font", phase_font)
+    monkeypatch.setattr(display_setting, "dummy_font", dummy_font)
+
+    latex_sizes: list[float] = []
+
+    def render_latex(_text: str, color: str, size: float) -> bytes:
+        latex_sizes.append(size)
+        return b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>'
+
+    monkeypatch.setattr(latex_render, "latex_to_svg", render_latex)
+
+    g = new_graph()
+    phase_vertex = g.add_vertex(VertexType.Z, qubit=0, row=0, phase=Fraction(1, 4))
+    text_vertex = g.add_vertex(VertexType.DUMMY, qubit=1, row=0)
+    g.set_vdata(text_vertex, "text", "label")
+    latex_vertex = g.add_vertex(VertexType.DUMMY, qubit=2, row=0)
+    g.set_vdata(latex_vertex, "text", r"$x$")
+
+    scene = GraphScene()
+    scene.set_graph(g)
+
+    assert scene.vertex_map[phase_vertex].phase_item.font() == phase_font
+    dummy_text_item = scene.vertex_map[text_vertex].dummy_text_item
+    assert dummy_text_item is not None
+    assert dummy_text_item.font() == dummy_font
+    assert latex_sizes == [dummy_font.pointSize() * 1.4]
+
+
+def test_graph_label_fonts_default_to_application_font(monkeypatch: pytest.MonkeyPatch) -> None:
+    values = {
+        "snap-granularity": "4",
+        "font/family": "Arial",
+        "font/size": 13,
+        "phase-font/family": "",
+        "phase-font/size": 0,
+        "dummy-font/family": "Courier",
+        "dummy-font/size": 0,
+    }
+    monkeypatch.setattr("zxlive.settings.get_settings_value", lambda name, _type: values[name])
+
+    settings = DisplaySettings()
+
+    assert settings.phase_font == settings.font
+    assert settings.dummy_font.family() == "Courier"
+    assert settings.dummy_font.pointSize() == settings.font.pointSize()
 
 
 def test_boundary_phase_cleared_on_refresh(qtbot: QtBot) -> None:
