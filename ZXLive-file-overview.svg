@@ -41,8 +41,13 @@
   <text x="610" y="245" text-anchor="middle" class="file" style="white-space: pre;">rule_panel.py</text>
   <rect x="711" y="220" width="180" height="40" class="box panel"></rect>
   <text x="801" y="245" text-anchor="middle" class="file" style="white-space: pre; font-size: 16px;">editor_base_panel.py</text>
+  <rect x="901" y="220" width="145" height="40" class="box panel"></rect>
+  <text x="973.5" y="245" text-anchor="middle" class="file" style="white-space: pre; font-size: 14px;">pauliwebs_panel.py</text>
   <text x="450" y="210" text-anchor="middle" class="group" style="white-space: pre;">Panels (GUI components)</text>
-  <text x="50.379" y="275.769" class="desc" style="white-space: pre; font-size: 14px;" transform="matrix(1, 0, 0, 1, -24.592072, -17.971588)"><tspan x="50.37900161743164" dy="1em">​</tspan>    Shared logic for all panels     Diagram editing panel          Proof view panel        Custom rewrite rule panel   Base for editor (edit and rule) panels<tspan x="50.37900161743164" dy="1em">​</tspan></text>
+  <text x="973.5" y="275" text-anchor="middle" class="desc" style="white-space: pre; font-size: 14px;">Pauli web viewer panel</text>
+  <text x="801" y="275" text-anchor="middle" class="desc" style="white-space: pre; font-size: 14px;">Base for editor</text>
+  <text x="801" y="291" text-anchor="middle" class="desc" style="white-space: pre; font-size: 14px;">(edit and rule) panels</text>
+  <text x="50.379" y="275.769" class="desc" style="white-space: pre; font-size: 14px;" transform="matrix(1, 0, 0, 1, -24.592072, -17.971588)"><tspan x="50.37900161743164" dy="1em">​</tspan>    Shared logic for all panels     Diagram editing panel          Proof view panel        Custom rewrite rule panel<tspan x="50.37900161743164" dy="1em">​</tspan></text>
   <rect x="60" y="340" width="140" height="40" class="box graph"></rect>
   <text x="130" y="365" text-anchor="middle" class="file" style="white-space: pre;">graphscene.py</text>
   <rect x="236.88" y="339.672" width="140" height="40" class="box graph"></rect>
@@ -52,6 +57,13 @@
   <rect x="571.88" y="339.672" width="140" height="40" class="box graph"></rect>
   <text x="641.88" y="364.672" text-anchor="middle" class="file" style="white-space: pre; font-size: 16px;">eitem.py</text>
   <text x="452.154" y="323.852" text-anchor="middle" class="group" style="white-space: pre; font-size: 18px;">Graph/Diagram Logic</text>
+  <rect x="765" y="339.672" width="140" height="40" class="box util"></rect>
+  <text x="835" y="364.672" text-anchor="middle" class="file" style="white-space: pre; font-size: 16px;">features.py</text>
+  <rect x="915" y="339.672" width="130" height="40" class="box util"></rect>
+  <text x="980" y="364.672" text-anchor="middle" class="file" style="white-space: pre; font-size: 16px;">tutorial.py</text>
+  <text x="905" y="323.852" text-anchor="middle" class="group" style="white-space: pre; font-size: 18px;">Onboarding</text>
+  <text x="835" y="396" text-anchor="middle" class="desc" style="white-space: pre; font-size: 14px;">Optional features</text>
+  <text x="980" y="396" text-anchor="middle" class="desc" style="white-space: pre; font-size: 14px;">Interactive tutorial</text>
   <text x="290" y="395" class="desc" style="white-space: pre;" transform="matrix(1, 0, 0, 1, 119.778366, 1.077251)">Visual item for a vertex      Visual item for an edge<tspan x="290" dy="1em">​</tspan></text>
   <rect x="60" y="460" width="140" height="40" class="box proof"></rect>
   <text x="130" y="485" text-anchor="middle" class="file" style="white-space: pre;">proof.py</text>

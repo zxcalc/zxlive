@@ -21,9 +21,11 @@ from .animations import make_animation
 from .commands import AddRewriteStep
 from .common import ET, GraphT, VT, get_data
 from .dialogs import show_error_msg
+from .features import FAULT_EQUIVALENCE, is_feature_enabled
 from .rewrite_data import (is_rewrite_data, RewriteData,
                            MatchType, MATCH_SINGLE, MATCH_DOUBLE, MATCH_COMPOUND,
-                           refresh_custom_rules, action_groups, rules_basic)
+                           refresh_custom_rules, action_groups, rules_basic,
+                           FAULT_EQUIVALENT_GROUP)
 from .settings import display_setting
 from .graphscene import GraphScene
 from .graphview import GraphView
@@ -58,6 +60,7 @@ class RewriteAction:
 
     supports_weight_parameter: bool = field(default=False)
     max_fault_equivalence: Optional[int] = field(default=None)
+    disabled_by_fe_mode: bool = field(default=False)
 
     @classmethod
     def from_rewrite_data(cls, d: RewriteData) -> RewriteAction:
@@ -189,6 +192,9 @@ class RewriteAction:
     # TODO: Fix code complexity
     # noqa: complexipy
     def update_active(self, g: GraphT, verts: list[VT], edges: list[ET]) -> None:  # noqa: PLR0912
+        if self.disabled_by_fe_mode:
+            self.enabled = False
+            return
         if self.copy_first:
             g = copy.deepcopy(g)
         if len(verts) == 0 and len(edges) == 0:
@@ -308,7 +314,12 @@ class RewriteActionTree:
         return self.id if self.rewrite is None else self.rewrite.name
 
     def tooltip(self) -> str:
-        return "" if self.rewrite is None else self.rewrite.tooltip
+        if self.rewrite is None:
+            return ""
+        if self.rewrite.disabled_by_fe_mode:
+            return ("This rewrite is not fault-equivalent, so it is disabled while "
+                    "fault-equivalent mode is active.")
+        return self.rewrite.tooltip
 
     def enabled(self) -> bool:
         return self.rewrite is None or self.rewrite.enabled
@@ -323,6 +334,14 @@ class RewriteActionTree:
         for group, actions in d.items():
             ret.append_child(cls.from_dict(actions, group, ret))
         return ret
+
+    def set_disabled_by_fe_mode(self, disabled: bool) -> None:
+        for child in self.child_items:
+            child.set_disabled_by_fe_mode(disabled)
+        if self.rewrite is not None:
+            self.rewrite.disabled_by_fe_mode = disabled
+            if disabled:
+                self.rewrite.enabled = False
 
     def update_on_selection(self, g: GraphT, selection: list[VT], edges: list[ET]) -> None:
         for child in self.child_items:
@@ -554,49 +573,50 @@ class RewriteActionTreeView(QTreeView):
 
         # Refresh the custom rules and update the model
         refresh_custom_rules()
-        filtered_action_groups = self.get_fault_equivalent_rules()
+        visible_action_groups = self.get_visible_action_groups()
 
-        model = RewriteActionTreeModel.from_dict(filtered_action_groups, self.proof_panel)
+        model = RewriteActionTreeModel.from_dict(visible_action_groups, self.proof_panel)
+        if self.fault_equivalent_mode_active():
+            for group in model.root_item.child_items:
+                group.set_disabled_by_fe_mode(group.id != FAULT_EQUIVALENT_GROUP)
+            expanded_indexes = [FAULT_EQUIVALENT_GROUP]
         self.setModel(model)
 
-        if not expanded_indexes:
+        expanded_any = False
+        for row in range(model.rowCount()):
+            index = model.index(row, 0)
+            if index.data() in expanded_indexes:
+                self.expand(index)
+                expanded_any = True
+        if not expanded_any:
             self.expand(model.index(0, 0))
-        else:
-            for row in range(model.rowCount()):
-                index = model.index(row, 0)
-                if index.data() in expanded_indexes:
-                    self.expand(index)
         self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
 
-    def get_fault_equivalent_rules(self) -> dict:
-        """Return action_groups filtered according to Fault Equivalent mode and weight:
-        
-        -FE mode OFF: show all groups except FE
-        -FE mode ON, w = None: show all FE rules
-        -FE mode ON, w is set: show all FE rules where their max fault equivalence is greater than w
+    def fault_equivalent_mode_active(self) -> bool:
+        return (is_feature_enabled(FAULT_EQUIVALENCE)
+                and self.proof_panel.fault_equivalent_mode.isChecked())
+
+    def get_visible_action_groups(self) -> dict[str, dict[str, RewriteData]]:
+        """Return the rewrite groups to display in the tree.
+
+        The fault-equivalent group is only shown in fault-equivalent mode, where it is
+        listed first and its rules are additionally filtered by the selected fault
+        weight: a rule is kept if it is fully fault-equivalent, or if a weight is set
+        that does not exceed the weight up to which the rule stays fault-equivalent.
+        An unset weight means w = ∞, so only fully fault-equivalent rules are kept.
         """
-        fe_mode = self.proof_panel.fault_equivalent_mode.isChecked()
+        fe_mode = self.fault_equivalent_mode_active()
         selected_weight = self.proof_panel.fault_equivalent_weight_value
 
+        visible_groups: dict[str, dict[str, RewriteData]] = {}
         if fe_mode:
-            fe_rules_group = action_groups.get("Fault Equivalent Rewrites", {})
-            filtered_rules: dict[str, RewriteData] = {}
-            for rule_name, rule in fe_rules_group.items():
-                max_rule_weight = rule.get("max_fault_equivalence", None)
-
-                #include rules if:
-                include_rule = (
-                    max_rule_weight is None # rule is fully fault tolerant or
-                    or selected_weight is None # no weight is selected
-                    or (selected_weight is not None and selected_weight <= max_rule_weight) # fault tolerance of the rule is greater than the fault considered
-                )
-
-                if include_rule:
-                    filtered_rules[rule_name] = rule
-            return filtered_rules
-        else:
-            filtered_groups: dict[str, dict[str, RewriteData]] = {}
-            for group_name, rules in action_groups.items():
-                if group_name != "Fault Equivalent Rewrites":
-                    filtered_groups[group_name] = rules
-            return filtered_groups
+            visible_groups[FAULT_EQUIVALENT_GROUP] = {
+                rule_name: rule
+                for rule_name, rule in action_groups[FAULT_EQUIVALENT_GROUP].items()
+                if (max_weight := rule.get("max_fault_equivalence", None)) is None
+                or (selected_weight is not None and selected_weight <= max_weight)
+            }
+        for group_name, rules in action_groups.items():
+            if group_name != FAULT_EQUIVALENT_GROUP:
+                visible_groups[group_name] = rules
+        return visible_groups
