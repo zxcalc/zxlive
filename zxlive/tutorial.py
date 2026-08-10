@@ -32,7 +32,8 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, TYPE_CHECKING, Union
 
 from PySide6.QtCore import (QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation,
-                            QRect, QRectF, Qt, QTimer, QVariantAnimation, SignalInstance)
+                            QRect, QRectF, Qt, QTimer, QVariantAnimation, Signal,
+                            SignalInstance)
 from PySide6.QtGui import (QColor, QFont, QMouseEvent, QPaintEvent, QPainter, QPen,
                            QRegion)
 from PySide6.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QGraphicsItem,
@@ -334,6 +335,9 @@ class _GhostPointer(QWidget):
 class TutorialController(QObject):
     """Drives a sequence of Steps over the live MainWindow."""
 
+    # Emits the settings key of the section that just ended, completed or skipped.
+    finished = Signal(str)
+
     def __init__(self, win: MainWindow) -> None:
         super().__init__(win)
         self.win = win
@@ -383,6 +387,7 @@ class TutorialController(QObject):
         self.ghost.hide()
         self.overlay.hide()
         self.coachmark.hide()
+        self.finished.emit(self._seen_key)
 
     # -- navigation --------------------------------------------------------
 
@@ -725,8 +730,8 @@ def build_main_steps() -> list[Step]:
         Step(
             title="Vertices sidebar",
             text="Pick what kind of node you'll draw here: <b>Z</b> and <b>X</b> "
-                 "spiders, <b>Hadamard</b> boxes, <b>W</b> nodes, boundaries and "
-                 "more. The highlighted type is what the Add Vertex tool drops.",
+                 "spiders, boundary nodes or dummy nodes. "
+                 "The highlighted type is what the Add Vertex tool drops.",
             target=_vertex_list,
         ),
         Step(
@@ -862,13 +867,17 @@ def start_main_tutorial(win: MainWindow) -> None:
     controller.start(build_main_steps(), _MAIN_SEEN)
 
 
-def maybe_show_tutorial_on_first_run(win: MainWindow) -> None:
-    """Auto-start the tutorial the very first time ZXLive is opened."""
+def maybe_show_tutorial_on_first_run(win: MainWindow) -> bool:
+    """Auto-start the tutorial the very first time ZXLive is opened.
+
+    Returns whether the tutorial was scheduled.
+    """
     if get_settings_value(_MAIN_SEEN, bool, False):
-        return
+        return False
     if win.active_panel is None:
-        return
+        return False
     QTimer.singleShot(400, lambda: start_main_tutorial(win))
+    return True
 
 
 def maybe_start_proof_tutorial(win: MainWindow) -> None:

@@ -49,7 +49,9 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
                       show_error_msg, write_to_file)
 from .edit_panel import GraphEditPanel
-from .features import FEATURES, is_feature_enabled, set_feature_enabled
+from .features import (FEATURES, has_seen_feature_picker, is_feature_enabled,
+                       mark_feature_picker_seen, set_feature_enabled,
+                       show_feature_picker)
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel
@@ -292,6 +294,7 @@ class MainWindow(QMainWindow):
         self._reset_menus(False)
 
         self.tutorial_controller = tutorial.TutorialController(self)
+        self.tutorial_controller.finished.connect(self._on_tutorial_finished)
 
         self.effects = {e: load_sfx(e) for e in SFXEnum}
 
@@ -314,8 +317,30 @@ class MainWindow(QMainWindow):
         tutorial.start_main_tutorial(self)
 
     def maybe_show_tutorial_on_first_run(self) -> None:
-        """Auto-start the tutorial on the very first launch."""
-        tutorial.maybe_show_tutorial_on_first_run(self)
+        """Auto-start the tutorial on the very first launch, then offer the feature picker."""
+        if not tutorial.maybe_show_tutorial_on_first_run(self):
+            self.maybe_show_feature_picker()
+
+    def _on_tutorial_finished(self, _seen_key: str) -> None:
+        # Deferred so a follow-on section (e.g. the proof-mode tour) can take over first.
+        QTimer.singleShot(400, self._offer_feature_picker)
+
+    def _offer_feature_picker(self) -> None:
+        if not self.tutorial_controller.active:
+            self.maybe_show_feature_picker()
+
+    def maybe_show_feature_picker(self) -> None:
+        """Offer the optional features once, after the first-run tutorial."""
+        if has_seen_feature_picker():
+            return
+        selection = show_feature_picker(self)
+        mark_feature_picker_seen()
+        if selection is None:
+            return
+        for feature_id, enabled in selection.items():
+            set_feature_enabled(feature_id, enabled)
+            self.feature_actions[feature_id].setChecked(enabled)
+        self.refresh_all_feature_visibility()
 
     def _reset_menus(self, has_active_tab: bool) -> None:
         is_saveable = has_active_tab and not isinstance(self.active_panel, PauliWebsPanel)
@@ -1132,6 +1157,9 @@ class MainWindow(QMainWindow):
     def _toggle_feature(self, feature_id: str, enabled: bool) -> None:
         """Toggle an optional feature from the View menu and update the open tabs."""
         set_feature_enabled(feature_id, enabled)
+        self.refresh_all_feature_visibility()
+
+    def refresh_all_feature_visibility(self) -> None:
         for i in range(self.tab_widget.count()):
             cast(BasePanel, self.tab_widget.widget(i)).refresh_feature_visibility()
 

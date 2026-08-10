@@ -62,11 +62,12 @@ font_defaults: dict[str, str | int | None] = {
 }
 
 # Optional features that can be toggled from the View > Features menu.
+# All off by default; the first-run picker is what turns them on.
 feature_defaults: dict[str, bool] = {
     "feature/fault-equivalence": False,
-    "feature/zh-calculus": True,
-    "feature/zw-calculus": True,
-    "feature/pauli-webs": True,
+    "feature/zh-calculus": False,
+    "feature/zw-calculus": False,
+    "feature/pauli-webs": False,
 }
 
 tikz_export_defaults: dict[str, str] = {

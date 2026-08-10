@@ -3,8 +3,10 @@
 
 ## Unreleased
 
+- Added an interactive tutorial that guides you through the basics of ZXLive, which is shown on first launch and can be accessed again from the **Help > Tutorial** menu (#530).
 - Added fault-equivalent rewrites, a set of rewrites that preserve the fault tolerance of a diagram, together with a fault weight threshold for the rewrites that are only fault-equivalent up to a given weight (#427).
 - Added a "View > Features" menu for showing or hiding optional features (fault-equivalent rewrites, ZH-calculus vertices, ZW-calculus vertices and Pauli webs) (#553).
+- Optional features are now all disabled by default, and ZXLive asks which ones you want on first launch, right after the tutorial (#563).
 - Fixed TikZ proof export so that graphs offset from the origin are normalised, equal signs are vertically centred between adjacent steps, and row wrapping works correctly (#198).
 - Fixed closing a tab leaking its panel, so proofs no longer retain their diagram, history and rewrite worker thread after being closed (#562).
 
