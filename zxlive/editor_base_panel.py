@@ -26,6 +26,7 @@ from .common import (VT, GraphT, ToolType, get_data,
                      pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
+from .features import ZH_CALCULUS, ZW_CALCULUS, is_feature_enabled
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene, EdgeDragSpec
 from .settings import display_setting
@@ -47,15 +48,18 @@ class DrawPanelNodeType(TypedDict):
 
 
 def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
-    return {
+    data: dict[VertexType, DrawPanelNodeType] = {
         VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["z_spider"])},
         VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["x_spider"])},
-        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])},
-        VertexType.Z_BOX: {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])},
-        VertexType.W_OUTPUT: {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])},
-        VertexType.BOUNDARY: {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])},
-        VertexType.DUMMY: {"text": "Dummy", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["dummy"])},
     }
+    if is_feature_enabled(ZH_CALCULUS):
+        data[VertexType.H_BOX] = {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])}
+    if is_feature_enabled(ZW_CALCULUS):
+        data[VertexType.Z_BOX] = {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])}
+        data[VertexType.W_OUTPUT] = {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])}
+    data[VertexType.BOUNDARY] = {"text": "boundary", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["w_input"])}
+    data[VertexType.DUMMY] = {"text": "Dummy", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["dummy"])}
+    return data
 
 
 def edges_data() -> dict[EdgeType, DrawPanelNodeType]:
@@ -122,8 +126,14 @@ class EditorBasePanel(BasePanel):
         self.sidebar.addWidget(self.variable_viewer)
 
     def update_side_bar(self) -> None:
-        populate_list_widget(self.vertex_list, vertices_data(), self._vty_clicked, self._vty_double_clicked)
-        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked)
+        vertices = vertices_data()
+        if self._curr_vty not in vertices:
+            self._curr_vty = VertexType.Z
+        populate_list_widget(self.vertex_list, vertices, self._vty_clicked, self._vty_double_clicked, self._curr_vty)
+        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked, self._curr_ety)
+
+    def refresh_feature_visibility(self) -> None:
+        self.update_side_bar()
 
     def refresh_patterns(self) -> None:
         """Refresh the patterns list if it exists."""
@@ -754,7 +764,8 @@ def create_list_widget(parent: EditorBasePanel,
 def populate_list_widget(list_widget: QListWidget,
                          data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                          onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
-                         ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> None:
+                         ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
+                         selected: VertexType | EdgeType | None = None) -> None:
     row = list_widget.currentRow()
     list_widget.clear()
     for typ, value in data.items():
@@ -764,6 +775,11 @@ def populate_list_widget(list_widget: QListWidget,
         list_widget.addItem(item)
     list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
     list_widget.itemDoubleClicked.connect(lambda x: ondoubleclick(x.data(Qt.ItemDataRole.UserRole)))
+    # Rows shift when entries are added or removed, so match on the type when we know it.
+    if selected is not None:
+        row = next((i for i in range(list_widget.count())
+                    if (item := list_widget.item(i)) is not None
+                    and item.data(Qt.ItemDataRole.UserRole) == selected), row)
     list_widget.setCurrentRow(row)
 
 

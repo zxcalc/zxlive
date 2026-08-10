@@ -61,6 +61,15 @@ font_defaults: dict[str, str | int | None] = {
     "font/family": "Arial",
 }
 
+# Optional features that can be toggled from the View > Features menu.
+# All off by default; the first-run picker is what turns them on.
+feature_defaults: dict[str, bool] = {
+    "feature/fault-equivalence": False,
+    "feature/zh-calculus": False,
+    "feature/zw-calculus": False,
+    "feature/pauli-webs": False,
+}
+
 tikz_export_defaults: dict[str, str] = {
     "tikz/boundary-export": 'none',
     "tikz/Z-spider-export": 'Z dot',
@@ -109,8 +118,9 @@ tikz_names_defaults: dict[str, str] = {
     "tikz/names/decompose hadamard": "eu",
 }
 
-defaults = general_defaults | font_defaults | tikz_export_defaults | \
-    tikz_import_defaults | tikz_layout_defaults | tikz_names_defaults
+defaults = general_defaults | font_defaults | feature_defaults | \
+    tikz_export_defaults | tikz_import_defaults | tikz_layout_defaults | \
+    tikz_names_defaults
 
 
 modern_red_green: ColorScheme = {

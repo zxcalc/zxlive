@@ -32,7 +32,8 @@ from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, TYPE_CHECKING, Union
 
 from PySide6.QtCore import (QEasingCurve, QEvent, QObject, QPoint, QPropertyAnimation,
-                            QRect, QRectF, Qt, QTimer, QVariantAnimation, SignalInstance)
+                            QRect, QRectF, Qt, QTimer, QVariantAnimation, Signal,
+                            SignalInstance)
 from PySide6.QtGui import (QColor, QFont, QMouseEvent, QPaintEvent, QPainter, QPen,
                            QRegion)
 from PySide6.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QGraphicsItem,
@@ -334,6 +335,9 @@ class _GhostPointer(QWidget):
 class TutorialController(QObject):
     """Drives a sequence of Steps over the live MainWindow."""
 
+    # Emits the settings key of the section that just ended, completed or skipped.
+    finished = Signal(str)
+
     def __init__(self, win: MainWindow) -> None:
         super().__init__(win)
         self.win = win
@@ -343,6 +347,8 @@ class TutorialController(QObject):
         self._seen_key = _MAIN_SEEN
         self._awaiting = False
         self._await_signal: Optional[SignalInstance] = None
+        # Set while the first-run main tour is scheduled but has not started yet.
+        self.main_tour_pending = False
         self.overlay = _SpotlightOverlay(win)
         self.coachmark = _Coachmark(win, self._prev, self._next, self._skip)
         self.ghost = _GhostPointer(win)
@@ -383,6 +389,7 @@ class TutorialController(QObject):
         self.ghost.hide()
         self.overlay.hide()
         self.coachmark.hide()
+        self.finished.emit(self._seen_key)
 
     # -- navigation --------------------------------------------------------
 
@@ -725,8 +732,8 @@ def build_main_steps() -> list[Step]:
         Step(
             title="Vertices sidebar",
             text="Pick what kind of node you'll draw here: <b>Z</b> and <b>X</b> "
-                 "spiders, <b>Hadamard</b> boxes, <b>W</b> nodes, boundaries and "
-                 "more. The highlighted type is what the Add Vertex tool drops.",
+                 "spiders, boundary nodes or dummy nodes. "
+                 "The highlighted type is what the Add Vertex tool drops.",
             target=_vertex_list,
         ),
         Step(
@@ -854,6 +861,7 @@ def _prepare_canvas(win: MainWindow) -> None:
 def start_main_tutorial(win: MainWindow) -> None:
     """Start (or replay) the full tutorial. Wired to Help -> Tutorial."""
     controller = win.tutorial_controller
+    controller.main_tour_pending = False
     if controller.active:
         return
     # Replaying the main tour also re-arms the proof-mode section.
@@ -862,13 +870,18 @@ def start_main_tutorial(win: MainWindow) -> None:
     controller.start(build_main_steps(), _MAIN_SEEN)
 
 
-def maybe_show_tutorial_on_first_run(win: MainWindow) -> None:
-    """Auto-start the tutorial the very first time ZXLive is opened."""
+def maybe_show_tutorial_on_first_run(win: MainWindow) -> bool:
+    """Auto-start the tutorial the very first time ZXLive is opened.
+
+    Returns whether the tutorial was scheduled.
+    """
     if get_settings_value(_MAIN_SEEN, bool, False):
-        return
+        return False
     if win.active_panel is None:
-        return
+        return False
+    win.tutorial_controller.main_tour_pending = True
     QTimer.singleShot(400, lambda: start_main_tutorial(win))
+    return True
 
 
 def maybe_start_proof_tutorial(win: MainWindow) -> None:
@@ -879,6 +892,10 @@ def maybe_start_proof_tutorial(win: MainWindow) -> None:
     def go() -> None:
         controller = win.tutorial_controller
         if not isinstance(win.active_panel, ProofPanel):
+            return
+        if controller.main_tour_pending:
+            # Opening a proof on first launch must not pre-empt the intro tour,
+            # which hands over to this section at its end anyway.
             return
         if controller.active:
             # The user clicked Start Derivation from the main tour's last step;

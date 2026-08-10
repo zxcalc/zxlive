@@ -8,15 +8,108 @@ or fractions) shouldn't overlap with the node body.
 from fractions import Fraction
 
 import pytest
-from PySide6.QtCore import QAbstractAnimation, QPointF
+from PySide6.QtCore import QAbstractAnimation, QEvent, QPointF, Qt
+from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from pyzx.utils import VertexType
 from pytestqt.qtbot import QtBot
 
+from zxlive.edit_panel import GraphEditPanel
 from zxlive.eitem import EItem, EItemAnimation
 from zxlive.graphscene import GraphScene
 from zxlive.common import SCALE, new_graph
 from zxlive.rule_panel import RulePanel
+from zxlive.settings import display_setting
 from zxlive.vitem import VItem, VItemAnimation
+
+
+def _drag(
+    scene: GraphScene,
+    start: QPointF,
+    end: QPointF,
+    modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier,
+    button: Qt.MouseButton = Qt.MouseButton.LeftButton,
+) -> None:
+    press = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMousePress)
+    press.setScenePos(start)
+    press.setButton(button)
+    press.setButtons(button)
+    press.setModifiers(modifiers)
+    press.setButtonDownScenePos(button, start)
+    scene.mousePressEvent(press)
+
+    move = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseMove)
+    move.setScenePos(end)
+    move.setLastScenePos(start)
+    move.setButtons(button)
+    move.setModifiers(modifiers)
+    move.setButtonDownScenePos(button, start)
+    scene.mouseMoveEvent(move)
+
+    release = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseRelease)
+    release.setScenePos(end)
+    release.setLastScenePos(end)
+    release.setButton(button)
+    release.setButtons(Qt.MouseButton.NoButton)
+    release.setModifiers(modifiers)
+    release.setButtonDownScenePos(button, start)
+    scene.mouseReleaseEvent(release)
+
+
+@pytest.mark.parametrize("grabber_selected", [True, False])
+def test_selected_vertices_share_snapped_drag_offset(qtbot: QtBot, grabber_selected: bool) -> None:
+    g = new_graph()
+    # These origins put per-item offsets on opposite sides of the 1.5-grid rounding boundary.
+    vertices = [
+        g.add_vertex(VertexType.Z, qubit=qubit, row=row)
+        for row, qubit in [(35.42516536005408, 0), (28.13661789343115, 1)]
+    ]
+    panel = GraphEditPanel(g)
+    qtbot.addWidget(panel)
+    scene = panel.graph_scene
+
+    items = [scene.vertex_map[v] for v in vertices]
+    snap = display_setting.SNAP
+
+    positions_before = [QPointF(item.pos()) for item in items]
+    spacing_before = positions_before[1] - positions_before[0]
+
+    if grabber_selected:
+        scene.select_vertices(vertices)
+        dragged_item = items[0]
+        modifiers = Qt.KeyboardModifier.NoModifier
+    else:
+        scene.select_vertices(vertices[:1])
+        dragged_item = items[1]
+        modifiers = Qt.KeyboardModifier.ControlModifier
+
+    start = dragged_item.pos()
+    _drag(scene, start, start + QPointF(3 * snap / 2, 0), modifiers)
+
+    expected_offset = QPointF(2 * snap, 0)
+    assert [item.pos() - before for item, before in zip(items, positions_before)] == [expected_offset] * len(items)
+    assert items[1].pos() - items[0].pos() == spacing_before
+
+    panel.undo_stack.undo()
+    assert [item.pos() for item in items] == positions_before
+
+
+@pytest.mark.parametrize("button", [Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton])
+def test_noop_mouse_gesture_does_not_leave_item_dragging(qtbot: QtBot, button: Qt.MouseButton) -> None:
+    g = new_graph()
+    vertex = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    scene = GraphScene()
+    scene.set_graph(g)
+    item = scene.vertex_map[vertex]
+    position = QPointF(item.pos())
+    moved = []
+    scene.vertices_moved.connect(moved.append)
+
+    _drag(scene, position, position, Qt.KeyboardModifier.NoModifier, button)
+
+    assert item.pos() == position
+    assert not item.is_dragging
+    assert moved == []
+
 
 def test_dummy_label_position(qtbot: QtBot) -> None:
     """Test that dummy labels sit cleanly above the node without overlapping.

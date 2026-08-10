@@ -7,9 +7,10 @@ A fault equivalent rewrite is a transformation that ensures the fault weight in 
 ZXLive makes it easy to work with fault equivalent rewrites using **Fault Equivalent Mode**. 
 
 How to use Fault Equivalent Mode:
-1. Activate Fault Equivalent Mode: in the proof panel, click the FE toggle in the toolbar to enable (and disable) FE mode (highlighted in red or 1 in image below)
-2. View FE rules: this mode will only show the rewrite rules that preserve fault equivalence
-3. Fault Weight Input: Set a maximum fault weight threshold in the input box next to the toggle. ZXLive will then only show the rewrites that abide by this fault threshold. (highlighted in green or 2 in image below)
+1. Enable the feature: fault-equivalent rewrites are hidden by default, so first tick **View > Features > Fault-equivalent rewrites**. A "Fault-equivalent" toggle then appears in the proof panel toolbar.
+2. Activate Fault Equivalent Mode: click the "Fault-equivalent" toggle to enter (and leave) FE mode.
+3. View FE rules: the rewrite panel gains a "Fault-equivalent rewrites" group, and all other rewrites are greyed out so they cannot be applied by accident.
+4. Fault Weight Input: the "Fault weight w ≤" box appears next to the toggle. Set a maximum fault weight threshold there and ZXLive will only show the rewrites that abide by this threshold. Leave it empty for w = ∞, i.e. fully fault-equivalent rewrites only.
 
 <img src="./_static/FE_rewrites_toolbar.png" alt="Fault Equivalent Rewrites Toolbar" width="350"/>
 

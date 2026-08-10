@@ -95,8 +95,14 @@ class VItem(QGraphicsPathItem):
     # Set of animations that are currently running on this vertex
     active_animations: set[VItemAnimation]
 
-    # Position before starting a drag-move
-    _old_pos: Optional[QPointF]
+    # Position at the start of the current drag.
+    _drag_start_pos: Optional[QPointF]
+
+    # Shared snapped offset for the current drag.
+    _drag_offset: Optional[QPointF]
+
+    # Vertices participating in this drag.
+    _drag_items: set[VItem]
 
     # Vertex we are currently dragged on top of
     _dragged_on: Optional[VItem]
@@ -128,7 +134,9 @@ class VItem(QGraphicsPathItem):
         self._last_type: Optional[VertexType] = None
         self.index_text_item = None
 
-        self._old_pos = None
+        self._drag_start_pos = None
+        self._drag_offset = None
+        self._drag_items = set()
         self._dragged_on = None
         self._last_pos = None
 
@@ -149,7 +157,7 @@ class VItem(QGraphicsPathItem):
 
     @property
     def is_dragging(self) -> bool:
-        return self._old_pos is not None
+        return bool(self._drag_items)
 
     @property
     def is_animated(self) -> bool:
@@ -300,16 +308,13 @@ class VItem(QGraphicsPathItem):
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         match change:
             # Snap items to grid on movement by intercepting the position-change
-            # event and returning a new position
-            case QGraphicsItem.GraphicsItemChange.ItemPositionChange if not self.is_animated:
+            # event and returning a new position. Bulk updates preserve the
+            # graph model's authoritative coordinates instead.
+            case QGraphicsItem.GraphicsItemChange.ItemPositionChange if (
+                not self.is_animated and not self.graph_scene.is_bulk_updating
+            ):
                 assert isinstance(value, QPointF)
-                if self.ty == VertexType.W_INPUT:
-                    x = value.x()
-                    y = value.y()
-                else:
-                    x = round(value.x() / display_setting.SNAP) * display_setting.SNAP
-                    y = round(value.y() / display_setting.SNAP) * display_setting.SNAP
-                return QPointF(x, y)
+                return self._constrain_position(value)
             
             # When selecting/deselecting items, we move them to the front/back
             case QGraphicsItem.GraphicsItemChange.ItemSelectedChange:
@@ -334,7 +339,18 @@ class VItem(QGraphicsPathItem):
             
             case _:
                 return super().itemChange(change, value)
-    
+
+    def _constrain_position(self, value: QPointF) -> QPointF:
+        if self._drag_start_pos is not None and self._drag_offset is not None:
+            return self._drag_start_pos + self._drag_offset
+        if self.ty == VertexType.W_INPUT:
+            return value
+        snap = display_setting.SNAP
+        return QPointF(
+            round(value.x() / snap) * snap,
+            round(value.y() / snap) * snap,
+        )
+
     def mouseDoubleClickEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         super().mouseDoubleClickEvent(e)
         if self.is_animated:
@@ -350,10 +366,27 @@ class VItem(QGraphicsPathItem):
         if self.is_animated:
             e.ignore()
             return
-        self._old_pos = self.pos()
+        if e.button() == Qt.MouseButton.LeftButton:
+            self._drag_items = {
+                it for it in self.graph_scene.selectedItems()
+                if isinstance(it, VItem)
+            }
+            self._drag_items.add(self)
+            for it in self._drag_items:
+                it._drag_start_pos = QPointF(it.pos())
 
     def mouseMoveEvent(self, e: QGraphicsSceneMouseEvent) -> None:
         """Handle drag-time behavior for partner syncing and hover targets."""
+        # Single vertices keep their existing absolute-position snapping.
+        if not self.is_animated and len(self._drag_items) > 1:
+            offset = e.scenePos() - e.buttonDownScenePos(Qt.MouseButton.LeftButton)
+            snap = display_setting.SNAP
+            drag_offset = QPointF(
+                round(offset.x() / snap) * snap,
+                round(offset.y() / snap) * snap,
+            )
+            for it in self._drag_items:
+                it._drag_offset = drag_offset
         super().mouseMoveEvent(e)
         if self.is_animated:
             e.ignore()
@@ -424,14 +457,19 @@ class VItem(QGraphicsPathItem):
         Qt does not expose a dedicated move-finished event, so release is used
         to decide whether this was a drop-onto action or a move action.
         """
+        drag_start_pos = self._drag_start_pos
         super().mouseReleaseEvent(e)
+        for it in self._drag_items:
+            it._drag_start_pos = None
+            it._drag_offset = None
+        self._drag_items.clear()
         if self.is_animated:
             e.ignore()
             return
         if e.button() != Qt.MouseButton.LeftButton:
             e.ignore()
             return
-        if self._old_pos is not None and self._old_pos == self.pos():
+        if drag_start_pos is None or drag_start_pos == self.pos():
             e.ignore()
             return
 
@@ -447,7 +485,6 @@ class VItem(QGraphicsPathItem):
             scene.vertices_moved.emit([(it.v, *pos_from_view(it.pos().x(), it.pos().y())) for it in moved_vertices])
 
         self._dragged_on = None
-        self._old_pos = None
 
     def _snap_w_input_partner_position(self) -> None:
         """If this is W_INPUT, snap it to the rotated offset of its partner."""
