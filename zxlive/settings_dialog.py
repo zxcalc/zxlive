@@ -309,6 +309,7 @@ class SettingsDialog(QDialog):
     def make_int_form_input(self, data: SettingsData) -> QSpinBox:
         widget = QSpinBox()
         if special_value_text := data.get("special_value_text"):
+            widget.setMinimum(0)
             widget.setSpecialValueText(special_value_text)
         widget.setValue(self.get_settings_from_data(data, int))
         return widget
