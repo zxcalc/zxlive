@@ -604,7 +604,7 @@ class RewriteActionTreeView(QTreeView):
         model = self.model()
         if isinstance(model, RewriteActionTreeModel):
             self.proof_panel.graph_scene.selection_changed_custom.disconnect(self._schedule_selection_update)
-            model.executor.shutdown(wait=True)
+            model.executor.shutdown(wait=True, cancel_futures=True)
 
     def fault_equivalent_mode_active(self) -> bool:
         return (is_feature_enabled(FAULT_EQUIVALENCE)
