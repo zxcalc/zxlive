@@ -138,7 +138,9 @@ class BasePanel(QWidget):
 
     def refresh_feature_visibility(self) -> None:
         """Show or hide the optional features that are toggled in the View menu."""
-        pass
+
+    def release_resources(self) -> None:
+        """Release anything that outlives the widget, called just before the panel is deleted."""
 
     def sync_splitter_sizes(self) -> None:
         self.splitter_sizes[self.__class__] = self.splitter.sizes()

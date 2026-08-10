@@ -191,6 +191,9 @@ class ProofPanel(BasePanel):
         self.graph_scene.select_vertices(selected_vertices)
         self.graph_scene.selection_changed_custom.emit()
 
+    def release_resources(self) -> None:
+        self.rewrites_panel.release_resources()
+
 
     class WeightInputValidator(QIntValidator):
         def validate(self, input_str: str, pos: int) -> tuple[QValidator.State, str, int]:

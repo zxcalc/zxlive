@@ -636,6 +636,9 @@ class MainWindow(QMainWindow):
                     return False
         widget.graph_scene.clearSelection()
         self.tab_widget.removeTab(i)
+        # removeTab only detaches the panel, so it has to be released explicitly.
+        widget.release_resources()
+        widget.deleteLater()
         if self.tab_widget.count() == 0:
             self._reset_menus(False)
         else:
