@@ -410,19 +410,24 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_verte
 
 # TODO: Fix code complexity
 # noqa: complexipy
-def check_rule(rule: CustomRule) -> None:
+def check_rule_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> None:
+    left_matrix, right_matrix = lhs_graph.to_matrix(), rhs_graph.to_matrix()
+    if not np.allclose(left_matrix, right_matrix):
+        if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
+            raise ValueError("The left-hand side and right-hand side of the rule differ by a scalar.")
+        else:
+            raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
+
+
+def check_rule(rule: CustomRule, check_matrices: bool = True) -> None:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
             len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
         raise ValueError("The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
     if len(rule.lhs_graph.var_registry.vars()) == 0 and len(rule.rhs_graph.var_registry.vars()) == 0:
-        left_matrix, right_matrix = rule.lhs_graph.to_matrix(), rule.rhs_graph.to_matrix()
-        if not np.allclose(left_matrix, right_matrix):
-            if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
-                raise ValueError("The left-hand side and right-hand side of the rule differ by a scalar.")
-            else:
-                raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
+        if check_matrices:
+            check_rule_matrices(rule.lhs_graph, rule.rhs_graph)
     else:
         lhs_vars = set(rule.lhs_graph.var_registry.vars())
         rhs_vars = set(rule.rhs_graph.var_registry.vars())
