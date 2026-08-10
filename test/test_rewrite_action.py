@@ -144,15 +144,19 @@ def test_do_rewrite_double_treats_empty_selection_as_all_edges(monkeypatch: Any)
     assert frozenset(rule.applied_pairs[0]) == frozenset((z1, z2))
 
 
-def test_refreshing_reuses_the_model_and_its_worker(qtbot: QtBot) -> None:
+def test_refreshing_reuses_the_model_and_its_worker(qtbot: QtBot, monkeypatch: Any) -> None:
     # A model per refresh would leak its worker thread and its selection_changed_custom connection.
     panel = ProofPanel(new_graph())
     qtbot.addWidget(panel)
     model = cast(RewriteActionTreeModel, panel.rewrites_panel.model())
     executor = model.executor
+    submissions: list[object] = []
+    monkeypatch.setattr(executor, "submit", lambda callback: submissions.append(callback))
 
     panel.rewrites_panel.refresh_rewrites_model()
     panel.rewrites_panel.refresh_rewrites_model()
+    panel.graph_scene.selection_changed_custom.emit()
 
     assert panel.rewrites_panel.model() is model
     assert model.executor is executor
+    assert submissions == [model.update_on_selection]
