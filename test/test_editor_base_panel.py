@@ -15,8 +15,11 @@
 
 
 import pytest
+from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtWidgets import QWidget
+from pytestqt.qtbot import QtBot
 
-from zxlive.editor_base_panel import string_to_complex
+from zxlive.editor_base_panel import create_list_widget, string_to_complex, vertices_data
 
 
 def test_string_to_complex() -> None:
@@ -33,3 +36,16 @@ def test_string_to_complex() -> None:
     # Test bad input.
     with pytest.raises(ValueError):
         string_to_complex('bad input')
+
+
+def test_vertex_list_fits_labels_with_large_font(qtbot: QtBot) -> None:
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    vertex_list = create_list_widget(parent, vertices_data(), lambda _: None, lambda _: None)  # type: ignore[arg-type]
+    vertex_list.setFont(QFont("Arial", 30))
+    vertex_list.resize(300, 300)
+    vertex_list.show()
+
+    boundary = next(vertex_list.item(row) for row in range(vertex_list.count())
+                    if vertex_list.item(row).text() == "boundary")
+    assert vertex_list.visualItemRect(boundary).width() >= QFontMetrics(vertex_list.font()).horizontalAdvance(boundary.text())
