@@ -176,11 +176,11 @@ class ProofPanel(BasePanel):
     def refresh_feature_visibility(self) -> None:
         fe_enabled = is_feature_enabled(FAULT_EQUIVALENCE)
         if not fe_enabled and self.fault_equivalent_mode.isChecked():
-            self.fault_equivalent_mode.setChecked(False)  # also triggers toggle_FE_mode
+            # Leaving the mode rebuilds the rewrite tree, which is the only feature that affects it.
+            self.fault_equivalent_mode.setChecked(False)
         self.set_toolbar_widget_visible(self.fault_equivalent_mode, fe_enabled)
         self.set_toolbar_widget_visible(self.fe_weight_widget, fe_enabled and self.fault_equivalent_mode.isChecked())
         self.set_toolbar_widget_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
-        self.rewrites_panel.refresh_rewrites_model()
 
     def toggle_FE_mode(self) -> None:
         fe_mode = self.fault_equivalent_mode.isChecked()

@@ -136,6 +136,19 @@ def test_disabling_feature_leaves_fault_equivalent_mode(app: MainWindow, qtbot: 
     assert FAULT_EQUIVALENT_GROUP not in _group_names(panel)
 
 
+def test_toggling_features_does_not_refresh_the_rewrite_tree(
+    app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    panel = _start_derivation(app, qtbot)
+    refreshes: list[int] = []
+    monkeypatch.setattr(panel.rewrites_panel, "refresh_rewrites_model", lambda: refreshes.append(1))
+
+    _set_feature(app, PAULI_WEBS, False)
+    _set_feature(app, FAULT_EQUIVALENCE, True)
+
+    assert refreshes == []
+
+
 @pytest.mark.parametrize(("weight", "expected"), [(None, True), (2, True), (3, False)])
 def test_fault_weight_filters_partially_fault_equivalent_rules(
     app: MainWindow, qtbot: QtBot, weight: int | None, expected: bool
