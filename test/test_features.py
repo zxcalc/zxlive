@@ -9,14 +9,19 @@ from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
 
 import zxlive.features
+import zxlive.mainwindow
+import zxlive.tutorial
+from zxlive.common import new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.editor_base_panel import vertices_data
-from zxlive.features import (FAULT_EQUIVALENCE, PAULI_WEBS, ZH_CALCULUS, ZW_CALCULUS,
-                             is_feature_enabled)
+from zxlive.features import (FAULT_EQUIVALENCE, FEATURES, PAULI_WEBS, ZH_CALCULUS, ZW_CALCULUS,
+                             has_seen_feature_picker, is_feature_enabled)
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
 from zxlive.rewrite_action import RewriteActionTreeModel
 from zxlive.rewrite_data import FAULT_EQUIVALENT_GROUP
+from zxlive.settings import feature_defaults
+from zxlive.tutorial import TutorialController
 
 
 @pytest.fixture(autouse=True)
@@ -222,3 +227,82 @@ def test_palette_highlight_stays_on_the_current_vertex_type(app: MainWindow) -> 
     edit_panel._vty_clicked(VertexType.DUMMY)
     _set_feature(app, ZW_CALCULUS, True)
     assert _selected_vty(edit_panel) == VertexType.DUMMY
+
+
+def test_all_features_are_disabled_by_default() -> None:
+    assert not any(feature_defaults.values())
+
+
+def _stub_picker(monkeypatch: pytest.MonkeyPatch,
+                 selection: dict[str, bool] | None) -> list[int]:
+    calls: list[int] = []
+
+    def fake_picker(_parent: object) -> dict[str, bool] | None:
+        calls.append(1)
+        return selection
+
+    monkeypatch.setattr(zxlive.mainwindow, "show_feature_picker", fake_picker)
+    return calls
+
+
+def test_feature_picker_applies_selection(app: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    _stub_picker(monkeypatch, {FAULT_EQUIVALENCE: True, PAULI_WEBS: True})
+    app.maybe_show_feature_picker()
+
+    assert is_feature_enabled(FAULT_EQUIVALENCE)
+    assert app.feature_actions[FAULT_EQUIVALENCE].isChecked()
+    edit_panel = app.active_panel
+    assert isinstance(edit_panel, GraphEditPanel)
+    assert edit_panel.is_toolbar_widget_visible(edit_panel.pauli_webs)
+
+
+def test_feature_picker_is_only_offered_once(app: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _stub_picker(monkeypatch, {})
+    app.maybe_show_feature_picker()
+    app.maybe_show_feature_picker()
+    assert calls == [1]
+
+
+def test_dismissing_the_picker_leaves_features_off(
+    app: MainWindow, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_picker(monkeypatch, None)
+    app.maybe_show_feature_picker()
+    assert not any(is_feature_enabled(feature["id"]) for feature in FEATURES)
+    assert has_seen_feature_picker()
+
+
+def test_finishing_the_tutorial_offers_the_picker(
+    app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _stub_picker(monkeypatch, {})
+    app.tutorial_controller.finished.emit("tutorial/main-seen")
+    qtbot.waitUntil(lambda: calls == [1], timeout=2000)
+
+
+def test_picker_waits_for_a_follow_on_tutorial_section(
+    app: MainWindow, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _stub_picker(monkeypatch, {})
+    monkeypatch.setattr(TutorialController, "active", property(lambda _self: True))
+    app._offer_feature_picker()
+    assert calls == []
+
+
+def test_opening_a_proof_on_first_run_does_not_pre_empt_the_main_tutorial(
+    app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Mirrors passing a proof file on the command line: the proof-mode section is
+    # scheduled before the first-run tutorial, but the intro tour must win.
+    tutorial_store: dict[str, bool] = {}
+    monkeypatch.setattr(zxlive.tutorial, "get_settings_value",
+                        lambda key, _type, default=None, settings=None: tutorial_store.get(key, default))
+    monkeypatch.setattr(zxlive.tutorial, "set_settings_value",
+                        lambda key, value, _type, settings=None: tutorial_store.__setitem__(key, value))
+    started: list[str] = []
+    monkeypatch.setattr(TutorialController, "start",
+                        lambda _self, _steps, seen_key: started.append(seen_key))
+
+    app.new_deriv(new_graph())
+    app.maybe_show_tutorial_on_first_run()
+    qtbot.waitUntil(lambda: started == ["tutorial/main-seen"], timeout=2000)
