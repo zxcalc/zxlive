@@ -46,6 +46,6 @@ def test_vertex_list_fits_labels_with_large_font(qtbot: QtBot) -> None:
     vertex_list.resize(300, 300)
     vertex_list.show()
 
-    boundary = next(vertex_list.item(row) for row in range(vertex_list.count())
-                    if vertex_list.item(row).text() == "boundary")
+    boundary = next(item for row in range(vertex_list.count())
+                    if (item := vertex_list.item(row)) is not None and item.text() == "boundary")
     assert vertex_list.visualItemRect(boundary).width() >= QFontMetrics(vertex_list.font()).horizontalAdvance(boundary.text())
