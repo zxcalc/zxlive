@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from pytestqt.qtbot import QtBot
 from pyzx.rewrite import Rewrite
 from pyzx.utils import EdgeType, VertexType
 
 import zxlive.rewrite_action as rewrite_action_module
 from zxlive.common import new_graph
-from zxlive.rewrite_action import RewriteAction
+from zxlive.proof_panel import ProofPanel
+from zxlive.rewrite_action import RewriteAction, RewriteActionTreeModel
 from zxlive.rewrite_data import MATCH_DOUBLE, MATCH_SINGLE
 
 
@@ -140,3 +142,17 @@ def test_do_rewrite_double_treats_empty_selection_as_all_edges(monkeypatch: Any)
     assert panel.undo_stack.push_called
     assert len(rule.applied_pairs) == 1
     assert frozenset(rule.applied_pairs[0]) == frozenset((z1, z2))
+
+
+def test_refreshing_reuses_the_model_and_its_worker(qtbot: QtBot) -> None:
+    # A model per refresh would leak its worker thread and its selection_changed_custom connection.
+    panel = ProofPanel(new_graph())
+    qtbot.addWidget(panel)
+    model = cast(RewriteActionTreeModel, panel.rewrites_panel.model())
+    executor = model.executor
+
+    panel.rewrites_panel.refresh_rewrites_model()
+    panel.rewrites_panel.refresh_rewrites_model()
+
+    assert panel.rewrites_panel.model() is model
+    assert model.executor is executor

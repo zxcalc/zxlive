@@ -365,12 +365,10 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.emitter.finished.connect(self.layoutChanged.emit)
         self.executor = ThreadPoolExecutor(max_workers=1)
 
-    @classmethod
-    def from_dict(cls, d: dict, proof_panel: ProofPanel) -> RewriteActionTreeModel:
-        return RewriteActionTreeModel(
-            RewriteActionTree.from_dict(d),
-            proof_panel
-        )
+    def set_root(self, root: RewriteActionTree) -> None:
+        self.beginResetModel()
+        self.root_item = root
+        self.endResetModel()
 
     def index(self, row: int, column: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> \
             QModelIndex:
@@ -573,14 +571,20 @@ class RewriteActionTreeView(QTreeView):
 
         # Refresh the custom rules and update the model
         refresh_custom_rules()
-        visible_action_groups = self.get_visible_action_groups()
-
-        model = RewriteActionTreeModel.from_dict(visible_action_groups, self.proof_panel)
+        root_item = RewriteActionTree.from_dict(self.get_visible_action_groups())
         if self.fault_equivalent_mode_active():
-            for group in model.root_item.child_items:
+            for group in root_item.child_items:
                 group.set_disabled_by_fe_mode(group.id != FAULT_EQUIVALENT_GROUP)
             expanded_indexes = [FAULT_EQUIVALENT_GROUP]
-        self.setModel(model)
+
+        # The model is reused so that its worker and signal connection are not duplicated.
+        model = self.model()
+        if isinstance(model, RewriteActionTreeModel):
+            model.set_root(root_item)
+        else:
+            model = RewriteActionTreeModel(root_item, self.proof_panel)
+            self.setModel(model)
+            self.proof_panel.graph_scene.selection_changed_custom.connect(self._schedule_selection_update)
 
         expanded_any = False
         for row in range(model.rowCount()):
@@ -590,7 +594,11 @@ class RewriteActionTreeView(QTreeView):
                 expanded_any = True
         if not expanded_any:
             self.expand(model.index(0, 0))
-        self.proof_panel.graph_scene.selection_changed_custom.connect(lambda: model.executor.submit(model.update_on_selection))
+
+    def _schedule_selection_update(self) -> None:
+        model = self.model()
+        if isinstance(model, RewriteActionTreeModel):
+            model.executor.submit(model.update_on_selection)
 
     def fault_equivalent_mode_active(self) -> bool:
         return (is_feature_enabled(FAULT_EQUIVALENCE)
