@@ -129,8 +129,8 @@ class EditorBasePanel(BasePanel):
         vertices = vertices_data()
         if self._curr_vty not in vertices:
             self._curr_vty = VertexType.Z
-        populate_list_widget(self.vertex_list, vertices, self._vty_clicked, self._vty_double_clicked)
-        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked)
+        populate_list_widget(self.vertex_list, vertices, self._vty_clicked, self._vty_double_clicked, self._curr_vty)
+        populate_list_widget(self.edge_list, edges_data(), self._ety_clicked, self._ety_double_clicked, self._curr_ety)
 
     def refresh_feature_visibility(self) -> None:
         self.update_side_bar()
@@ -764,7 +764,8 @@ def create_list_widget(parent: EditorBasePanel,
 def populate_list_widget(list_widget: QListWidget,
                          data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                          onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
-                         ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> None:
+                         ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
+                         selected: VertexType | EdgeType | None = None) -> None:
     row = list_widget.currentRow()
     list_widget.clear()
     for typ, value in data.items():
@@ -774,6 +775,11 @@ def populate_list_widget(list_widget: QListWidget,
         list_widget.addItem(item)
     list_widget.itemClicked.connect(lambda x: onclick(x.data(Qt.ItemDataRole.UserRole)))
     list_widget.itemDoubleClicked.connect(lambda x: ondoubleclick(x.data(Qt.ItemDataRole.UserRole)))
+    # Rows shift when entries are added or removed, so match on the type when we know it.
+    if selected is not None:
+        row = next((i for i in range(list_widget.count())
+                    if (item := list_widget.item(i)) is not None
+                    and item.data(Qt.ItemDataRole.UserRole) == selected), row)
     list_widget.setCurrentRow(row)
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
@@ -50,7 +51,6 @@ def _set_feature(app: MainWindow, feature_id: str, enabled: bool) -> None:
 
 
 def _start_derivation(app: MainWindow, qtbot: QtBot) -> ProofPanel:
-    from PySide6.QtCore import Qt
     edit_panel = app.active_panel
     assert isinstance(edit_panel, GraphEditPanel)
     qtbot.mouseClick(edit_panel.start_derivation, Qt.MouseButton.LeftButton)
@@ -193,3 +193,32 @@ def test_vertex_palette_follows_calculus_features(app: MainWindow) -> None:
 
     _set_feature(app, ZW_CALCULUS, True)
     assert {VertexType.H_BOX, VertexType.Z_BOX, VertexType.W_OUTPUT} <= set(vertices_data())
+
+
+def _selected_vty(edit_panel: GraphEditPanel) -> VertexType:
+    item = edit_panel.vertex_list.currentItem()
+    assert item is not None
+    return cast(VertexType, item.data(Qt.ItemDataRole.UserRole))
+
+
+def test_palette_highlight_stays_on_the_current_vertex_type(app: MainWindow) -> None:
+    edit_panel = app.active_panel
+    assert isinstance(edit_panel, GraphEditPanel)
+    _set_feature(app, ZW_CALCULUS, True)
+    edit_panel._vty_double_clicked(VertexType.W_OUTPUT)
+    edit_panel.update_side_bar()
+    assert _selected_vty(edit_panel) == VertexType.W_OUTPUT
+
+    # Removing the W node must not leave the highlight on whatever took over its row.
+    _set_feature(app, ZW_CALCULUS, False)
+    assert edit_panel._curr_vty == VertexType.Z
+    assert _selected_vty(edit_panel) == VertexType.Z
+
+    edit_panel._vty_clicked(VertexType.X)
+    edit_panel.update_side_bar()
+    assert _selected_vty(edit_panel) == VertexType.X
+
+    # Adding entries back shifts the later rows, so the highlight must follow the type.
+    edit_panel._vty_clicked(VertexType.DUMMY)
+    _set_feature(app, ZW_CALCULUS, True)
+    assert _selected_vty(edit_panel) == VertexType.DUMMY
