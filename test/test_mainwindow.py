@@ -15,8 +15,10 @@
 
 
 import copy
+import gc
 import pytest
 import os
+import weakref
 from pathlib import Path
 from typing import Optional
 from PySide6 import QtCore
@@ -57,6 +59,24 @@ def test_close_action(app: MainWindow) -> None:
     # Check that the close action on the last tab closes the app.
     app.close_action.trigger()
     assert app.isHidden()
+
+
+def test_closing_a_proof_tab_releases_the_panel(app: MainWindow, qtbot: QtBot) -> None:
+    # A retained panel keeps its whole proof, rewrite tree and rewrite worker thread alive.
+    panel = _start_derivation(app, qtbot)
+    panel_ref = weakref.ref(panel)
+    model = panel.rewrites_panel.model()
+    assert isinstance(model, RewriteActionTreeModel)
+    executor = model.executor
+
+    app.close_tab(app.tab_widget.currentIndex())
+    del panel, model
+    QtCore.QCoreApplication.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+    gc.collect()
+
+    assert panel_ref() is None
+    with pytest.raises(RuntimeError):
+        executor.submit(lambda: None)
 
 
 def test_undo_redo_actions(app: MainWindow) -> None:

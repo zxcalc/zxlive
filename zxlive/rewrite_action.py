@@ -600,6 +600,12 @@ class RewriteActionTreeView(QTreeView):
         if isinstance(model, RewriteActionTreeModel):
             model.executor.submit(model.update_on_selection)
 
+    def release_resources(self) -> None:
+        model = self.model()
+        if isinstance(model, RewriteActionTreeModel):
+            self.proof_panel.graph_scene.selection_changed_custom.disconnect(self._schedule_selection_update)
+            model.executor.shutdown(wait=True)
+
     def fault_equivalent_mode_active(self) -> bool:
         return (is_feature_enabled(FAULT_EQUIVALENCE)
                 and self.proof_panel.fault_equivalent_mode.isChecked())
