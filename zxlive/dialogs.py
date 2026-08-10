@@ -48,6 +48,35 @@ class _BackgroundWorker(QObject):
             self.finished.emit()
 
 
+class _BackgroundResult(QObject):
+    def __init__(self, dialog: QDialog, thread: QThread) -> None:
+        super().__init__(dialog)
+        self.dialog = dialog
+        self.worker_thread = thread
+        self.result: object = None
+        self.error: Optional[Exception] = None
+        self.completed = False
+        self.cancelled = False
+
+    @Slot(object)
+    def succeed(self, result: object) -> None:
+        if not self.cancelled:
+            self.result = result
+            self.completed = True
+            self.dialog.accept()
+
+    @Slot(object)
+    def fail(self, error: object) -> None:
+        if not self.cancelled:
+            self.error = cast(Exception, error)
+            self.dialog.accept()
+
+    @Slot()
+    def cancel(self) -> None:
+        self.cancelled = True
+        self.worker_thread.requestInterruption()
+
+
 def run_in_thread(task: Callable[[], T], message: str, cancel_text: str,
                   parent: QWidget) -> tuple[bool, Optional[T]]:
     """Run a task in a worker thread while showing a cancellable progress dialog."""
@@ -62,48 +91,31 @@ def run_in_thread(task: Callable[[], T], message: str, cancel_text: str,
     worker.moveToThread(thread)
     _running_threads.add(thread)
     _running_workers.add(worker)
-
-    results: list[T] = []
-    errors: list[Exception] = []
-    cancelled = False
-
-    def succeed(result: object) -> None:
-        if not cancelled:
-            results.append(cast(T, result))
-
-    def fail(error: object) -> None:
-        if not cancelled:
-            errors.append(cast(Exception, error))
-
-    def cancel() -> None:
-        nonlocal cancelled
-        cancelled = True
-        thread.requestInterruption()
+    result = _BackgroundResult(dialog, thread)
 
     def clean_up() -> None:
         _running_threads.discard(thread)
         _running_workers.discard(worker)
 
     thread.started.connect(worker.run)
-    worker.succeeded.connect(succeed)
-    worker.succeeded.connect(dialog.accept)
-    worker.failed.connect(fail)
-    worker.failed.connect(dialog.accept)
+    worker.succeeded.connect(result.succeed)
+    worker.failed.connect(result.fail)
     worker.finished.connect(thread.quit)
     worker.finished.connect(worker.deleteLater)
     thread.finished.connect(clean_up)
     thread.finished.connect(thread.deleteLater)
-    dialog.canceled.connect(cancel)
+    dialog.canceled.connect(result.cancel)
 
     QTimer.singleShot(0, thread.start)
     dialog_result = dialog.exec()
     dialog.deleteLater()
 
-    if cancelled or dialog_result != QDialog.DialogCode.Accepted:
+    if result.cancelled or dialog_result != QDialog.DialogCode.Accepted:
         return False, None
-    if errors:
-        raise errors[0]
-    return True, results[0]
+    if result.error is not None:
+        raise result.error
+    assert result.completed
+    return True, cast(T, result.result)
 
 
 def compute_matrix_with_progress(graph: GraphT, parent: QWidget) -> Optional[Any]:
