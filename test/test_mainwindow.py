@@ -27,6 +27,7 @@ from pytestqt.qtbot import QtBot
 import pyzx
 from pyzx.utils import EdgeType, VertexType
 
+import zxlive.rewrite_action
 from zxlive.commands import AddRewriteStep
 from zxlive.dialogs import import_diagram_from_file
 from zxlive.common import GraphT, W_INPUT_OFFSET, new_graph
@@ -162,6 +163,7 @@ def test_export_tikz_series(app: MainWindow, qtbot: QtBot, tmp_path: Path,
 def test_settings_dialog(app: MainWindow) -> None:
     # Warning: Do not actually change the settings in this test as this will impact the app's real settings.
     dialog = SettingsDialog(app)
+    assert "expand-rules-sidebar" in dialog.value_dict
     dialog.show()
     dialog.close()
 
@@ -318,6 +320,17 @@ def _start_derivation(app: MainWindow, qtbot: QtBot) -> ProofPanel:
     proof_panel = app.active_panel
     assert isinstance(proof_panel, ProofPanel)
     return proof_panel
+
+
+def test_expand_rules_sidebar_setting_expands_every_group(
+        app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(zxlive.rewrite_action, "get_settings_value", lambda *_args, **_kwargs: True)
+
+    panel = _start_derivation(app, qtbot)
+    model = panel.rewrites_panel.model()
+    assert model is not None
+    assert model.rowCount() > 1
+    assert all(panel.rewrites_panel.isExpanded(model.index(row, 0)) for row in range(model.rowCount()))
 
 
 def _find_rewrite_node(node: RewriteActionTree, name: str) -> Optional[RewriteActionTree]:

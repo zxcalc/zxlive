@@ -44,6 +44,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
     "previews-show": True,
+    "expand-rules-sidebar": False,
     "rewrite-animations": True,
     "sparkle-mode": True,
     'sound-effects': False,

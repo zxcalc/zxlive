@@ -19,7 +19,7 @@ from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT, get_data
+from .common import ET, GraphT, VT, get_data, get_settings_value
 from .dialogs import show_error_msg
 from .features import FAULT_EQUIVALENCE, is_feature_enabled
 from .rewrite_data import (is_rewrite_data, RewriteData,
@@ -593,7 +593,10 @@ class RewriteActionTreeView(QTreeView):
                 self.expand(index)
                 expanded_any = True
         if not expanded_any:
-            self.expand(model.index(0, 0))
+            if get_settings_value("expand-rules-sidebar", bool):
+                self.expandAll()
+            else:
+                self.expand(model.index(0, 0))
 
     def _schedule_selection_update(self) -> None:
         model = self.model()
