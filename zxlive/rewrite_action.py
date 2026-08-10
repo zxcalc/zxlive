@@ -601,8 +601,9 @@ class RewriteActionTreeView(QTreeView):
 
         The fault-equivalent group is only shown in fault-equivalent mode, where it is
         listed first and its rules are additionally filtered by the selected fault
-        weight: a rule is kept if it is fully fault-equivalent, or if the selected weight
-        does not exceed the weight up to which the rule stays fault-equivalent.
+        weight: a rule is kept if it is fully fault-equivalent, or if a weight is set
+        that does not exceed the weight up to which the rule stays fault-equivalent.
+        An unset weight means w = ∞, so only fully fault-equivalent rules are kept.
         """
         fe_mode = self.fault_equivalent_mode_active()
         selected_weight = self.proof_panel.fault_equivalent_weight_value
@@ -613,8 +614,7 @@ class RewriteActionTreeView(QTreeView):
                 rule_name: rule
                 for rule_name, rule in action_groups[FAULT_EQUIVALENT_GROUP].items()
                 if (max_weight := rule.get("max_fault_equivalence", None)) is None
-                or selected_weight is None
-                or selected_weight <= max_weight
+                or (selected_weight is not None and selected_weight <= max_weight)
             }
         for group_name, rules in action_groups.items():
             if group_name != FAULT_EQUIVALENT_GROUP:

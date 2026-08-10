@@ -149,7 +149,7 @@ def test_toggling_features_does_not_refresh_the_rewrite_tree(
     assert refreshes == []
 
 
-@pytest.mark.parametrize(("weight", "expected"), [(None, True), (2, True), (3, False)])
+@pytest.mark.parametrize(("weight", "expected"), [(None, False), (2, True), (3, False)])
 def test_fault_weight_filters_partially_fault_equivalent_rules(
     app: MainWindow, qtbot: QtBot, weight: int | None, expected: bool
 ) -> None:
@@ -159,7 +159,7 @@ def test_fault_weight_filters_partially_fault_equivalent_rules(
     panel.fault_equivalent_weight_value = weight
 
     fe_rules = panel.rewrites_panel.get_visible_action_groups()[FAULT_EQUIVALENT_GROUP]
-    # "Unfuse-n Simp" is only fault-equivalent up to weight 2.
+    # "Unfuse-n Simp" is only fault-equivalent up to weight 2, so an unset weight (∞) excludes it.
     assert ("Unfuse-n Simp" in fe_rules) is expected
 
 
