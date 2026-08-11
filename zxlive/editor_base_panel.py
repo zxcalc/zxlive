@@ -7,7 +7,7 @@ import sys
 from enum import Enum
 from typing import Callable, Iterator, Optional, TypedDict
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
@@ -745,11 +745,35 @@ def create_titled_widget(
     return container, layout
 
 
+class PaletteListWidget(QListWidget):
+    """List widget whose entries all share the size of the largest entry.
+
+    Sizing every cell to the widest and tallest item keeps the palette
+    looking uniform and equally spaced while still leaving room for longer
+    labels, so nothing gets clipped at larger font sizes."""
+
+    def sync_item_sizes(self) -> None:
+        model = self.model()
+        hints = [self.sizeHintForIndex(model.index(row, 0)) for row in range(self.count())]
+        if not hints:
+            self.setGridSize(QSize())
+            return
+        width = max(hint.width() for hint in hints)
+        height = max(hint.height() for hint in hints)
+        self.setGridSize(QSize(width, height))
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        # Recompute the uniform cell size when the font changes (e.g. via settings).
+        if event.type() == QEvent.Type.FontChange:
+            self.sync_item_sizes()
+
+
 def create_list_widget(parent: EditorBasePanel,
                        data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                        onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
                        ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> QListWidget:
-    list_widget = QListWidget(parent)
+    list_widget = PaletteListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
     list_widget.setViewMode(QListView.ViewMode.IconMode)
     list_widget.setMovement(QListView.Movement.Static)
@@ -780,6 +804,9 @@ def populate_list_widget(list_widget: QListWidget,
                     if (item := list_widget.item(i)) is not None
                     and item.data(Qt.ItemDataRole.UserRole) == selected), row)
     list_widget.setCurrentRow(row)
+    # Keep every entry the same size once the set of entries is known.
+    if isinstance(list_widget, PaletteListWidget):
+        list_widget.sync_item_sizes()
 
 
 def create_icon(shape: ShapeType, color: QColor) -> QIcon:

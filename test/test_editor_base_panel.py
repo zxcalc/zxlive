@@ -38,7 +38,7 @@ def test_string_to_complex() -> None:
         string_to_complex('bad input')
 
 
-def test_vertex_list_fits_labels_with_large_font(qtbot: QtBot) -> None:
+def test_vertex_palette_is_uniform_and_fits_labels(qtbot: QtBot) -> None:
     parent = QWidget()
     qtbot.addWidget(parent)
     vertex_list = create_list_widget(parent, vertices_data(), lambda _: None, lambda _: None)  # type: ignore[arg-type]
@@ -46,6 +46,14 @@ def test_vertex_list_fits_labels_with_large_font(qtbot: QtBot) -> None:
     vertex_list.resize(300, 300)
     vertex_list.show()
 
-    boundary = next(item for row in range(vertex_list.count())
-                    if (item := vertex_list.item(row)) is not None and item.text() == "boundary")
-    assert vertex_list.visualItemRect(boundary).width() >= QFontMetrics(vertex_list.font()).horizontalAdvance(boundary.text())
+    items = [item for row in range(vertex_list.count())
+             if (item := vertex_list.item(row)) is not None]
+    boundary = next(item for item in items if item.text() == "boundary")
+
+    # Every entry occupies the same, uniformly sized cell...
+    grid = vertex_list.gridSize()
+    assert grid.isValid()
+    assert len({vertex_list.visualItemRect(item).height() for item in items}) == 1
+
+    # ...while the longest label still has enough width to avoid being clipped.
+    assert grid.width() >= QFontMetrics(vertex_list.font()).horizontalAdvance(boundary.text())
