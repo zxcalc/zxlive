@@ -362,6 +362,8 @@ rules_basic: dict[str, RewriteData] = {
     },
 }
 
+FAULT_EQUIVALENT_GROUP = "Fault-equivalent rewrites"
+
 rewrites_fault_tolerant: dict[str, RewriteData] = {
     "Elim Rewrite": {
         "text": "FE Identity removal",
@@ -473,7 +475,7 @@ action_groups = {
     # "ZXW rules": {key: operations[key] for key in rules_zxw},
     # "ZH rules": {key: operations[key] for key in rules_zh},
     "Simplification routines": simplifications, 
-    "Fault Equivalent Rewrites": rewrites_fault_tolerant,
+    FAULT_EQUIVALENT_GROUP: rewrites_fault_tolerant,
 }
 
 

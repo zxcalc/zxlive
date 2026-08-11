@@ -16,6 +16,7 @@ from .commands import UpdateGraph
 from .common import VT, GraphT, get_settings_value
 from .dialogs import create_circuit_dialog, show_error_msg, write_to_file
 from .editor_base_panel import EditorBasePanel
+from .features import PAULI_WEBS, is_feature_enabled
 from .graphscene import EditGraphScene
 from .graphview import GraphView
 from .settings_dialog import input_circuit_formats
@@ -71,6 +72,10 @@ class GraphEditPanel(EditorBasePanel):
         self.pauli_webs.setText("Pauli Webs")
         self.pauli_webs.clicked.connect(self._start_pauliwebs)
         yield ToolbarSection(self.pauli_webs)
+
+    def refresh_feature_visibility(self) -> None:
+        super().refresh_feature_visibility()
+        self.set_toolbar_widget_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():

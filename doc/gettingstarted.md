@@ -85,3 +85,14 @@ Apply these techniques one more time to reduce the diagram to the SWAP operation
 *Simplify the graph to a SWAP.*
 
 Our proof is now complete and we could either save it as a proof file ("File > Save") which could be loaded by ZXLive again later, or we could export the proof to tikz to be included in a LaTex document by selecting "File > Export to Tikz".
+
+## Optional features
+
+ZXLive keeps its interface simple by hiding the more specialised features until you ask for them. All of them are off by default, and the first time you run ZXLive it asks which ones you would like — right after the tutorial. You can change your mind at any time from the **View > Features** menu:
+
+- **Fault-equivalent rewrites**: adds the fault-equivalent mode toggle to the proof toolbar. See [Fault equivalent rewrites](fault-equivalent-rewrites.md).
+- **ZH-calculus (H-boxes)**: shows the H-box vertex type in the editor sidebar.
+- **ZW-calculus (W-nodes and Z-boxes)**: shows the W-node and Z-box vertex types in the editor sidebar.
+- **Pauli webs**: shows the "Pauli Webs" button in the editor and proof toolbars.
+
+Changes take effect immediately in every open tab, and are remembered the next time you start ZXLive.

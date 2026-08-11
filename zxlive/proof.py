@@ -459,7 +459,13 @@ class ProofStepItemDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), size.height() + 2 * self.vert_padding)
+        # paint() renders the text with ``option.font`` (the view/application font),
+        # so the row height must be derived from that same font. Relying solely on
+        # super().sizeHint() uses the model's Qt::FontRole, which can differ from the
+        # painted font and leaves rows too short, cutting off text at large font sizes.
+        text_height = QFontMetrics(option.font).height()  # type: ignore[attr-defined]
+        height = max(size.height(), text_height) + 2 * self.vert_padding
+        return QSize(size.width(), height)
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: Union[QModelIndex, QPersistentModelIndex]) -> QLineEdit:
         editor = QLineEdit(parent)

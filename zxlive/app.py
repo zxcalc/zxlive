@@ -84,6 +84,9 @@ class ZXLive(QApplication):
             # No files provided and no session restored - open demo graph
             main_window.open_demo_graph()
 
+        # Offer the interactive tutorial and the feature picker on the very first launch.
+        main_window.maybe_show_tutorial_on_first_run()
+
     def _apply_base_settings(self) -> None:
         """Set font, app name, and version metadata."""
         self.setFont(display_setting.font)
@@ -98,9 +101,6 @@ class ZXLive(QApplication):
             self.main_window.setWindowIcon(QIcon(get_data('icons/logo.png')))
             self.setWindowIcon(self.main_window.windowIcon())
         return self.main_window
-
-        # Offer the interactive tutorial on the very first launch.
-        self.main_window.maybe_show_tutorial_on_first_run()
 
     def on_update_available(self, version: str, url: str) -> None:
         """Handle update available notification."""
