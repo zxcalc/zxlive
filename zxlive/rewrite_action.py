@@ -19,7 +19,7 @@ from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT, get_data
+from .common import ET, GraphT, VT, get_data, get_settings_value
 from .dialogs import show_error_msg
 from .features import FAULT_EQUIVALENCE, is_feature_enabled
 from .rewrite_data import (is_rewrite_data, RewriteData,
@@ -541,14 +541,19 @@ class RewriteActionTreeView(QTreeView):
         if hasattr(model,"do_rewrite"):
             model.do_rewrite(index)
 
+    def _expanded_group_ids(self) -> list[str]:
+        model = self.model()
+        if model is None:
+            return []
+        expanded_group_ids = []
+        for row in range(model.rowCount()):
+            index = model.index(row, 0)
+            if self.isExpanded(index):
+                expanded_group_ids.append(cast(str, index.data()))
+        return expanded_group_ids
+
     def refresh_rewrites_model(self) -> None:
-        # Preserve expanded state
-        expanded_indexes = []
-        if self.model():
-            for row in range(self.model().rowCount()):
-                index = self.model().index(row, 0)
-                if self.isExpanded(index):
-                    expanded_indexes.append(self.model().index(row, 0).data())
+        expanded_group_ids = self._expanded_group_ids()
 
         # Refresh the custom rules and update the model
         refresh_custom_rules()
@@ -556,7 +561,7 @@ class RewriteActionTreeView(QTreeView):
         if self.fault_equivalent_mode_active():
             for group in root_item.child_items:
                 group.set_disabled_by_fe_mode(group.id != FAULT_EQUIVALENT_GROUP)
-            expanded_indexes = [FAULT_EQUIVALENT_GROUP]
+            expanded_group_ids = [FAULT_EQUIVALENT_GROUP]
 
         # The model is reused so that its worker and signal connection are not duplicated.
         model = self.model()
@@ -570,11 +575,14 @@ class RewriteActionTreeView(QTreeView):
         expanded_any = False
         for row in range(model.rowCount()):
             index = model.index(row, 0)
-            if index.data() in expanded_indexes:
+            if index.data() in expanded_group_ids:
                 self.expand(index)
                 expanded_any = True
         if not expanded_any:
-            self.expand(model.index(0, 0))
+            if get_settings_value("expand-rules-sidebar", bool):
+                self.expandAll()
+            else:
+                self.expand(model.index(0, 0))
 
     def _schedule_selection_update(self) -> None:
         model = self.model()
