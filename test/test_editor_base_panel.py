@@ -18,12 +18,14 @@ import pytest
 from pathlib import Path
 from typing import cast
 
+from PySide6.QtGui import QFont, QFontMetrics
 from PySide6.QtWidgets import QWidget
 from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
 
 from zxlive.common import new_graph
-from zxlive.editor_base_panel import EditorBasePanel, PatternsListWidget, string_to_complex
+from zxlive.editor_base_panel import (EditorBasePanel, PatternsListWidget, create_list_widget,
+                                      string_to_complex, vertices_data)
 from zxlive.settings import display_setting
 
 
@@ -41,6 +43,27 @@ def test_string_to_complex() -> None:
     # Test bad input.
     with pytest.raises(ValueError):
         string_to_complex('bad input')
+
+
+def test_vertex_palette_is_uniform_and_fits_labels(qtbot: QtBot) -> None:
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    vertex_list = create_list_widget(parent, vertices_data(), lambda _: None, lambda _: None)  # type: ignore[arg-type]
+    vertex_list.setFont(QFont("Arial", 30))
+    vertex_list.resize(300, 300)
+    vertex_list.show()
+
+    items = [item for row in range(vertex_list.count())
+             if (item := vertex_list.item(row)) is not None]
+    boundary = next(item for item in items if item.text() == "boundary")
+
+    # Every entry occupies the same, uniformly sized cell...
+    grid = vertex_list.gridSize()
+    assert grid.isValid()
+    assert len({vertex_list.visualItemRect(item).height() for item in items}) == 1
+
+    # ...while the longest label still has enough width to avoid being clipped.
+    assert grid.width() >= QFontMetrics(vertex_list.font()).horizontalAdvance(boundary.text())
 
 
 def _patterns_widget(qtbot: QtBot, tmp_path: Path) -> tuple[QWidget, PatternsListWidget]:
