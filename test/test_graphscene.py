@@ -58,6 +58,7 @@ def test_right_click_empty_space_adds_vertex_with_existing_selection(qtbot: QtBo
     scene.curr_tool = ToolType.SELECT
     scene.vertex_map[selected].setSelected(True)
     empty_pos = scene.vertex_map[selected].pos() + QPointF(2 * SCALE, 2 * SCALE)
+    assert panel.graph.num_vertices() == 1
 
     qtbot.mouseClick(
         panel.graph_view.viewport(),
@@ -65,4 +66,7 @@ def test_right_click_empty_space_adds_vertex_with_existing_selection(qtbot: QtBo
         pos=panel.graph_view.mapFromScene(empty_pos),
     )
 
-    assert panel.graph.num_vertices() == 2
+    new_vertices = set(panel.graph.vertices()) - {selected}
+    assert len(new_vertices) == 1
+    added = new_vertices.pop()
+    assert (panel.graph.row(added), panel.graph.qubit(added)) == (2, 2)
