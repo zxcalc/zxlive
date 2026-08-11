@@ -38,7 +38,8 @@ def test_pattern_context_menu_only_opens_on_selected_item(
         scene.contextMenuEvent(event)
 
     open_context_menu(scene.vertex_map[unselected].pos())
-    open_context_menu(scene.vertex_map[selected].pos() + QPointF(0, 2 * SCALE))
+    empty_pos = scene.vertex_map[selected].pos() + QPointF(2 * SCALE, 2 * SCALE)
+    open_context_menu(empty_pos)
     assert opened_at == []
 
     open_context_menu(scene.vertex_map[selected].pos())
