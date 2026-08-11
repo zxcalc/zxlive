@@ -220,12 +220,10 @@ class RewriteAction:
             self.enabled = False
             return
         elif self.match_type == MATCH_COMPOUND:
-            if hasattr(self.rule, 'is_match'):
-                if self.rule.is_match(g, verts):  # type: ignore
-                    self.enabled = True
-                else:
-                    self.enabled = False
-            else:
+            try:
+                self.enabled = bool(self.rule.is_match(g, verts)) # type: ignore
+            except (AttributeError, TypeError):
+                # No compatible matcher exists, so defer applicability checking until application.
                 self.enabled = True
             return
 
@@ -436,10 +434,13 @@ class RewriteActionTreeModel(QAbstractItemModel):
             )
 
     def update_on_selection(self) -> None:
-        selection, edges = self.proof_panel.parse_selection()
-        g = self.proof_panel.graph_scene.g
-        self.root_item.update_on_selection(g, selection, edges)
-        QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
+        try:
+            selection, edges = self.proof_panel.parse_selection()
+            g = self.proof_panel.graph_scene.g
+            self.root_item.update_on_selection(g, selection, edges)
+        finally:
+            # If an exception happens while matching some rule, we still want to update the view
+            QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)
 
 
 class RewriteActionTreeView(QTreeView):
