@@ -22,6 +22,7 @@ import weakref
 from pathlib import Path
 from typing import Optional
 from PySide6 import QtCore
+from PySide6.QtWidgets import QCheckBox, QComboBox, QSpinBox
 from pytestqt.qtbot import QtBot
 
 import pyzx
@@ -164,6 +165,77 @@ def test_settings_dialog(app: MainWindow) -> None:
     dialog = SettingsDialog(app)
     dialog.show()
     dialog.close()
+
+
+def test_graph_label_font_settings(
+    app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Saving should exercise the per-test QSettings store without changing the
+    # process-global DisplaySettings used by the rest of the test suite.
+    monkeypatch.setattr("zxlive.settings_dialog.display_setting.update", lambda: None)
+    app.settings.remove("phase-font")
+    app.settings.remove("dummy-font")
+    app.settings.sync()
+
+    def font_widgets(dialog: SettingsDialog, prefix: str) -> tuple[QCheckBox, QComboBox, QSpinBox]:
+        same_as_app = dialog.value_dict[f"{prefix}/same-as-app"]
+        family = dialog.value_dict[f"{prefix}/family"]
+        size = dialog.value_dict[f"{prefix}/size"]
+        assert isinstance(same_as_app, QCheckBox)
+        assert isinstance(family, QComboBox)
+        assert isinstance(size, QSpinBox)
+        return same_as_app, family, size
+
+    dialog = SettingsDialog(app)
+    qtbot.addWidget(dialog)
+    phase_widgets = font_widgets(dialog, "phase-font")
+    dummy_widgets = font_widgets(dialog, "dummy-font")
+
+    for same_as_app, family, size in (phase_widgets, dummy_widgets):
+        assert same_as_app.text() == "Same as app"
+        assert same_as_app.isChecked()
+        assert not family.isEnabled()
+        assert not size.isEnabled()
+
+        same_as_app.setChecked(False)
+        assert family.isEnabled()
+        assert size.isEnabled()
+
+    phase_same_as_app, phase_family, phase_size = phase_widgets
+    _, dummy_family, dummy_size = dummy_widgets
+    phase_family.setCurrentIndex(1 if phase_family.count() > 1 else 0)
+    dummy_family.setCurrentIndex(2 if dummy_family.count() > 2 else 0)
+    expected_phase_family = phase_family.currentData()
+    expected_dummy_family = dummy_family.currentData()
+    phase_size.setValue(17)
+    dummy_size.setValue(19)
+
+    # Custom values remain persisted even when inheritance is switched back on.
+    phase_same_as_app.setChecked(True)
+    dialog.update_global_settings()
+    dialog.close()
+
+    reopened = SettingsDialog(app)
+    qtbot.addWidget(reopened)
+    reopened_phase = font_widgets(reopened, "phase-font")
+    reopened_dummy = font_widgets(reopened, "dummy-font")
+
+    for same_as_app, family, size, inherited, expected_family, expected_size in (
+        (*reopened_phase, True, expected_phase_family, 17),
+        (*reopened_dummy, False, expected_dummy_family, 19),
+    ):
+        assert same_as_app.isChecked() is inherited
+        assert family.isEnabled() is not inherited
+        assert size.isEnabled() is not inherited
+        assert family.currentData() == expected_family
+        assert size.value() == expected_size
+
+        same_as_app.setChecked(False)
+        assert family.isEnabled()
+        assert size.isEnabled()
+        assert family.currentData() == expected_family
+        assert size.value() == expected_size
+    reopened.close()
 
 
 def test_file_formats_preserved(app: MainWindow) -> None:

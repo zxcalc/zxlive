@@ -6,9 +6,11 @@ or fractions) shouldn't overlap with the node body.
 """
 
 from fractions import Fraction
+from unittest.mock import Mock
 
 import pytest
 from PySide6.QtCore import QAbstractAnimation, QEvent, QPointF, Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from pyzx.utils import VertexType
 from pytestqt.qtbot import QtBot
@@ -18,7 +20,7 @@ from zxlive.eitem import EItem, EItemAnimation
 from zxlive.graphscene import GraphScene
 from zxlive.common import SCALE, new_graph
 from zxlive.rule_panel import RulePanel
-from zxlive.settings import display_setting
+from zxlive.settings import DisplaySettings, display_setting
 from zxlive.vitem import VItem, VItemAnimation
 
 
@@ -154,6 +156,110 @@ def test_dummy_label_position(qtbot: QtBot) -> None:
     svg_rect = vitem_latex._dummy_svg_renderer.viewBoxF()
     expected_svg_y = node_top - gap - svg_rect.height()
     assert vitem_latex.dummy_svg_item.pos().y() == pytest.approx(expected_svg_y)
+
+
+def test_phase_and_plain_dummy_fonts_update_independently(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    phase_font = QFont("Phase Font", 17)
+    dummy_font = QFont("Dummy Font", 19)
+    monkeypatch.setattr(display_setting, "phase_font", phase_font)
+    monkeypatch.setattr(display_setting, "dummy_font", dummy_font)
+
+    g = new_graph()
+    v_phase = g.add_vertex(VertexType.Z, qubit=0, row=0, phase=Fraction(1, 4))
+    v_dummy = g.add_vertex(VertexType.DUMMY, qubit=1, row=0)
+    g.set_vdata(v_dummy, 'text', 'hello')
+
+    scene = GraphScene()
+    scene.set_graph(g)
+    phase_vitem = scene.vertex_map[v_phase]
+    dummy_vitem = scene.vertex_map[v_dummy]
+
+    assert phase_vitem.phase_item.font() == phase_font
+    assert dummy_vitem.dummy_text_item is not None
+    assert dummy_vitem.dummy_text_item.font() == dummy_font
+
+    updated_phase_font = QFont("Updated Phase Font", 23)
+    updated_dummy_font = QFont("Updated Dummy Font", 29)
+    monkeypatch.setattr(display_setting, "phase_font", updated_phase_font)
+    monkeypatch.setattr(display_setting, "dummy_font", updated_dummy_font)
+
+    phase_vitem.update_font()
+    dummy_vitem.update_font()
+
+    assert phase_vitem.phase_item.font() == updated_phase_font
+    assert dummy_vitem.dummy_text_item.font() == updated_dummy_font
+
+
+def test_graph_label_fonts_can_inherit_or_override_app_font(monkeypatch: pytest.MonkeyPatch) -> None:
+    values: dict[str, str | int | bool] = {
+        "snap-granularity": "4",
+        "font/family": "Application Font",
+        "font/size": 13,
+        "phase-font/family": "Phase Font",
+        "phase-font/size": 17,
+        "dummy-font/same-as-app": False,
+        "dummy-font/family": "Dummy Font",
+        "dummy-font/size": 19,
+    }
+    monkeypatch.setattr(
+        "zxlive.settings.get_settings_value",
+        lambda name, _type, default=None: values.get(name, default),
+    )
+
+    settings = DisplaySettings()
+
+    assert settings.phase_font == settings.font
+    assert settings.dummy_font.family() == "Dummy Font"
+    assert settings.dummy_font.pointSize() == 19
+
+    values["phase-font/same-as-app"] = False
+    values["dummy-font/same-as-app"] = True
+    settings.update()
+
+    assert settings.phase_font.family() == "Phase Font"
+    assert settings.phase_font.pointSize() == 17
+    assert settings.dummy_font == settings.font
+
+
+def test_rule_panel_updates_fonts_in_both_views() -> None:
+    left_view = Mock()
+    right_view = Mock()
+    panel = Mock(graph_view_left=left_view, graph_view_right=right_view)
+
+    RulePanel.update_font(panel)
+
+    left_view.update_font.assert_called_once_with()
+    right_view.update_font.assert_called_once_with()
+
+
+def test_latex_dummy_size_tracks_dummy_font_on_update(
+    qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rendered_sizes: list[float] = []
+
+    def fake_latex_to_svg(text: str, color: str, size: float) -> bytes:
+        rendered_sizes.append(size)
+        return b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"/>'
+
+    monkeypatch.setattr("zxlive.latex_render.latex_to_svg", fake_latex_to_svg)
+    monkeypatch.setattr(display_setting, "dummy_font", QFont("Dummy Font", 20))
+
+    g = new_graph()
+    v = g.add_vertex(VertexType.DUMMY, qubit=0, row=0)
+    g.set_vdata(v, 'text', r'$x$')
+    scene = GraphScene()
+    scene.set_graph(g)
+    vitem = scene.vertex_map[v]
+
+    assert rendered_sizes == [pytest.approx(20 * 1.4)]
+    assert vitem.dummy_svg_item is not None
+
+    monkeypatch.setattr(display_setting, "dummy_font", QFont("New Dummy Font", 30))
+    vitem.update_font()
+
+    assert rendered_sizes == [pytest.approx(20 * 1.4), pytest.approx(30 * 1.4)]
 
 
 def test_boundary_phase_cleared_on_refresh(qtbot: QtBot) -> None:

@@ -29,6 +29,7 @@ from .eitem import EItem, HAD_EDGE_BLUE
 from .features import ZH_CALCULUS, ZW_CALCULUS, is_feature_enabled
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene, EdgeDragSpec
+from .graphview import graph_to_tooltip
 from .settings import display_setting
 
 from . import animations
@@ -555,7 +556,9 @@ class PatternsListWidget(QListWidget):
             }
         """)
 
+        self.setMouseTracking(True)
         self.itemDoubleClicked.connect(self._pattern_selected)
+        self.itemEntered.connect(self._set_pattern_tooltip)
         self.refresh_patterns()
 
     def refresh_patterns(self) -> None:
@@ -596,6 +599,17 @@ class PatternsListWidget(QListWidget):
             for pattern_name in patterns:
                 item = QListWidgetItem(pattern_name)
                 self.addItem(item)
+
+    def _set_pattern_tooltip(self, item: QListWidgetItem) -> None:
+        if item.flags() == Qt.ItemFlag.NoItemFlags or item.toolTip() or not display_setting.previews_show:
+            return
+        pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
+        try:
+            with open(pattern_path, encoding="utf-8") as file:
+                graph = GraphT.from_json(file.read())
+            item.setToolTip(graph_to_tooltip(graph))
+        except (OSError, ValueError, KeyError, TypeError):
+            return
 
     def _pattern_selected(self, item: QListWidgetItem) -> None:
         """Handle pattern selection."""

@@ -81,6 +81,7 @@ class SettingsData(TypedDict):
     label: str
     type: FormInputType
     data: NotRequired[dict[Any, str]]
+    checkbox_text: NotRequired[str]
 
 
 color_scheme_data = {
@@ -136,16 +137,25 @@ general_settings: list[SettingsData] = [
 
 
 font_settings: list[SettingsData] = [
-    {"id": "font/size", "label": "Font size", "type": FormInputType.Int},
+    {"id": "font/size", "label": "Application font size", "type": FormInputType.Int},
     # Font families can be loaded after a QGuiApplication is constructed.
     # load_font_families needs to be called once a QGuiApplication is up.
-    {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "font/family", "label": "Application font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "phase-font/same-as-app", "label": "Phase font", "type": FormInputType.Bool, "checkbox_text": "Same as app"},
+    {"id": "phase-font/size", "label": "Phase font size", "type": FormInputType.Int},
+    {"id": "phase-font/family", "label": "Phase font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "dummy-font/same-as-app", "label": "Dummy label font", "type": FormInputType.Bool, "checkbox_text": "Same as app"},
+    {"id": "dummy-font/size", "label": "Dummy label font size", "type": FormInputType.Int},
+    {"id": "dummy-font/family", "label": "Dummy label font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
 ]
 
 
 def load_font_families() -> None:
-    index = next(i for i, d in enumerate(font_settings) if d["id"] == "font/family")
-    font_settings[index]["data"] |= {f: f for f in QFontDatabase.families()}
+    families = {f: f for f in QFontDatabase.families()}
+    for setting in font_settings:
+        if setting["id"].endswith("/family"):
+            assert "data" in setting
+            setting["data"] |= families
 
 
 tikz_export_settings: list[SettingsData] = [
@@ -216,6 +226,8 @@ class SettingsDialog(QDialog):
 
         self.add_settings_tab(tab_widget, "General", "General ZXLive settings", general_settings)
         self.add_settings_tab(tab_widget, "Font", "Font settings", font_settings)
+        self._configure_font_inheritance("phase-font")
+        self._configure_font_inheritance("dummy-font")
 
         # --- Begin TikZ nested tab structure ---
         tikz_tab = QWidget()
@@ -269,8 +281,23 @@ class SettingsDialog(QDialog):
         cancel_button.clicked.connect(self.cancel)
         hlayout.addWidget(cancel_button)
 
+    def _configure_font_inheritance(self, prefix: str) -> None:
+        same_as_app = self.value_dict[f"{prefix}/same-as-app"]
+        size = self.value_dict[f"{prefix}/size"]
+        family = self.value_dict[f"{prefix}/family"]
+        assert isinstance(same_as_app, QCheckBox)
+        assert isinstance(size, QSpinBox)
+        assert isinstance(family, QComboBox)
+
+        def set_custom_font_enabled(inherit: bool) -> None:
+            size.setEnabled(not inherit)
+            family.setEnabled(not inherit)
+
+        same_as_app.toggled.connect(set_custom_font_enabled)
+        set_custom_font_enabled(same_as_app.isChecked())
+
     def make_bool_form_input(self, data: SettingsData) -> QCheckBox:
-        widget = QCheckBox()
+        widget = QCheckBox(data.get("checkbox_text", ""))
         widget.setChecked(self.get_settings_from_data(data, bool))
         return widget
 
