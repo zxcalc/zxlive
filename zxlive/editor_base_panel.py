@@ -772,7 +772,7 @@ class PaletteListWidget(QListWidget):
 def create_list_widget(parent: EditorBasePanel,
                        data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                        onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
-                       ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> QListWidget:
+                       ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> PaletteListWidget:
     list_widget = PaletteListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
     list_widget.setViewMode(QListView.ViewMode.IconMode)
@@ -784,7 +784,7 @@ def create_list_widget(parent: EditorBasePanel,
     return list_widget
 
 
-def populate_list_widget(list_widget: QListWidget,
+def populate_list_widget(list_widget: PaletteListWidget,
                          data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                          onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
                          ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
@@ -805,8 +805,7 @@ def populate_list_widget(list_widget: QListWidget,
                     and item.data(Qt.ItemDataRole.UserRole) == selected), row)
     list_widget.setCurrentRow(row)
     # Keep every entry the same size once the set of entries is known.
-    if isinstance(list_widget, PaletteListWidget):
-        list_widget.sync_item_sizes()
+    list_widget.sync_item_sizes()
 
 
 def create_icon(shape: ShapeType, color: QColor) -> QIcon:
