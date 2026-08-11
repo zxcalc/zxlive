@@ -19,11 +19,12 @@ from pyzx.graph.scalar import Scalar
 
 import math
 import random
-from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
+from PySide6.QtCore import (QBuffer, QIODevice, QRect, QSize, QPointF, Signal, Qt,
+                           QRectF, QLineF, QObject, QTimerEvent)
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform,
                            QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence,
-                           QKeyEvent)
+                           QKeyEvent, QPixmap)
 
 from dataclasses import dataclass
 
@@ -362,6 +363,33 @@ class GraphView(QGraphicsView):
         for i in self.graph_scene.items():
             if isinstance(i, VItem):
                 i.update_font()
+
+
+def graph_preview_view(graph: Optional[GraphT]) -> GraphView:
+    scene = GraphScene()
+    view = GraphView(scene)
+    view.draw_background_lines = False
+    if graph is not None:
+        view.set_graph(graph)
+    view.fit_view()
+    view.setSceneRect(scene.itemsBoundingRect())
+    return view
+
+
+def pixmap_to_tooltip(pixmap: QPixmap, text: str = "") -> str:
+    buffer = QBuffer()
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+    pixmap.save(buffer, "PNG", quality=100)
+    image = bytes(buffer.data().toBase64()).decode()  # type: ignore
+    return f'<img src="data:image/png;base64,{image}" width="500">{text}'
+
+
+def graph_to_tooltip(graph: GraphT) -> str:
+    view = graph_preview_view(graph)
+    pixmap = QPixmap(view.viewport().size())
+    pixmap.fill(QColor("#ffffff"))
+    view.viewport().render(pixmap)
+    return pixmap_to_tooltip(pixmap)
 
 
 class ProofGraphView(GraphView):
