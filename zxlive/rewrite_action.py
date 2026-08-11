@@ -12,7 +12,7 @@ from pyzx.ft_rewrite import RewriteSingleVertex_ft
 from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
-                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
+                            Signal, QObject, QMetaObject, QPoint, QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen, QAction
 from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
 
@@ -28,7 +28,7 @@ from .rewrite_data import (is_rewrite_data, RewriteData,
                            FAULT_EQUIVALENT_GROUP)
 from .settings import display_setting
 from .graphscene import GraphScene
-from .graphview import GraphView
+from .graphview import GraphView, graph_preview_view, pixmap_to_tooltip
 from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
@@ -233,20 +233,8 @@ class RewriteAction:
             return self.tooltip_str
         if self.picture_path == 'custom':
             # We will create a custom tooltip picture representing the custom rewrite
-            graph_scene_left = GraphScene()
-            graph_scene_right = GraphScene()
-            graph_view_left = GraphView(graph_scene_left)
-            graph_view_left.draw_background_lines = False
-            if self.lhs_graph is not None:
-                graph_view_left.set_graph(self.lhs_graph)
-            graph_view_right = GraphView(graph_scene_right)
-            graph_view_right.draw_background_lines = False
-            if self.rhs_graph is not None:
-                graph_view_right.set_graph(self.rhs_graph)
-            graph_view_left.fit_view()
-            graph_view_right.fit_view()
-            graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
-            graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
+            graph_view_left = graph_preview_view(self.lhs_graph)
+            graph_view_right = graph_preview_view(self.rhs_graph)
             lhs_size = graph_view_left.viewport().size()
             rhs_size = graph_view_right.viewport().size()
             # The picture needs to be wide enough to fit both of them and have some space for the = sign
@@ -263,18 +251,10 @@ class RewriteAction:
             new_view.setSceneRect(new_scene.itemsBoundingRect())
             new_view.viewport().render(pixmap, QPoint(lhs_size.width(), int(max(lhs_size.height(), rhs_size.height()) / 2 - 20)))
 
-            buffer = QBuffer()
-            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-            pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
         else:
             pixmap = QPixmap()
             pixmap.load(get_data("tooltips/" + self.picture_path))
-            buffer = QBuffer()
-            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-            pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
-        self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
+        self.tooltip_str = pixmap_to_tooltip(pixmap, self.tooltip_str)
         self.picture_path = None
         return self.tooltip_str
 
