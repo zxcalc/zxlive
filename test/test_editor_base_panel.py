@@ -76,3 +76,15 @@ def test_pattern_tooltip_respects_preview_setting(
     widget._set_pattern_tooltip(item)
 
     assert item.toolTip() == ""
+
+
+def test_invalid_pattern_does_not_get_tooltip(
+        qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(type(display_setting), "previews_show", property(lambda _self: True))
+    _parent, widget = _patterns_widget(qtbot, tmp_path)
+    (tmp_path / "example.zxg").write_text("invalid", encoding="utf-8")
+    item = widget.item(0)
+
+    widget._set_pattern_tooltip(item)
+
+    assert item.toolTip() == ""

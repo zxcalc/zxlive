@@ -366,6 +366,7 @@ class GraphView(QGraphicsView):
 
 
 def graph_preview_view(graph: Optional[GraphT]) -> GraphView:
+    """Create an off-screen view fitted to a graph for preview rendering."""
     scene = GraphScene()
     view = GraphView(scene)
     view.draw_background_lines = False
@@ -377,6 +378,7 @@ def graph_preview_view(graph: Optional[GraphT]) -> GraphView:
 
 
 def pixmap_to_tooltip(pixmap: QPixmap, text: str = "") -> str:
+    """Embed a pixmap and optional text in an HTML tooltip."""
     buffer = QBuffer()
     buffer.open(QIODevice.OpenModeFlag.WriteOnly)
     pixmap.save(buffer, "PNG", quality=100)
@@ -385,6 +387,7 @@ def pixmap_to_tooltip(pixmap: QPixmap, text: str = "") -> str:
 
 
 def graph_to_tooltip(graph: GraphT) -> str:
+    """Render a graph in an off-screen view and return an HTML tooltip."""
     view = graph_preview_view(graph)
     pixmap = QPixmap(view.viewport().size())
     pixmap.fill(QColor("#ffffff"))

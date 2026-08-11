@@ -608,7 +608,7 @@ class PatternsListWidget(QListWidget):
             with open(pattern_path, encoding="utf-8") as file:
                 graph = GraphT.from_json(file.read())
             item.setToolTip(graph_to_tooltip(graph))
-        except Exception:
+        except (OSError, ValueError, KeyError, TypeError):
             return
 
     def _pattern_selected(self, item: QListWidgetItem) -> None:
