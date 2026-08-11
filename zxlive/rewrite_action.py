@@ -217,8 +217,8 @@ class RewriteAction:
             try:
                 self.enabled = bool(self.rule.is_match(g, verts)) # type: ignore
             except (AttributeError, TypeError):
-                # No matcher existed, or the types didn't match
-                self.enabled = False
+                # No compatible matcher exists, so defer applicability checking until application.
+                self.enabled = True
             return
 
     @property
