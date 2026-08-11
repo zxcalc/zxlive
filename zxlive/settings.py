@@ -56,9 +56,15 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "show-vertex-indices": False,
 }
 
-font_defaults: dict[str, str | int | None] = {
+font_defaults: dict[str, str | int | bool | None] = {
     "font/size": 11,
     "font/family": "Arial",
+    "phase-font/same-as-app": True,
+    "phase-font/family": "Arial",
+    "phase-font/size": 11,
+    "dummy-font/same-as-app": True,
+    "dummy-font/family": "Arial",
+    "dummy-font/size": 11,
 }
 
 # Optional features that can be toggled from the View > Features menu.
@@ -252,6 +258,14 @@ class DisplaySettings:
         self.font = QFont(
             get_settings_value("font/family", str),
             get_settings_value("font/size", int)
+        )
+        self.phase_font = QFont(self.font) if get_settings_value("phase-font/same-as-app", bool, True) else QFont(
+            get_settings_value("phase-font/family", str),
+            get_settings_value("phase-font/size", int)
+        )
+        self.dummy_font = QFont(self.font) if get_settings_value("dummy-font/same-as-app", bool, True) else QFont(
+            get_settings_value("dummy-font/family", str),
+            get_settings_value("dummy-font/size", int)
         )
         self.SNAP = SCALE / self.SNAP_DIVISION
         self._invalidate_color_cache()

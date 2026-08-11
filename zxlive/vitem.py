@@ -520,7 +520,7 @@ class VItem(QGraphicsPathItem):
         self._cached_font_key = ""
 
     def update_font(self) -> None:
-        self.phase_item.setFont(display_setting.font)
+        self.phase_item.setFont(display_setting.phase_font)
         self.phase_item.update_text_color()
         # Clear dummy-label cache so changed font triggers re-render
         self._cached_dummy_text = ""
@@ -541,7 +541,7 @@ class VItem(QGraphicsPathItem):
             return
 
         text_color = display_setting.text_color
-        font_key = display_setting.font.toString()
+        font_key = display_setting.dummy_font.toString()
         if (text == self._cached_dummy_text
                 and text_color == self._cached_text_color
                 and font_key == self._cached_font_key):
@@ -557,7 +557,7 @@ class VItem(QGraphicsPathItem):
             if self.dummy_text_item is not None:
                 self.dummy_text_item.setVisible(False)
             # Scale LaTeX slightly larger so it matches plain-text visual size
-            latex_size = float(display_setting.font.pointSize()) * 1.4
+            latex_size = float(display_setting.dummy_font.pointSize()) * 1.4
             svg_bytes = latex_to_svg(text, color=text_color, size=latex_size)
             renderer = QSvgRenderer(svg_bytes)
             if self.dummy_svg_item is None:
@@ -572,7 +572,7 @@ class VItem(QGraphicsPathItem):
                 self.dummy_svg_item.setVisible(False)
             if self.dummy_text_item is None:
                 self.dummy_text_item = QGraphicsTextItem(self)
-            self.dummy_text_item.setFont(display_setting.font)
+            self.dummy_text_item.setFont(display_setting.dummy_font)
             self.dummy_text_item.setDefaultTextColor(QColor(text_color))
             self.dummy_text_item.setPlainText(text)
             rect = self.dummy_text_item.boundingRect()
@@ -672,6 +672,7 @@ class PhaseItem(QGraphicsTextItem):
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
         self.v_item = v_item
+        self.setFont(display_setting.phase_font)
         # Persistent label for boundary vertices (e.g. I/O labels set by the
         # rule editor). Survives refresh() calls so it is not wiped by
         # selection/position changes.
