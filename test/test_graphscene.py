@@ -5,7 +5,7 @@ from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
 
 import zxlive.graphscene
-from zxlive.common import SCALE, new_graph
+from zxlive.common import SCALE, ToolType, new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.graphscene import EditGraphScene
 
@@ -55,6 +55,7 @@ def test_right_click_empty_space_adds_vertex_with_existing_selection(qtbot: QtBo
     panel.show()
 
     scene = panel.graph_scene
+    scene.curr_tool = ToolType.SELECT
     scene.vertex_map[selected].setSelected(True)
     empty_pos = scene.vertex_map[selected].pos() + QPointF(2 * SCALE, 2 * SCALE)
 
