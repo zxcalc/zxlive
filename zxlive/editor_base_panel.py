@@ -26,7 +26,7 @@ from .common import (VT, GraphT, ToolType, get_data,
                      pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
-from .features import ZH_CALCULUS, ZW_CALCULUS, is_feature_enabled
+from .features import ZW_CALCULUS, is_feature_enabled
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene, EdgeDragSpec
 from .graphview import graph_to_tooltip
@@ -52,9 +52,8 @@ def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
     data: dict[VertexType, DrawPanelNodeType] = {
         VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["z_spider"])},
         VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["x_spider"])},
+        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])},
     }
-    if is_feature_enabled(ZH_CALCULUS):
-        data[VertexType.H_BOX] = {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])}
     if is_feature_enabled(ZW_CALCULUS):
         data[VertexType.Z_BOX] = {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])}
         data[VertexType.W_OUTPUT] = {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])}

@@ -72,7 +72,6 @@ font_defaults: dict[str, str | int | bool | None] = {
 # All off by default; the first-run picker is what turns them on.
 feature_defaults: dict[str, bool] = {
     "feature/fault-equivalence": False,
-    "feature/zh-calculus": False,
     "feature/zw-calculus": False,
     "feature/pauli-webs": False,
 }

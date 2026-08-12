@@ -16,7 +16,6 @@ class FeatureData(TypedDict):
 
 
 FAULT_EQUIVALENCE = "feature/fault-equivalence"
-ZH_CALCULUS = "feature/zh-calculus"
 ZW_CALCULUS = "feature/zw-calculus"
 PAULI_WEBS = "feature/pauli-webs"
 
@@ -29,11 +28,6 @@ FEATURES: list[FeatureData] = [
         "label": "Fault-equivalent rewrites",
         "tooltip": "Show the fault-equivalent rewrite mode in the proof panel. "
                    "These rewrites preserve the fault tolerance of a diagram.",
-    },
-    {
-        "id": ZH_CALCULUS,
-        "label": "ZH-calculus (H-boxes)",
-        "tooltip": "Show H-box vertices in the editor sidebar.",
     },
     {
         "id": ZW_CALCULUS,

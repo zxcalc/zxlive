@@ -14,7 +14,7 @@ import zxlive.tutorial
 from zxlive.common import new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.editor_base_panel import vertices_data
-from zxlive.features import (FAULT_EQUIVALENCE, FEATURES, PAULI_WEBS, ZH_CALCULUS, ZW_CALCULUS,
+from zxlive.features import (FAULT_EQUIVALENCE, FEATURES, PAULI_WEBS, ZW_CALCULUS,
                              has_seen_feature_picker, is_feature_enabled)
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
@@ -187,14 +187,9 @@ def test_vertex_palette_follows_calculus_features(app: MainWindow) -> None:
     assert isinstance(edit_panel, GraphEditPanel)
     edit_panel._curr_vty = VertexType.W_OUTPUT
 
-    _set_feature(app, ZH_CALCULUS, False)
     _set_feature(app, ZW_CALCULUS, False)
-    assert set(vertices_data()) == {VertexType.Z, VertexType.X, VertexType.BOUNDARY, VertexType.DUMMY}
+    assert set(vertices_data()) == {VertexType.Z, VertexType.X, VertexType.H_BOX, VertexType.BOUNDARY, VertexType.DUMMY}
     assert edit_panel._curr_vty == VertexType.Z
-
-    _set_feature(app, ZH_CALCULUS, True)
-    assert VertexType.H_BOX in vertices_data()
-    assert VertexType.Z_BOX not in vertices_data()
 
     _set_feature(app, ZW_CALCULUS, True)
     assert {VertexType.H_BOX, VertexType.Z_BOX, VertexType.W_OUTPUT} <= set(vertices_data())
