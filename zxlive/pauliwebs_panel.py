@@ -152,34 +152,47 @@ class PauliWebsPanel(BasePanel):
     # TODO: Fix code complexity
     # noqa: complexipy
     def _show_current_pauli_web(self) -> None:
-        new_g = copy.deepcopy(self.graph_scene.g)
-        for e in new_g.edges():
-            new_g.set_edata(e, "xweb0", False)
-            new_g.set_edata(e, "zweb0", False)
-            new_g.set_edata(e, "xweb1", False)
-            new_g.set_edata(e, "zweb1", False)
+        graph = self.graph_scene.g
+        use_y_webs = get_settings_value("blue-y-pauli-web", bool)
+        swap_colors = get_settings_value("swap-pauli-web-colors", bool)
 
         if self._pauli_web_index:
             web = self._pauli_webs[self._pauli_web_index[0]]
             for i in self._pauli_web_index[1:]:
-                web *= self._pauli_webs[i]
+                web *= self._pauli_webs[i] # Composes selected Pauli webs
+        else:
+            web = None
+        
+        for (s, t, _) in graph.edges():
+            if s >= t:
+                # "Left" half-edge is the one where s < t
+                s, t = t, s
+            
+            left = web[s, t] if web else "I"
+            right = web[t, s] if web else "I"
+            
+            xweb_left = left in ("X", "Y")
+            xweb_right = right in ("X", "Y")
+            zweb_left = left in ("Z", "Y")
+            zweb_right = right in ("Z", "Y")
+            
+            if swap_colors:
+                xweb_left, zweb_left = zweb_left, xweb_left
+                xweb_right, zweb_right = zweb_right, xweb_right
+            
+            # Get the EItem which corresponds to this edge
+            # Assumption: graphs in this panel are simple, so there is only one
+            edge = graph.edge(s, t)
+            eitem = next(iter(self.graph_scene.edge_map[edge].values()))
+            eitem.update_pauli_webs(
+                xweb_left=xweb_left,
+                xweb_right=xweb_right,
+                zweb_left=zweb_left,
+                zweb_right=zweb_right,
+                highlight=False, # TODO: handle highlights
+                use_y_webs=use_y_webs
+            )
 
-            for (s, t), pauli in web.half_edges().items():
-                try:
-                    edge = new_g.edge(s, t)
-                except Exception:
-                    continue
-
-                if pauli in ("X", "Y") and s < t:
-                    new_g.set_edata(edge, "xweb0", True)
-                if pauli in ("X", "Y") and s > t:
-                    new_g.set_edata(edge, "xweb1", True)
-                if pauli in ("Z", "Y") and s < t:
-                    new_g.set_edata(edge, "zweb0", True)
-                if pauli in ("Z", "Y") and s > t:
-                    new_g.set_edata(edge, "zweb1", True)
-
-        self.undo_stack.push(UpdateGraph(self.graph_view, new_g))  # or SetGraph if you don’t want undo entries
         self.graph_scene.invalidate()  # TODO: invalidating the whole scene might be overkill
 
     def _on_web_selection_changed(self) -> None:

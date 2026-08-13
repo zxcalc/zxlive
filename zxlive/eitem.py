@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from __future__ import annotations
+from dataclasses import dataclass
 from math import sqrt
 from typing import Optional, Any, TYPE_CHECKING, Union
 from enum import Enum
@@ -46,6 +47,13 @@ class EItem(QGraphicsPathItem):
         Thickness = 1
         Opacity = 2
 
+    @dataclass
+    class PauliWebData:
+        left: bool
+        right: bool
+        color: QColor
+        thickness: float
+
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
         self.setZValue(EITEM_Z)
@@ -73,6 +81,7 @@ class EItem(QGraphicsPathItem):
         self._old_pos: Optional[QPointF] = None
         self.thickness: float = 3.0
         self.color: QColor = QColor()
+        self.pauli_webs: list[EItem.PauliWebData] = []
         self.reset_color()
 
         self.refresh()
@@ -148,67 +157,65 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
+    def _add_pauli_web(self, left: bool, right: bool, color: QColor):
+        self.pauli_webs.append(EItem.PauliWebData(
+            left=left,
+            right=right,
+            color=color,
+            thickness=0 # Temporary placeholder thickness; this should be set later
+        ))
+
+    def update_pauli_webs(self, *, xweb_left: bool, xweb_right: bool, zweb_left: bool, zweb_right: bool, highlight: bool, use_y_webs: bool):
+        """Updates the Pauli web data for this edge."""
+        # Webs are sorted from outer to inner
+        # We use a temporary placeholder for the thickness
+        self.pauli_webs.clear()
+        self._add_pauli_web(highlight, highlight, QColor("#FFC107")) # TODO: cache this color
+
+        zcolor = display_setting.effective_colors["z_pauli_web"]
+        xcolor = display_setting.effective_colors["x_pauli_web"]
+        ycolor = display_setting.effective_colors["y_pauli_web"]
+
+        # Only draw Y-webs if the setting is enabled
+        if use_y_webs:
+            yweb0 = zweb_left and xweb_left
+            yweb1 = zweb_right and xweb_right
+
+            # If we're drawing Y-webs, we shouldn't draw the corresponding X- and Z-webs
+            zweb_left = zweb_left and not yweb0
+            zweb_right = zweb_right and not yweb1
+            xweb_left = xweb_left and not yweb0
+            xweb_right = xweb_right and not yweb1
+
+            self._add_pauli_web(yweb0, yweb1, ycolor)
+
+        self._add_pauli_web(zweb_left, zweb_right, zcolor)
+        self._add_pauli_web(xweb_left, xweb_right, xcolor)
+
+        # Determine thicknesses for each web
+        left_thickness = 2.5
+        right_thickness = 2.5
+        for web in reversed(self.pauli_webs):
+            if web.left and web.right:
+                web.thickness = max(left_thickness, right_thickness)
+                left_thickness = web.thickness + 1
+                right_thickness = web.thickness + 1
+            elif web.left:
+                web.thickness = left_thickness
+                left_thickness += 1
+            elif web.right:
+                web.thickness = right_thickness
+                right_thickness += 1
+
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
         option.state &= ~QStyle.StateFlag.State_Selected
 
-        webs: list[tuple[bool, bool, QColor]] = []
-
-        swap = get_settings_value("swap-pauli-web-colors", bool)
-        zweb0 = self.g.edata(self.e, "xweb0" if swap else "zweb0")
-        zweb1 = self.g.edata(self.e, "xweb1" if swap else "zweb1")
-        xweb0 = self.g.edata(self.e, "zweb0" if swap else "xweb0")
-        xweb1 = self.g.edata(self.e, "zweb1" if swap else "xweb1")
-
-        highlight = self.g.edata(self.e, "highlight")
-        webs.append((highlight, highlight, QColor("#FFC107")))  # highlight web
-
-        zcolor = display_setting.effective_colors["z_pauli_web"]
-        xcolor = display_setting.effective_colors["x_pauli_web"]
-        ycolor = display_setting.effective_colors["y_pauli_web"]
-
-        # only draw y webs if the setting is enabled
-        if get_settings_value("blue-y-pauli-web", bool):
-            yweb0 = zweb0 and xweb0
-            yweb1 = zweb1 and xweb1
-
-            # if we're drawing y webs, we shouldn't draw the corresponding x and z webs
-            zweb0 = zweb0 and not yweb0
-            zweb1 = zweb1 and not yweb1
-            xweb0 = xweb0 and not yweb0
-            xweb1 = xweb1 and not yweb1
-
-            webs.append((yweb0, yweb1, ycolor))
-
-        webs.append((zweb0, zweb1, zcolor))
-        webs.append((xweb0, xweb1, xcolor))
-
-        # determine thicknesses for each web
-        thicknesses: list[float] = []
-        left_thickness = 2.5
-        right_thickness = 2.5
-        for left, right, _ in reversed(webs):
-            if left and right:
-                thickness = max(left_thickness, right_thickness)
-                thicknesses.append(thickness)
-                left_thickness = right_thickness = thickness + 1
-            elif left:
-                thicknesses.append(left_thickness)
-                left_thickness += 1
-            elif right:
-                thicknesses.append(right_thickness)
-                right_thickness += 1
-            else:
-                thicknesses.append(0)
-        thicknesses.reverse()
-
         # draw webs from outermost to innermost
-        for (left, right, color), thickness in zip(webs, thicknesses):
-            self._paint_pauli_web(painter, option, widget, color, thickness, left=left, right=right)
+        for web in self.pauli_webs:
+            self._paint_pauli_web(painter, option, widget, web.color, web.thickness, left=web.left, right=web.right)
 
         super().paint(painter, option, widget)
 
