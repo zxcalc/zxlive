@@ -154,11 +154,7 @@ class EItem(QGraphicsPathItem):
         # By default, Qt draws a dashed rectangle around selected items.
         # We have our own implementation to draw selected vertices, so
         # we intercept the selected option here.
-        # The type stub is missing the 'state' attribute, so there is a
-        # false positive mypy error if we set the usual way.
-        assert hasattr(option, "state")
-        state = getattr(option, "state")
-        setattr(option, "state", state & ~QStyle.StateFlag.State_Selected)
+        option.state &= ~QStyle.StateFlag.State_Selected
 
         webs: list[tuple[bool, bool, QColor]] = []
 
