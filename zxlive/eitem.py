@@ -195,7 +195,7 @@ class EItem(QGraphicsPathItem):
         # Webs are sorted from outer to inner
         # We use a temporary placeholder for the thickness
         self.pauli_webs.clear()
-        self._add_pauli_web(highlight, highlight, QColor("#FFC107")) # TODO: cache this color
+        self._add_pauli_web(highlight, highlight, display_setting.effective_colors["pauli_web_highlight"])
 
         zcolor = display_setting.effective_colors["z_pauli_web"]
         xcolor = display_setting.effective_colors["x_pauli_web"]

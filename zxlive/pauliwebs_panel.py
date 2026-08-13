@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-import copy
 from typing import Iterator, Optional
 from typing_extensions import TypeAlias
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor, QBrush, QFont
+from PySide6.QtGui import QAction, QBrush, QFont
 from PySide6.QtWidgets import (QLabel, QListWidget,
                                QListWidgetItem, QSplitter, QVBoxLayout, QWidget, QToolButton)
 from pyzx import EdgeType, VertexType, pauliweb
 from zxlive.graphview import GraphView
 
 from .base_panel import BasePanel, ToolbarSection
-from .commands import UpdateGraph
 from .common import ET, GraphT, get_settings_value
 from .dialogs import show_error_msg
 from .graphscene import GraphScene
+from .settings import display_setting
 
 
 import json
@@ -235,7 +234,7 @@ class PauliWebsPanel(BasePanel):
             item.setFont(QFont())
             if (e[0], e[1]) in web.half_edges():
                 if item:
-                    item.setForeground(QColor("#FFC107"))
+                    item.setForeground(display_setting.effective_colors["pauli_web_highlight"])
                     font = QFont()
                     font.setBold(True)
                     font.setPointSize(10)  # Optional: Make it larger too
