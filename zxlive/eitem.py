@@ -257,7 +257,7 @@ class EItem(QGraphicsPathItem):
 
             # Draw webs from outermost to innermost
             for web in self.pauli_webs:
-                if not web.should_draw() <= 0:
+                if not web.should_draw():
                     continue
 
                 # Choose the path to draw based on the web properties
