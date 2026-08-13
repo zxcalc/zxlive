@@ -82,6 +82,12 @@ class EItem(QGraphicsPathItem):
         self.thickness: float = 3.0
         self.color: QColor = QColor()
         self.pauli_webs: list[EItem.PauliWebData] = []
+        self.xweb_left: bool = False
+        self.xweb_right: bool = False
+        self.zweb_left: bool = False
+        self.zweb_right: bool = False
+        self.highlight: bool = False
+        self.use_y_webs: bool = False
         self.reset_color()
 
         self.refresh()
@@ -165,8 +171,27 @@ class EItem(QGraphicsPathItem):
             thickness=0 # Temporary placeholder thickness; this should be set later
         ))
 
-    def update_pauli_webs(self, *, xweb_left: bool | None = None, xweb_right: bool, zweb_left: bool, zweb_right: bool, highlight: bool, use_y_webs: bool):
-        """Updates the Pauli web data for this edge."""
+    def update_pauli_webs(
+        self,
+        *,
+        xweb_left: bool | None = None,
+        xweb_right: bool | None = None,
+        zweb_left: bool | None = None,
+        zweb_right: bool | None = None,
+        highlight: bool | None = None,
+        use_y_webs: bool | None = None
+    ):
+        """Updates the Pauli web data for this edge. Omitted parameters are unchanged."""
+
+        # Default to cached values for any parameters which aren't provided
+        # Additionally, cache the values for any parameters which are provided
+        self.xweb_left = xweb_left = (self.xweb_left if xweb_left is None else xweb_left)
+        self.xweb_right = xweb_right = (self.xweb_right if xweb_right is None else xweb_right)
+        self.zweb_left = zweb_left = (self.zweb_left if zweb_left is None else zweb_left)
+        self.zweb_right = zweb_right = (self.zweb_right if zweb_right is None else zweb_right)
+        self.highlight = highlight = (self.highlight if highlight is None else highlight)
+        self.use_y_webs = use_y_webs = (self.use_y_webs if use_y_webs is None else use_y_webs)
+
         # Webs are sorted from outer to inner
         # We use a temporary placeholder for the thickness
         self.pauli_webs.clear()
@@ -177,7 +202,7 @@ class EItem(QGraphicsPathItem):
         ycolor = display_setting.effective_colors["y_pauli_web"]
 
         # Only draw Y-webs if the setting is enabled
-        if use_y_webs:
+        if self.use_y_webs:
             yweb0 = zweb_left and xweb_left
             yweb1 = zweb_right and xweb_right
 

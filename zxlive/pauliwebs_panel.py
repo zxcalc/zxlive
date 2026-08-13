@@ -57,6 +57,7 @@ class PauliWebsPanel(BasePanel):
 
         self._pauli_webs: list[PauliWeb] = []
         self._pauli_web_index: list[int] = []
+        self._highlighted_edge: ET | None = None
         self._compute_pauli_webs()
 
         self.edge_clicked = False
@@ -149,6 +150,10 @@ class PauliWebsPanel(BasePanel):
             self._pauli_web_index = []
             self._show_current_pauli_web()
 
+    def _get_eitem_from_edge(self, edge: ET):
+        # Assumption: graphs in this panel are simple, so there is exactly one
+        return next(iter(self.graph_scene.edge_map[edge].values()))
+
     def _show_current_pauli_web(self) -> None:
         """Updates the graph to display the currently selected Pauli web(s)."""
 
@@ -182,15 +187,12 @@ class PauliWebsPanel(BasePanel):
                 xweb_left, zweb_left = zweb_left, xweb_left
                 xweb_right, zweb_right = zweb_right, xweb_right
 
-            # Get the EItem which corresponds to this edge
-            # Assumption: graphs in this panel are simple, so there is exactly one
-            eitem = next(iter(self.graph_scene.edge_map[edge].values()))
+            eitem = self._get_eitem_from_edge(edge)
             eitem.update_pauli_webs(
                 xweb_left=xweb_left,
                 xweb_right=xweb_right,
                 zweb_left=zweb_left,
                 zweb_right=zweb_right,
-                highlight=False, # TODO: handle highlights
                 use_y_webs=use_y_webs
             )
 
@@ -213,11 +215,19 @@ class PauliWebsPanel(BasePanel):
         self.web_list.clearSelection()
         self._show_current_pauli_web()
 
-    def edge_double_clicked(self, e: ET) -> None:
-        for edge in self.graph_scene.g.edges():
-            self.graph_scene.g.set_edata(edge, "highlight", False)
+    def unhighlight_edge(self) -> None:
+        if not self._highlighted_edge:
+            return
+        
+        eitem = self._get_eitem_from_edge(self._highlighted_edge)
+        eitem.update_pauli_webs(highlight=False)
+        self._highlighted_edge = None
 
-        self.graph_scene.g.set_edata(e, "highlight", True)
+    def edge_double_clicked(self, e: ET) -> None:
+        self.unhighlight_edge()
+        eitem = self._get_eitem_from_edge(e)
+        eitem.update_pauli_webs(highlight=True)
+        self._highlighted_edge = e
 
         for i, web in enumerate(self._pauli_webs):
             item = self.web_list.item(i)
@@ -233,8 +243,7 @@ class PauliWebsPanel(BasePanel):
         self.graph_scene.invalidate()
 
     def on_background_double_clicked(self) -> None:
-        for edge in self.graph_scene.g.edges():
-            self.graph_scene.g.set_edata(edge, "highlight", False)
+        self.unhighlight_edge()
 
         for i in range(self.web_list.count()):
             item = self.web_list.item(i)
