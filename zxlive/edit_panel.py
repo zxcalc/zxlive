@@ -5,7 +5,7 @@ import json
 import os
 from typing import Iterator
 
-from PySide6.QtCore import Signal, QSettings
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm

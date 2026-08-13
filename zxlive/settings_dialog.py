@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Dict, Any
 from PySide6.QtGui import QColor, QIcon, QFontDatabase
 from typing_extensions import TypedDict, NotRequired
 
-from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,

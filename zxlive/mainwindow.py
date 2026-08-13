@@ -25,7 +25,7 @@ from typing import Callable, Optional, cast
 import networkx as nx
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QMimeData, QSettings, QTextStream, QTimer, QUrl,
+                            QMimeData, QTextStream, QTimer, QUrl,
                             Qt)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)

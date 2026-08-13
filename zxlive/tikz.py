@@ -1,7 +1,7 @@
 from PySide6.QtCore import QSettings
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
-from .common import GraphT, get_settings_value
+from .common import DEFAULT_SETTINGS, GraphT, get_settings_value
 from zxlive.proof import ProofModel, Rewrite
 
 
@@ -82,7 +82,7 @@ def proof_to_tikz(proof: ProofModel) -> str:
             # sign. If wrapped to a new row, ignore prev_height since it is on
             # a different row.
             eq_height = height if wrapped else max(prev_height, height)
-            total_verts.append(_eq_node(settings, proof.steps[i - 1], idoffset,
+            total_verts.append(_eq_node(DEFAULT_SETTINGS, proof.steps[i - 1], idoffset,
                                         xoffset, yoffset, hspace, eq_height))
             idoffset += 1
 
