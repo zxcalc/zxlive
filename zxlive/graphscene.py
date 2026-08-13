@@ -114,6 +114,10 @@ class GraphScene(QGraphicsScene):
                 self.vertex_map[v].setSelected(True)
         self.selection_changed_custom.emit()
 
+    def select_all_vertices(self) -> None:
+        """Selects all vertices in the scene."""
+        self.select_vertices(self.vertex_map.keys())
+
     def set_graph(self, g: GraphT) -> None:
         """Set the PyZX graph for the scene.
         If the scene already contains a graph, it will be replaced."""
@@ -315,12 +319,6 @@ class GraphScene(QGraphicsScene):
         for e in self.g.edges():
             s, t = self.g.edge_st(e)
             self.update_edge_curves(s, t)
-
-    def select_all(self) -> None:
-        """Selects all vertices and edges in the scene."""
-        for it in self.items():
-            it.setSelected(True)
-        self.selection_changed_custom.emit()
 
 
 class EditGraphScene(GraphScene):
