@@ -151,11 +151,12 @@ class PauliWebsPanel(BasePanel):
             self._show_current_pauli_web()
 
     def _get_eitem_from_edge(self, edge: ET) -> EItem:
-        # Assumption: graphs in this panel are simple, so there is exactly one
+        """Given an edge, returns the corresponding EItem from the graph scene."""
+        # Assumption: graphs in this panel are simple, so there is exactly one edge
         return next(iter(self.graph_scene.edge_map[edge].values()))
 
     def _show_current_pauli_web(self) -> None:
-        """Updates the graph to display the currently selected Pauli web(s)."""
+        """Updates the graph scene to display the currently selected Pauli web(s)."""
 
         graph = self.graph_scene.g
         use_y_webs = get_settings_value("blue-y-pauli-web", bool)

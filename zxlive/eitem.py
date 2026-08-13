@@ -170,6 +170,7 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setVisible(self.isSelected())
 
     def _add_pauli_web(self, left: bool, right: bool, color: QColor) -> None:
+        """Adds a Pauli web to the edge. The new Pauli web will be the innermost one."""
         self.pauli_webs.append(EItem.PauliWebData(
             left=left,
             right=right,
@@ -198,8 +199,7 @@ class EItem(QGraphicsPathItem):
         self.highlight = highlight = (self.highlight if highlight is None else highlight)
         self.use_y_webs = use_y_webs = (self.use_y_webs if use_y_webs is None else use_y_webs)
 
-        # Webs are sorted from outer to inner
-        # We use a temporary placeholder for the thickness
+        # Webs are sorted from outer to inner. The highlight should always be on the outside.
         self.pauli_webs.clear()
         self._add_pauli_web(highlight, highlight, display_setting.effective_colors["pauli_web_highlight"])
 
