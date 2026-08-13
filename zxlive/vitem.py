@@ -322,20 +322,25 @@ class VItem(QGraphicsPathItem):
                 self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
                 return value
             
-            # Intercept selection- and position-has-changed events to call `refresh`.
+            # Intercept position- and selection-has-changed events to call `refresh`.
             # Note that the position and selected values are already updated when
             # this event fires.
-            case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged | QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            case QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
                 # Skip refresh when the scene is performing a bulk graph update
                 # (it will refresh all affected items in a single pass afterwards).
                 if not self.is_animated and not self.graph_scene.is_bulk_updating:
                     self.refresh()
+            
+            case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                # Same as above, but we don't need to update neighbouring edges
+                if not self.is_animated and not self.graph_scene.is_bulk_updating:
+                    self.refresh(cascade_edges=False)
                 
+                # Assumption: we will only be using VItem with a GraphScene
                 scene = self.scene()
-                if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-                    if TYPE_CHECKING:
-                        assert isinstance(scene, GraphScene)
-                    scene.selection_changed_custom.emit()
+                if TYPE_CHECKING:
+                    assert isinstance(scene, GraphScene)
+                scene.selection_changed_custom.emit()
             
             case _:
                 return super().itemChange(change, value)
