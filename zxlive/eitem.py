@@ -54,7 +54,7 @@ class EItem(QGraphicsPathItem):
         color: QColor
         thickness: float
         
-        def should_draw(self):
+        def should_draw(self) -> bool:
             return (self.left or self.right) and self.thickness > 0
 
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
@@ -169,7 +169,7 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
-    def _add_pauli_web(self, left: bool, right: bool, color: QColor):
+    def _add_pauli_web(self, left: bool, right: bool, color: QColor) -> None:
         self.pauli_webs.append(EItem.PauliWebData(
             left=left,
             right=right,
@@ -186,7 +186,7 @@ class EItem(QGraphicsPathItem):
         zweb_right: bool | None = None,
         highlight: bool | None = None,
         use_y_webs: bool | None = None
-    ):
+    ) -> None:
         """Updates the Pauli web data for this edge. Omitted parameters are unchanged."""
 
         # Default to cached values for any parameters which aren't provided

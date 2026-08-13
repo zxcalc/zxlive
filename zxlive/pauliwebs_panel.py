@@ -8,6 +8,7 @@ from PySide6.QtGui import QAction, QBrush, QFont
 from PySide6.QtWidgets import (QLabel, QListWidget,
                                QListWidgetItem, QSplitter, QVBoxLayout, QWidget, QToolButton)
 from pyzx import EdgeType, VertexType, pauliweb
+from zxlive.eitem import EItem
 from zxlive.graphview import GraphView
 
 from .base_panel import BasePanel, ToolbarSection
@@ -56,7 +57,7 @@ class PauliWebsPanel(BasePanel):
 
         self._pauli_webs: list[PauliWeb] = []
         self._pauli_web_index: list[int] = []
-        self._highlighted_edge: ET | None = None
+        self._highlighted_edge: EItem | None = None
         self._compute_pauli_webs()
 
         self.edge_clicked = False
@@ -149,7 +150,7 @@ class PauliWebsPanel(BasePanel):
             self._pauli_web_index = []
             self._show_current_pauli_web()
 
-    def _get_eitem_from_edge(self, edge: ET):
+    def _get_eitem_from_edge(self, edge: ET) -> EItem:
         # Assumption: graphs in this panel are simple, so there is exactly one
         return next(iter(self.graph_scene.edge_map[edge].values()))
 
@@ -218,15 +219,16 @@ class PauliWebsPanel(BasePanel):
         if not self._highlighted_edge:
             return
         
-        eitem = self._get_eitem_from_edge(self._highlighted_edge)
-        eitem.update_pauli_webs(highlight=False)
+        self._highlighted_edge.update_pauli_webs(highlight=False)
         self._highlighted_edge = None
 
     def edge_double_clicked(self, e: ET) -> None:
         self.unhighlight_edge()
+
+        # Highlight double-clicked edge
         eitem = self._get_eitem_from_edge(e)
         eitem.update_pauli_webs(highlight=True)
-        self._highlighted_edge = e
+        self._highlighted_edge = eitem
 
         for i, web in enumerate(self._pauli_webs):
             item = self.web_list.item(i)
@@ -243,7 +245,6 @@ class PauliWebsPanel(BasePanel):
 
     def on_background_double_clicked(self) -> None:
         self.unhighlight_edge()
-
         for i in range(self.web_list.count()):
             item = self.web_list.item(i)
             item.setForeground(QBrush())
