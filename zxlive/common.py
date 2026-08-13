@@ -15,27 +15,23 @@ import pyzx
 
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 
+T = TypeVar('T') # TODO: remove this and use 3.12 generic syntax
 
-T = TypeVar('T')
-
+DEFAULT_SETTINGS = QSettings("zxlive", "zxlive")
 
 def get_data(path: str) -> str:
     return os.path.join(os.environ.get("_MEIPASS", _ROOT), path)
 
 
-def set_settings_value(arg: str, val: T, _type: Type[T], settings: QSettings | None = None) -> None:
-    _settings = settings or QSettings("zxlive", "zxlive")
+def set_settings_value[T](arg: str, val: T, _type: Type[T], settings: QSettings = DEFAULT_SETTINGS) -> None:
     if not isinstance(val, _type):
         raise ValueError(f"Unexpected type for {arg}: expected {_type}, got {type(val)}")
-    _settings.setValue(arg, val)
+    settings.setValue(arg, val)
 
 
-# TODO: Fix code complexity
-# noqa: complexipy
-def get_settings_value(arg: str, _type: Type[T], default: T | None = None, settings: QSettings | None = None) -> T:
-    _settings = settings or QSettings("zxlive", "zxlive")
+def get_settings_value[T](arg: str, _type: Type[T], default: T | None = None, settings: QSettings = DEFAULT_SETTINGS) -> T:
     try:
-        val = _settings.value(arg, default)
+        val = settings.value(arg, default)
         if _type == bool:
             val = str(val) == "True" or str(val) == "true"
         if _type == int:
@@ -57,8 +53,7 @@ def get_settings_value(arg: str, _type: Type[T], default: T | None = None, setti
 
 
 def get_custom_rules_path() -> str:
-    settings = QSettings("zxlive", "zxlive")
-    return str(settings.value('path/custom-rules'))
+    return str(DEFAULT_SETTINGS.value('path/custom-rules'))
 
 
 VT: TypeAlias = int

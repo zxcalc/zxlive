@@ -9,7 +9,7 @@ from PySide6.QtCore import QObject, QSettings, QUrl, Signal
 from PySide6.QtNetwork import (QNetworkAccessManager, QNetworkReply,
                                QNetworkRequest)
 
-from .common import get_settings_value, set_settings_value
+from .common import DEFAULT_SETTINGS, get_settings_value, set_settings_value
 
 GITHUB_API_URL = "https://api.github.com/repos/zxcalc/zxlive/releases/latest"
 CHECK_INTERVAL_DAYS = 1
@@ -24,7 +24,7 @@ class UpdateChecker(QObject):
     def __init__(self, current_version: str, settings: Optional[QSettings] = None) -> None:
         super().__init__()
         self.current_version = current_version
-        self.settings = settings or QSettings("zxlive", "zxlive")
+        self.settings = settings or DEFAULT_SETTINGS
         self.network = QNetworkAccessManager(self)
 
     def should_check_for_updates(self) -> bool:

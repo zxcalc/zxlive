@@ -54,10 +54,9 @@ def _eq_node(settings: QSettings, rewrite: Rewrite, idoffset: int, xoffset: floa
 
 
 def proof_to_tikz(proof: ProofModel) -> str:
-    settings = QSettings("zxlive", "zxlive")
-    vspace = get_settings_value("tikz/layout/vspace", float, settings=settings)
-    hspace = get_settings_value("tikz/layout/hspace", float, settings=settings)
-    max_width = get_settings_value("tikz/layout/max-width", float, settings=settings)
+    vspace = get_settings_value("tikz/layout/vspace", float)
+    hspace = get_settings_value("tikz/layout/hspace", float)
+    max_width = get_settings_value("tikz/layout/max-width", float)
 
     xoffset = -max_width
     yoffset = -10.0

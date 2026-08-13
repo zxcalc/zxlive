@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TypedDict
 
 import pyzx
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QApplication, QTabWidget
 
-from .common import get_settings_value, SCALE
+from .common import DEFAULT_SETTINGS, SCALE, get_settings_value
 
 
 class ColorScheme(TypedDict):
@@ -349,7 +349,7 @@ class DisplaySettings:
 
 
 # Initialise settings
-settings = QSettings("zxlive", "zxlive")
+settings = DEFAULT_SETTINGS
 for key, value in defaults.items():
     if not settings.contains(key):
         settings.setValue(key, value)
