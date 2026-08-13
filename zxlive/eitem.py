@@ -213,10 +213,10 @@ class EItem(QGraphicsPathItem):
             yweb1 = zweb_right and xweb_right
 
             # If we're drawing Y-webs, we shouldn't draw the corresponding X- and Z-webs
-            zweb_left = zweb_left and not yweb0
-            zweb_right = zweb_right and not yweb1
-            xweb_left = xweb_left and not yweb0
-            xweb_right = xweb_right and not yweb1
+            zweb_left &= not yweb0
+            zweb_right &= not yweb1
+            xweb_left &= not yweb0
+            xweb_right &= not yweb1
 
             self._add_pauli_web(yweb0, yweb1, ycolor)
 
