@@ -109,7 +109,7 @@ def view_to_length(width: float, height: float) -> tuple[float, float]:
 
 def to_tikz(g: GraphT) -> str:
     """Export graph to TikZ; PyZX includes variable type metadata when present."""
-    return pyzx.tikz.to_tikz(g)  # type: ignore
+    return pyzx.tikz.to_tikz(g)
 
 
 def find_unknown_tikz_styles(tikz: str) -> list[str]:
