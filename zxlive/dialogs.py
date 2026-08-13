@@ -4,147 +4,27 @@ import copy
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Optional
 
-from PySide6.QtCore import QFile, QIODevice, QObject, QThread, QTextStream, QTimer, QUrl, Signal, Slot
+from PySide6.QtCore import QFile, QIODevice, QTextStream, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFileDialog,
                                QFormLayout, QLineEdit, QMessageBox,
-                               QProgressDialog, QPushButton, QTextEdit, QWidget, QInputDialog)
+                               QPushButton, QTextEdit, QWidget, QInputDialog)
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
 from .common import GraphT, VT
-from .settings import get_settings_value
-from .custom_rule import CustomRule, check_rule, check_rule_matrices
+from .custom_rule import CustomRule
+from .matrix import (
+    check_rule_with_progress as check_rule_with_progress,
+    compute_matrix_with_progress as compute_matrix_with_progress,
+)
 from .proof import ProofModel
+from .settings import get_settings_value
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
-
-T = TypeVar("T")
-_running_threads: set[QThread] = set()
-_running_workers: set[QObject] = set()
-
-
-class _BackgroundWorker(QObject):
-    succeeded = Signal(object)
-    failed = Signal(object)
-    finished = Signal()
-
-    def __init__(self, task: Callable[[], object]) -> None:
-        super().__init__()
-        self.task = task
-
-    @Slot()
-    def run(self) -> None:
-        try:
-            result = self.task()
-        except Exception as e:
-            self.failed.emit(e)
-        else:
-            self.succeeded.emit(result)
-        finally:
-            self.finished.emit()
-
-
-class _BackgroundResult(QObject):
-    def __init__(self, dialog: QDialog, thread: QThread) -> None:
-        super().__init__(dialog)
-        self.dialog = dialog
-        self.worker_thread = thread
-        self.result: object = None
-        self.error: Optional[Exception] = None
-        self.completed = False
-        self.cancelled = False
-
-    @Slot(object)
-    def succeed(self, result: object) -> None:
-        if not self.cancelled:
-            self.result = result
-            self.completed = True
-            self.dialog.accept()
-
-    @Slot(object)
-    def fail(self, error: object) -> None:
-        if not self.cancelled:
-            self.error = cast(Exception, error)
-            self.dialog.accept()
-
-    @Slot()
-    def cancel(self) -> None:
-        self.cancelled = True
-        self.worker_thread.requestInterruption()
-
-
-def run_in_thread(task: Callable[[], T], message: str, cancel_text: str,
-                  parent: QWidget) -> tuple[bool, Optional[T]]:
-    """Run a task in a worker thread while showing a cancellable progress dialog."""
-    dialog = QProgressDialog(message, cancel_text, 0, 0, parent)
-    dialog.setWindowTitle("ZXLive")
-    dialog.setMinimumDuration(0)
-    dialog.setAutoClose(False)
-    dialog.setAutoReset(False)
-
-    thread = QThread()
-    worker = _BackgroundWorker(task)
-    worker.moveToThread(thread)
-    _running_threads.add(thread)
-    _running_workers.add(worker)
-    result = _BackgroundResult(dialog, thread)
-
-    def clean_up() -> None:
-        _running_threads.discard(thread)
-        _running_workers.discard(worker)
-
-    thread.started.connect(worker.run)
-    worker.succeeded.connect(result.succeed)
-    worker.failed.connect(result.fail)
-    worker.finished.connect(thread.quit)
-    worker.finished.connect(worker.deleteLater)
-    thread.finished.connect(clean_up)
-    thread.finished.connect(thread.deleteLater)
-    dialog.canceled.connect(result.cancel)
-
-    QTimer.singleShot(0, thread.start)
-    dialog_result = dialog.exec()
-    dialog.deleteLater()
-
-    if result.cancelled or dialog_result != QDialog.DialogCode.Accepted:
-        return False, None
-    if result.error is not None:
-        raise result.error
-    assert result.completed
-    return True, cast(T, result.result)
-
-
-def compute_matrix_with_progress(graph: GraphT, parent: QWidget) -> Optional[Any]:
-    graph_copy = copy.deepcopy(graph)
-
-    def compute() -> Any:
-        graph_copy.auto_detect_io()
-        return graph_copy.to_matrix()
-
-    completed, matrix = run_in_thread(compute, "Computing matrix...", "Abort", parent)
-    return matrix if completed else None
-
-
-def check_rule_with_progress(rule: CustomRule, parent: QWidget) -> bool:
-    """Validate a rule, allowing expensive matrix validation to be skipped."""
-    check_rule(rule, check_matrices=False)
-    if len(rule.lhs_graph.var_registry.vars()) != 0 or len(rule.rhs_graph.var_registry.vars()) != 0:
-        return True
-
-    lhs_graph = copy.deepcopy(rule.lhs_graph)
-    rhs_graph = copy.deepcopy(rule.rhs_graph)
-    completed, _ = run_in_thread(
-        lambda: check_rule_matrices(lhs_graph, rhs_graph),
-        "Computing rule matrices...",
-        "Skip validation",
-        parent,
-    )
-    return completed
-
 
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""

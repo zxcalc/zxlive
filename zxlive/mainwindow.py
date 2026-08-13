@@ -44,7 +44,6 @@ from .commands import MoveNode, ProofModeCommand
 from .custom_rule import CustomRule, to_networkx
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite, export_gif_dialog,
-                      check_rule_with_progress,
                       export_proof_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
@@ -53,6 +52,7 @@ from .edit_panel import GraphEditPanel
 from .features import (FEATURES, has_seen_feature_picker, is_feature_enabled,
                        mark_feature_picker_seen, set_feature_enabled,
                        show_feature_picker)
+from .matrix import check_rule_with_progress
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel

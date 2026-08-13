@@ -160,7 +160,8 @@ class BasePanel(QWidget):
         from PySide6.QtWidgets import QSpinBox, QPushButton, QHBoxLayout, QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem
         import pyperclip
         from .common import get_settings_value
-        from .dialogs import compute_matrix_with_progress, show_error_msg
+        from .dialogs import show_error_msg
+        from .matrix import compute_matrix_with_progress
         precision: int = get_settings_value("matrix/precision", int, 4)
 
         def format_str(c: complex, p: int) -> str:
