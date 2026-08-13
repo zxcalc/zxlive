@@ -10,7 +10,7 @@
 - Fixed TikZ proof export so that graphs offset from the origin are normalised, equal signs are vertically centred between adjacent steps, and row wrapping works correctly (#198).
 - Fixed a bug which caused the list of available rewrites in proof mode to not be updated until the mouse was hovered over the rewrite panel (#465)
 - Fixed closing a tab leaking its panel, so proofs no longer retain their diagram, history and rewrite worker thread after being closed (#562).
-
+- Changed the Ctrl+A shortcut to only select vertices and no longer select edges in order to improve performance (#515)
 
 ## v1.0.0
 This is the first version where changes were tracked. This version 1.0.0 release brings with it many new features, including:
