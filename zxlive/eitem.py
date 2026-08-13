@@ -165,7 +165,7 @@ class EItem(QGraphicsPathItem):
             thickness=0 # Temporary placeholder thickness; this should be set later
         ))
 
-    def update_pauli_webs(self, *, xweb_left: bool, xweb_right: bool, zweb_left: bool, zweb_right: bool, highlight: bool, use_y_webs: bool):
+    def update_pauli_webs(self, *, xweb_left: bool | None = None, xweb_right: bool, zweb_left: bool, zweb_right: bool, highlight: bool, use_y_webs: bool):
         """Updates the Pauli web data for this edge."""
         # Webs are sorted from outer to inner
         # We use a temporary placeholder for the thickness
@@ -206,6 +206,7 @@ class EItem(QGraphicsPathItem):
             elif web.right:
                 web.thickness = right_thickness
                 right_thickness += 1
+        self.update()
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
         # By default, Qt draws a dashed rectangle around selected items.
