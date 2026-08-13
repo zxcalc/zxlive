@@ -171,12 +171,13 @@ class EItem(QGraphicsPathItem):
 
     def _add_pauli_web(self, left: bool, right: bool, color: QColor) -> None:
         """Adds a Pauli web to the edge. The new Pauli web will be the innermost one."""
-        self.pauli_webs.append(EItem.PauliWebData(
-            left=left,
-            right=right,
-            color=color,
-            thickness=0 # Temporary placeholder thickness; this should be set later
-        ))
+        if left or right:
+            self.pauli_webs.append(EItem.PauliWebData(
+                left=left,
+                right=right,
+                color=color,
+                thickness=0 # Temporary placeholder thickness; this should be set later
+            ))
 
     def update_pauli_webs(
         self,
@@ -201,8 +202,7 @@ class EItem(QGraphicsPathItem):
 
         # Webs are sorted from outer to inner. The highlight should always be on the outside.
         self.pauli_webs.clear()
-        if highlight:
-            self._add_pauli_web(True, True, display_setting.effective_colors["pauli_web_highlight"])
+        self._add_pauli_web(True, True, display_setting.effective_colors["pauli_web_highlight"])
 
         zcolor = display_setting.effective_colors["z_pauli_web"]
         xcolor = display_setting.effective_colors["x_pauli_web"]
@@ -210,21 +210,19 @@ class EItem(QGraphicsPathItem):
 
         # Only draw Y-webs if the setting is enabled
         if self.use_y_webs:
-            yweb0 = zweb_left and xweb_left
-            yweb1 = zweb_right and xweb_right
+            yweb_left = zweb_left and xweb_left
+            yweb_right = zweb_right and xweb_right
 
             # If we're drawing Y-webs, we shouldn't draw the corresponding X- and Z-webs
-            zweb_left &= not yweb0
-            zweb_right &= not yweb1
-            xweb_left &= not yweb0
-            xweb_right &= not yweb1
+            zweb_left &= not yweb_left
+            zweb_right &= not yweb_right
+            xweb_left &= not yweb_left
+            xweb_right &= not yweb_right
 
-            self._add_pauli_web(yweb0, yweb1, ycolor)
+            self._add_pauli_web(yweb_left, yweb_right, ycolor)
         
-        if zweb_left or zweb_right:
-            self._add_pauli_web(zweb_left, zweb_right, zcolor)
-        if xweb_left or xweb_right:
-            self._add_pauli_web(xweb_left, xweb_right, xcolor)
+        self._add_pauli_web(zweb_left, zweb_right, zcolor)
+        self._add_pauli_web(xweb_left, xweb_right, xcolor)
 
         # Determine thicknesses for each web
         left_thickness = 2.5
