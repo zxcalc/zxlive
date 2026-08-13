@@ -26,7 +26,7 @@ from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStro
 
 from pyzx.utils import EdgeType, VertexType
 
-from .common import SCALE, ET, GraphT, get_settings_value
+from .common import SCALE, ET, GraphT
 from .settings import display_setting
 from .vitem import VItem, EITEM_Z
 
@@ -53,6 +53,9 @@ class EItem(QGraphicsPathItem):
         right: bool
         color: QColor
         thickness: float
+        
+        def should_draw(self):
+            return (self.left or self.right) and self.thickness > 0
 
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
@@ -88,6 +91,9 @@ class EItem(QGraphicsPathItem):
         self.zweb_right: bool = False
         self.highlight: bool = False
         self.use_y_webs: bool = False
+        self.pauli_pen: QPen = QPen(self.pen())
+        self.pauli_pen.setStyle(Qt.PenStyle.SolidLine)
+        self.pauli_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         self.reset_color()
 
         self.refresh()
@@ -239,35 +245,38 @@ class EItem(QGraphicsPathItem):
         # we intercept the selected option here.
         option.state &= ~QStyle.StateFlag.State_Selected
 
-        # draw webs from outermost to innermost
-        for web in self.pauli_webs:
-            self._paint_pauli_web(painter, option, widget, web.color, web.thickness, left=web.left, right=web.right)
+        # First, we draw any Pauli webs the edge has
+        if self.pauli_webs:
+            # Self-loops may not define half-paths, so we fall back to the full path
+            full_path = self.path()
+            left_path = self.half_path_left or full_path
+            right_path = self.half_path_right or full_path
+
+            painter.save()
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+            # Draw webs from outermost to innermost
+            for web in self.pauli_webs:
+                if not web.should_draw() <= 0:
+                    continue
+
+                # Choose the path to draw based on the web properties
+                if web.left and web.right:
+                    path = full_path
+                elif web.left:
+                    path = left_path
+                else:
+                    path = right_path
+
+                # Set the painter and draw the web
+                self.pauli_pen.setWidthF(self.thickness * web.thickness)
+                self.pauli_pen.setColor(web.color)
+                painter.setPen(self.pauli_pen)
+                painter.drawPath(path)
+
+            painter.restore()
 
         super().paint(painter, option, widget)
-
-    def _paint_pauli_web(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget],
-                         color: QColor, thickness: float, *, left: bool, right: bool) -> None:
-        """Draws a colored Pauli web on the edge if specified by the flags."""
-
-        if not (left or right):
-            return
-
-        old_path = self.path()
-        old_pen = self.pen()
-
-        path = old_path if left and right else (self.half_path_left if left else self.half_path_right)
-        path = path or old_path  # fallback if half paths are not defined (self-loops)
-
-        pen = QPen(old_pen)
-        pen.setWidthF(self.thickness * thickness)
-        pen.setColor(color)
-        pen.setStyle(Qt.PenStyle.SolidLine)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        self.setPen(pen)
-        self.setPath(path)
-        super().paint(painter, option, widget)
-        self.setPen(old_pen)
-        self.setPath(old_path)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Intercept selection- and position-has-changed events to call `refresh`.
