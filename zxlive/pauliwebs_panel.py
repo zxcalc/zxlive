@@ -219,7 +219,7 @@ class PauliWebsPanel(BasePanel):
     def unhighlight_edge(self) -> None:
         if not self._highlighted_edge:
             return
-        
+
         self._highlighted_edge.update_pauli_webs(highlight=False)
         self._highlighted_edge = None
 

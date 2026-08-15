@@ -53,7 +53,7 @@ class EItem(QGraphicsPathItem):
         right: bool
         color: QColor
         thickness: float
-        
+
         def should_draw(self) -> bool:
             return (self.left or self.right) and self.thickness > 0
 
@@ -202,7 +202,7 @@ class EItem(QGraphicsPathItem):
 
         # Webs are sorted from outer to inner. The highlight should always be on the outside.
         self.pauli_webs.clear()
-        self._add_pauli_web(True, True, display_setting.effective_colors["pauli_web_highlight"])
+        self._add_pauli_web(highlight, highlight, display_setting.effective_colors["pauli_web_highlight"])
 
         zcolor = display_setting.effective_colors["z_pauli_web"]
         xcolor = display_setting.effective_colors["x_pauli_web"]
@@ -220,7 +220,7 @@ class EItem(QGraphicsPathItem):
             xweb_right &= not yweb_right
 
             self._add_pauli_web(yweb_left, yweb_right, ycolor)
-        
+
         self._add_pauli_web(zweb_left, zweb_right, zcolor)
         self._add_pauli_web(xweb_left, xweb_right, xcolor)
 
