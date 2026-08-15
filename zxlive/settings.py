@@ -33,7 +33,7 @@ class ColorScheme(TypedDict):
     z_pauli_web: QColor
     x_pauli_web: QColor
     y_pauli_web: QColor
-
+    pauli_web_highlight: QColor
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "path/custom-rules": "rules/",
@@ -152,6 +152,7 @@ modern_red_green: ColorScheme = {
     "z_pauli_web": QColor("#ccffcc"),
     "x_pauli_web": QColor("#ff8888"),
     "y_pauli_web": QColor("#6688ff"),
+    "pauli_web_highlight": QColor("#ffddaa"),
 }
 
 classic_red_green: ColorScheme = {
