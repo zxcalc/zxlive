@@ -21,14 +21,13 @@ from typing import TYPE_CHECKING, Dict, Any
 from PySide6.QtGui import QColor, QIcon, QFontDatabase
 from typing_extensions import TypedDict, NotRequired
 
-from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
     QComboBox, QApplication, QCheckBox, QMessageBox, QColorDialog, QStyle
 )
 
-from .common import get_settings_value, T, get_data
+from .common import DEFAULT_SETTINGS, get_settings_value, T, get_data
 from .settings import (
     refresh_pyzx_tikz_settings, defaults, display_setting, color_schemes
 )
@@ -210,7 +209,7 @@ class SettingsDialog(QDialog):
         self.main_window = main_window
         self.setWindowTitle("Settings")
 
-        self.settings = QSettings("zxlive", "zxlive")
+        self.settings = DEFAULT_SETTINGS
         self.value_dict: Dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)

@@ -5,7 +5,7 @@ import json
 import os
 from typing import Iterator
 
-from PySide6.QtCore import Signal, QSettings
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QInputDialog, QMessageBox, QToolButton
 from pyzx import EdgeType, VertexType, sqasm
@@ -13,7 +13,7 @@ from pyzx.circuit.qasmparser import QASMParser
 
 from .base_panel import ToolbarSection
 from .commands import UpdateGraph
-from .common import VT, GraphT, get_settings_value
+from .common import DEFAULT_SETTINGS, VT, GraphT, get_settings_value
 from .dialogs import create_circuit_dialog, show_error_msg, write_to_file
 from .editor_base_panel import EditorBasePanel
 from .features import PAULI_WEBS, is_feature_enabled
@@ -101,7 +101,7 @@ class GraphEditPanel(EditorBasePanel):
         self.start_pauliwebs_signal.emit(new_g)
 
     def _input_circuit(self) -> None:
-        settings = QSettings("zxlive", "zxlive")
+        settings = DEFAULT_SETTINGS
         circuit_format = str(settings.value("input-circuit-format"))
         explanations = {
             'openqasm': "Write a circuit in QASM format.",

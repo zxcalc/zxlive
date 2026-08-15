@@ -1,7 +1,7 @@
 from PySide6.QtCore import QSettings
 from pyzx.tikz import TIKZ_BASE, _to_tikz
 
-from .common import GraphT, get_settings_value
+from .common import DEFAULT_SETTINGS, GraphT, get_settings_value
 from zxlive.proof import ProofModel, Rewrite
 
 
@@ -54,10 +54,9 @@ def _eq_node(settings: QSettings, rewrite: Rewrite, idoffset: int, xoffset: floa
 
 
 def proof_to_tikz(proof: ProofModel) -> str:
-    settings = QSettings("zxlive", "zxlive")
-    vspace = get_settings_value("tikz/layout/vspace", float, settings=settings)
-    hspace = get_settings_value("tikz/layout/hspace", float, settings=settings)
-    max_width = get_settings_value("tikz/layout/max-width", float, settings=settings)
+    vspace = get_settings_value("tikz/layout/vspace", float)
+    hspace = get_settings_value("tikz/layout/hspace", float)
+    max_width = get_settings_value("tikz/layout/max-width", float)
 
     xoffset = -max_width
     yoffset = -10.0
@@ -83,7 +82,7 @@ def proof_to_tikz(proof: ProofModel) -> str:
             # sign. If wrapped to a new row, ignore prev_height since it is on
             # a different row.
             eq_height = height if wrapped else max(prev_height, height)
-            total_verts.append(_eq_node(settings, proof.steps[i - 1], idoffset,
+            total_verts.append(_eq_node(DEFAULT_SETTINGS, proof.steps[i - 1], idoffset,
                                         xoffset, yoffset, hspace, eq_height))
             idoffset += 1
 

@@ -25,7 +25,7 @@ from typing import Callable, Optional, cast
 import networkx as nx
 import pyperclip
 from PySide6.QtCore import (QByteArray, QEvent, QFile, QFileInfo, QIODevice,
-                            QMimeData, QSettings, QTextStream, QTimer, QUrl,
+                            QMimeData, QTextStream, QTimer, QUrl,
                             Qt)
 from PySide6.QtGui import (QAction, QCloseEvent, QDesktopServices, QIcon,
                            QKeySequence, QMouseEvent, QShortcut)
@@ -37,7 +37,7 @@ from pyzx.utils import VertexType
 from shiboken6 import isValid
 
 from .base_panel import BasePanel
-from .common import (VT, GraphT, from_tikz, get_custom_rules_path, get_data,
+from .common import (DEFAULT_SETTINGS, VT, GraphT, from_tikz, get_custom_rules_path, get_data,
                      get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .commands import MoveNode, ProofModeCommand
@@ -68,7 +68,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
-        self.settings = QSettings("zxlive", "zxlive")
+        self.settings = DEFAULT_SETTINGS
 
         self.setWindowTitle("zxlive")
 
