@@ -105,6 +105,15 @@ class GraphScene(QGraphicsScene):
     def selected_edges(self) -> Iterator[ET]:
         return (it.e for it in self.selectedItems() if isinstance(it, EItem))
 
+    def is_selected_item_at(self, pos: QPointF) -> bool:
+        selected_items = set(self.selectedItems())
+        for item in self.items(pos, deviceTransform=QTransform()):
+            while item is not None:
+                if item in selected_items:
+                    return True
+                item = item.parentItem()
+        return False
+
     def select_vertices(self, vs: Iterable[VT]) -> None:
         """Selects the given collection of vertices."""
         self.clearSelection()
@@ -347,7 +356,7 @@ class EditGraphScene(GraphScene):
         self._is_mouse_pressed = False
 
     def mousePressEvent(self, e: QGraphicsSceneMouseEvent) -> None:
-        if e.button() == Qt.MouseButton.RightButton and self.selectedItems():
+        if e.button() == Qt.MouseButton.RightButton and self.is_selected_item_at(e.scenePos()):
             return
         press_vertex = self._vertex_at(e.scenePos())
         selected_vertices = set(self.selected_vertices)
@@ -472,8 +481,7 @@ class EditGraphScene(GraphScene):
             e.ignore()
 
     def contextMenuEvent(self, event: QGraphicsSceneContextMenuEvent) -> None:
-        selected_items = self.selectedItems()
-        if selected_items:
+        if self.is_selected_item_at(event.scenePos()):
             menu = QMenu()
             add_pattern_action = menu.addAction("Add selection to patterns")
             action = menu.exec_(event.screenPos())
