@@ -7,9 +7,9 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'zxlive'
-copyright = '2024, ZXLive team'
+copyright = '2026, ZXLive team'
 author = 'ZXLive team'
-release = '0.1'
+release = '1.1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

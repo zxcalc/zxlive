@@ -5,6 +5,14 @@
 
 ### New features
 
+### Improvements
+
+### Fixes
+
+## v1.1.0
+
+### New features
+
 - Added fault-equivalent rewrites, a set of rewrites that preserve the fault tolerance of a diagram, together with a fault weight threshold for the rewrites that are only fault-equivalent up to a given weight (#427).
 - The edge tool now lets you draw multiple parallel edges simultaneously by selecting multiple vertices before clicking and dragging (#521).
 - Added an interactive tutorial that guides you through the basics of ZXLive, which is shown on first launch and can be accessed again from the **Help > Tutorial** menu (#530).
