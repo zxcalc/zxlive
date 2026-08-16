@@ -5,7 +5,7 @@ from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
 
 import zxlive.graphscene
-from zxlive.common import SCALE, ToolType, new_graph
+from zxlive.common import SCALE, ToolType, new_graph, pos_to_view
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.graphscene import EditGraphScene
 
@@ -26,6 +26,57 @@ def _scene_with_vertex(qtbot: QtBot) -> tuple[EditGraphScene, QGraphicsView, int
     view = QGraphicsView(scene)
     qtbot.addWidget(view)
     return scene, view, vertex
+
+
+def test_empty_graph_starts_with_small_scene_rect_at_origin(qtbot: QtBot) -> None:
+    scene = EditGraphScene()
+    scene.set_graph(new_graph())
+
+    origin = QPointF(*pos_to_view(0, 0))
+    assert scene.sceneRect().center() == origin
+    assert scene.sceneRect().width() == pytest.approx(20 * SCALE)
+    assert scene.sceneRect().height() == pytest.approx(20 * SCALE)
+
+
+def test_initial_scene_rect_follows_far_away_graph(qtbot: QtBot) -> None:
+    graph = new_graph()
+    graph.add_vertex(VertexType.Z, qubit=-100, row=100)
+    scene = EditGraphScene()
+    scene.set_graph(graph)
+
+    item_bounds = scene.itemsBoundingRect()
+    assert scene.sceneRect().contains(item_bounds)
+    assert scene.sceneRect().width() == pytest.approx(item_bounds.width() + 20 * SCALE)
+    assert scene.sceneRect().height() == pytest.approx(item_bounds.height() + 20 * SCALE)
+    assert not scene.sceneRect().contains(QPointF(*pos_to_view(0, 0)))
+
+
+def test_scene_rect_grows_but_does_not_shrink_on_graph_updates(qtbot: QtBot) -> None:
+    graph = new_graph()
+    graph.add_vertex(VertexType.Z, qubit=0, row=0)
+    scene = EditGraphScene()
+    scene.set_graph(graph)
+    initial_rect = scene.sceneRect()
+
+    outward_graph = new_graph()
+    outward_graph.add_vertex(VertexType.Z, qubit=-100, row=100)
+    scene.update_graph(outward_graph)
+    expanded_rect = scene.sceneRect()
+    assert expanded_rect.top() < initial_rect.top()
+    assert expanded_rect.right() > initial_rect.right()
+
+    scene.update_graph(new_graph())
+    assert scene.sceneRect() == expanded_rect
+
+
+def test_scene_rect_grows_while_vertex_is_moved(qtbot: QtBot) -> None:
+    scene, _view, vertex = _scene_with_vertex(qtbot)
+    initial_rect = scene.sceneRect()
+
+    scene.vertex_map[vertex].setPos(initial_rect.right() + SCALE, initial_rect.bottom() + SCALE)
+
+    assert scene.sceneRect().right() > initial_rect.right()
+    assert scene.sceneRect().bottom() > initial_rect.bottom()
 
 
 def test_edge_tool_single_click_does_not_create_self_loop(qtbot: QtBot) -> None:

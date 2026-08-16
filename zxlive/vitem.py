@@ -330,6 +330,7 @@ class VItem(QGraphicsPathItem):
                 # (it will refresh all affected items in a single pass afterwards).
                 if not self.is_animated and not self.graph_scene.is_bulk_updating:
                     self.refresh()
+                    self.graph_scene.ensure_scene_rect_contains(self.sceneBoundingRect())
             
             case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
                 # Same as above, but we don't need to update neighbouring edges

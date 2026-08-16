@@ -135,6 +135,29 @@ def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     assert not app.export_tikz_series.isEnabled()
 
 
+def test_start_derivation_centers_far_away_graph(app: MainWindow, qtbot: QtBot) -> None:
+    assert isinstance(app.active_panel, GraphEditPanel)
+    app.resize(1200, 800)
+    app.show()
+
+    graph = copy.deepcopy(app.active_panel.graph)
+    for vertex in graph.vertices():
+        graph.set_position(
+            vertex,
+            graph.qubit(vertex) - 100,
+            graph.row(vertex) + 100,
+        )
+    app.active_panel.graph_view.set_graph(graph)
+
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+
+    assert isinstance(app.active_panel, ProofPanel)
+    visible_rect = app.active_panel.graph_view.mapToScene(
+        app.active_panel.graph_view.viewport().rect()
+    ).boundingRect()
+    assert visible_rect.intersects(app.active_panel.graph_scene.itemsBoundingRect())
+
+
 def test_export_tikz_series(app: MainWindow, qtbot: QtBot, tmp_path: Path,
                             monkeypatch: pytest.MonkeyPatch) -> None:
     """Exporting proof steps writes one .tikz file per step into the chosen directory."""

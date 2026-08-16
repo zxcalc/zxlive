@@ -80,6 +80,7 @@ class GraphView(QGraphicsView):
     def __init__(self, graph_scene: GraphScene) -> None:
         self.graph_scene = graph_scene
         self.tool = GraphTool.Selection
+        self._has_loaded_graph = False
 
         super().__init__(self.graph_scene)
         self.setMouseTracking(True)
@@ -117,7 +118,11 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
+        first_graph = not self._has_loaded_graph
         self.graph_scene.set_graph(g)
+        if first_graph:
+            self.centerOn(self.graph_scene.sceneRect().center())
+            self._has_loaded_graph = True
 
     def update_graph(self, g: GraphT, select_new: bool = False) -> None:
         self.graph_scene.update_graph(g, select_new)
