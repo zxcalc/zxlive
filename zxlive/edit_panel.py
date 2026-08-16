@@ -76,6 +76,7 @@ class GraphEditPanel(EditorBasePanel):
     def refresh_feature_visibility(self) -> None:
         super().refresh_feature_visibility()
         self.set_toolbar_widget_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
+        self.set_toolbar_separator_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
 
     def _start_derivation(self) -> None:
         if not self.graph_scene.g.is_well_formed():

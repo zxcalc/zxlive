@@ -180,7 +180,9 @@ class ProofPanel(BasePanel):
             self.fault_equivalent_mode.setChecked(False)
         self.set_toolbar_widget_visible(self.fault_equivalent_mode, fe_enabled)
         self.set_toolbar_widget_visible(self.fe_weight_widget, fe_enabled and self.fault_equivalent_mode.isChecked())
+        self.set_toolbar_separator_visible(self.fe_weight_widget, fe_enabled)
         self.set_toolbar_widget_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
+        self.set_toolbar_separator_visible(self.pauli_webs, is_feature_enabled(PAULI_WEBS))
 
     def toggle_FE_mode(self) -> None:
         fe_mode = self.fault_equivalent_mode.isChecked()

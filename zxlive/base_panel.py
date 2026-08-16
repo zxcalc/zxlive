@@ -96,6 +96,14 @@ class BasePanel(QWidget):
         """Toolbar widgets are wrapped in a QWidgetAction, whose visibility governs them."""
         self._toolbar_actions[widget].setVisible(visible)
 
+    def set_toolbar_separator_visible(self, last_widget: QWidget, visible: bool) -> None:
+        """Set the visibility of the separator following a toolbar section."""
+        action = self._toolbar_actions[last_widget]
+        actions = self.toolbar.actions()
+        separator = actions[actions.index(action) + 1]
+        assert separator.isSeparator()
+        separator.setVisible(visible)
+
     def is_toolbar_widget_visible(self, widget: QWidget) -> bool:
         return self._toolbar_actions[widget].isVisible()
 

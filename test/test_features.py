@@ -68,6 +68,12 @@ def _group_names(panel: ProofPanel) -> list[str]:
     return list(panel.rewrites_panel.get_visible_action_groups().keys())
 
 
+def _has_adjacent_visible_separators(panel: GraphEditPanel | ProofPanel) -> bool:
+    visible_actions = [action for action in panel.toolbar.actions() if action.isVisible()]
+    return any(first.isSeparator() and second.isSeparator()
+               for first, second in zip(visible_actions, visible_actions[1:]))
+
+
 def test_fault_equivalence_is_off_by_default(app: MainWindow, qtbot: QtBot) -> None:
     assert not is_feature_enabled(FAULT_EQUIVALENCE)
     panel = _start_derivation(app, qtbot)
@@ -176,6 +182,8 @@ def test_pauli_webs_button_follows_its_feature(app: MainWindow, qtbot: QtBot) ->
     _set_feature(app, PAULI_WEBS, False)
     assert not edit_panel.is_toolbar_widget_visible(edit_panel.pauli_webs)
     assert not proof_panel.is_toolbar_widget_visible(proof_panel.pauli_webs)
+    assert not _has_adjacent_visible_separators(edit_panel)
+    assert not _has_adjacent_visible_separators(proof_panel)
 
     _set_feature(app, PAULI_WEBS, True)
     assert edit_panel.is_toolbar_widget_visible(edit_panel.pauli_webs)
