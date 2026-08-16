@@ -32,6 +32,9 @@ from .eitem import EItem, EDragItem
 from .settings import display_setting
 
 
+_CANVAS_PADDING = 10 * SCALE
+
+
 @dataclass
 class EdgeDragSpec:
     """A translated drag path and the vertices it crosses;
@@ -67,14 +70,53 @@ class GraphScene(QGraphicsScene):
 
     def __init__(self) -> None:
         super().__init__()
-        self.setSceneRect(0, 0, 2 * OFFSET_X, 2 * OFFSET_Y)
+        self.setSceneRect(self._default_scene_rect())
         self.update_background_brush()
         self.vertex_map: dict[VT, VItem] = {}
         self.edge_map: dict[ET, dict[int, EItem]] = {}
         self.g: GraphT
+        self._has_loaded_graph = False
         # True while update_graph is running; suppresses per-item refresh
         # cascades in VItem.itemChange so that refreshes can be deduplicated.
         self._bulk_updating: bool = False
+
+    @staticmethod
+    def _default_scene_rect() -> QRectF:
+        return QRectF(
+            OFFSET_X - _CANVAS_PADDING,
+            OFFSET_Y - _CANVAS_PADDING,
+            2 * _CANVAS_PADDING,
+            2 * _CANVAS_PADDING,
+        )
+
+    @staticmethod
+    def _padded_rect(bounds: QRectF) -> QRectF:
+        return bounds.adjusted(
+            -_CANVAS_PADDING,
+            -_CANVAS_PADDING,
+            _CANVAS_PADDING,
+            _CANVAS_PADDING,
+        )
+
+    def ensure_scene_rect_contains(self, bounds: QRectF) -> None:
+        """Grow the scrollable canvas to contain ``bounds`` with padding."""
+        if bounds.isEmpty():
+            return
+        padded_bounds = self._padded_rect(bounds)
+        scene_rect = self.sceneRect()
+        if not scene_rect.contains(padded_bounds):
+            self.setSceneRect(scene_rect.united(padded_bounds))
+
+    def _update_scene_rect_for_graph(self, reset: bool = False) -> None:
+        if not self.vertex_map:
+            if reset:
+                self.setSceneRect(self._default_scene_rect())
+            return
+        bounds = self.itemsBoundingRect()
+        if reset:
+            self.setSceneRect(self._padded_rect(bounds))
+        else:
+            self.ensure_scene_rect_contains(bounds)
 
     def update_background_brush(self) -> None:
         if display_setting.dark_mode:
@@ -131,6 +173,7 @@ class GraphScene(QGraphicsScene):
         """Set the PyZX graph for the scene.
         If the scene already contains a graph, it will be replaced."""
 
+        first_graph = not self._has_loaded_graph
         self.g = g
         # Stop all animations
         for it in self.items():
@@ -139,6 +182,8 @@ class GraphScene(QGraphicsScene):
                     anim.stop()
         self.clear()
         self.add_items()
+        self._update_scene_rect_for_graph(reset=first_graph)
+        self._has_loaded_graph = True
         self.invalidate()
 
     def update_graph(self, new: GraphT, select_new: bool = False) -> None:  # noqa: PLR0912
@@ -157,6 +202,7 @@ class GraphScene(QGraphicsScene):
             view.setUpdatesEnabled(False)
         try:
             self._update_graph_inner(new, select_new)
+            self._update_scene_rect_for_graph()
         finally:
             self._bulk_updating = False
             for view in views:

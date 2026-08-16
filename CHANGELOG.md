@@ -11,6 +11,7 @@
 - Fixed a bug which caused the list of available rewrites in proof mode to not be updated until the mouse was hovered over the rewrite panel (#465)
 - Fixed closing a tab leaking its panel, so proofs no longer retain their diagram, history and rewrite worker thread after being closed (#562).
 - Changed the Ctrl+A shortcut to only select vertices and no longer select edges in order to improve performance (#515)
+- Changed graph canvases to start around their diagrams and grow dynamically, so diagrams far from the origin remain visible when entering proof mode (#526).
 
 ## v1.0.0
 This is the first version where changes were tracked. This version 1.0.0 release brings with it many new features, including:
