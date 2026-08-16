@@ -15,13 +15,16 @@ from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
 from .common import GraphT, VT
-from .settings import get_settings_value
-from .custom_rule import CustomRule, check_rule
+from .custom_rule import CustomRule
+from .matrix import (
+    check_rule_with_progress as check_rule_with_progress,
+    compute_matrix_with_progress as compute_matrix_with_progress,
+)
 from .proof import ProofModel
+from .settings import get_settings_value
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
-
 
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
@@ -357,7 +360,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
             return
         rule = CustomRule(left_graph, right_graph, name.text(), description.toPlainText())
         try:
-            check_rule(rule)
+            check_rule_with_progress(rule, parent)
         except Exception as e:
             show_error_msg("Warning!", str(e), parent=parent)
         if save_rule_dialog(rule, parent):

@@ -161,6 +161,7 @@ class BasePanel(QWidget):
         import pyperclip
         from .common import get_settings_value
         from .dialogs import show_error_msg
+        from .matrix import compute_matrix_with_progress
         precision: int = get_settings_value("matrix/precision", int, 4)
 
         def format_str(c: complex, p: int) -> str:
@@ -174,14 +175,15 @@ class BasePanel(QWidget):
             return f"{c.real:.{p}f} + {c.imag:.{p}f}j"
 
         try:
-            self.graph.auto_detect_io()
-            matrix = self.graph.to_matrix()
+            matrix = compute_matrix_with_progress(self.graph, self)
         except AttributeError:
             show_error_msg("Can't show matrix",
                            "Showing matrices for parametrized diagrams is not supported yet.", parent=self)
             return
         except Exception as e:
             show_error_msg("Can't show matrix", str(e), parent=self)
+            return
+        if matrix is None:
             return
         dialog = QDialog(self)
         dialog.setWindowTitle("Matrix")

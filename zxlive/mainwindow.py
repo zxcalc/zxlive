@@ -41,7 +41,7 @@ from .common import (DEFAULT_SETTINGS, VT, GraphT, from_tikz, get_custom_rules_p
                      get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .commands import MoveNode, ProofModeCommand
-from .custom_rule import CustomRule, check_rule, to_networkx
+from .custom_rule import CustomRule, to_networkx
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite, export_gif_dialog,
                       export_proof_dialog, get_lemma_name_and_description,
@@ -52,6 +52,7 @@ from .edit_panel import GraphEditPanel
 from .features import (FEATURES, has_seen_feature_picker, is_feature_enabled,
                        mark_feature_picker_seen, set_feature_enabled,
                        show_feature_picker)
+from .matrix import check_rule_with_progress
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel
@@ -688,7 +689,7 @@ class MainWindow(QMainWindow):
             data = self.active_panel.proof_model.to_json()
         elif isinstance(self.active_panel, RulePanel):
             try:
-                check_rule(self.active_panel.get_rule())
+                check_rule_with_progress(self.active_panel.get_rule(), self)
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             data = self.active_panel.get_rule().to_json()
@@ -719,7 +720,7 @@ class MainWindow(QMainWindow):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
             try:
-                check_rule(self.active_panel.get_rule())
+                check_rule_with_progress(self.active_panel.get_rule(), self)
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             out = save_rule_dialog(self.active_panel.get_rule(), self)
