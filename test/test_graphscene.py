@@ -1,5 +1,5 @@
 from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtWidgets import QGraphicsSceneContextMenuEvent
+from PySide6.QtWidgets import QGraphicsSceneContextMenuEvent, QGraphicsSceneMouseEvent, QGraphicsView
 import pytest
 from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
@@ -8,6 +8,67 @@ import zxlive.graphscene
 from zxlive.common import SCALE, ToolType, new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.graphscene import EditGraphScene
+
+
+def _mouse_event(event_type: QEvent.Type, pos: QPointF) -> QGraphicsSceneMouseEvent:
+    event = QGraphicsSceneMouseEvent(event_type)
+    event.setScenePos(pos)
+    event.setButton(Qt.MouseButton.LeftButton)
+    return event
+
+
+def _scene_with_vertex(qtbot: QtBot) -> tuple[EditGraphScene, QGraphicsView, int]:
+    graph = new_graph()
+    vertex = graph.add_vertex(VertexType.Z, qubit=0, row=0)
+    scene = EditGraphScene()
+    scene.curr_tool = ToolType.EDGE
+    scene.set_graph(graph)
+    view = QGraphicsView(scene)
+    qtbot.addWidget(view)
+    return scene, view, vertex
+
+
+def test_edge_tool_single_click_does_not_create_self_loop(qtbot: QtBot) -> None:
+    scene, _view, vertex = _scene_with_vertex(qtbot)
+    pos = scene.vertex_map[vertex].pos()
+    emitted: list[tuple[int, int]] = []
+    scene.edge_added.connect(lambda source, target, _crossed: emitted.append((source, target)))
+
+    scene.mousePressEvent(_mouse_event(QEvent.Type.GraphicsSceneMousePress, pos))
+    scene.mouseReleaseEvent(_mouse_event(QEvent.Type.GraphicsSceneMouseRelease, pos))
+
+    assert emitted == []
+    assert scene._drag is None
+
+
+def test_edge_tool_double_click_edits_phase_without_self_loop(qtbot: QtBot) -> None:
+    scene, _view, vertex = _scene_with_vertex(qtbot)
+    pos = scene.vertex_map[vertex].pos()
+    edges: list[tuple[int, int]] = []
+    double_clicked: list[int] = []
+    scene.edge_added.connect(lambda source, target, _crossed: edges.append((source, target)))
+    scene.vertex_double_clicked.connect(double_clicked.append)
+
+    scene.mousePressEvent(_mouse_event(QEvent.Type.GraphicsSceneMousePress, pos))
+    scene.mouseReleaseEvent(_mouse_event(QEvent.Type.GraphicsSceneMouseRelease, pos))
+    scene.mouseDoubleClickEvent(_mouse_event(QEvent.Type.GraphicsSceneMouseDoubleClick, pos))
+
+    assert edges == []
+    assert double_clicked == [vertex]
+
+
+def test_edge_tool_drag_back_to_source_creates_self_loop(qtbot: QtBot) -> None:
+    scene, _view, vertex = _scene_with_vertex(qtbot)
+    pos = scene.vertex_map[vertex].pos()
+    emitted: list[tuple[int, int]] = []
+    scene.edge_added.connect(lambda source, target, _crossed: emitted.append((source, target)))
+
+    scene.mousePressEvent(_mouse_event(QEvent.Type.GraphicsSceneMousePress, pos))
+    scene.mouseMoveEvent(_mouse_event(QEvent.Type.GraphicsSceneMouseMove, pos + QPointF(SCALE, 0)))
+    scene.mouseMoveEvent(_mouse_event(QEvent.Type.GraphicsSceneMouseMove, pos))
+    scene.mouseReleaseEvent(_mouse_event(QEvent.Type.GraphicsSceneMouseRelease, pos))
+
+    assert emitted == [(vertex, vertex)]
 
 
 def test_pattern_context_menu_only_opens_on_selected_item(

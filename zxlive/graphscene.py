@@ -391,7 +391,11 @@ class EditGraphScene(GraphScene):
                                     e.button() == Qt.MouseButton.RightButton)
         if self._drag and (self.curr_tool == ToolType.EDGE or isRightClickOnSelectTool):
             self._set_drag_sources_movable(True)
-            self.add_edge(e)
+            if self.curr_tool == ToolType.EDGE and not self._is_dragging:
+                self.removeItem(self._drag)
+                self._drag = None
+            else:
+                self.add_edge(e)
         elif not self._is_dragging and (self.curr_tool == ToolType.VERTEX or isRightClickOnSelectTool):
             self.add_vertex(e)
         else:
