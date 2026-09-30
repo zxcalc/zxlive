@@ -9,6 +9,9 @@
 
 ### Fixes
 
+- Changing an edge type via double-clicking now properly preserves edge curves (#594).
+- Changing an edge type via double-clicking now can be undone correctly (#595).
+
 ## v1.1.0
 
 ### New features
