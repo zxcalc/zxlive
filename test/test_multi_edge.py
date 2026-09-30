@@ -68,6 +68,10 @@ def test_change_edge_color_removes_stale_curve_slot() -> None:
     )
 
     command.redo()
+    command.undo()
+    assert scene.g.edata_dict((source, target, EdgeType.SIMPLE)) == {"curve_0": 1.0, "curve_1": 2.0}
+    assert scene.g.edata_dict((source, target, EdgeType.HADAMARD)) == {}
+    command.redo()
 
     assert scene.g.edata_dict((source, target, EdgeType.SIMPLE)) == {"curve_0": 2.0}
     assert scene.g.edata_dict((source, target, EdgeType.HADAMARD)) == {"curve_0": 1.0}
