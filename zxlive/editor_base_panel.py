@@ -188,7 +188,7 @@ class EditorBasePanel(BasePanel):
     def _ety_double_clicked(self, ety: EdgeType) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
-        selected = list(self.graph_scene.selected_edges)
+        selected = [it for it in self.graph_scene.selectedItems() if isinstance(it, EItem)]
         if len(selected) > 0:
             cmd = ChangeEdgeColor(self.graph_view, selected, ety)
             self.undo_stack.push(cmd)
