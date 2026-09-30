@@ -238,8 +238,8 @@ class ChangeEdgeColor(BaseCommand):
             target = (edge.e[0], edge.e[1], self.ety)
             self.g.set_edge_type(target, edge.e[2])
 
-        for edge, edata in self._original_edata.items():
-            self.g.set_edata_dict(edge, edata)
+        for e, edata in self._original_edata.items():
+            self.g.set_edata_dict(e, edata)
 
         self.update_graph_view()
 
