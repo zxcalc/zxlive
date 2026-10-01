@@ -862,3 +862,18 @@ def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     app.select_all_action.trigger()
     app.close_action.trigger()
+
+
+def test_toggle_grid(app: MainWindow) -> None:
+    from zxlive.common import get_settings_value
+    from zxlive.graphview import GraphView
+    assert app.show_grid_action.isCheckable()
+    assert app.show_grid_action.isChecked()
+    assert get_settings_value("show-grid", bool)
+    views = app.tab_widget.currentWidget().findChildren(GraphView)
+    assert views
+    app.show_grid_action.trigger()
+    assert not app.show_grid_action.isChecked()
+    assert not get_settings_value("show-grid", bool)
+    app.show_grid_action.trigger()
+    assert get_settings_value("show-grid", bool)
