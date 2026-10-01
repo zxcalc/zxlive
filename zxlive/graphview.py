@@ -341,7 +341,7 @@ class GraphView(QGraphicsView):
         painter.setBrush(bg_color)
         painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
-        if not self.draw_background_lines:
+        if not self.draw_background_lines or not get_settings_value("show-grid", bool, True):
             return
 
         # Calculate grid lines
@@ -364,6 +364,11 @@ class GraphView(QGraphicsView):
         painter.drawLines(lines)
         painter.setPen(QPen(thick_grid_color, 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
+
+    def refresh_background(self) -> None:
+        """Redraw the (cached) background, e.g. after the grid is toggled."""
+        self.resetCachedContent()
+        self.viewport().update()
 
     def update_font(self) -> None:
         for i in self.graph_scene.items():
