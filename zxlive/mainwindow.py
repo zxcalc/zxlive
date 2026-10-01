@@ -1142,7 +1142,10 @@ class MainWindow(QMainWindow):
         """Show or hide the background grid in all open tabs."""
         set_settings_value("show-grid", checked, bool)
         for i in range(self.tab_widget.count()):
-            for view in self.tab_widget.widget(i).findChildren(GraphView):
+            tab = self.tab_widget.widget(i)
+            if tab is None:
+                continue
+            for view in tab.findChildren(GraphView):
                 view.refresh_background()
 
     def _toggle_feature(self, feature_id: str, enabled: bool) -> None:
