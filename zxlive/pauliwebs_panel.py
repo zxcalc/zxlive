@@ -87,9 +87,6 @@ class PauliWebsPanel(BasePanel):
         except Exception as err:
             show_error_msg("Failed to compute Pauli webs", str(err), parent=self)
             return
-        if stabs is None or regions is None:
-            show_error_msg("Failed to compute Pauli webs", parent=self)
-            return
 
         # Store the webs
         self._pauli_webs = stabs + regions
