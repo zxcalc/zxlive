@@ -5,6 +5,8 @@
 
 ### New features
 
+- Added a **View → Show grid** option (also available in the settings dialog) to toggle the background grid on and off.
+
 ### Improvements
 
 ### Fixes

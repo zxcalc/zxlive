@@ -49,6 +49,7 @@ from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
                       show_error_msg, try_import_tikz, write_to_file)
 from .edit_panel import GraphEditPanel
+from .graphview import GraphView
 from .features import (FEATURES, has_seen_feature_picker, is_feature_enabled,
                        mark_feature_picker_seen, set_feature_enabled,
                        show_feature_picker)
@@ -240,11 +241,18 @@ class MainWindow(QMainWindow):
             "Auto arrange", self.auto_arrange, QKeySequence("Ctrl+L"),
             "Automatically arrange vertices using spring layout")
 
+        self.show_grid_action = self._new_action(
+            "Show grid", self.toggle_grid, None,
+            "Show or hide the background grid")
+        self.show_grid_action.setCheckable(True)
+        self.show_grid_action.setChecked(get_settings_value("show-grid", bool, True))
+
         view_menu = menu.addMenu("&View")
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
         view_menu.addAction(self.auto_arrange_action)
+        view_menu.addAction(self.show_grid_action)
         view_menu.addSeparator()
 
         features_menu = view_menu.addMenu("&Features")
@@ -1129,6 +1137,16 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
+
+    def toggle_grid(self, checked: bool) -> None:
+        """Show or hide the background grid in all open tabs."""
+        set_settings_value("show-grid", checked, bool)
+        for i in range(self.tab_widget.count()):
+            tab = self.tab_widget.widget(i)
+            if tab is None:
+                continue
+            for view in tab.findChildren(GraphView):
+                view.refresh_background()
 
     def _toggle_feature(self, feature_id: str, enabled: bool) -> None:
         """Toggle an optional feature from the View menu and update the open tabs."""

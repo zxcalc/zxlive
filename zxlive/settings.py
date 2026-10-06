@@ -55,6 +55,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "startup-behavior": "restore",
     "phase-label-color": "",
     "show-vertex-indices": False,
+    "show-grid": True,
 }
 
 font_defaults: dict[str, str | int | bool | None] = {
