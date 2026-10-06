@@ -133,6 +133,7 @@ general_settings: list[SettingsData] = [
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
     {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Color},
     {"id": "show-vertex-indices", "label": "Show vertex indices", "type": FormInputType.Bool},
+    {"id": "show-grid", "label": "Show grid", "type": FormInputType.Bool},
 ]
 
 
@@ -423,6 +424,9 @@ class SettingsDialog(QDialog):
         pos = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
         if pos != self.prev_tab_bar_location:
             self.main_window.tab_widget.setTabPosition(pos)
+        show_grid = self.get_settings_value("show-grid", bool)
+        self.main_window.show_grid_action.setChecked(show_grid)
+        self.main_window.toggle_grid(show_grid)
         app = QApplication.instance()
         if isinstance(app, QApplication):
             app.setFont(display_setting.font)

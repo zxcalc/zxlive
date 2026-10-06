@@ -877,3 +877,21 @@ def test_toggle_grid(app: MainWindow) -> None:
     assert not get_settings_value("show-grid", bool)
     app.show_grid_action.trigger()
     assert get_settings_value("show-grid", bool)
+
+
+def test_settings_dialog_show_grid(app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from zxlive.common import get_settings_value
+    monkeypatch.setattr("zxlive.settings_dialog.display_setting.update", lambda: None)
+    dialog = SettingsDialog(app)
+    qtbot.addWidget(dialog)
+    checkbox = dialog.value_dict["show-grid"]
+    assert isinstance(checkbox, QCheckBox)
+    assert checkbox.isChecked() == app.show_grid_action.isChecked()
+    checkbox.setChecked(False)
+    dialog.update_global_settings()
+    dialog.apply_global_settings()
+    assert not get_settings_value("show-grid", bool)
+    assert not app.show_grid_action.isChecked()
+    dialog.close()
+    app.show_grid_action.trigger()
+    assert get_settings_value("show-grid", bool)
