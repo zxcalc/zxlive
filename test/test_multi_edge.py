@@ -14,12 +14,15 @@
 # limitations under the License.
 
 
+from types import SimpleNamespace
+
 from PySide6.QtCore import QEvent, QPointF
 from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 from pyzx.utils import EdgeType, VertexType
 from pytestqt.qtbot import QtBot
 
 from zxlive.common import GraphT, SCALE, ToolType, new_graph
+from zxlive.commands import ChangeEdgeColor
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.eitem import EDragItem
 from zxlive.graphscene import EditGraphScene, EdgeDragSpec
@@ -41,6 +44,64 @@ def _parallel_graph() -> tuple[GraphT, int, int, int, int]:
     right_top = g.add_vertex(VertexType.Z, qubit=0, row=2)
     right_bottom = g.add_vertex(VertexType.Z, qubit=1, row=2)
     return g, left_top, left_bottom, right_top, right_bottom
+
+
+def test_change_edge_color_removes_stale_curve_slot() -> None:
+    g = new_graph()
+    source = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    target = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    g.add_edge((source, target), EdgeType.SIMPLE)
+    g.add_edge((source, target), EdgeType.SIMPLE)
+    edge = (source, target, EdgeType.SIMPLE)
+    g.set_edata(edge, "curve_0", 1.0)
+    g.set_edata(edge, "curve_1", 2.0)
+
+    scene = SimpleNamespace(g=g)
+    view = SimpleNamespace(
+        graph_scene=scene,
+        update_graph=lambda new, select_new=False: setattr(scene, "g", new),
+    )
+    command = ChangeEdgeColor(
+        view,
+        [SimpleNamespace(e=edge, index=0)],
+        EdgeType.HADAMARD,
+    )
+
+    command.redo()
+    command.undo()
+    assert scene.g.edata_dict((source, target, EdgeType.SIMPLE)) == {"curve_0": 1.0, "curve_1": 2.0}
+    assert scene.g.edata_dict((source, target, EdgeType.HADAMARD)) == {}
+    command.redo()
+
+    assert scene.g.edata_dict((source, target, EdgeType.SIMPLE)) == {"curve_0": 2.0}
+    assert scene.g.edata_dict((source, target, EdgeType.HADAMARD)) == {"curve_0": 1.0}
+
+
+def test_change_edge_color_removes_selected_last_curve_slot() -> None:
+    g = new_graph()
+    source = g.add_vertex(VertexType.Z, qubit=0, row=0)
+    target = g.add_vertex(VertexType.Z, qubit=0, row=1)
+    g.add_edge((source, target), EdgeType.SIMPLE)
+    g.add_edge((source, target), EdgeType.SIMPLE)
+    edge = (source, target, EdgeType.SIMPLE)
+    g.set_edata(edge, "curve_0", 1.0)
+    g.set_edata(edge, "curve_1", 2.0)
+
+    scene = SimpleNamespace(g=g)
+    view = SimpleNamespace(
+        graph_scene=scene,
+        update_graph=lambda new, select_new=False: setattr(scene, "g", new),
+    )
+    command = ChangeEdgeColor(
+        view,
+        [SimpleNamespace(e=edge, index=1)],
+        EdgeType.HADAMARD,
+    )
+
+    command.redo()
+
+    assert scene.g.edata_dict((source, target, EdgeType.SIMPLE)) == {"curve_0": 1.0}
+    assert scene.g.edata_dict((source, target, EdgeType.HADAMARD)) == {"curve_0": 2.0}
 
 
 def _release_multi_drag(scene: EditGraphScene, sources: list[int],
