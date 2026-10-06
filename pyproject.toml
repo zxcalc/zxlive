@@ -40,7 +40,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "mypy>=2.3.0",
+    "mypy~=2.4.0",
     "ruff",
     "pytest-qt",
     "complexipy",
