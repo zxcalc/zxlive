@@ -5,11 +5,11 @@
 
 ### New features
 
-- Added a **View → Show grid** option (also available in the settings dialog) to toggle the background grid on and off.
+- Added a **View → Show grid** option (also available in the settings dialog) to toggle the background grid on and off (#598).
 
 ### Improvements
 
-- Matrix computations (**Show Matrix** and custom rule validation) now run in a background worker process with a progress dialog, so they can be aborted or skipped without freezing the interface. The worker starts on first use and is reused for later computations (#568, fixes #471).
+- Matrix computations (**Show Matrix** and custom rule validation) now run in a background worker process with a progress dialog, so they can be aborted or skipped without freezing the interface. The worker starts on first use and is reused for later computations (#568).
   **Note for embedding:** standalone scripts that call `get_embedded_app()` must now put their code under an `if __name__ == "__main__":` guard, as the matrix process re-imports the main script (see `embedded_zxlive_demo.py`). Jupyter notebooks are unaffected.
 
 ### Fixes
