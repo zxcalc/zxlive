@@ -204,46 +204,53 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        view = obj.parent()
+        if not isinstance(view, GraphView) or not isinstance(view.graph_scene, EditGraphScene):
+            return super().eventFilter(obj, event)
         if isinstance(event, QDropEvent):
-            view = obj.parent()
-            if isinstance(view, GraphView) and isinstance(view.graph_scene, EditGraphScene):
-                if not event.mimeData().hasFormat(_PATTERN_MIME_TYPE):
-                    event.ignore()
-                    return True
-                if event.type() == QEvent.Type.Drop:
-                    self.graph_view, self.graph_scene = view, view.graph_scene
-                    pos = view.mapToScene(event.position().toPoint())
-                    path = bytes(event.mimeData().data(_PATTERN_MIME_TYPE).data()).decode("utf-8")
-                    self.insert_pattern_from_sidebar(path, pos_from_view(pos.x(), pos.y()))
-                event.setDropAction(Qt.DropAction.CopyAction)
-                event.accept()
-                return True
-        if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease,
-                            QEvent.Type.MouseButtonDblClick, QEvent.Type.ContextMenu):
-            view = obj.parent()
-            if (isinstance(view, GraphView) and isinstance(view.graph_scene, EditGraphScene)
-                    and view.graph_scene.curr_tool == ToolType.SELECT and self.patterns_list.selectedItems()):
-                if event.type() == QEvent.Type.MouseButtonPress:
-                    self._pattern_inserted = False
-                if isinstance(event, (QMouseEvent, QContextMenuEvent)):
-                    pos = event.position().toPoint() if isinstance(event, QMouseEvent) else event.pos()
-                    if (view.graph_scene.is_selected_item_at(view.mapToScene(pos))
-                            and not (event.type() == QEvent.Type.ContextMenu and self._pattern_inserted)):
-                        return super().eventFilter(obj, event)
-                if isinstance(event, QMouseEvent):
-                    if event.button() != Qt.MouseButton.RightButton:
-                        return super().eventFilter(obj, event)
-                    if event.type() == QEvent.Type.MouseButtonRelease:
-                        self.graph_view, self.graph_scene = view, view.graph_scene
-                        pos = view.mapToScene(event.position().toPoint())
-                        item = self.patterns_list.selectedItems()[0]
-                        path = os.path.join(self.patterns_list.patterns_folder, item.text() + ".zxg")
-                        self.insert_pattern_from_sidebar(path, pos_from_view(pos.x(), pos.y()))
-                        self._pattern_inserted = True
-                # Consume the press and context menu too, preventing vertex/edge creation.
-                event.accept()
-                return True
+            return self._filter_pattern_drop(view, view.graph_scene, event)
+        if isinstance(event, (QMouseEvent, QContextMenuEvent)):
+            return self._filter_pattern_click(view, view.graph_scene, event)
         return super().eventFilter(obj, event)
+
+    def _filter_pattern_drop(self, view: GraphView, scene: EditGraphScene, event: QDropEvent) -> bool:
+        if not event.mimeData().hasFormat(_PATTERN_MIME_TYPE):
+            event.ignore()
+            return True
+        if event.type() == QEvent.Type.Drop:
+            self.graph_view, self.graph_scene = view, scene  # this ensures the relevant graph view/scene are selected in the rule_panel
+            scene_pos = view.mapToScene(event.position().toPoint())
+            path = bytes(event.mimeData().data(_PATTERN_MIME_TYPE).data()).decode("utf-8")
+            self.insert_pattern_from_sidebar(path, pos_from_view(scene_pos.x(), scene_pos.y()))
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+        return True
+
+    def _filter_pattern_click(self, view: GraphView, scene: EditGraphScene,
+                              event: QMouseEvent | QContextMenuEvent) -> bool:
+        if event.type() not in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease,
+                                QEvent.Type.MouseButtonDblClick, QEvent.Type.ContextMenu):
+            return False
+        if scene.curr_tool != ToolType.SELECT or not self.patterns_list.selectedItems():
+            return False
+        if isinstance(event, QMouseEvent) and event.button() != Qt.MouseButton.RightButton:
+            return False
+        if event.type() == QEvent.Type.MouseButtonPress:
+            self._pattern_inserted = False
+        viewport_pos = event.position().toPoint() if isinstance(event, QMouseEvent) else event.pos()
+        scene_pos = view.mapToScene(viewport_pos)
+        if (scene.is_selected_item_at(scene_pos)
+                and not (event.type() == QEvent.Type.ContextMenu and self._pattern_inserted)):
+            return False
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            self.graph_view, self.graph_scene = view, scene
+            item = self.patterns_list.selectedItems()[0]
+            path = os.path.join(self.patterns_list.patterns_folder, item.text() + ".zxg")
+            self.insert_pattern_from_sidebar(path, pos_from_view(scene_pos.x(), scene_pos.y()))
+            self._pattern_inserted = True
+        # Consume the press and context menu too, preventing vertex/edge creation.
+        event.accept()
+        return True
 
     def paste_graph(self, graph: GraphT, position: Optional[tuple[float, float]] = None) -> None:
         """Paste with the usual offset, or place the graph's top-left corner at position."""
