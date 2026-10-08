@@ -74,7 +74,7 @@ runs:
 
     - name: Submit signing request to SignPath
       id: sign
-      uses: signpath/github-action-submit-signing-request@v2
+      uses: signpath/github-action-submit-signing-request@v3
       with:
         api-token: ${{ inputs.api-token }}
         organization-id: ${{ inputs.organization-id }}
