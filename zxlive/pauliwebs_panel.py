@@ -84,6 +84,7 @@ class PauliWebsPanel(BasePanel):
 
         try:
             stabs, regions = compute_pauli_webs(simple_g)
+            assert stabs is not None and regions is not None # TODO: Fix type annotation in pyzx
         except Exception as err:
             show_error_msg("Failed to compute Pauli webs", str(err), parent=self)
             return

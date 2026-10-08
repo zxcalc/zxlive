@@ -862,3 +862,36 @@ def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     app.select_all_action.trigger()
     app.close_action.trigger()
+
+
+def test_toggle_grid(app: MainWindow) -> None:
+    from zxlive.common import get_settings_value
+    from zxlive.graphview import GraphView
+    assert app.show_grid_action.isCheckable()
+    assert app.show_grid_action.isChecked()
+    assert get_settings_value("show-grid", bool)
+    views = app.tab_widget.currentWidget().findChildren(GraphView)
+    assert views
+    app.show_grid_action.trigger()
+    assert not app.show_grid_action.isChecked()
+    assert not get_settings_value("show-grid", bool)
+    app.show_grid_action.trigger()
+    assert get_settings_value("show-grid", bool)
+
+
+def test_settings_dialog_show_grid(app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from zxlive.common import get_settings_value
+    monkeypatch.setattr("zxlive.settings_dialog.display_setting.update", lambda: None)
+    dialog = SettingsDialog(app)
+    qtbot.addWidget(dialog)
+    checkbox = dialog.value_dict["show-grid"]
+    assert isinstance(checkbox, QCheckBox)
+    assert checkbox.isChecked() == app.show_grid_action.isChecked()
+    checkbox.setChecked(False)
+    dialog.update_global_settings()
+    dialog.apply_global_settings()
+    assert not get_settings_value("show-grid", bool)
+    assert not app.show_grid_action.isChecked()
+    dialog.close()
+    app.show_grid_action.trigger()
+    assert get_settings_value("show-grid", bool)

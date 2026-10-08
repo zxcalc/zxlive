@@ -37,21 +37,23 @@ from pyzx.utils import VertexType
 from shiboken6 import isValid
 
 from .base_panel import BasePanel
-from .common import (DEFAULT_SETTINGS, VT, GraphT, from_tikz, get_custom_rules_path, get_data,
+from .common import (DEFAULT_SETTINGS, VT, GraphT, get_custom_rules_path, get_data,
                      get_settings_value, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .commands import MoveNode, ProofModeCommand
-from .custom_rule import CustomRule, check_rule, to_networkx
+from .custom_rule import CustomRule, to_networkx
 from .dialogs import (FileFormat, ImportGraphOutput, ImportProofOutput,
                       ImportRuleOutput, create_new_rewrite, export_gif_dialog,
                       export_proof_dialog, get_lemma_name_and_description,
                       import_diagram_dialog, import_diagram_from_file,
                       save_diagram_dialog, save_proof_dialog, save_rule_dialog,
-                      show_error_msg, write_to_file)
+                      show_error_msg, try_import_tikz, write_to_file)
 from .edit_panel import GraphEditPanel
+from .graphview import GraphView
 from .features import (FEATURES, has_seen_feature_picker, is_feature_enabled,
                        mark_feature_picker_seen, set_feature_enabled,
                        show_feature_picker)
+from .matrix import check_rule_with_progress
 from .proof_panel import ProofPanel
 from .pauliwebs_panel import PauliWebsPanel
 from .rule_panel import RulePanel
@@ -240,11 +242,18 @@ class MainWindow(QMainWindow):
             "Auto arrange", self.auto_arrange, QKeySequence("Ctrl+L"),
             "Automatically arrange vertices using spring layout")
 
+        self.show_grid_action = self._new_action(
+            "Show grid", self.toggle_grid, None,
+            "Show or hide the background grid")
+        self.show_grid_action.setCheckable(True)
+        self.show_grid_action.setChecked(get_settings_value("show-grid", bool, True))
+
         view_menu = menu.addMenu("&View")
         view_menu.addAction(self.zoom_in_action)
         view_menu.addAction(self.zoom_out_action)
         view_menu.addAction(self.fit_view_action)
         view_menu.addAction(self.auto_arrange_action)
+        view_menu.addAction(self.show_grid_action)
         view_menu.addSeparator()
 
         features_menu = view_menu.addMenu("&Features")
@@ -688,7 +697,7 @@ class MainWindow(QMainWindow):
             data = self.active_panel.proof_model.to_json()
         elif isinstance(self.active_panel, RulePanel):
             try:
-                check_rule(self.active_panel.get_rule())
+                check_rule_with_progress(self.active_panel.get_rule(), self)
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             data = self.active_panel.get_rule().to_json()
@@ -719,7 +728,7 @@ class MainWindow(QMainWindow):
             out = save_proof_dialog(self.active_panel.proof_model, self)
         elif isinstance(self.active_panel, RulePanel):
             try:
-                check_rule(self.active_panel.get_rule())
+                check_rule_with_progress(self.active_panel.get_rule(), self)
             except Exception as e:
                 show_error_msg("Warning!", str(e), parent=self)
             out = save_rule_dialog(self.active_panel.get_rule(), self)
@@ -846,31 +855,7 @@ class MainWindow(QMainWindow):
             tikz = pyperclip.paste()
         if not tikz:
             return None
-        try:
-            return from_tikz(tikz)
-        except Exception as e:
-            from .common import find_unknown_tikz_styles
-            unknown = find_unknown_tikz_styles(tikz)
-            detail = str(e)
-            if unknown:
-                detail += "\n\nUnknown styles: " + ", ".join(unknown)
-            msg = QMessageBox(self)
-            msg.setIcon(QMessageBox.Icon.Warning)
-            msg.setText("TikZ import error")
-            msg.setInformativeText(detail)
-            retry_btn = msg.addButton("Retry ignoring errors",
-                                      QMessageBox.ButtonRole.AcceptRole)
-            msg.addButton(QMessageBox.StandardButton.Cancel)
-            msg.exec()
-            if msg.clickedButton() != retry_btn:
-                return None
-        try:
-            return from_tikz(tikz, ignore_errors=True)
-        except Exception as e:
-            show_error_msg("TikZ import error",
-                           f"Error while importing TikZ: {e}",
-                           parent=self)
-            return None
+        return try_import_tikz(tikz, parent=self)
 
     def delete_graph(self) -> None:
         assert self.active_panel is not None
@@ -1153,6 +1138,16 @@ class MainWindow(QMainWindow):
         from .common import set_settings_value
         checked = self.auto_save_action.isChecked()
         set_settings_value("auto-save", checked, bool)
+
+    def toggle_grid(self, checked: bool) -> None:
+        """Show or hide the background grid in all open tabs."""
+        set_settings_value("show-grid", checked, bool)
+        for i in range(self.tab_widget.count()):
+            tab = self.tab_widget.widget(i)
+            if tab is None:
+                continue
+            for view in tab.findChildren(GraphView):
+                view.refresh_background()
 
     def _toggle_feature(self, feature_id: str, enabled: bool) -> None:
         """Toggle an optional feature from the View menu and update the open tabs."""
