@@ -5,10 +5,10 @@ import os
 import subprocess
 import sys
 from enum import Enum
-from typing import Callable, Iterator, Optional, TypedDict
+from typing import Callable, Iterator, Optional, Sequence, TypedDict
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
-from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QMouseEvent, QPainter, QPalette, QPen, QPixmap
+from PySide6.QtCore import QEvent, QMimeData, QObject, QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
+from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QDropEvent, QIcon, QMouseEvent, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
                                QListWidgetItem, QMenu, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
@@ -33,6 +33,8 @@ from .graphview import GraphView, graph_to_tooltip
 from .settings import display_setting
 
 from . import animations
+
+_PATTERN_MIME_TYPE = "application/x-zxlive-pattern"
 
 
 class ShapeType(Enum):
@@ -121,6 +123,7 @@ class EditorBasePanel(BasePanel):
 
             self.patterns_list = PatternsListWidget(self, self.patterns_folder)
             for view in self.findChildren(GraphView):
+                view.setAcceptDrops(True)
                 view.viewport().installEventFilter(self)
             patterns_layout.addWidget(self.patterns_list)
             self.sidebar.addWidget(patterns_container)
@@ -201,6 +204,20 @@ class EditorBasePanel(BasePanel):
             self.undo_stack.push(cmd)
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if isinstance(event, QDropEvent):
+            view = obj.parent()
+            if isinstance(view, GraphView) and isinstance(view.graph_scene, EditGraphScene):
+                if not event.mimeData().hasFormat(_PATTERN_MIME_TYPE):
+                    event.ignore()
+                    return True
+                if event.type() == QEvent.Type.Drop:
+                    self.graph_view, self.graph_scene = view, view.graph_scene
+                    pos = view.mapToScene(event.position().toPoint())
+                    path = bytes(event.mimeData().data(_PATTERN_MIME_TYPE).data()).decode("utf-8")
+                    self.insert_pattern_from_sidebar(path, pos_from_view(pos.x(), pos.y()))
+                event.setDropAction(Qt.DropAction.CopyAction)
+                event.accept()
+                return True
         if event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease,
                             QEvent.Type.MouseButtonDblClick, QEvent.Type.ContextMenu):
             view = obj.parent()
@@ -578,6 +595,8 @@ class PatternsListWidget(QListWidget):
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setViewMode(QListView.ViewMode.ListMode)
         self.setMovement(QListView.Movement.Static)
+        self.setDragDropMode(QListView.DragDropMode.DragOnly)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
         self.setWordWrap(True)
         self.setSpacing(2)
         self.setStyleSheet("""
@@ -601,6 +620,13 @@ class PatternsListWidget(QListWidget):
         self.itemDoubleClicked.connect(self._pattern_selected)
         self.itemEntered.connect(self._set_pattern_tooltip)
         self.refresh_patterns()
+
+    def mimeData(self, items: Sequence[QListWidgetItem]) -> QMimeData:
+        mime = QMimeData()
+        if items and items[0].flags() != Qt.ItemFlag.NoItemFlags:
+            path = os.path.join(self.patterns_folder, items[0].text() + ".zxg")
+            mime.setData(_PATTERN_MIME_TYPE, os.path.abspath(path).encode("utf-8"))
+        return mime
 
     def refresh_patterns(self) -> None:
         """Refresh the list of patterns from the patterns folder."""

@@ -1,8 +1,8 @@
 from pathlib import Path
 from fractions import Fraction
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
-from PySide6.QtGui import QContextMenuEvent
+from PySide6.QtCore import QEvent, QMimeData, QPoint, QPointF, Qt
+from PySide6.QtGui import QContextMenuEvent, QDragEnterEvent, QDragMoveEvent, QDropEvent
 from PySide6.QtWidgets import QApplication, QGraphicsSceneContextMenuEvent, QGraphicsSceneMouseEvent, QGraphicsView
 import pytest
 from pytestqt.qtbot import QtBot
@@ -338,3 +338,46 @@ def test_selected_pattern_inserts_into_both_rule_canvases(qtbot: QtBot, pattern_
         assert view.graph_scene.g.num_vertices() == 2
     panel._vty_clicked(VertexType.Z)
     assert not panel.patterns_list.selectedItems()
+
+
+@pytest.mark.parametrize("rule_editor", [False, True])
+def test_drag_pattern_to_canvas(
+    qtbot: QtBot, pattern_panel: GraphEditPanel, rule_editor: bool
+) -> None:
+    panel = RulePanel(new_graph(), new_graph(), "", "") if rule_editor else pattern_panel
+    if rule_editor:
+        qtbot.addWidget(panel)
+        panel.resize(1000, 600)
+        panel.show()
+    mime = panel.patterns_list.mimeData([panel.patterns_list.item(0)])
+    # The payload survives clearing the sidebar selection during a drag.
+    panel.patterns_list.clearSelection()
+    assert panel.patterns_list.dragEnabled()
+    views = (panel.graph_view_left, panel.graph_view_right) if isinstance(panel, RulePanel) else (panel.graph_view,)
+    for view in views:
+        before = set(view.graph_scene.g.vertices())
+        pos = view.mapFromScene(QPointF(*pos_to_view(1, 2)))
+        for event in (QDragEnterEvent(pos, Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                                      Qt.KeyboardModifier.NoModifier),
+                      QDragMoveEvent(pos, Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                                     Qt.KeyboardModifier.NoModifier),
+                      QDropEvent(QPointF(pos), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                                 Qt.KeyboardModifier.NoModifier)):
+            QApplication.sendEvent(view.viewport(), event)
+            assert event.isAccepted()
+            assert event.dropAction() == Qt.DropAction.CopyAction
+        added = set(view.graph_scene.g.vertices()) - before
+        assert len(added) == 2
+        assert {(view.graph_scene.g.row(v), view.graph_scene.g.qubit(v)) for v in added} == {(1, 2), (2, 3)}
+    panel.undo_stack.undo()
+    assert set(views[-1].graph_scene.g.vertices()) == before
+
+
+def test_canvas_rejects_unrelated_drag_data(pattern_panel: GraphEditPanel) -> None:
+    mime = QMimeData()
+    mime.setText("unrelated text")
+    event = QDragEnterEvent(QPoint(), Qt.DropAction.CopyAction, mime, Qt.MouseButton.LeftButton,
+                            Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(pattern_panel.graph_view.viewport(), event)
+    assert not event.isAccepted()
+    assert pattern_panel.graph.num_vertices() == 1
