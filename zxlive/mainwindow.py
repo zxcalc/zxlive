@@ -373,9 +373,10 @@ class MainWindow(QMainWindow):
         # Paste is enabled only if there is something in the clipboard.
         self.paste_action.setEnabled(has_active_tab and self._has_pasteable_clipboard_data())
 
-        # Undo and redo are always disabled whether on a new tab or closing the last tab.
-        self.undo_action.setEnabled(False)
-        self.redo_action.setEnabled(False)
+        # Preserve the active tab's undo/redo availability when resetting menus.
+        panel = self.active_panel if has_active_tab else None
+        self.undo_action.setEnabled(panel is not None and panel.undo_stack.canUndo())
+        self.redo_action.setEnabled(panel is not None and panel.undo_stack.canRedo())
 
         # TODO: As an enhancement, cut, copy, delete, select all and
         # deselect all should start disabled even on a new tab, and

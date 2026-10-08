@@ -15,6 +15,7 @@
 
 ### Fixes
 
+- Fixed Undo and Redo becoming disabled after switching tabs or closing another tab (#593).
 - Changing an edge type via double-clicking now properly preserves edge curves (#594).
 - Changing an edge type via double-clicking now can be undone correctly (#595).
 

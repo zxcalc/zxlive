@@ -29,7 +29,7 @@ import pyzx
 from pyzx.utils import EdgeType, VertexType
 
 import zxlive.rewrite_action
-from zxlive.commands import AddRewriteStep
+from zxlive.commands import AddNode, AddRewriteStep, ProofModeCommand
 from zxlive.dialogs import import_diagram_from_file
 from zxlive.common import GraphT, W_INPUT_OFFSET, new_graph
 from zxlive.edit_panel import GraphEditPanel
@@ -102,6 +102,51 @@ def test_undo_redo_actions(app: MainWindow) -> None:
     app.undo_action.trigger()
     assert not app.undo_action.isEnabled()
     assert app.redo_action.isEnabled()
+
+
+@pytest.mark.parametrize("proof_mode", [False, True])
+@pytest.mark.parametrize("redo_available", [False, True])
+@pytest.mark.parametrize("close_other_tab", [False, True])
+def test_undo_redo_after_changing_tabs(
+    app: MainWindow, proof_mode: bool, redo_available: bool, close_other_tab: bool
+) -> None:
+    if proof_mode:
+        app.new_deriv(new_graph())
+    else:
+        app.new_graph()
+    panel = app.active_panel
+    assert panel is not None
+    panel_index = app.tab_widget.currentIndex()
+    cmd = AddNode(panel.graph_view, 0, 0, VertexType.Z)
+    if isinstance(panel, ProofPanel):
+        panel.undo_stack.push(ProofModeCommand(cmd, panel.step_view))
+    else:
+        panel.undo_stack.push(cmd)
+    if redo_available:
+        app.undo_action.trigger()
+    assert panel.graph.num_vertices() == (0 if redo_available else 1)
+
+    app.new_graph()
+    other_panel = app.active_panel
+    assert other_panel is not None
+    assert not app.undo_action.isEnabled()
+    assert not app.redo_action.isEnabled()
+
+    if close_other_tab:
+        app.close_tab(app.tab_widget.currentIndex())
+    else:
+        app.tab_widget.setCurrentIndex(panel_index)
+    assert app.active_panel is panel
+    assert app.undo_action.isEnabled() == (not redo_available)
+    assert app.redo_action.isEnabled() == redo_available
+
+    action = app.redo_action if redo_available else app.undo_action
+    action.trigger()
+    assert panel.graph.num_vertices() == (1 if redo_available else 0)
+    if not close_other_tab:
+        assert other_panel.graph.num_vertices() == 0
+    assert app.undo_action.isEnabled() == redo_available
+    assert app.redo_action.isEnabled() == (not redo_available)
 
 
 def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
