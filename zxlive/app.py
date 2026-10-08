@@ -25,7 +25,7 @@ from PySide6.QtWidgets import QApplication
 
 from .mainwindow import MainWindow
 from .common import get_data, GraphT, get_settings_value
-from .matrix import shutdown_matrix_worker
+from .matrix import kill_matrix_worker
 from .settings import display_setting
 from .update_checker import UpdateChecker
 from .dialogs import show_update_available_dialog
@@ -54,7 +54,6 @@ class ZXLive(QApplication):
         main_window = self._ensure_main_window()
 
         self.lastWindowClosed.connect(self.quit)
-        self.aboutToQuit.connect(shutdown_matrix_worker)
 
         if not standalone:
             return
@@ -90,11 +89,12 @@ class ZXLive(QApplication):
         main_window.maybe_show_tutorial_on_first_run()
 
     def _apply_base_settings(self) -> None:
-        """Set font, app name, and version metadata."""
+        """Set font, app name and version metadata, and stop the matrix worker on quit."""
         self.setFont(display_setting.font)
         self.setApplicationName('ZXLive')
         self.setDesktopFileName('ZXLive')
         self.setApplicationVersion(get_version())
+        self.aboutToQuit.connect(kill_matrix_worker)
 
     def _ensure_main_window(self) -> MainWindow:
         """Create and configure the main window if it does not already exist."""

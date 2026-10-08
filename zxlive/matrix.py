@@ -27,8 +27,8 @@ def _get_executor() -> ProcessPoolExecutor:
     return _executor
 
 
-def _kill_executor() -> None:
-    """Kill the worker, including any running job, and discard the executor."""
+def kill_matrix_worker() -> None:
+    """Kill the matrix worker process, including any running job."""
     global _executor
     executor, _executor = _executor, None
     if executor is None:
@@ -40,14 +40,6 @@ def _kill_executor() -> None:
         executor.shutdown(wait=False, cancel_futures=True)
         for process in processes:
             process.kill()
-
-
-def shutdown_matrix_worker() -> None:
-    """Stop the matrix worker process, if one is running."""
-    global _executor
-    executor, _executor = _executor, None
-    if executor is not None:
-        executor.shutdown(cancel_futures=True)
 
 
 def _compute_matrix(graph: GraphT) -> np.ndarray:
@@ -79,16 +71,20 @@ def _wait_with_dialog(future: Future[Any], message: str, cancel_text: str,
 
 def _run_with_progress(function: Callable[..., Any], args: tuple[Any, ...], message: str,
                        cancel_text: str, parent: QWidget) -> Any:
-    """Run function(*args) in the worker process. Returns None if the user cancels."""
+    """Run function(*args) in the worker process. Returns None if cancelled or killed."""
+    executor = _get_executor()
     try:
-        future = _get_executor().submit(function, *args)
+        future = executor.submit(function, *args)
         if not _wait_with_dialog(future, message, cancel_text, parent):
-            _kill_executor()
-            _get_executor().submit(os.getpid)  # Warm up a replacement so the next job starts quickly.
+            if _executor is executor:  # Cancelled by the user, not by the app quitting.
+                kill_matrix_worker()
+                _get_executor().submit(os.getpid)  # Warm up a replacement so the next job starts quickly.
             return None
         return future.result()
     except BrokenProcessPool as error:
-        _kill_executor()
+        if _executor is not executor:
+            return None  # Killed by kill_matrix_worker, e.g. because the app is quitting.
+        kill_matrix_worker()
         raise RuntimeError("The matrix process exited unexpectedly.") from error
 
 

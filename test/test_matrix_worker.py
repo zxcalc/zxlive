@@ -1,7 +1,7 @@
 import multiprocessing
 import os
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -65,7 +65,7 @@ def stop_matrix_worker(qtbot: QtBot) -> Iterator[None]:
     yield
     # Progress dialogs still pending deletion crash the os._exit in conftest.
     QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
-    matrix.shutdown_matrix_worker()
+    matrix.kill_matrix_worker()
 
 
 @pytest.fixture
@@ -84,6 +84,39 @@ def _worker_pid(parent: QWidget) -> int:
 
 def _child_pids() -> set[int]:
     return {p.pid for p in multiprocessing.active_children() if p.pid is not None}
+
+
+def _compute_and_act_when_started(
+        parent: QWidget, tmp_path: Path,
+        action: Callable[[QProgressDialog], None]) -> tuple[np.ndarray | None, int]:
+    """Run a blocking matrix job, call action once it is running, and return (result, worker pid)."""
+    started_path = tmp_path / "matrix-started"
+    release_path = tmp_path / "release-matrix"
+    callback_errors: list[str] = []
+    deadline = time.monotonic() + 30
+
+    def act_when_started() -> None:
+        dialog = QApplication.activeModalWidget()
+        if started_path.exists() and isinstance(dialog, QProgressDialog):
+            action(dialog)
+        elif time.monotonic() >= deadline:
+            callback_errors.append("matrix worker did not start in time")
+            if isinstance(dialog, QProgressDialog):
+                dialog.cancel()
+        else:
+            QTimer.singleShot(10, act_when_started)
+
+    QTimer.singleShot(10, act_when_started)
+    try:
+        result = matrix.compute_matrix_with_progress(
+            cast(GraphT, _MatrixGraph(
+                started_path=str(started_path), release_path=str(release_path))),
+            parent,
+        )
+    finally:
+        release_path.touch()
+    assert not callback_errors
+    return result, int(started_path.read_text())
 
 
 def test_matrix_job_keeps_ui_responsive(parent: QWidget) -> None:
@@ -126,56 +159,38 @@ def test_worker_crash_is_reported_and_replaced(parent: QWidget) -> None:
 
 def test_abort_kills_worker_and_warms_replacement(
         parent: QWidget, qtbot: QtBot, tmp_path: Path) -> None:
-    started_path = tmp_path / "matrix-started"
-    release_path = tmp_path / "release-matrix"
-    callback_errors: list[str] = []
-    deadline = time.monotonic() + 30
+    def click_abort(dialog: QProgressDialog) -> None:
+        next(b for b in dialog.findChildren(QPushButton) if b.text() == "Abort").click()
 
-    def abort_when_started() -> None:
-        dialog = QApplication.activeModalWidget()
-        if started_path.exists():
-            if not isinstance(dialog, QProgressDialog):
-                callback_errors.append(f"unexpected modal widget: {dialog!r}")
-                return
-            button = next((b for b in dialog.findChildren(QPushButton)
-                           if b.text() == "Abort"), None)
-            if button is None:
-                callback_errors.append("could not find the Abort button")
-                dialog.cancel()
-            else:
-                button.click()
-        elif time.monotonic() >= deadline:
-            callback_errors.append("matrix worker did not start in time")
-            if isinstance(dialog, QProgressDialog):
-                dialog.cancel()
-        else:
-            QTimer.singleShot(10, abort_when_started)
+    result, aborted_pid = _compute_and_act_when_started(parent, tmp_path, click_abort)
 
-    QTimer.singleShot(10, abort_when_started)
-    try:
-        result = matrix.compute_matrix_with_progress(
-            cast(GraphT, _MatrixGraph(
-                started_path=str(started_path), release_path=str(release_path))),
-            parent,
-        )
-
-        assert not callback_errors
-        assert result is None
-        assert not release_path.exists()
-        aborted_pid = int(started_path.read_text())
-        qtbot.waitUntil(lambda: aborted_pid not in _child_pids())
-        assert _child_pids(), "a replacement worker should already be starting"
-        assert _worker_pid(parent) != aborted_pid
-    finally:
-        release_path.touch()
+    assert result is None
+    qtbot.waitUntil(lambda: aborted_pid not in _child_pids())
+    assert _child_pids(), "a replacement worker should already be starting"
+    assert _worker_pid(parent) != aborted_pid
 
 
-def test_shutdown_stops_worker(parent: QWidget) -> None:
+# Quitting the app runs kill_matrix_worker and then closes open dialogs as cancelled.
+@pytest.mark.parametrize("cancel_dialog", [True, False])
+def test_kill_during_job_stops_it_quietly(
+        parent: QWidget, qtbot: QtBot, tmp_path: Path, cancel_dialog: bool) -> None:
+    def kill(dialog: QProgressDialog) -> None:
+        matrix.kill_matrix_worker()
+        if cancel_dialog:
+            dialog.cancel()
+
+    result, _ = _compute_and_act_when_started(parent, tmp_path, kill)
+
+    assert result is None
+    qtbot.waitUntil(lambda: not _child_pids())
+
+
+def test_kill_stops_idle_worker(parent: QWidget, qtbot: QtBot) -> None:
     pid = _worker_pid(parent)
 
-    matrix.shutdown_matrix_worker()
+    matrix.kill_matrix_worker()
 
-    assert pid not in _child_pids()
+    qtbot.waitUntil(lambda: pid not in _child_pids())
 
 
 def test_real_graph_matrix_and_rule(parent: QWidget) -> None:

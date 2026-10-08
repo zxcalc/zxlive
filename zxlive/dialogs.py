@@ -15,10 +15,10 @@ from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
 from .common import GraphT, VT
+from .settings import get_settings_value
 from .custom_rule import CustomRule
 from .matrix import check_rule_with_progress
 from .proof import ProofModel
-from .settings import get_settings_value
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow

@@ -408,8 +408,6 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_verte
     return ret
 
 
-# TODO: Fix code complexity
-# noqa: complexipy
 def check_rule_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> None:
     left_matrix, right_matrix = lhs_graph.to_matrix(), rhs_graph.to_matrix()
     if not np.allclose(left_matrix, right_matrix):
@@ -419,6 +417,8 @@ def check_rule_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> None:
             raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
 
 
+# TODO: Fix code complexity
+# noqa: complexipy
 def check_rule(rule: CustomRule,
                check_matrices: Callable[[GraphT, GraphT], None] = check_rule_matrices) -> None:
     rule.lhs_graph.auto_detect_io()
