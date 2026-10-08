@@ -17,7 +17,8 @@ from pyzx.utils import VertexType
 
 from .common import GraphT, VT, find_unknown_tikz_styles, from_tikz
 from .settings import get_settings_value, tikz_import_categories
-from .custom_rule import CustomRule, check_rule
+from .custom_rule import CustomRule
+from .matrix import check_rule_with_progress
 from .proof import ProofModel
 
 if TYPE_CHECKING:
@@ -507,7 +508,7 @@ def create_new_rewrite(parent: MainWindow) -> None:
             return
         rule = CustomRule(left_graph, right_graph, name.text(), description.toPlainText())
         try:
-            check_rule(rule)
+            check_rule_with_progress(rule, parent)
         except Exception as e:
             show_error_msg("Warning!", str(e), parent=parent)
         if save_rule_dialog(rule, parent):
