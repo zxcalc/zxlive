@@ -365,6 +365,7 @@ rules_basic: dict[str, RewriteData] = {
 FAULT_EQUIVALENT_GROUP = "Fault-equivalent rewrites"
 
 rewrites_fault_tolerant: dict[str, RewriteData] = {
+    "ocm": rules_basic["ocm"],
     "Elim Rewrite": {
         "text": "FE Identity removal",
         "tooltip": "Removes a 2-ary phaseless spider",

@@ -5,6 +5,7 @@
 
 ### New features
 
+- Added "Save changed positions" to the fault-equivalent rewrites (#584).
 - Added a **View → Show grid** option (also available in the settings dialog) to toggle the background grid on and off (#598).
 
 ### Improvements
