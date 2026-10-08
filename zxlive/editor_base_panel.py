@@ -5,10 +5,10 @@ import os
 import subprocess
 import sys
 from enum import Enum
-from typing import Callable, Iterator, Optional, TypedDict
+from typing import Callable, Iterator, Optional, Sequence, TypedDict
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
-from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QPainter, QPalette, QPen, QPixmap
+from PySide6.QtCore import QEvent, QMimeData, QObject, QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
+from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QDropEvent, QIcon, QMouseEvent, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
                                QListWidgetItem, QMenu, QMessageBox, QPushButton, QScrollArea, QSizePolicy,
@@ -29,10 +29,12 @@ from .eitem import EItem, HAD_EDGE_BLUE
 from .features import ZW_CALCULUS, is_feature_enabled
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene, EdgeDragSpec
-from .graphview import graph_to_tooltip
+from .graphview import GraphView, graph_to_tooltip
 from .settings import display_setting
 
 from . import animations
+
+_PATTERN_MIME_TYPE = "application/x-zxlive-pattern"
 
 
 class ShapeType(Enum):
@@ -87,6 +89,7 @@ class EditorBasePanel(BasePanel):
         self._curr_vty = VertexType.Z
         self._curr_ety = EdgeType.SIMPLE
         self.patterns_folder = get_settings_value("patterns-folder", str)
+        self._pattern_inserted = False
 
     def _toolbar_sections(self) -> Iterator[ToolbarSection]:
         yield from toolbar_select_node_edge(self)
@@ -119,6 +122,9 @@ class EditorBasePanel(BasePanel):
             patterns_layout.addWidget(self.patterns_search)
 
             self.patterns_list = PatternsListWidget(self, self.patterns_folder)
+            for view in self.findChildren(GraphView):
+                view.setAcceptDrops(True)
+                view.viewport().installEventFilter(self)
             patterns_layout.addWidget(self.patterns_list)
             self.sidebar.addWidget(patterns_container)
 
@@ -173,6 +179,8 @@ class EditorBasePanel(BasePanel):
 
     def _vty_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty
+        if hasattr(self, 'patterns_list'):
+            self.patterns_list.clearSelection()
 
     def _vty_double_clicked(self, vty: VertexType) -> None:
         self._curr_vty = vty
@@ -184,6 +192,8 @@ class EditorBasePanel(BasePanel):
     def _ety_clicked(self, ety: EdgeType) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
+        if hasattr(self, 'patterns_list'):
+            self.patterns_list.clearSelection()
 
     def _ety_double_clicked(self, ety: EdgeType) -> None:
         self._curr_ety = ety
@@ -193,21 +203,77 @@ class EditorBasePanel(BasePanel):
             cmd = ChangeEdgeColor(self.graph_view, selected, ety)
             self.undo_stack.push(cmd)
 
-    def paste_graph(self, graph: GraphT) -> None:
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        view = obj.parent()
+        if not isinstance(view, GraphView) or not isinstance(view.graph_scene, EditGraphScene):
+            return super().eventFilter(obj, event)
+        if isinstance(event, QDropEvent):
+            return self._filter_pattern_drop(view, view.graph_scene, event)
+        if isinstance(event, (QMouseEvent, QContextMenuEvent)):
+            return self._filter_pattern_click(view, view.graph_scene, event)
+        return super().eventFilter(obj, event)
+
+    def _filter_pattern_drop(self, view: GraphView, scene: EditGraphScene, event: QDropEvent) -> bool:
+        if not event.mimeData().hasFormat(_PATTERN_MIME_TYPE):
+            event.ignore()
+            return True
+        if event.type() == QEvent.Type.Drop:
+            self.graph_view, self.graph_scene = view, scene  # this ensures the relevant graph view/scene are selected in the rule_panel
+            scene_pos = view.mapToScene(event.position().toPoint())
+            path = bytes(event.mimeData().data(_PATTERN_MIME_TYPE).data()).decode("utf-8")
+            self.insert_pattern_from_sidebar(path, pos_from_view(scene_pos.x(), scene_pos.y()))
+        event.setDropAction(Qt.DropAction.CopyAction)
+        event.accept()
+        return True
+
+    def _filter_pattern_click(self, view: GraphView, scene: EditGraphScene,
+                              event: QMouseEvent | QContextMenuEvent) -> bool:
+        if event.type() not in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease,
+                                QEvent.Type.MouseButtonDblClick, QEvent.Type.ContextMenu):
+            return False
+        if scene.curr_tool != ToolType.SELECT or not self.patterns_list.selectedItems():
+            return False
+        if isinstance(event, QMouseEvent) and event.button() != Qt.MouseButton.RightButton:
+            return False
+        if event.type() == QEvent.Type.MouseButtonPress:
+            self._pattern_inserted = False
+        viewport_pos = event.position().toPoint() if isinstance(event, QMouseEvent) else event.pos()
+        scene_pos = view.mapToScene(viewport_pos)
+        if (scene.is_selected_item_at(scene_pos)
+                and not (event.type() == QEvent.Type.ContextMenu and self._pattern_inserted)):
+            return False
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            self.graph_view, self.graph_scene = view, scene
+            item = self.patterns_list.selectedItems()[0]
+            path = os.path.join(self.patterns_list.patterns_folder, item.text() + ".zxg")
+            self.insert_pattern_from_sidebar(path, pos_from_view(scene_pos.x(), scene_pos.y()))
+            self._pattern_inserted = True
+        # Consume the press and context menu too, preventing vertex/edge creation.
+        event.accept()
+        return True
+
+    def paste_graph(self, graph: GraphT, position: Optional[tuple[float, float]] = None) -> None:
+        """Paste with the usual offset, or place the graph's top-left corner at position."""
+        dx, dy = 0.5, 0.5
+        if position is not None:
+            if not graph.num_vertices():
+                return
+            dx = position[0] - min(graph.row(v) for v in graph.vertices())
+            dy = position[1] - min(graph.qubit(v) for v in graph.vertices())
         new_g = copy.deepcopy(self.graph_scene.g)
-        new_verts, new_edges = new_g.merge(graph.translate(0.5, 0.5))
+        new_verts, new_edges = new_g.merge(graph.translate(dx, dy))
         cmd = UpdateGraph(self.graph_view, new_g)
         self.undo_stack.push(cmd)
         self.graph_scene.select_vertices(new_verts)
         for name in new_g.var_registry.vars():
             self.variable_viewer.add_item(name)
 
-    def insert_pattern_from_sidebar(self, pattern_path: str) -> None:
+    def insert_pattern_from_sidebar(self, pattern_path: str, position: Optional[tuple[float, float]] = None) -> None:
         """Insert a pattern into the current graph view."""
         try:
             out = import_diagram_from_file(pattern_path, parent=self)
             if out is not None and hasattr(out, 'g'):
-                self.paste_graph(out.g)
+                self.paste_graph(out.g, position)
         except Exception as e:
             QMessageBox.warning(self, "Pattern Insert Error", str(e))
 
@@ -536,6 +602,8 @@ class PatternsListWidget(QListWidget):
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setViewMode(QListView.ViewMode.ListMode)
         self.setMovement(QListView.Movement.Static)
+        self.setDragDropMode(QListView.DragDropMode.DragOnly)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
         self.setWordWrap(True)
         self.setSpacing(2)
         self.setStyleSheet("""
@@ -559,6 +627,13 @@ class PatternsListWidget(QListWidget):
         self.itemDoubleClicked.connect(self._pattern_selected)
         self.itemEntered.connect(self._set_pattern_tooltip)
         self.refresh_patterns()
+
+    def mimeData(self, items: Sequence[QListWidgetItem]) -> QMimeData:
+        mime = QMimeData()
+        if items and items[0].flags() != Qt.ItemFlag.NoItemFlags:
+            path = os.path.join(self.patterns_folder, items[0].text() + ".zxg")
+            mime.setData(_PATTERN_MIME_TYPE, os.path.abspath(path).encode("utf-8"))
+        return mime
 
     def refresh_patterns(self) -> None:
         """Refresh the list of patterns from the patterns folder."""
