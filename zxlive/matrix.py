@@ -95,10 +95,16 @@ def compute_matrix_with_progress(graph: GraphT, parent: QWidget) -> Optional[np.
     return matrix
 
 
-def check_rule_with_progress(rule: CustomRule, parent: QWidget) -> None:
-    """Validate a rule, allowing the expensive matrix comparison to be skipped."""
+def check_rule_with_progress(rule: CustomRule, parent: QWidget) -> bool:
+    """Validate a rule, returning False if the matrix comparison was skipped."""
+    validated = True
+
     def compare_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> None:
-        _run_with_progress(check_rule_matrices, (lhs_graph, rhs_graph),
-                           "Computing rule matrices...", "Skip validation", parent)
+        nonlocal validated
+        result = _run_with_progress(check_rule_matrices, (lhs_graph, rhs_graph),
+                                    "Computing rule matrices...", "Skip validation", parent)
+        if result is not True:
+            validated = False
 
     check_rule(rule, compare_matrices)
+    return validated

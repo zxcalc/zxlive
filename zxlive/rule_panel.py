@@ -4,16 +4,18 @@ from typing import Iterator
 
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QLineEdit
+from PySide6.QtWidgets import QLineEdit, QMessageBox, QToolButton
 from pyzx.utils import EdgeType, VertexType
 
 
 from .base_panel import ToolbarSection
 from .common import GraphT, ToolType, VT
 from .custom_rule import CustomRule
+from .dialogs import show_error_msg
 from .editor_base_panel import EditorBasePanel
 from .graphscene import EditGraphScene, EdgeDragSpec
 from .graphview import RuleEditGraphView
+from .matrix import check_rule_with_progress
 from .eitem import EItem
 from .vitem import VItem
 
@@ -78,6 +80,20 @@ class RulePanel(EditorBasePanel):
         self.description_field.setText(self.description)
         self.description_field.setMaximumWidth(400)
         yield ToolbarSection(self.name_field, self.description_field)
+
+        self.check_correctness_button = QToolButton(self)
+        self.check_correctness_button.setText("Check correctness")
+        self.check_correctness_button.clicked.connect(self._check_correctness)
+        yield ToolbarSection(self.check_correctness_button)
+
+    def _check_correctness(self) -> None:
+        try:
+            validated = check_rule_with_progress(self.get_rule(), self)
+        except Exception as e:
+            show_error_msg("Rule validation failed", str(e), parent=self)
+            return
+        message = "The rule passed the correctness checks." if validated else "Rule validation was skipped."
+        QMessageBox.information(self, "Check correctness", message)
 
     def _tool_clicked(self, tool: ToolType) -> None:
         self.graph_scene_left.curr_tool = tool

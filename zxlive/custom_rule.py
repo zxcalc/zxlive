@@ -408,19 +408,28 @@ def get_vertex_positions(graph: GraphT, rhs_graph: nx.MultiGraph, boundary_verte
     return ret
 
 
-def check_rule_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> None:
+def check_rule_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> bool:
+    """Check if the matrices of the left-hand side and right-hand side graphs are equal.
+
+    Raises:
+        ValueError: If the matrices differ by a scalar or have different semantics.
+
+    Returns:
+        bool: True if the matrices are equal.
+    """
     left_matrix, right_matrix = lhs_graph.to_matrix(), rhs_graph.to_matrix()
     if not np.allclose(left_matrix, right_matrix):
         if np.allclose(left_matrix / np.linalg.norm(left_matrix), right_matrix / np.linalg.norm(right_matrix)):
             raise ValueError("The left-hand side and right-hand side of the rule differ by a scalar.")
         else:
             raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
+    return True
 
 
 # TODO: Fix code complexity
 # noqa: complexipy
 def check_rule(rule: CustomRule,
-               check_matrices: Callable[[GraphT, GraphT], None] = check_rule_matrices) -> None:
+               check_matrices: Callable[[GraphT, GraphT], bool | None] = check_rule_matrices) -> None:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
