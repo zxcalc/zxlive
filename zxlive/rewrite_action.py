@@ -12,14 +12,14 @@ from pyzx.ft_rewrite import RewriteSingleVertex_ft
 from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
-                            Signal, QObject, QMetaObject, QIODevice, QBuffer, QPoint, QPointF, QLineF)
+                            Signal, QObject, QMetaObject, QPoint, QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen, QAction
 from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
 
 
 from .animations import make_animation
 from .commands import AddRewriteStep
-from .common import ET, GraphT, VT, get_data
+from .common import ET, GraphT, VT, get_data, get_settings_value
 from .dialogs import show_error_msg
 from .features import FAULT_EQUIVALENCE, is_feature_enabled
 from .rewrite_data import (is_rewrite_data, RewriteData,
@@ -28,7 +28,7 @@ from .rewrite_data import (is_rewrite_data, RewriteData,
                            FAULT_EQUIVALENT_GROUP)
 from .settings import display_setting
 from .graphscene import GraphScene
-from .graphview import GraphView
+from .graphview import GraphView, graph_preview_view, pixmap_to_tooltip
 from .custom_rule import CustomRule
 
 if TYPE_CHECKING:
@@ -220,12 +220,10 @@ class RewriteAction:
             self.enabled = False
             return
         elif self.match_type == MATCH_COMPOUND:
-            if hasattr(self.rule, 'is_match'):
-                if self.rule.is_match(g, verts):  # type: ignore
-                    self.enabled = True
-                else:
-                    self.enabled = False
-            else:
+            try:
+                self.enabled = bool(self.rule.is_match(g, verts)) # type: ignore
+            except (AttributeError, TypeError):
+                # No compatible matcher exists, so defer applicability checking until application.
                 self.enabled = True
             return
 
@@ -235,20 +233,8 @@ class RewriteAction:
             return self.tooltip_str
         if self.picture_path == 'custom':
             # We will create a custom tooltip picture representing the custom rewrite
-            graph_scene_left = GraphScene()
-            graph_scene_right = GraphScene()
-            graph_view_left = GraphView(graph_scene_left)
-            graph_view_left.draw_background_lines = False
-            if self.lhs_graph is not None:
-                graph_view_left.set_graph(self.lhs_graph)
-            graph_view_right = GraphView(graph_scene_right)
-            graph_view_right.draw_background_lines = False
-            if self.rhs_graph is not None:
-                graph_view_right.set_graph(self.rhs_graph)
-            graph_view_left.fit_view()
-            graph_view_right.fit_view()
-            graph_view_left.setSceneRect(graph_scene_left.itemsBoundingRect())
-            graph_view_right.setSceneRect(graph_scene_right.itemsBoundingRect())
+            graph_view_left = graph_preview_view(self.lhs_graph)
+            graph_view_right = graph_preview_view(self.rhs_graph)
             lhs_size = graph_view_left.viewport().size()
             rhs_size = graph_view_right.viewport().size()
             # The picture needs to be wide enough to fit both of them and have some space for the = sign
@@ -265,18 +251,10 @@ class RewriteAction:
             new_view.setSceneRect(new_scene.itemsBoundingRect())
             new_view.viewport().render(pixmap, QPoint(lhs_size.width(), int(max(lhs_size.height(), rhs_size.height()) / 2 - 20)))
 
-            buffer = QBuffer()
-            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-            pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
         else:
             pixmap = QPixmap()
             pixmap.load(get_data("tooltips/" + self.picture_path))
-            buffer = QBuffer()
-            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
-            pixmap.save(buffer, "PNG", quality=100)
-            image = bytes(buffer.data().toBase64()).decode()  # type: ignore # This gives an overloading error, but QByteArray can be converted to bytes
-        self.tooltip_str = '<img src="data:image/png;base64,{}" width="500">'.format(image) + self.tooltip_str
+        self.tooltip_str = pixmap_to_tooltip(pixmap, self.tooltip_str)
         self.picture_path = None
         return self.tooltip_str
 
@@ -436,10 +414,13 @@ class RewriteActionTreeModel(QAbstractItemModel):
             )
 
     def update_on_selection(self) -> None:
-        selection, edges = self.proof_panel.parse_selection()
-        g = self.proof_panel.graph_scene.g
-        self.root_item.update_on_selection(g, selection, edges)
-        QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)  # type: ignore
+        try:
+            selection, edges = self.proof_panel.parse_selection()
+            g = self.proof_panel.graph_scene.g
+            self.root_item.update_on_selection(g, selection, edges)
+        finally:
+            # If an exception happens while matching some rule, we still want to update the view
+            QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)
 
 
 class RewriteActionTreeView(QTreeView):
@@ -560,14 +541,19 @@ class RewriteActionTreeView(QTreeView):
         if hasattr(model,"do_rewrite"):
             model.do_rewrite(index)
 
+    def _expanded_group_ids(self) -> list[str]:
+        model = self.model()
+        if model is None:
+            return []
+        expanded_group_ids = []
+        for row in range(model.rowCount()):
+            index = model.index(row, 0)
+            if self.isExpanded(index):
+                expanded_group_ids.append(cast(str, index.data()))
+        return expanded_group_ids
+
     def refresh_rewrites_model(self) -> None:
-        # Preserve expanded state
-        expanded_indexes = []
-        if self.model():
-            for row in range(self.model().rowCount()):
-                index = self.model().index(row, 0)
-                if self.isExpanded(index):
-                    expanded_indexes.append(self.model().index(row, 0).data())
+        expanded_group_ids = self._expanded_group_ids()
 
         # Refresh the custom rules and update the model
         refresh_custom_rules()
@@ -575,7 +561,7 @@ class RewriteActionTreeView(QTreeView):
         if self.fault_equivalent_mode_active():
             for group in root_item.child_items:
                 group.set_disabled_by_fe_mode(group.id != FAULT_EQUIVALENT_GROUP)
-            expanded_indexes = [FAULT_EQUIVALENT_GROUP]
+            expanded_group_ids = [FAULT_EQUIVALENT_GROUP]
 
         # The model is reused so that its worker and signal connection are not duplicated.
         model = self.model()
@@ -589,11 +575,14 @@ class RewriteActionTreeView(QTreeView):
         expanded_any = False
         for row in range(model.rowCount()):
             index = model.index(row, 0)
-            if index.data() in expanded_indexes:
+            if index.data() in expanded_group_ids:
                 self.expand(index)
                 expanded_any = True
         if not expanded_any:
-            self.expand(model.index(0, 0))
+            if get_settings_value("expand-rules-sidebar", bool):
+                self.expandAll()
+            else:
+                self.expand(model.index(0, 0))
 
     def _schedule_selection_update(self) -> None:
         model = self.model()

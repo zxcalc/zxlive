@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 from pyzx.rewrite import Rewrite
 from pyzx.utils import EdgeType, VertexType
@@ -112,6 +113,31 @@ def test_update_active_double_treats_empty_selection_as_all_edges() -> None:
 
     action.update_active(g, [], [e_in])
     assert not action.enabled
+
+
+def test_custom_rule_tooltip_contains_graph_preview(
+        qapp: QApplication, monkeypatch: Any) -> None:
+    monkeypatch.setattr(
+        type(rewrite_action_module.display_setting),
+        "previews_show",
+        property(lambda _self: True),
+    )
+    graph = new_graph()
+    graph.add_vertex(VertexType.Z, row=0, qubit=0)
+    action = RewriteAction(
+        "custom",
+        cast(Rewrite, _SingleRule(0)),
+        MATCH_SINGLE,
+        "description",
+        picture_path="custom",
+        lhs_graph=graph,
+        rhs_graph=graph,
+    )
+
+    tooltip = action.tooltip
+
+    assert tooltip.startswith('<img src="data:image/png;base64,')
+    assert tooltip.endswith("description")
 
 
 def test_do_rewrite_single_treats_empty_selection_as_all_vertices(monkeypatch: Any) -> None:

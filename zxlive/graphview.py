@@ -19,11 +19,12 @@ from pyzx.graph.scalar import Scalar
 
 import math
 import random
-from PySide6.QtCore import QRect, QSize, QPointF, Signal, Qt, QRectF, QLineF, QObject, QTimerEvent
+from PySide6.QtCore import (QBuffer, QIODevice, QRect, QSize, QPointF, Signal, Qt,
+                           QRectF, QLineF, QObject, QTimerEvent)
 from PySide6.QtWidgets import QGraphicsView, QGraphicsPathItem, QRubberBand, QGraphicsEllipseItem, QGraphicsItem, QLabel
 from PySide6.QtGui import (QPen, QColor, QPainter, QPainterPath, QTransform,
                            QMouseEvent, QWheelEvent, QBrush, QShortcut, QKeySequence,
-                           QKeyEvent)
+                           QKeyEvent, QPixmap)
 
 from dataclasses import dataclass
 
@@ -79,6 +80,7 @@ class GraphView(QGraphicsView):
     def __init__(self, graph_scene: GraphScene) -> None:
         self.graph_scene = graph_scene
         self.tool = GraphTool.Selection
+        self._has_loaded_graph = False
 
         super().__init__(self.graph_scene)
         self.setMouseTracking(True)
@@ -116,7 +118,11 @@ class GraphView(QGraphicsView):
         self.sparkle_mode = not self.sparkle_mode
 
     def set_graph(self, g: GraphT) -> None:
+        first_graph = not self._has_loaded_graph
         self.graph_scene.set_graph(g)
+        if first_graph:
+            self.centerOn(self.graph_scene.sceneRect().center())
+            self._has_loaded_graph = True
 
     def update_graph(self, g: GraphT, select_new: bool = False) -> None:
         self.graph_scene.update_graph(g, select_new)
@@ -217,7 +223,8 @@ class GraphView(QGraphicsView):
     # TODO: Fix code complexity
     # noqa: complexipy
     def mouseReleaseEvent(self, e: QMouseEvent) -> None:  # noqa: PLR0912
-        if e.button() == Qt.MouseButton.RightButton and self.graph_scene.selectedItems():
+        if e.button() == Qt.MouseButton.RightButton and \
+                self.graph_scene.is_selected_item_at(self.mapToScene(e.position().toPoint())):
             return
         if self.tool == GraphTool.Selection and Qt.KeyboardModifier.ShiftModifier & e.modifiers():
             e.setModifiers(e.modifiers() | Qt.KeyboardModifier.ControlModifier)
@@ -334,7 +341,7 @@ class GraphView(QGraphicsView):
         painter.setBrush(bg_color)
         painter.setPen(QPen(Qt.PenStyle.NoPen))
         painter.drawRect(rect)
-        if not self.draw_background_lines:
+        if not self.draw_background_lines or not get_settings_value("show-grid", bool, True):
             return
 
         # Calculate grid lines
@@ -358,10 +365,45 @@ class GraphView(QGraphicsView):
         painter.setPen(QPen(thick_grid_color, 2, Qt.PenStyle.SolidLine))
         painter.drawLines(thick_lines)
 
+    def refresh_background(self) -> None:
+        """Redraw the (cached) background, e.g. after the grid is toggled."""
+        self.resetCachedContent()
+        self.viewport().update()
+
     def update_font(self) -> None:
         for i in self.graph_scene.items():
             if isinstance(i, VItem):
                 i.update_font()
+
+
+def graph_preview_view(graph: Optional[GraphT]) -> GraphView:
+    """Create an off-screen view fitted to a graph for preview rendering."""
+    scene = GraphScene()
+    view = GraphView(scene)
+    view.draw_background_lines = False
+    if graph is not None:
+        view.set_graph(graph)
+    view.fit_view()
+    view.setSceneRect(scene.itemsBoundingRect())
+    return view
+
+
+def pixmap_to_tooltip(pixmap: QPixmap, text: str = "") -> str:
+    """Embed a pixmap and optional text in an HTML tooltip."""
+    buffer = QBuffer()
+    buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+    pixmap.save(buffer, "PNG", quality=100)
+    image = bytes(buffer.data().toBase64()).decode()  # type: ignore
+    return f'<img src="data:image/png;base64,{image}" width="500">{text}'
+
+
+def graph_to_tooltip(graph: GraphT) -> str:
+    """Render a graph in an off-screen view and return an HTML tooltip."""
+    view = graph_preview_view(graph)
+    pixmap = QPixmap(view.viewport().size())
+    pixmap.fill(QColor("#ffffff"))
+    view.viewport().render(pixmap)
+    return pixmap_to_tooltip(pixmap)
 
 
 class ProofGraphView(GraphView):

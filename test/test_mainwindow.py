@@ -22,11 +22,13 @@ import weakref
 from pathlib import Path
 from typing import Optional
 from PySide6 import QtCore
+from PySide6.QtWidgets import QCheckBox, QComboBox, QSpinBox
 from pytestqt.qtbot import QtBot
 
 import pyzx
 from pyzx.utils import EdgeType, VertexType
 
+import zxlive.rewrite_action
 from zxlive.commands import AddRewriteStep
 from zxlive.dialogs import import_diagram_from_file
 from zxlive.common import GraphT, W_INPUT_OFFSET, new_graph
@@ -133,6 +135,29 @@ def test_start_derivation(app: MainWindow, qtbot: QtBot) -> None:
     assert not app.export_tikz_series.isEnabled()
 
 
+def test_start_derivation_centers_far_away_graph(app: MainWindow, qtbot: QtBot) -> None:
+    assert isinstance(app.active_panel, GraphEditPanel)
+    app.resize(1200, 800)
+    app.show()
+
+    graph = copy.deepcopy(app.active_panel.graph)
+    for vertex in graph.vertices():
+        graph.set_position(
+            vertex,
+            graph.qubit(vertex) - 100,
+            graph.row(vertex) + 100,
+        )
+    app.active_panel.graph_view.set_graph(graph)
+
+    qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
+
+    assert isinstance(app.active_panel, ProofPanel)
+    visible_rect = app.active_panel.graph_view.mapToScene(
+        app.active_panel.graph_view.viewport().rect()
+    ).boundingRect()
+    assert visible_rect.intersects(app.active_panel.graph_scene.itemsBoundingRect())
+
+
 def test_export_tikz_series(app: MainWindow, qtbot: QtBot, tmp_path: Path,
                             monkeypatch: pytest.MonkeyPatch) -> None:
     """Exporting proof steps writes one .tikz file per step into the chosen directory."""
@@ -162,8 +187,80 @@ def test_export_tikz_series(app: MainWindow, qtbot: QtBot, tmp_path: Path,
 def test_settings_dialog(app: MainWindow) -> None:
     # Warning: Do not actually change the settings in this test as this will impact the app's real settings.
     dialog = SettingsDialog(app)
+    assert "expand-rules-sidebar" in dialog.value_dict
     dialog.show()
     dialog.close()
+
+
+def test_graph_label_font_settings(
+    app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Saving should exercise the per-test QSettings store without changing the
+    # process-global DisplaySettings used by the rest of the test suite.
+    monkeypatch.setattr("zxlive.settings_dialog.display_setting.update", lambda: None)
+    app.settings.remove("phase-font")
+    app.settings.remove("dummy-font")
+    app.settings.sync()
+
+    def font_widgets(dialog: SettingsDialog, prefix: str) -> tuple[QCheckBox, QComboBox, QSpinBox]:
+        same_as_app = dialog.value_dict[f"{prefix}/same-as-app"]
+        family = dialog.value_dict[f"{prefix}/family"]
+        size = dialog.value_dict[f"{prefix}/size"]
+        assert isinstance(same_as_app, QCheckBox)
+        assert isinstance(family, QComboBox)
+        assert isinstance(size, QSpinBox)
+        return same_as_app, family, size
+
+    dialog = SettingsDialog(app)
+    qtbot.addWidget(dialog)
+    phase_widgets = font_widgets(dialog, "phase-font")
+    dummy_widgets = font_widgets(dialog, "dummy-font")
+
+    for same_as_app, family, size in (phase_widgets, dummy_widgets):
+        assert same_as_app.text() == "Same as app"
+        assert same_as_app.isChecked()
+        assert not family.isEnabled()
+        assert not size.isEnabled()
+
+        same_as_app.setChecked(False)
+        assert family.isEnabled()
+        assert size.isEnabled()
+
+    phase_same_as_app, phase_family, phase_size = phase_widgets
+    _, dummy_family, dummy_size = dummy_widgets
+    phase_family.setCurrentIndex(1 if phase_family.count() > 1 else 0)
+    dummy_family.setCurrentIndex(2 if dummy_family.count() > 2 else 0)
+    expected_phase_family = phase_family.currentData()
+    expected_dummy_family = dummy_family.currentData()
+    phase_size.setValue(17)
+    dummy_size.setValue(19)
+
+    # Custom values remain persisted even when inheritance is switched back on.
+    phase_same_as_app.setChecked(True)
+    dialog.update_global_settings()
+    dialog.close()
+
+    reopened = SettingsDialog(app)
+    qtbot.addWidget(reopened)
+    reopened_phase = font_widgets(reopened, "phase-font")
+    reopened_dummy = font_widgets(reopened, "dummy-font")
+
+    for same_as_app, family, size, inherited, expected_family, expected_size in (
+        (*reopened_phase, True, expected_phase_family, 17),
+        (*reopened_dummy, False, expected_dummy_family, 19),
+    ):
+        assert same_as_app.isChecked() is inherited
+        assert family.isEnabled() is not inherited
+        assert size.isEnabled() is not inherited
+        assert family.currentData() == expected_family
+        assert size.value() == expected_size
+
+        same_as_app.setChecked(False)
+        assert family.isEnabled()
+        assert size.isEnabled()
+        assert family.currentData() == expected_family
+        assert size.value() == expected_size
+    reopened.close()
 
 
 def test_file_formats_preserved(app: MainWindow) -> None:
@@ -318,6 +415,17 @@ def _start_derivation(app: MainWindow, qtbot: QtBot) -> ProofPanel:
     proof_panel = app.active_panel
     assert isinstance(proof_panel, ProofPanel)
     return proof_panel
+
+
+def test_expand_rules_sidebar_setting_expands_every_group(
+        app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(zxlive.rewrite_action, "get_settings_value", lambda *_args, **_kwargs: True)
+
+    panel = _start_derivation(app, qtbot)
+    model = panel.rewrites_panel.model()
+    assert model is not None
+    assert model.rowCount() > 1
+    assert all(panel.rewrites_panel.isExpanded(model.index(row, 0)) for row in range(model.rowCount()))
 
 
 def _find_rewrite_node(node: RewriteActionTree, name: str) -> Optional[RewriteActionTree]:
@@ -754,3 +862,36 @@ def test_proof_cleanup_before_close(app: MainWindow, qtbot: QtBot) -> None:
     qtbot.mouseClick(app.active_panel.start_derivation, QtCore.Qt.MouseButton.LeftButton)
     app.select_all_action.trigger()
     app.close_action.trigger()
+
+
+def test_toggle_grid(app: MainWindow) -> None:
+    from zxlive.common import get_settings_value
+    from zxlive.graphview import GraphView
+    assert app.show_grid_action.isCheckable()
+    assert app.show_grid_action.isChecked()
+    assert get_settings_value("show-grid", bool)
+    views = app.tab_widget.currentWidget().findChildren(GraphView)
+    assert views
+    app.show_grid_action.trigger()
+    assert not app.show_grid_action.isChecked()
+    assert not get_settings_value("show-grid", bool)
+    app.show_grid_action.trigger()
+    assert get_settings_value("show-grid", bool)
+
+
+def test_settings_dialog_show_grid(app: MainWindow, qtbot: QtBot, monkeypatch: pytest.MonkeyPatch) -> None:
+    from zxlive.common import get_settings_value
+    monkeypatch.setattr("zxlive.settings_dialog.display_setting.update", lambda: None)
+    dialog = SettingsDialog(app)
+    qtbot.addWidget(dialog)
+    checkbox = dialog.value_dict["show-grid"]
+    assert isinstance(checkbox, QCheckBox)
+    assert checkbox.isChecked() == app.show_grid_action.isChecked()
+    checkbox.setChecked(False)
+    dialog.update_global_settings()
+    dialog.apply_global_settings()
+    assert not get_settings_value("show-grid", bool)
+    assert not app.show_grid_action.isChecked()
+    dialog.close()
+    app.show_grid_action.trigger()
+    assert get_settings_value("show-grid", bool)

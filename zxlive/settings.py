@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 import pyzx
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QApplication, QTabWidget
 
-from .common import get_settings_value, SCALE
+from .common import DEFAULT_SETTINGS, SCALE, get_settings_value
 
 
 class ColorScheme(TypedDict):
@@ -33,7 +33,7 @@ class ColorScheme(TypedDict):
     z_pauli_web: QColor
     x_pauli_web: QColor
     y_pauli_web: QColor
-
+    pauli_web_highlight: QColor
 
 general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "path/custom-rules": "rules/",
@@ -44,6 +44,7 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "snap-granularity": '4',
     "input-circuit-format": 'openqasm',
     "previews-show": True,
+    "expand-rules-sidebar": False,
     "rewrite-animations": True,
     "sparkle-mode": True,
     'sound-effects': False,
@@ -54,18 +55,24 @@ general_defaults: dict[str, str | QTabWidget.TabPosition | int | bool] = {
     "startup-behavior": "restore",
     "phase-label-color": "",
     "show-vertex-indices": False,
+    "show-grid": True,
 }
 
-font_defaults: dict[str, str | int | None] = {
+font_defaults: dict[str, str | int | bool | None] = {
     "font/size": 11,
     "font/family": "Arial",
+    "phase-font/same-as-app": True,
+    "phase-font/family": "Arial",
+    "phase-font/size": 11,
+    "dummy-font/same-as-app": True,
+    "dummy-font/family": "Arial",
+    "dummy-font/size": 11,
 }
 
 # Optional features that can be toggled from the View > Features menu.
 # All off by default; the first-run picker is what turns them on.
 feature_defaults: dict[str, bool] = {
     "feature/fault-equivalence": False,
-    "feature/zh-calculus": False,
     "feature/zw-calculus": False,
     "feature/pauli-webs": False,
 }
@@ -99,6 +106,27 @@ tikz_import_defaults: dict[str, str] = {
     "tikz/edge-H-import": ", ".join(pyzx.tikz.synonyms_hedge),
     "tikz/edge-W-import": ", ".join(pyzx.tikz.synonyms_wedge),
 }
+
+# (display label, import settings key). Used by the "unknown TikZ styles"
+# dialog to let the user categorise an unfamiliar style; ``None`` means
+# "skip this style". Keys are checked against ``tikz_import_defaults``
+# below so a rename in one place fails loudly instead of silently
+# breaking imports (see #537).
+tikz_import_categories: list[tuple[str, Optional[str]]] = [
+    ("(skip)",   None),
+    ("Z spider", "tikz/Z-spider-import"),
+    ("X spider", "tikz/X-spider-import"),
+    ("Boundary", "tikz/boundary-import"),
+    ("H-box",    "tikz/Hadamard-import"),
+    ("W input",  "tikz/w-input-import"),
+    ("W output", "tikz/w-output-import"),
+    ("Z box",    "tikz/z-box-import"),
+    ("Dummy",    "tikz/dummy-import"),
+]
+
+assert all(key is None or key in tikz_import_defaults
+           for _, key in tikz_import_categories), \
+    "tikz_import_categories keys must exist in tikz_import_defaults"
 
 tikz_layout_defaults: dict[str, float] = {
     "tikz/layout/hspace": 2.0,
@@ -146,6 +174,7 @@ modern_red_green: ColorScheme = {
     "z_pauli_web": QColor("#ccffcc"),
     "x_pauli_web": QColor("#ff8888"),
     "y_pauli_web": QColor("#6688ff"),
+    "pauli_web_highlight": QColor("#ffddaa"),
 }
 
 classic_red_green: ColorScheme = {
@@ -253,6 +282,14 @@ class DisplaySettings:
             get_settings_value("font/family", str),
             get_settings_value("font/size", int)
         )
+        self.phase_font = QFont(self.font) if get_settings_value("phase-font/same-as-app", bool, True) else QFont(
+            get_settings_value("phase-font/family", str),
+            get_settings_value("phase-font/size", int)
+        )
+        self.dummy_font = QFont(self.font) if get_settings_value("dummy-font/same-as-app", bool, True) else QFont(
+            get_settings_value("dummy-font/family", str),
+            get_settings_value("dummy-font/size", int)
+        )
         self.SNAP = SCALE / self.SNAP_DIVISION
         self._invalidate_color_cache()
 
@@ -335,7 +372,7 @@ class DisplaySettings:
 
 
 # Initialise settings
-settings = QSettings("zxlive", "zxlive")
+settings = DEFAULT_SETTINGS
 for key, value in defaults.items():
     if not settings.contains(key):
         settings.setValue(key, value)

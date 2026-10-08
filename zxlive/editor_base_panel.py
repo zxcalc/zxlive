@@ -7,7 +7,7 @@ import sys
 from enum import Enum
 from typing import Callable, Iterator, Optional, TypedDict
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, Signal, QEasingCurve, QParallelAnimationGroup
 from PySide6.QtGui import QAction, QColor, QContextMenuEvent, QIcon, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
@@ -26,9 +26,10 @@ from .common import (VT, GraphT, ToolType, get_data,
                      pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
-from .features import ZH_CALCULUS, ZW_CALCULUS, is_feature_enabled
+from .features import ZW_CALCULUS, is_feature_enabled
 from .vitem import VItem, BLACK
 from .graphscene import EditGraphScene, EdgeDragSpec
+from .graphview import graph_to_tooltip
 from .settings import display_setting
 
 from . import animations
@@ -51,9 +52,8 @@ def vertices_data() -> dict[VertexType, DrawPanelNodeType]:
     data: dict[VertexType, DrawPanelNodeType] = {
         VertexType.Z: {"text": "Z spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["z_spider"])},
         VertexType.X: {"text": "X spider", "icon": (ShapeType.CIRCLE, display_setting.effective_colors["x_spider"])},
+        VertexType.H_BOX: {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])},
     }
-    if is_feature_enabled(ZH_CALCULUS):
-        data[VertexType.H_BOX] = {"text": "H box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["hadamard"])}
     if is_feature_enabled(ZW_CALCULUS):
         data[VertexType.Z_BOX] = {"text": "Z box", "icon": (ShapeType.SQUARE, display_setting.effective_colors["z_spider"])}
         data[VertexType.W_OUTPUT] = {"text": "W node", "icon": (ShapeType.TRIANGLE, display_setting.effective_colors["w_output"])}
@@ -188,7 +188,7 @@ class EditorBasePanel(BasePanel):
     def _ety_double_clicked(self, ety: EdgeType) -> None:
         self._curr_ety = ety
         self.graph_scene.curr_ety = ety
-        selected = list(self.graph_scene.selected_edges)
+        selected = [it for it in self.graph_scene.selectedItems() if isinstance(it, EItem)]
         if len(selected) > 0:
             cmd = ChangeEdgeColor(self.graph_view, selected, ety)
             self.undo_stack.push(cmd)
@@ -555,7 +555,9 @@ class PatternsListWidget(QListWidget):
             }
         """)
 
+        self.setMouseTracking(True)
         self.itemDoubleClicked.connect(self._pattern_selected)
+        self.itemEntered.connect(self._set_pattern_tooltip)
         self.refresh_patterns()
 
     def refresh_patterns(self) -> None:
@@ -596,6 +598,17 @@ class PatternsListWidget(QListWidget):
             for pattern_name in patterns:
                 item = QListWidgetItem(pattern_name)
                 self.addItem(item)
+
+    def _set_pattern_tooltip(self, item: QListWidgetItem) -> None:
+        if item.flags() == Qt.ItemFlag.NoItemFlags or item.toolTip() or not display_setting.previews_show:
+            return
+        pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
+        try:
+            with open(pattern_path, encoding="utf-8") as file:
+                graph = GraphT.from_json(file.read())
+            item.setToolTip(graph_to_tooltip(graph))
+        except (OSError, ValueError, KeyError, TypeError):
+            return
 
     def _pattern_selected(self, item: QListWidgetItem) -> None:
         """Handle pattern selection."""
@@ -745,15 +758,38 @@ def create_titled_widget(
     return container, layout
 
 
+class PaletteListWidget(QListWidget):
+    """List widget whose entries all share the size of the largest entry.
+
+    Sizing every cell to the widest and tallest item keeps the palette
+    looking uniform and equally spaced while still leaving room for longer
+    labels, so nothing gets clipped at larger font sizes."""
+
+    def sync_item_sizes(self) -> None:
+        model = self.model()
+        hints = [self.sizeHintForIndex(model.index(row, 0)) for row in range(self.count())]
+        if not hints:
+            self.setGridSize(QSize())
+            return
+        width = max(hint.width() for hint in hints)
+        height = max(hint.height() for hint in hints)
+        self.setGridSize(QSize(width, height))
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        # Recompute the uniform cell size when the font changes (e.g. via settings).
+        if event.type() == QEvent.Type.FontChange:
+            self.sync_item_sizes()
+
+
 def create_list_widget(parent: EditorBasePanel,
                        data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                        onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
-                       ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> QListWidget:
-    list_widget = QListWidget(parent)
+                       ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None]) -> PaletteListWidget:
+    list_widget = PaletteListWidget(parent)
     list_widget.setResizeMode(QListView.ResizeMode.Adjust)
     list_widget.setViewMode(QListView.ViewMode.IconMode)
     list_widget.setMovement(QListView.Movement.Static)
-    list_widget.setUniformItemSizes(True)
     list_widget.setWordWrap(True)
     list_widget.setIconSize(QSize(24, 24))
     populate_list_widget(list_widget, data, onclick, ondoubleclick)
@@ -761,7 +797,7 @@ def create_list_widget(parent: EditorBasePanel,
     return list_widget
 
 
-def populate_list_widget(list_widget: QListWidget,
+def populate_list_widget(list_widget: PaletteListWidget,
                          data: dict[VertexType, DrawPanelNodeType] | dict[EdgeType, DrawPanelNodeType],
                          onclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
                          ondoubleclick: Callable[[VertexType], None] | Callable[[EdgeType], None],
@@ -781,6 +817,8 @@ def populate_list_widget(list_widget: QListWidget,
                     if (item := list_widget.item(i)) is not None
                     and item.data(Qt.ItemDataRole.UserRole) == selected), row)
     list_widget.setCurrentRow(row)
+    # Keep every entry the same size once the set of entries is known.
+    list_widget.sync_item_sizes()
 
 
 def create_icon(shape: ShapeType, color: QColor) -> QIcon:

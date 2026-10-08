@@ -322,20 +322,26 @@ class VItem(QGraphicsPathItem):
                 self.setZValue(VITEM_SELECTED_Z if value else VITEM_UNSELECTED_Z)
                 return value
             
-            # Intercept selection- and position-has-changed events to call `refresh`.
+            # Intercept position- and selection-has-changed events to call `refresh`.
             # Note that the position and selected values are already updated when
             # this event fires.
-            case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged | QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            case QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
                 # Skip refresh when the scene is performing a bulk graph update
                 # (it will refresh all affected items in a single pass afterwards).
                 if not self.is_animated and not self.graph_scene.is_bulk_updating:
                     self.refresh()
+                    self.graph_scene.ensure_scene_rect_contains(self.sceneBoundingRect())
+            
+            case QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+                # Same as above, but we don't need to update neighbouring edges
+                if not self.is_animated and not self.graph_scene.is_bulk_updating:
+                    self.refresh(cascade_edges=False)
                 
+                # Assumption: we will only be using VItem with a GraphScene
                 scene = self.scene()
-                if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-                    if TYPE_CHECKING:
-                        assert isinstance(scene, GraphScene)
-                    scene.selection_changed_custom.emit()
+                if TYPE_CHECKING:
+                    assert isinstance(scene, GraphScene)
+                scene.selection_changed_custom.emit()
             
             case _:
                 return super().itemChange(change, value)
@@ -520,7 +526,7 @@ class VItem(QGraphicsPathItem):
         self._cached_font_key = ""
 
     def update_font(self) -> None:
-        self.phase_item.setFont(display_setting.font)
+        self.phase_item.setFont(display_setting.phase_font)
         self.phase_item.update_text_color()
         # Clear dummy-label cache so changed font triggers re-render
         self._cached_dummy_text = ""
@@ -541,7 +547,7 @@ class VItem(QGraphicsPathItem):
             return
 
         text_color = display_setting.text_color
-        font_key = display_setting.font.toString()
+        font_key = display_setting.dummy_font.toString()
         if (text == self._cached_dummy_text
                 and text_color == self._cached_text_color
                 and font_key == self._cached_font_key):
@@ -557,7 +563,7 @@ class VItem(QGraphicsPathItem):
             if self.dummy_text_item is not None:
                 self.dummy_text_item.setVisible(False)
             # Scale LaTeX slightly larger so it matches plain-text visual size
-            latex_size = float(display_setting.font.pointSize()) * 1.4
+            latex_size = float(display_setting.dummy_font.pointSize()) * 1.4
             svg_bytes = latex_to_svg(text, color=text_color, size=latex_size)
             renderer = QSvgRenderer(svg_bytes)
             if self.dummy_svg_item is None:
@@ -572,7 +578,7 @@ class VItem(QGraphicsPathItem):
                 self.dummy_svg_item.setVisible(False)
             if self.dummy_text_item is None:
                 self.dummy_text_item = QGraphicsTextItem(self)
-            self.dummy_text_item.setFont(display_setting.font)
+            self.dummy_text_item.setFont(display_setting.dummy_font)
             self.dummy_text_item.setDefaultTextColor(QColor(text_color))
             self.dummy_text_item.setPlainText(text)
             rect = self.dummy_text_item.boundingRect()
@@ -672,6 +678,7 @@ class PhaseItem(QGraphicsTextItem):
         super().__init__()
         self.setZValue(PHASE_ITEM_Z)
         self.v_item = v_item
+        self.setFont(display_setting.phase_font)
         # Persistent label for boundary vertices (e.g. I/O labels set by the
         # rule editor). Survives refresh() calls so it is not wiped by
         # selection/position changes.

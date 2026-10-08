@@ -14,7 +14,7 @@ import zxlive.tutorial
 from zxlive.common import new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.editor_base_panel import vertices_data
-from zxlive.features import (FAULT_EQUIVALENCE, FEATURES, PAULI_WEBS, ZH_CALCULUS, ZW_CALCULUS,
+from zxlive.features import (FAULT_EQUIVALENCE, FEATURES, PAULI_WEBS, ZW_CALCULUS,
                              has_seen_feature_picker, is_feature_enabled)
 from zxlive.mainwindow import MainWindow
 from zxlive.proof_panel import ProofPanel
@@ -66,6 +66,12 @@ def _start_derivation(app: MainWindow, qtbot: QtBot) -> ProofPanel:
 
 def _group_names(panel: ProofPanel) -> list[str]:
     return list(panel.rewrites_panel.get_visible_action_groups().keys())
+
+
+def _has_adjacent_visible_separators(panel: GraphEditPanel | ProofPanel) -> bool:
+    visible_actions = [action for action in panel.toolbar.actions() if action.isVisible()]
+    return any(first.isSeparator() and second.isSeparator()
+               for first, second in zip(visible_actions, visible_actions[1:]))
 
 
 def test_fault_equivalence_is_off_by_default(app: MainWindow, qtbot: QtBot) -> None:
@@ -176,6 +182,8 @@ def test_pauli_webs_button_follows_its_feature(app: MainWindow, qtbot: QtBot) ->
     _set_feature(app, PAULI_WEBS, False)
     assert not edit_panel.is_toolbar_widget_visible(edit_panel.pauli_webs)
     assert not proof_panel.is_toolbar_widget_visible(proof_panel.pauli_webs)
+    assert not _has_adjacent_visible_separators(edit_panel)
+    assert not _has_adjacent_visible_separators(proof_panel)
 
     _set_feature(app, PAULI_WEBS, True)
     assert edit_panel.is_toolbar_widget_visible(edit_panel.pauli_webs)
@@ -187,14 +195,9 @@ def test_vertex_palette_follows_calculus_features(app: MainWindow) -> None:
     assert isinstance(edit_panel, GraphEditPanel)
     edit_panel._curr_vty = VertexType.W_OUTPUT
 
-    _set_feature(app, ZH_CALCULUS, False)
     _set_feature(app, ZW_CALCULUS, False)
-    assert set(vertices_data()) == {VertexType.Z, VertexType.X, VertexType.BOUNDARY, VertexType.DUMMY}
+    assert set(vertices_data()) == {VertexType.Z, VertexType.X, VertexType.H_BOX, VertexType.BOUNDARY, VertexType.DUMMY}
     assert edit_panel._curr_vty == VertexType.Z
-
-    _set_feature(app, ZH_CALCULUS, True)
-    assert VertexType.H_BOX in vertices_data()
-    assert VertexType.Z_BOX not in vertices_data()
 
     _set_feature(app, ZW_CALCULUS, True)
     assert {VertexType.H_BOX, VertexType.Z_BOX, VertexType.W_OUTPUT} <= set(vertices_data())

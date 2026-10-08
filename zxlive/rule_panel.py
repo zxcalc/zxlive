@@ -83,6 +83,10 @@ class RulePanel(EditorBasePanel):
         self.graph_scene_left.curr_tool = tool
         self.graph_scene_right.curr_tool = tool
 
+    def update_font(self) -> None:
+        self.graph_view_left.update_font()
+        self.graph_view_right.update_font()
+
     def get_rule(self) -> CustomRule:
         return CustomRule(self.graph_scene_left.g,
                           self.graph_scene_right.g,

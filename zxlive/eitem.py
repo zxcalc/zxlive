@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from __future__ import annotations
+from dataclasses import dataclass
 from math import sqrt
 from typing import Optional, Any, TYPE_CHECKING, Union
 from enum import Enum
@@ -25,7 +26,7 @@ from PySide6.QtGui import QPen, QPainter, QColor, QPainterPath, QPainterPathStro
 
 from pyzx.utils import EdgeType, VertexType
 
-from .common import SCALE, ET, GraphT, get_settings_value
+from .common import SCALE, ET, GraphT
 from .settings import display_setting
 from .vitem import VItem, EITEM_Z
 
@@ -45,6 +46,16 @@ class EItem(QGraphicsPathItem):
         """Properties of an EItem that can be animated."""
         Thickness = 1
         Opacity = 2
+
+    @dataclass
+    class PauliWebData:
+        left: bool
+        right: bool
+        color: QColor
+        thickness: float
+
+        def should_draw(self) -> bool:
+            return (self.left or self.right) and self.thickness > 0
 
     def __init__(self, graph_scene: GraphScene, e: ET, s_item: VItem, t_item: VItem, curve_distance: float = 0, index: int = 0) -> None:
         super().__init__()
@@ -73,6 +84,16 @@ class EItem(QGraphicsPathItem):
         self._old_pos: Optional[QPointF] = None
         self.thickness: float = 3.0
         self.color: QColor = QColor()
+        self.pauli_webs: list[EItem.PauliWebData] = []
+        self.xweb_left: bool = False
+        self.xweb_right: bool = False
+        self.zweb_left: bool = False
+        self.zweb_right: bool = False
+        self.highlight: bool = False
+        self.use_y_webs: bool = False
+        self.pauli_pen: QPen = QPen(self.pen())
+        self.pauli_pen.setStyle(Qt.PenStyle.SolidLine)
+        self.pauli_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         self.reset_color()
 
         self.refresh()
@@ -148,97 +169,115 @@ class EItem(QGraphicsPathItem):
         self.selection_node.setPos(curve_midpoint.x(), curve_midpoint.y())
         self.selection_node.setVisible(self.isSelected())
 
-    # TODO: Fix code complexity
-    # noqa: complexipy
-    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
-        # By default, Qt draws a dashed rectangle around selected items.
-        # We have our own implementation to draw selected vertices, so
-        # we intercept the selected option here.
-        # The type stub is missing the 'state' attribute, so there is a
-        # false positive mypy error if we set the usual way.
-        assert hasattr(option, "state")
-        state = getattr(option, "state")
-        setattr(option, "state", state & ~QStyle.StateFlag.State_Selected)
+    def _add_pauli_web(self, left: bool, right: bool, color: QColor) -> None:
+        """Adds a Pauli web to the edge. The new Pauli web will be the innermost one."""
+        if left or right:
+            self.pauli_webs.append(EItem.PauliWebData(
+                left=left,
+                right=right,
+                color=color,
+                thickness=0 # Temporary placeholder thickness; this should be set later
+            ))
 
-        webs: list[tuple[bool, bool, QColor]] = []
+    def update_pauli_webs(
+        self,
+        *,
+        xweb_left: bool | None = None,
+        xweb_right: bool | None = None,
+        zweb_left: bool | None = None,
+        zweb_right: bool | None = None,
+        highlight: bool | None = None,
+        use_y_webs: bool | None = None
+    ) -> None:
+        """Updates the Pauli web data for this edge. Omitted parameters are unchanged."""
 
-        swap = get_settings_value("swap-pauli-web-colors", bool)
-        zweb0 = self.g.edata(self.e, "xweb0" if swap else "zweb0")
-        zweb1 = self.g.edata(self.e, "xweb1" if swap else "zweb1")
-        xweb0 = self.g.edata(self.e, "zweb0" if swap else "xweb0")
-        xweb1 = self.g.edata(self.e, "zweb1" if swap else "xweb1")
+        # Default to cached values for any parameters which aren't provided
+        # Additionally, cache the values for any parameters which are provided
+        self.xweb_left = xweb_left = (self.xweb_left if xweb_left is None else xweb_left)
+        self.xweb_right = xweb_right = (self.xweb_right if xweb_right is None else xweb_right)
+        self.zweb_left = zweb_left = (self.zweb_left if zweb_left is None else zweb_left)
+        self.zweb_right = zweb_right = (self.zweb_right if zweb_right is None else zweb_right)
+        self.highlight = highlight = (self.highlight if highlight is None else highlight)
+        self.use_y_webs = use_y_webs = (self.use_y_webs if use_y_webs is None else use_y_webs)
 
-        highlight = self.g.edata(self.e, "highlight")
-        webs.append((highlight, highlight, QColor("#FFC107")))  # highlight web
+        # Webs are sorted from outer to inner. The highlight should always be on the outside.
+        self.pauli_webs.clear()
+        self._add_pauli_web(highlight, highlight, display_setting.effective_colors["pauli_web_highlight"])
 
         zcolor = display_setting.effective_colors["z_pauli_web"]
         xcolor = display_setting.effective_colors["x_pauli_web"]
         ycolor = display_setting.effective_colors["y_pauli_web"]
 
-        # only draw y webs if the setting is enabled
-        if get_settings_value("blue-y-pauli-web", bool):
-            yweb0 = zweb0 and xweb0
-            yweb1 = zweb1 and xweb1
+        # Only draw Y-webs if the setting is enabled
+        if self.use_y_webs:
+            yweb_left = zweb_left and xweb_left
+            yweb_right = zweb_right and xweb_right
 
-            # if we're drawing y webs, we shouldn't draw the corresponding x and z webs
-            zweb0 = zweb0 and not yweb0
-            zweb1 = zweb1 and not yweb1
-            xweb0 = xweb0 and not yweb0
-            xweb1 = xweb1 and not yweb1
+            # If we're drawing Y-webs, we shouldn't draw the corresponding X- and Z-webs
+            zweb_left &= not yweb_left
+            zweb_right &= not yweb_right
+            xweb_left &= not yweb_left
+            xweb_right &= not yweb_right
 
-            webs.append((yweb0, yweb1, ycolor))
+            self._add_pauli_web(yweb_left, yweb_right, ycolor)
 
-        webs.append((zweb0, zweb1, zcolor))
-        webs.append((xweb0, xweb1, xcolor))
+        self._add_pauli_web(zweb_left, zweb_right, zcolor)
+        self._add_pauli_web(xweb_left, xweb_right, xcolor)
 
-        # determine thicknesses for each web
-        thicknesses: list[float] = []
+        # Determine thicknesses for each web
         left_thickness = 2.5
         right_thickness = 2.5
-        for left, right, _ in reversed(webs):
-            if left and right:
-                thickness = max(left_thickness, right_thickness)
-                thicknesses.append(thickness)
-                left_thickness = right_thickness = thickness + 1
-            elif left:
-                thicknesses.append(left_thickness)
+        for web in reversed(self.pauli_webs):
+            if web.left and web.right:
+                web.thickness = max(left_thickness, right_thickness)
+                left_thickness = web.thickness + 1
+                right_thickness = web.thickness + 1
+            elif web.left:
+                web.thickness = left_thickness
                 left_thickness += 1
-            elif right:
-                thicknesses.append(right_thickness)
+            elif web.right:
+                web.thickness = right_thickness
                 right_thickness += 1
-            else:
-                thicknesses.append(0)
-        thicknesses.reverse()
+        self.update()
 
-        # draw webs from outermost to innermost
-        for (left, right, color), thickness in zip(webs, thicknesses):
-            self._paint_pauli_web(painter, option, widget, color, thickness, left=left, right=right)
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None) -> None:
+        # By default, Qt draws a dashed rectangle around selected items.
+        # We have our own implementation to draw selected vertices, so
+        # we intercept the selected option here.
+        option.state &= ~QStyle.StateFlag.State_Selected
+
+        # First, we draw any Pauli webs the edge has
+        if self.pauli_webs:
+            # Self-loops may not define half-paths, so we fall back to the full path
+            full_path = self.path()
+            left_path = self.half_path_left or full_path
+            right_path = self.half_path_right or full_path
+
+            painter.save()
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+
+            # Draw webs from outermost to innermost
+            for web in self.pauli_webs:
+                if not web.should_draw():
+                    continue
+
+                # Choose the path to draw based on the web properties
+                if web.left and web.right:
+                    path = full_path
+                elif web.left:
+                    path = left_path
+                else:
+                    path = right_path
+
+                # Set the painter and draw the web
+                self.pauli_pen.setWidthF(self.thickness * web.thickness)
+                self.pauli_pen.setColor(web.color)
+                painter.setPen(self.pauli_pen)
+                painter.drawPath(path)
+
+            painter.restore()
 
         super().paint(painter, option, widget)
-
-    def _paint_pauli_web(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget],
-                         color: QColor, thickness: float, *, left: bool, right: bool) -> None:
-        """Draws a colored Pauli web on the edge if specified by the flags."""
-
-        if not (left or right):
-            return
-
-        old_path = self.path()
-        old_pen = self.pen()
-
-        path = old_path if left and right else (self.half_path_left if left else self.half_path_right)
-        path = path or old_path  # fallback if half paths are not defined (self-loops)
-
-        pen = QPen(old_pen)
-        pen.setWidthF(self.thickness * thickness)
-        pen.setColor(color)
-        pen.setStyle(Qt.PenStyle.SolidLine)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        self.setPen(pen)
-        self.setPath(path)
-        super().paint(painter, option, widget)
-        self.setPen(old_pen)
-        self.setPath(old_path)
 
     def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value: Any) -> Any:
         # Intercept selection- and position-has-changed events to call `refresh`.

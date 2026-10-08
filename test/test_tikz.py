@@ -8,7 +8,7 @@ from PySide6.QtCore import QSettings
 from pyzx.utils import VertexType
 from pytestqt.qtbot import QtBot
 
-from zxlive.common import GraphT, new_graph
+from zxlive.common import DEFAULT_SETTINGS, GraphT, new_graph
 from zxlive.proof import ProofModel, Rewrite
 from zxlive.tikz import _escape_tex, proof_to_tikz
 
@@ -24,7 +24,7 @@ _TIKZ_LAYOUT: dict[str, float] = {
 @pytest.fixture(autouse=True)
 def _isolate_tikz_settings() -> Iterator[None]:
     """Pin TikZ layout settings on the per-test QSettings path."""
-    settings = QSettings("zxlive", "zxlive")
+    settings = DEFAULT_SETTINGS
     saved: dict[str, object] = {
         key: settings.value(key) if settings.contains(key) else None
         for key in _TIKZ_LAYOUT
@@ -153,7 +153,7 @@ def test_offset_graphs_align_eq_sign(qtbot: QtBot) -> None:
 def test_eq_sign_after_wrap_ignores_prev_height(qtbot: QtBot) -> None:
     """After a row wrap, the equal sign is centred using only the current graph."""
     # Force every graph to wrap onto a new row.
-    settings = QSettings("zxlive", "zxlive")
+    settings = DEFAULT_SETTINGS
     settings.setValue("tikz/layout/max-width", 0.0)
     settings.sync()
 

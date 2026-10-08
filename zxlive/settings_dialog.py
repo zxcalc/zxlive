@@ -21,14 +21,13 @@ from typing import TYPE_CHECKING, Dict, Any
 from PySide6.QtGui import QColor, QIcon, QFontDatabase
 from typing_extensions import TypedDict, NotRequired
 
-from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import (
     QDialog, QFileDialog, QFormLayout, QLineEdit, QPushButton, QWidget,
     QVBoxLayout, QSpinBox, QDoubleSpinBox, QLabel, QHBoxLayout, QTabWidget,
     QComboBox, QApplication, QCheckBox, QMessageBox, QColorDialog, QStyle
 )
 
-from .common import get_settings_value, T, get_data
+from .common import DEFAULT_SETTINGS, get_settings_value, T, get_data
 from .settings import (
     refresh_pyzx_tikz_settings, defaults, display_setting, color_schemes
 )
@@ -81,6 +80,7 @@ class SettingsData(TypedDict):
     label: str
     type: FormInputType
     data: NotRequired[dict[Any, str]]
+    checkbox_text: NotRequired[str]
 
 
 color_scheme_data = {
@@ -119,6 +119,7 @@ general_settings: list[SettingsData] = [
     {"id": "dark-mode", "label": "Theme", "type": FormInputType.Combo, "data": dark_mode_options},
     {"id": "sparkle-mode", "label": "Sparkle Mode", "type": FormInputType.Bool},
     {"id": "previews-show", "label": "Show rewrite previews", "type": FormInputType.Bool},
+    {"id": "expand-rules-sidebar", "label": "Expand rules sidebar by default", "type": FormInputType.Bool},
     {"id": "rewrite-animations", "label": "Rewrite animations", "type": FormInputType.Bool},
     {"id": "sound-effects", "label": "Sound Effects", "type": FormInputType.Bool},
     {"id": "color-scheme", "label": "Color scheme", "type": FormInputType.Combo, "data": color_scheme_data},
@@ -132,20 +133,30 @@ general_settings: list[SettingsData] = [
     {"id": "matrix/precision", "label": "Matrix display precision", "type": FormInputType.Int},
     {"id": "phase-label-color", "label": "Phase label color", "type": FormInputType.Color},
     {"id": "show-vertex-indices", "label": "Show vertex indices", "type": FormInputType.Bool},
+    {"id": "show-grid", "label": "Show grid", "type": FormInputType.Bool},
 ]
 
 
 font_settings: list[SettingsData] = [
-    {"id": "font/size", "label": "Font size", "type": FormInputType.Int},
+    {"id": "font/size", "label": "Application font size", "type": FormInputType.Int},
     # Font families can be loaded after a QGuiApplication is constructed.
     # load_font_families needs to be called once a QGuiApplication is up.
-    {"id": "font/family", "label": "Font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "font/family", "label": "Application font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "phase-font/same-as-app", "label": "Phase font", "type": FormInputType.Bool, "checkbox_text": "Same as app"},
+    {"id": "phase-font/size", "label": "Phase font size", "type": FormInputType.Int},
+    {"id": "phase-font/family", "label": "Phase font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
+    {"id": "dummy-font/same-as-app", "label": "Dummy label font", "type": FormInputType.Bool, "checkbox_text": "Same as app"},
+    {"id": "dummy-font/size", "label": "Dummy label font size", "type": FormInputType.Int},
+    {"id": "dummy-font/family", "label": "Dummy label font family", "type": FormInputType.Combo, "data": {"Arial": "Arial"}},
 ]
 
 
 def load_font_families() -> None:
-    index = next(i for i, d in enumerate(font_settings) if d["id"] == "font/family")
-    font_settings[index]["data"] |= {f: f for f in QFontDatabase.families()}
+    families = {f: f for f in QFontDatabase.families()}
+    for setting in font_settings:
+        if setting["id"].endswith("/family"):
+            assert "data" in setting
+            setting["data"] |= families
 
 
 tikz_export_settings: list[SettingsData] = [
@@ -199,7 +210,7 @@ class SettingsDialog(QDialog):
         self.main_window = main_window
         self.setWindowTitle("Settings")
 
-        self.settings = QSettings("zxlive", "zxlive")
+        self.settings = DEFAULT_SETTINGS
         self.value_dict: Dict[str, QWidget] = {}
         self.prev_color_scheme = self.get_settings_value("color-scheme", str)
         self.prev_tab_bar_location = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
@@ -216,6 +227,8 @@ class SettingsDialog(QDialog):
 
         self.add_settings_tab(tab_widget, "General", "General ZXLive settings", general_settings)
         self.add_settings_tab(tab_widget, "Font", "Font settings", font_settings)
+        self._configure_font_inheritance("phase-font")
+        self._configure_font_inheritance("dummy-font")
 
         # --- Begin TikZ nested tab structure ---
         tikz_tab = QWidget()
@@ -269,8 +282,23 @@ class SettingsDialog(QDialog):
         cancel_button.clicked.connect(self.cancel)
         hlayout.addWidget(cancel_button)
 
+    def _configure_font_inheritance(self, prefix: str) -> None:
+        same_as_app = self.value_dict[f"{prefix}/same-as-app"]
+        size = self.value_dict[f"{prefix}/size"]
+        family = self.value_dict[f"{prefix}/family"]
+        assert isinstance(same_as_app, QCheckBox)
+        assert isinstance(size, QSpinBox)
+        assert isinstance(family, QComboBox)
+
+        def set_custom_font_enabled(inherit: bool) -> None:
+            size.setEnabled(not inherit)
+            family.setEnabled(not inherit)
+
+        same_as_app.toggled.connect(set_custom_font_enabled)
+        set_custom_font_enabled(same_as_app.isChecked())
+
     def make_bool_form_input(self, data: SettingsData) -> QCheckBox:
-        widget = QCheckBox()
+        widget = QCheckBox(data.get("checkbox_text", ""))
         widget.setChecked(self.get_settings_from_data(data, bool))
         return widget
 
@@ -396,6 +424,9 @@ class SettingsDialog(QDialog):
         pos = self.get_settings_value("tab-bar-location", QTabWidget.TabPosition)
         if pos != self.prev_tab_bar_location:
             self.main_window.tab_widget.setTabPosition(pos)
+        show_grid = self.get_settings_value("show-grid", bool)
+        self.main_window.show_grid_action.setChecked(show_grid)
+        self.main_window.toggle_grid(show_grid)
         app = QApplication.instance()
         if isinstance(app, QApplication):
             app.setFont(display_setting.font)

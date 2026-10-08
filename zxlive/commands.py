@@ -4,7 +4,7 @@ import copy
 from collections import namedtuple
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Callable, Iterable, Optional, Set
+from typing import Any, Callable, Iterable, Optional, Set
 
 from PySide6.QtCore import QModelIndex
 from PySide6.QtGui import QUndoCommand
@@ -225,22 +225,70 @@ class ChangeNodeType(BaseCommand):
 @dataclass
 class ChangeEdgeColor(BaseCommand):
     """Changes the color of a set of edges"""
-    es: Iterable[ET]
+    es: Iterable[EItem]
     ety: EdgeType
 
-    _old_etys: Optional[list[EdgeType]] = field(default=None, init=False)
+    _original_edata: dict[ET, dict[str, Any]] | None = field(default=None, init=False)
 
     def undo(self) -> None:
-        assert self._old_etys is not None
-        for e, old_ety in zip(self.es, self._old_etys):  # TODO: strict=True in Python 3.10
-            self.g.set_edge_type(e, old_ety)
+        assert self._original_edata is not None
+        
+        for edge in self.es:
+            # Find edge with new edge type and set it back to original edge type
+            target = (edge.e[0], edge.e[1], self.ety)
+            self.g.set_edge_type(target, edge.e[2])
+
+        for e, edata in self._original_edata.items():
+            self.g.set_edata_dict(e, edata)
+
         self.update_graph_view()
 
     def redo(self) -> None:
-        self._old_etys = [self.g.edge_type(e) for e in self.es]
-        for e in self.es:
-            self.g.set_edge_type(e, self.ety)
+        if self._original_edata is None:
+            self._original_edata = {}
+        for edge in sorted(self.es, key=lambda e: e.index, reverse=True):
+            old_type = edge.e[2]
+            new_type = self.ety
+            new_edge = (edge.e[0], edge.e[1], new_type)
+            if old_type != new_type:
+                old_edata = self.g.edata_dict(edge.e)
+                new_edata = self.g.edata_dict(new_edge)
+                
+                # Use setdefault here to only set edata the first time we encounter the edge
+                self._original_edata.setdefault(edge.e, dict(old_edata))
+                self._original_edata.setdefault(new_edge, dict(new_edata))
+
+                new_index = self.g.num_edges(*new_edge) # Index of the edge which will be added
+                del_index = self.g.num_edges(*edge.e) - 1 # Index of the edge which will be deleted
+
+                self.g.set_edge_type(edge.e, self.ety)
+
+                # Since the edge indices change when we change an edge type, we need to shuffle
+                # around the curve data to preserve the existing edge curves. The "last" edge will
+                # always be deleted, so we copy its curve to the index which we're targeting.
+
+                # Copy curve from target edge to new edge
+                curve = old_edata.get(f"curve_{edge.index}")
+                if curve is not None:
+                    new_edata[f"curve_{new_index}"] = curve
+                else:
+                    new_edata.pop(f"curve_{new_index}", None)
+
+                # Copy curve from deleted edge to target edge
+                curve = old_edata.get(f"curve_{del_index}")
+                if curve is not None:
+                    old_edata[f"curve_{edge.index}"] = curve
+                else:
+                    old_edata.pop(f"curve_{edge.index}", None)
+
+                # Delete curve data of deleted edge to prevent stale entries
+                old_edata.pop(f"curve_{del_index}", None)
+
+                self.g.set_edata_dict(edge.e, old_edata)
+                self.g.set_edata_dict(new_edge, new_edata)
+
         self.update_graph_view()
+
 
 
 @dataclass
