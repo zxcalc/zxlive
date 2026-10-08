@@ -1,7 +1,7 @@
 
 import json
 from fractions import Fraction
-from typing import TYPE_CHECKING, Hashable, Optional, Sequence, Dict, TypeVar, Union, Any
+from typing import TYPE_CHECKING, Callable, Hashable, Optional, Sequence, Dict, TypeVar, Union, Any
 
 import networkx as nx
 import numpy as np
@@ -419,15 +419,15 @@ def check_rule_matrices(lhs_graph: GraphT, rhs_graph: GraphT) -> None:
             raise ValueError("The left-hand side and right-hand side of the rule have different semantics.")
 
 
-def check_rule(rule: CustomRule, check_matrices: bool = True) -> None:
+def check_rule(rule: CustomRule,
+               check_matrices: Callable[[GraphT, GraphT], None] = check_rule_matrices) -> None:
     rule.lhs_graph.auto_detect_io()
     rule.rhs_graph.auto_detect_io()
     if len(rule.lhs_graph.inputs()) != len(rule.rhs_graph.inputs()) or \
             len(rule.lhs_graph.outputs()) != len(rule.rhs_graph.outputs()):
         raise ValueError("The left-hand side and right-hand side of the rule have different numbers of inputs or outputs.")
     if len(rule.lhs_graph.var_registry.vars()) == 0 and len(rule.rhs_graph.var_registry.vars()) == 0:
-        if check_matrices:
-            check_rule_matrices(rule.lhs_graph, rule.rhs_graph)
+        check_matrices(rule.lhs_graph, rule.rhs_graph)
     else:
         lhs_vars = set(rule.lhs_graph.var_registry.vars())
         rhs_vars = set(rule.rhs_graph.var_registry.vars())

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import QApplication
 
 from .mainwindow import MainWindow
 from .common import get_data, GraphT, get_settings_value
+from .matrix import shutdown_matrix_worker
 from .settings import display_setting
 from .update_checker import UpdateChecker
 from .dialogs import show_update_available_dialog
@@ -53,6 +54,7 @@ class ZXLive(QApplication):
         main_window = self._ensure_main_window()
 
         self.lastWindowClosed.connect(self.quit)
+        self.aboutToQuit.connect(shutdown_matrix_worker)
 
         if not standalone:
             return
@@ -126,6 +128,9 @@ def get_embedded_app() -> ZXLive:
     Reuses an existing QApplication if one is running (e.g., from ``%gui qt6``
     in Jupyter); otherwise creates a new one with minimal initialisation,
     skipping CLI argument parsing, session restore, and update checks.
+
+    Standalone scripts must call this under an ``if __name__ == "__main__":``
+    guard, since matrix computations spawn a process that re-imports the script.
     """
     app = QApplication.instance()
     if app is not None:

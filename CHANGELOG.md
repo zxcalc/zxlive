@@ -9,6 +9,8 @@
 - Optional features are now all disabled by default, and ZXLive asks which ones you want on first launch, right after the tutorial (#563).
 - Fixed TikZ proof export so that graphs offset from the origin are normalised, equal signs are vertically centred between adjacent steps, and row wrapping works correctly (#198).
 - Fixed closing a tab leaking its panel, so proofs no longer retain their diagram, history and rewrite worker thread after being closed (#562).
+- Matrix computations (**Show Matrix** and custom rule validation) now run in a background worker process with a progress dialog, so they can be aborted or skipped without freezing the interface. The worker starts on first use and is reused for later computations.
+  **Note for embedding:** standalone scripts that call `get_embedded_app()` must now put their code under an `if __name__ == "__main__":` guard, as the matrix process re-imports the main script (see `embedded_zxlive_demo.py`). Jupyter notebooks are unaffected.
 
 
 ## v1.0.0

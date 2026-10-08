@@ -16,15 +16,13 @@ from pyzx.utils import VertexType
 
 from .common import GraphT, VT
 from .custom_rule import CustomRule
-from .matrix import (
-    check_rule_with_progress as check_rule_with_progress,
-    compute_matrix_with_progress as compute_matrix_with_progress,
-)
+from .matrix import check_rule_with_progress
 from .proof import ProofModel
 from .settings import get_settings_value
 
 if TYPE_CHECKING:
     from .mainwindow import MainWindow
+
 
 class FileFormat(Enum):
     """Supported formats for importing/exporting diagrams."""
