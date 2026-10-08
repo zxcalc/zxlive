@@ -22,6 +22,7 @@
 - Fixed Undo and Redo becoming disabled after switching tabs or closing another tab (#593).
 - Changing an edge type via double-clicking now properly preserves edge curves (#594).
 - Changing an edge type via double-clicking now can be undone correctly (#595).
+- Several bug fixes upstream in pyzx
 
 ## v1.1.0
 
