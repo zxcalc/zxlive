@@ -3,7 +3,7 @@
 title = ZXLive
 # project directory. the general assumption is that project_dir is the parent directory
 # of input_file
-project_dir = ./zxlive/
+project_dir = ./
 # source file path
 input_file = main.py
 # directory where exec is stored
