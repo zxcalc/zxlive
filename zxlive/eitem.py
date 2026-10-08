@@ -404,7 +404,7 @@ def calculate_control_points(s_pos: QPointF, t_pos: QPointF,
                              curve_distance: float) -> tuple[QPointF, QPointF, QPointF, QPointF]:
     """Return the four control points (P0, P1, P2, P3) of the cubic Bezier for an edge."""
     if s_pos == t_pos:
-        # Self-loop (or degenerate coincident endpoints): use TikZit's defaults.
+        # Self-loop (or degenerate coincident endpoints): use TikZiT's defaults.
         cd = curve_distance + 1 / sqrt(2) if curve_distance >= 0 else curve_distance - 1 / sqrt(2)
         return (s_pos,
                 s_pos + QPointF(1, -1) * cd * SCALE,
@@ -418,7 +418,7 @@ def calculate_control_points(s_pos: QPointF, t_pos: QPointF,
     cp_dist = length * 0.4
     offset_scene = curve_distance * SCALE
     tangent_sq = cp_dist * cp_dist - offset_scene * offset_scene
-    tangent = unit * (sqrt(tangent_sq) if tangent_sq > 0 else 0.0)
+    tangent = unit * sqrt(max(tangent_sq, 0.0))
     offset = perp * offset_scene
     return s_pos, s_pos + tangent + offset, t_pos - tangent + offset, t_pos
 

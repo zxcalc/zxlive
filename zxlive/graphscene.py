@@ -340,7 +340,7 @@ class GraphScene(QGraphicsScene):
                 edges.append(self.edge_map[e][i])
         midpoint_index = 0.5 * (len(edges) - 1)
         for n, edge in enumerate(edges):
-            edge.curve_distance = (n - midpoint_index) * 0.5
+            edge.curve_distance = (n - midpoint_index) / 3
             edge.refresh()
 
     def update_colors(self) -> None:

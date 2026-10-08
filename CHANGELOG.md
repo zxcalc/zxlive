@@ -7,6 +7,8 @@
 
 ### Improvements
 
+- Edges are now drawn as cubic Bézier curves following TikZiT's parametrisation, giving smoother curved edges and self-loops that match TikZiT. Edges curved manually in previously saved diagrams will appear more strongly curved (#545).
+
 ### Fixes
 
 ## v1.1.0
