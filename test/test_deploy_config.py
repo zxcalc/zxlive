@@ -15,3 +15,12 @@ def test_deployment_directory_is_inside_project() -> None:
     assert source_file.is_file()
     assert source_file.is_relative_to(project_dir)
     assert deployment_dir.is_relative_to(project_dir)
+
+
+def test_deployment_uses_single_file_mode() -> None:
+    """Release pipelines expect a single .exe or .bin, not a .dist directory."""
+    repo_dir = Path(__file__).resolve().parent.parent
+    config = ConfigParser()
+    config.read(repo_dir / "pysidedeploy.spec")
+
+    assert config["nuitka"].get("mode") == "onefile"

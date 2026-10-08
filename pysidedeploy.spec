@@ -35,6 +35,8 @@ wheel_pyside =
 wheel_shiboken = 
 
 [nuitka]
+# Release pipelines require single-file executables on Windows and Linux; macOS uses an app bundle.
+mode = onefile
 # (str) specify any extra nuitka arguments
 # for arm macos add --macos-create-app-bundle
 extra_args =
