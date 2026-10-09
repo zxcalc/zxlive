@@ -136,6 +136,8 @@ class GraphEditPanel(EditorBasePanel):
             cmd = UpdateGraph(self.graph_view, new_g)
             self.undo_stack.push(cmd)
             self.graph_scene.select_vertices(new_verts)
+            for name in new_g.var_registry.vars():
+                self.variable_viewer.add_item(name)
 
     def add_selection_as_pattern(self) -> None:
         selected: list[VT] = list(self.graph_scene.selected_vertices)
