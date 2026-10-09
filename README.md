@@ -24,8 +24,6 @@ To install from source, you need Python >= 3.12 and pip. If you have those, just
 
 Then, you can run ZXLive by typing `zxlive`.
 
-Note that ZXLive requires the most recent development version of PyZX. If you already have a version of PyZX installed, first uninstall it with `pip uninstall pyzx`, and then run `pip install .` in the ZXLive folder (or manually install the latest PyZX version using `pip install @git+https://github.com/zxcalc/pyzx.git`).
-
 # Contributing
 
 Contributions are welcome! Please read the [contributing guidelines](CONTRIBUTING.md) before getting started. If you are looking for something to work on, see the [roadmap issue](https://github.com/zxcalc/zxlive/issues/614) for an overview of planned features and open issues.
