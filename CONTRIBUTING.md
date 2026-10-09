@@ -1,6 +1,8 @@
 # Guidelines for contributing to ZXLive
 
-Thanks for wanting to contribute to ZXLive! Here are a couple of things you might want to keep in mind in order to make the process as smooth as possible:
+Thanks for wanting to contribute to ZXLive! If you're looking for something to work on, check the [roadmap issue](https://github.com/zxcalc/zxlive/issues/614).
+
+Here are a couple of things you might want to keep in mind in order to make the process as smooth as possible:
 
 - Avoid re-implementing stuff. If it is PyZX, use it! If it is in Qt, use it! 
 - If you want to contribute something not directly related to GUI components, consider whether it would be better placed in PyZX (things like logic for rewriting graphs belongs there).
