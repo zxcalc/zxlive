@@ -141,7 +141,6 @@ class RewriteAction:
                     matches = [list(g.vertices())]  # type: ignore
                 else:
                     matches = [verts.copy()]  # type: ignore
-            matches_list.extend(matches)
             if not matches:
                 break
             current_auto_simplify_setting = g.get_auto_simplify()
@@ -153,27 +152,22 @@ class RewriteAction:
                     if self.supports_weight_parameter:
                         if self.match_type == MATCH_SINGLE:
                             rule_sv_ft = cast(RewriteSingleVertex_ft, self.rule)
-                            if rule_sv_ft.apply(g, cast(VT, m), weight=weight):
-                                applied = True
+                            match_applied = rule_sv_ft.apply(g, cast(VT, m), weight=weight)
                         else:
                             raise ValueError('Unknown fault-tolerant match type. Currently, only MATCH_SINGLE is supported.')
+                    elif self.match_type == MATCH_DOUBLE:
+                        rule_dv = cast(RewriteDoubleVertex, self.rule)
+                        v1, v2 = cast(tuple[VT, VT], m)
+                        match_applied = rule_dv.apply(g, v1, v2)
+                    elif self.match_type == MATCH_SINGLE:
+                        rule_sv = cast(RewriteSingleVertex, self.rule)
+                        match_applied = rule_sv.apply(g, cast(VT, m))
                     else:
-                        if self.match_type == MATCH_DOUBLE:
-                            rule_dv = cast(RewriteDoubleVertex, self.rule)
-                            v1, v2 = cast(tuple[VT, VT], m)
-                            if rule_dv.apply(g, v1, v2):
-                                applied = True
-                        elif self.match_type == MATCH_SINGLE:
-                            rule_sv = cast(RewriteSingleVertex, self.rule)
-                            if rule_sv.apply(g, cast(VT, m)):
-                                applied = True
-                        else:
-                            rule_sg = cast(RewriteSimpGraph, self.rule)
-                            if rule_sg.apply(g, cast(list[VT], m)):
-                                applied = True
-
-                # g, rem_verts = self.apply_rewrite(g, matches)
-                # rem_verts_list.extend(rem_verts)
+                        rule_sg = cast(RewriteSimpGraph, self.rule)
+                        match_applied = rule_sg.apply(g, cast(list[VT], m))
+                    if match_applied:
+                        applied = True
+                        matches_list.append(m)
             except Exception as ex:
                 show_error_msg('Error while applying rewrite rule', str(ex))
                 return

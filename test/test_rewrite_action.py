@@ -171,6 +171,34 @@ def test_do_rewrite_single_treats_empty_selection_as_all_vertices(monkeypatch: A
     assert rule.applied_vertices == [z1]
 
 
+def test_do_rewrite_only_animates_applied_matches(monkeypatch: Any) -> None:
+    g, z1, _, e_mid, _ = _make_chain_graph()
+    _, z2 = g.edge_st(e_mid)
+
+    class _FirstApplyOnlyRule(_SingleRule):
+        """Matches z1 and z2, but applying the first match stops the second from applying."""
+        def is_match(self, _graph: object, vertex: int) -> bool:
+            return vertex in (z1, z2)
+
+        def apply(self, _graph: object, vertex: int) -> bool:
+            if self.applied_vertices:
+                return False
+            self.applied_vertices.append(vertex)
+            return True
+
+    action = RewriteAction("single", cast(Rewrite, _FirstApplyOnlyRule(z1)), MATCH_SINGLE, "")
+    action.enabled = True
+    panel = _Panel(g, [z1, z2], [])
+    _patch_rewrite_side_effects(monkeypatch)
+    animated_matches: list[list[Any]] = []
+    monkeypatch.setattr(rewrite_action_module, "make_animation",
+                        lambda _self, _panel, _g, matches, _rem: animated_matches.append(matches) or (None, None))
+
+    action.do_rewrite(cast(Any, panel))
+
+    assert animated_matches == [[z1]]
+
+
 def test_do_rewrite_double_treats_empty_selection_as_all_edges(monkeypatch: Any) -> None:
     g, z1, _, e_mid, _ = _make_chain_graph()
     _, z2 = g.edge_st(e_mid)
