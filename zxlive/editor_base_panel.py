@@ -270,6 +270,9 @@ class EditorBasePanel(BasePanel):
 
     def insert_pattern_from_sidebar(self, pattern_path: str, position: Optional[tuple[float, float]] = None) -> None:
         """Insert a pattern into the current graph view."""
+        if position is not None:
+            snap = display_setting.SNAP_DIVISION
+            position = (round(position[0] * snap) / snap, round(position[1] * snap) / snap)
         try:
             out = import_diagram_from_file(pattern_path, parent=self)
             if out is not None and hasattr(out, 'g'):
