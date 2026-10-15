@@ -24,6 +24,7 @@ from pytestqt.qtbot import QtBot
 from pyzx.utils import VertexType
 
 from zxlive.common import new_graph
+from zxlive.edit_panel import GraphEditPanel
 from zxlive.editor_base_panel import (EditorBasePanel, PatternsListWidget, create_list_widget,
                                       string_to_complex, vertices_data)
 from zxlive.settings import display_setting
@@ -111,3 +112,18 @@ def test_invalid_pattern_does_not_get_tooltip(
     widget._set_pattern_tooltip(item)
 
     assert item.toolTip() == ""
+
+
+def test_inserted_pattern_snaps_to_grid(
+        qtbot: QtBot, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(display_setting, "SNAP_DIVISION", 4)
+    pattern = new_graph()
+    pattern.add_vertex(VertexType.Z, row=10, qubit=-3)
+    pattern.add_vertex(VertexType.X, row=11, qubit=-2)
+    (tmp_path / "example.zxg").write_text(pattern.to_json(), encoding="utf-8")
+    panel = GraphEditPanel(new_graph())
+    qtbot.addWidget(panel)
+
+    panel.insert_pattern_from_sidebar(str(tmp_path / "example.zxg"), (1.4, 2.1))
+
+    assert {(panel.graph.row(v), panel.graph.qubit(v)) for v in panel.graph.vertices()} == {(1.5, 2), (2.5, 3)}
