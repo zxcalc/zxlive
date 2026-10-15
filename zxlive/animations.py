@@ -338,18 +338,13 @@ def make_animation(self: RewriteAction, panel: ProofPanel, g: GraphT, matches: l
             w = list(panel.graph.neighbors(v))[0]
             anim_after.addAnimation(strong_comp(panel.graph, g, w, panel.graph_scene))
     elif self.name == rules_basic['pauli']['text']:
+        # Pairs are (spider, pauli), matching check_pauli(g, v, w).
         anim_before = QParallelAnimationGroup()
+        for v, w in matches:
+            anim_before.addAnimation(fuse(panel.graph_scene.vertex_map[w], panel.graph_scene.vertex_map[v]))
         anim_after = QParallelAnimationGroup()
-
-        v = matches[0]
-        old_g = panel.graph_scene.g
-        neighs = list(old_g.neighbors(v))
-        neigh = neighs[0]
-
-        anim_before.addAnimation(fuse( panel.graph_scene.vertex_map[v], panel.graph_scene.vertex_map[neigh]))
-        anim_after.addAnimation(strong_comp(panel.graph, g, neigh, panel.graph_scene))
-
-        return anim_before, anim_after
+        for v, _ in matches:
+            anim_after.addAnimation(strong_comp(panel.graph, g, v, panel.graph_scene))
     elif self.name == rules_basic['bialgebra']['text']:
         anim_before = QParallelAnimationGroup()
         for v1, v2 in matches:
