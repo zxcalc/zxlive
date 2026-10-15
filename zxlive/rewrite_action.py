@@ -123,7 +123,6 @@ class RewriteAction:
             verts = list(g.vertices())
             edges = list(g.edges())
 
-        rem_verts_list: list[VT] = []
         matches_list: list[VT | tuple[VT, VT] | list[VT]] = []
         while True:
             matches: list[VT | tuple[VT, VT] | list[VT]] = []
@@ -192,6 +191,8 @@ class RewriteAction:
             weight_callback=set_weight_callback,
             refresh_rules_callback=panel.rewrites_panel.refresh_rewrites_model
         )
+        new_verts = set(g.vertices())
+        rem_verts_list = [v for v in panel.graph_scene.g.vertices() if v not in new_verts]
         anim_before, anim_after = make_animation(self, panel, g, matches_list, rem_verts_list)
         panel.undo_stack.push(cmd, anim_before=anim_before, anim_after=anim_after)
 
