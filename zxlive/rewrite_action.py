@@ -37,6 +37,19 @@ if TYPE_CHECKING:
 # operations = copy.deepcopy(pyzx.editor.operations)
 
 
+def _match_edge(rule: RewriteDoubleVertex, g: GraphT, e: ET) -> Optional[tuple[VT, VT]]:
+    """Return the endpoints of ``e`` in the order ``rule`` matches them, or None."""
+    # Some rules (e.g. push Pauli, pivot gadget) give their two vertices different roles.
+    s, t = g.edge_st(e)
+    if s == t:
+        return None
+    if rule.is_match(g, s, t):
+        return (s, t)
+    if rule.is_match(g, t, s):
+        return (t, s)
+    return None
+
+
 @dataclass
 class RewriteAction:
     name: str
@@ -121,9 +134,8 @@ class RewriteAction:
                 matches = [v for v in verts if rule_sv.is_match(g, v)]
             elif self.match_type == MATCH_DOUBLE:
                 rule_dv = cast(RewriteDoubleVertex, self.rule)
-                matches = [g.edge_st(e) for e in edges
-                           if g.edge_st(e)[0] != g.edge_st(e)[1]
-                           and rule_dv.is_match(g, *g.edge_st(e))]
+                matches = [pair for e in edges
+                           if (pair := _match_edge(rule_dv, g, e)) is not None]
             elif self.match_type == MATCH_COMPOUND:  # We don't necessarily have a matcher in this case
                 if len(verts) == 0:
                     matches = [list(g.vertices())]  # type: ignore
@@ -211,10 +223,7 @@ class RewriteAction:
         elif self.match_type == MATCH_DOUBLE:
             rule_dv = cast(RewriteDoubleVertex, self.rule)
             for e in edges:
-                s, t = g.edge_st(e)
-                if s == t:
-                    continue
-                if rule_dv.is_match(g, s, t):
+                if _match_edge(rule_dv, g, e) is not None:
                     self.enabled = True
                     return
             self.enabled = False
