@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from typing import Any, cast
 
+import pytest
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 from pyzx.rewrite import Rewrite
@@ -11,7 +13,7 @@ import zxlive.rewrite_action as rewrite_action_module
 from zxlive.common import new_graph
 from zxlive.proof_panel import ProofPanel
 from zxlive.rewrite_action import RewriteAction, RewriteActionTreeModel
-from zxlive.rewrite_data import MATCH_DOUBLE, MATCH_SINGLE
+from zxlive.rewrite_data import MATCH_DOUBLE, MATCH_SINGLE, rules_basic
 
 
 class _SingleRule:
@@ -39,6 +41,21 @@ class _DoubleRule:
 
     def apply(self, _graph: object, v1: int, v2: int) -> bool:
         if frozenset((v1, v2)) != self.matching_pair:
+            return False
+        self.applied_pairs.append((v1, v2))
+        return True
+
+
+class _OrderedDoubleRule(_DoubleRule):
+    def __init__(self, matching_pair: tuple[int, int]) -> None:
+        super().__init__(matching_pair)
+        self.ordered_pair = matching_pair
+
+    def is_match(self, _graph: object, v1: int, v2: int) -> bool:
+        return (v1, v2) == self.ordered_pair
+
+    def apply(self, _graph: object, v1: int, v2: int) -> bool:
+        if (v1, v2) != self.ordered_pair:
             return False
         self.applied_pairs.append((v1, v2))
         return True
@@ -168,6 +185,60 @@ def test_do_rewrite_double_treats_empty_selection_as_all_edges(monkeypatch: Any)
     assert panel.undo_stack.push_called
     assert len(rule.applied_pairs) == 1
     assert frozenset(rule.applied_pairs[0]) == frozenset((z1, z2))
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_update_active_double_matches_either_edge_order(reverse: bool) -> None:
+    g, _z1, _inp, e_mid, _ = _make_chain_graph()
+    s, t = g.edge_st(e_mid)
+    pair = (t, s) if reverse else (s, t)
+    action = RewriteAction("double", cast(Rewrite, _OrderedDoubleRule(pair)), MATCH_DOUBLE, "")
+
+    action.update_active(g, [], [e_mid])
+
+    assert action.enabled
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_do_rewrite_double_applies_in_matching_order_once(monkeypatch: Any, reverse: bool) -> None:
+    g, _z1, _inp, e_mid, _ = _make_chain_graph()
+    s, t = g.edge_st(e_mid)
+    pair = (t, s) if reverse else (s, t)
+    rule = _OrderedDoubleRule(pair)
+    action = RewriteAction("double", cast(Rewrite, rule), MATCH_DOUBLE, "")
+    action.enabled = True
+    panel = _Panel(g, [], [e_mid])
+    _patch_rewrite_side_effects(monkeypatch)
+
+    action.do_rewrite(cast(Any, panel))
+
+    assert rule.applied_pairs == [pair]
+
+
+@pytest.mark.parametrize("pauli, spider", [(1, 2), (2, 1)])
+def test_push_pauli_matches_for_either_vertex_order(monkeypatch: Any, pauli: int, spider: int) -> None:
+    g = new_graph()
+    g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0, index=0)
+    g.add_vertex(VertexType.X, qubit=0, row=1, phase=Fraction(1), index=pauli)
+    g.add_vertex(VertexType.Z, qubit=0, row=2, phase=Fraction(1, 4), index=spider)
+    g.add_vertex(VertexType.BOUNDARY, qubit=0, row=3, index=3)
+    g.add_vertex(VertexType.BOUNDARY, qubit=1, row=3, index=4)
+    e = g.add_edge((pauli, spider))
+    for v, w in ((0, pauli), (spider, 3), (spider, 4)):
+        g.add_edge((v, w))
+    action = RewriteAction.from_rewrite_data(rules_basic["pauli"])
+
+    action.update_active(g, [], [e])
+    assert action.enabled
+
+    panel = _Panel(g, [], [e])
+    _patch_rewrite_side_effects(monkeypatch)
+    steps: list[dict[str, Any]] = []
+    monkeypatch.setattr(rewrite_action_module, "AddRewriteStep", lambda **kwargs: steps.append(kwargs))
+    action.do_rewrite(cast(Any, panel))
+
+    assert panel.undo_stack.push_called
+    assert pauli not in steps[0]["new_g"].vertices()
 
 
 def test_refreshing_reuses_the_model_and_its_worker(qtbot: QtBot, monkeypatch: Any) -> None:

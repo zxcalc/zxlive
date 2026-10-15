@@ -23,6 +23,7 @@
 - Changing an edge type via double-clicking now properly preserves edge curves (#594).
 - Changing an edge type via double-clicking now can be undone correctly (#595).
 - Fixed variable viewer not updating correctly when new variables are added via qasm input (#615).
+- Fixed "Push Pauli" only being available for one ordering of the two vertex indices (#617).
 - Fixed "Push Pauli" raising an error instead of being applied when rewrite animations are enabled (#618).
 - Several bug fixes upstream in pyzx
 
