@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+import base64
 from fractions import Fraction
 from typing import Any, cast
 
 import pytest
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 from pytestqt.qtbot import QtBot
 from pyzx.rewrite import Rewrite
 from pyzx.utils import EdgeType, VertexType
 
 import zxlive.rewrite_action as rewrite_action_module
-from zxlive.common import new_graph
+from zxlive.common import GraphT, new_graph
 from zxlive.proof_panel import ProofPanel
 from zxlive.rewrite_action import RewriteAction, RewriteActionTreeModel
 from zxlive.rewrite_data import MATCH_DOUBLE, MATCH_SINGLE, rules_basic
@@ -97,7 +99,7 @@ def _patch_rewrite_side_effects(monkeypatch: Any) -> None:
     monkeypatch.setattr(rewrite_action_module, "make_animation", lambda *_args, **_kwargs: (None, None))
 
 
-def _make_chain_graph() -> tuple[object, int, int, tuple[int, int, EdgeType], tuple[int, int, EdgeType]]:
+def _make_chain_graph() -> tuple[GraphT, int, int, tuple[int, int, EdgeType], tuple[int, int, EdgeType]]:
     g = new_graph()
     inp = g.add_vertex(VertexType.BOUNDARY, qubit=0, row=0)
     z1 = g.add_vertex(VertexType.Z, qubit=0, row=1)
@@ -157,6 +159,78 @@ def test_custom_rule_tooltip_contains_graph_preview(
     assert tooltip.endswith("description")
 
 
+@pytest.mark.parametrize("rule_name, picture", [
+    ("id_simp", "remove_id.gif"),
+    ("fuse_simp", "fuse_spiders.gif"),
+    ("remove_self_loops", "remove_self_loops.svg"),
+    ("hopf", "remove_parallel_edges.svg"),
+    ("unfuse", "unfuse_spider.svg"),
+    ("ocm", "save_positions.svg"),
+    ("cc", "change_color_z.gif"),
+    ("euler", "decompose_hadamard.gif"),
+])
+def test_basic_rule_tooltip_contains_preview(
+        qapp: QApplication, monkeypatch: Any, rule_name: str, picture: str) -> None:
+    monkeypatch.setattr(
+        type(rewrite_action_module.display_setting),
+        "previews_show",
+        property(lambda _self: True),
+    )
+    action = RewriteAction.from_rewrite_data(rules_basic[rule_name])
+
+    assert action.picture_path == picture
+    tooltip = action.tooltip
+
+    assert tooltip.startswith('<img src="data:image/png;base64,')
+    assert tooltip.endswith(rules_basic[rule_name]["tooltip"])
+    encoded = tooltip.split('base64,', 1)[1].split('"', 1)[0]
+    pixmap = QPixmap()
+    assert pixmap.loadFromData(base64.b64decode(encoded))
+    assert pixmap.width() > 0 and pixmap.height() > 0
+
+
+@pytest.mark.parametrize("rule_name, picture", [
+    ("copy", "copy_pi.png"),
+    ("bialgebra_op", "bialgebra.png"),
+])
+def test_existing_basic_rule_preview_is_unchanged(
+        qapp: QApplication, monkeypatch: Any, rule_name: str, picture: str) -> None:
+    monkeypatch.setattr(
+        type(rewrite_action_module.display_setting),
+        "previews_show",
+        property(lambda _self: True),
+    )
+    action = RewriteAction.from_rewrite_data(rules_basic[rule_name])
+
+    assert action.picture_path == picture
+    assert action.tooltip.startswith('<img src="data:image/png;base64,')
+
+
+def test_named_missing_previews_are_available_for_matching_graphs(qapp: QApplication) -> None:
+    identity_graph = new_graph()
+    left = identity_graph.add_vertex(VertexType.BOUNDARY, row=0, qubit=0)
+    spider = identity_graph.add_vertex(VertexType.Z, row=1, qubit=0)
+    right = identity_graph.add_vertex(VertexType.BOUNDARY, row=2, qubit=0)
+    identity_graph.add_edge((left, spider))
+    identity_graph.add_edge((spider, right))
+
+    fuse_graph, _, _, _, _ = _make_chain_graph()
+
+    loop_graph = new_graph()
+    loop_vertex = loop_graph.add_vertex(VertexType.Z, row=1, qubit=0)
+    loop_graph.add_edge((loop_vertex, loop_vertex))
+
+    for name, graph in (
+        ("id_simp", identity_graph),
+        ("fuse_simp", fuse_graph),
+        ("remove_self_loops", loop_graph),
+    ):
+        action = RewriteAction.from_rewrite_data(rules_basic[name])
+        action.update_active(cast(GraphT, graph), [], [])
+        assert action.enabled
+        assert action.picture_path is not None
+
+
 def test_do_rewrite_single_treats_empty_selection_as_all_vertices(monkeypatch: Any) -> None:
     g, z1, _, _, _ = _make_chain_graph()
     rule = _SingleRule(z1)
@@ -191,8 +265,12 @@ def test_do_rewrite_only_animates_applied_matches(monkeypatch: Any) -> None:
     panel = _Panel(g, [z1, z2], [])
     _patch_rewrite_side_effects(monkeypatch)
     animated_matches: list[list[Any]] = []
+    def record_animation(_self: Any, _panel: Any, _g: Any, matches: list[Any], _rem: Any) -> tuple[None, None]:
+        animated_matches.append(matches)
+        return None, None
+
     monkeypatch.setattr(rewrite_action_module, "make_animation",
-                        lambda _self, _panel, _g, matches, _rem: animated_matches.append(matches) or (None, None))
+                        record_animation)
 
     action.do_rewrite(cast(Any, panel))
 

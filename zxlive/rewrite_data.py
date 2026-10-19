@@ -284,6 +284,7 @@ rules_basic: dict[str, RewriteData] = {
         "tooltip": "Removes a 2-ary phaseless spider",
         "rule": simplify.id_simp,
         "type": MATCH_SINGLE,
+        "picture": "remove_id.gif",
         "repeat_rule_application": True
     },
     'fuse_simp': {
@@ -291,6 +292,7 @@ rules_basic: dict[str, RewriteData] = {
         "tooltip": "Fuses connected spiders of the same color, also works for W-spiders",
         "rule": simplify.fuse_simp,
         "type": MATCH_DOUBLE,
+        "picture": "fuse_spiders.gif",
         "repeat_rule_application": True
     },
     'remove_self_loops': {
@@ -298,6 +300,7 @@ rules_basic: dict[str, RewriteData] = {
         "tooltip": "Removes all self-loops on a spider",
         "rule": simplify.remove_self_loop_simp,
         "type": MATCH_SINGLE,
+        "picture": "remove_self_loops.svg",
         "repeat_rule_application": True
     },
     "hopf": {
@@ -305,6 +308,7 @@ rules_basic: dict[str, RewriteData] = {
         "tooltip": "Applies the Hopf rule between pairs of spiders that share parallel edges",
         "rule": simplify.hopf_simp,
         "type": MATCH_DOUBLE,
+        "picture": "remove_parallel_edges.svg",
         "repeat_rule_application": True
     },
     'unfuse': {
@@ -312,12 +316,14 @@ rules_basic: dict[str, RewriteData] = {
         "tooltip": "Unfuse a spider",
         "rule": unfusion_rewrite,
         "type": MATCH_COMPOUND,
+        "picture": "unfuse_spider.svg",
     },
     'ocm': {
         "text": "Save changed positions",
         "tooltip": "Only Connectivity Matters. Saves the graph with the current vertex positions",
         "rule": rewrite_strategy_to_rewrite(ocm_rule),
         "type": MATCH_COMPOUND,
+        "picture": "save_positions.svg",
     },
     'copy': {
         "text": "Copy 0/pi spider through its neighbour",
@@ -337,7 +343,8 @@ rules_basic: dict[str, RewriteData] = {
         "text": "Colour change", 
         "tooltip": "Changes the color of a given vertex",
         "rule": simplify.color_change_rewrite,
-        "type": MATCH_SINGLE
+        "type": MATCH_SINGLE,
+        "picture": "change_color_z.gif",
     },
     'bialgebra': {
         "text": "Strong complementarity",
@@ -359,6 +366,7 @@ rules_basic: dict[str, RewriteData] = {
         "tooltip": "Expands a Hadamard-edge into its component spiders using its Euler decomposition",
         "rule": simplify.euler_expansion_rewrite,
         "type": MATCH_DOUBLE,
+        "picture": "decompose_hadamard.gif",
     },
 }
 

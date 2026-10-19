@@ -18,6 +18,7 @@
 
 ### Fixes
 
+- Added diagram previews for the remaining basic rewrite rules (#555).
 - Fixed the "pivot gadget" and "pivot boundary" simplification routines throwing errors instead of applying repeated pivots (#576).
 - Fixed Undo and Redo becoming disabled after switching tabs or closing another tab (#593).
 - Changing an edge type via double-clicking now properly preserves edge curves (#594).
