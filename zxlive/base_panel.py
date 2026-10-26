@@ -126,10 +126,10 @@ class BasePanel(QWidget):
         self.graph_scene.clearSelection()
 
     def copy_selection(self) -> GraphT:
-        selection = list(self.graph_scene.selected_vertices)
+        # We sort because relative vertex order matters in some cases (e.g., curve distance)
+        selection = list(sorted(self.graph_scene.selected_vertices))
         copied_graph = self.graph.subgraph_from_vertices(selection)
-        # Mypy issue: https://github.com/python/mypy/issues/11673
-        assert isinstance(copied_graph, GraphT)  # type: ignore
+        assert isinstance(copied_graph, GraphT)
         return copied_graph
 
     def delete_selection(self) -> None:
