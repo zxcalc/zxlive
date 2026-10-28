@@ -5,6 +5,7 @@
 
 ### New features
 
+- Added a preview image for the "Fuse spiders" rewrite rule.
 - Patterns can now be dragged onto the canvas, or inserted at the cursor by right-clicking with the Select tool (#571).
 - Added a "Check correctness" button to the custom rule editor to validate rules without saving (#590).
 - Added "Save changed positions" to the fault-equivalent rewrites (#584).

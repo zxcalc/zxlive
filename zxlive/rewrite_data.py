@@ -289,6 +289,7 @@ rules_basic: dict[str, RewriteData] = {
     'fuse_simp': {
         "text": "Fuse spiders",
         "tooltip": "Fuses connected spiders of the same color, also works for W-spiders",
+        "picture": "fuse_simp.png",
         "rule": simplify.fuse_simp,
         "type": MATCH_DOUBLE,
         "repeat_rule_application": True
