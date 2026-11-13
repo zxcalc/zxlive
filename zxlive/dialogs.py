@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
 from pyzx import Circuit, extract_circuit
 from pyzx.utils import VertexType
 
-from .common import GraphT, VT, find_unknown_tikz_styles, from_tikz
+from .common import GraphT, VT, find_unknown_tikz_styles, from_tikz, graph_from_json
 from .settings import get_settings_value, tikz_import_categories
 from .custom_rule import CustomRule
 from .matrix import check_rule_with_progress
@@ -308,7 +308,7 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
         elif selected_format == FileFormat.ZXRule:
             return ImportRuleOutput(selected_format, file_path, CustomRule.from_json(data))
         elif selected_format in (FileFormat.QGraph, FileFormat.Json):
-            g = GraphT.from_json(data)
+            g = graph_from_json(data)
             if TYPE_CHECKING:
                 assert isinstance(g, GraphT)
             g.set_auto_simplify(False)
@@ -334,7 +334,7 @@ def import_diagram_from_file(file_path: str, selected_filter: str = FileFormat.A
                 return ImportGraphOutput(FileFormat.QASM, file_path, g)  # type: ignore
             except TypeError:
                 try:
-                    g = GraphT.from_json(data)
+                    g = graph_from_json(data)
                     if TYPE_CHECKING:
                         assert isinstance(g, GraphT)
                     g.set_auto_simplify(False)

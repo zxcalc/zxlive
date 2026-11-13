@@ -22,7 +22,7 @@ from .base_panel import BasePanel, ToolbarSection
 from .commands import (BaseCommand, AddEdge, AddEdges, AddNode, AddNodeSnapped, AddWNode, ChangeEdgeColor, ChangeEdgeCurve,
                        ChangeNodeType, ChangePhase, MergeNodes, MoveNode, SetGraph,
                        UpdateGraph)
-from .common import (VT, GraphT, ToolType, get_data,
+from .common import (VT, GraphT, ToolType, get_data, graph_from_json,
                      pos_from_view, get_settings_value)
 from .dialogs import import_diagram_from_file, show_error_msg, update_dummy_vertex_text
 from .eitem import EItem, HAD_EDGE_BLUE
@@ -683,7 +683,7 @@ class PatternsListWidget(QListWidget):
         pattern_path = os.path.join(self.patterns_folder, item.text() + ".zxg")
         try:
             with open(pattern_path, encoding="utf-8") as file:
-                graph = GraphT.from_json(file.read())
+                graph = graph_from_json(file.read())
             item.setToolTip(graph_to_tooltip(graph))
         except (OSError, ValueError, KeyError, TypeError):
             return
