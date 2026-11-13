@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QLineEdit, QListView, QMenu,
                                QStyle, QStyledItemDelegate,
                                QStyleOptionViewItem, QWidget)
 
-from .common import GraphT
+from .common import GraphT, graph_from_json
 from .settings import display_setting
 
 
@@ -45,7 +45,7 @@ class Rewrite(NamedTuple):
         else:
             d = json_str
         grouped_rewrites = d.get("grouped_rewrites")
-        graph = GraphT.from_json(d["graph"])
+        graph = graph_from_json(d["graph"])
         assert isinstance(graph, GraphT)
         graph.set_auto_simplify(False)
 
@@ -213,7 +213,7 @@ class ProofModel(QAbstractListModel):
             d = json.loads(json_str)
         else:
             d = json_str
-        initial_graph = GraphT.from_json(d["initial_graph"])
+        initial_graph = graph_from_json(d["initial_graph"])
         # Mypy issue: https://github.com/python/mypy/issues/11673
         if TYPE_CHECKING:
             assert isinstance(initial_graph, GraphT)

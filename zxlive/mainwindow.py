@@ -38,7 +38,7 @@ from shiboken6 import isValid
 
 from .base_panel import BasePanel
 from .common import (DEFAULT_SETTINGS, VT, GraphT, get_custom_rules_path, get_data,
-                     get_settings_value, new_graph, set_settings_value, to_tikz)
+                     get_settings_value, graph_from_json, new_graph, set_settings_value, to_tikz)
 from .construct import construct_circuit
 from .commands import MoveNode, ProofModeCommand
 from .custom_rule import CustomRule, to_networkx
@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
 
                 try:
                     if tab_type == 'graph':
-                        graph: GraphT = BaseGraph.from_json(tab_data['data'])  # type: ignore
+                        graph = graph_from_json(tab_data['data'])
                         self.new_graph(graph, tab_name)
                     elif tab_type == 'proof':
                         from .proof import ProofModel
@@ -543,7 +543,7 @@ class MainWindow(QMainWindow):
                         rule = CustomRule.from_json(tab_data['data'])
                         self.new_rule_editor(rule, tab_name)
                     elif tab_type == 'pauliwebs':
-                        pauli_graph: GraphT = BaseGraph.from_json(tab_data['data'])  # type: ignore
+                        pauli_graph = graph_from_json(tab_data['data'])
                         self.new_pauli_webs(pauli_graph, tab_name)
 
                     # Restore file path and file type if available
@@ -843,7 +843,7 @@ class MainWindow(QMainWindow):
                 payload = json.loads(raw.decode("utf-8"))
                 graph_json = payload.get("graph_json")
                 if isinstance(graph_json, str):  # type: ignore
-                    g = GraphT.from_json(graph_json)
+                    g = graph_from_json(graph_json)
                     assert isinstance(g, GraphT)  # type: ignore[misc]
                     g.rebind_variables_to_registry()
                     g.set_auto_simplify(False)

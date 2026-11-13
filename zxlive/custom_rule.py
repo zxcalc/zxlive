@@ -12,11 +12,10 @@ from shapely import Polygon
 from shapely.errors import ShapelyError
 
 from pyzx.symbolic import Poly, Var
-from pyzx.graph import jsonparser
 from pyzx.graph.base import BaseGraph
 from pyzx.rewrite import RewriteSimpGraph
 
-from .common import ET, VT, GraphT
+from .common import ET, VT, GraphT, graph_from_json
 
 NodeT = TypeVar("NodeT", bound=Hashable)
 ScalarPhase = Union[int, float, complex, Fraction]
@@ -211,8 +210,8 @@ class CustomRule(RewriteSimpGraph[VT, ET]):
             d = json.loads(json_str)
         else:
             d = json_str
-        lhs_graph = jsonparser.json_to_graph(d['lhs_graph'], 'multigraph')
-        rhs_graph = jsonparser.json_to_graph(d['rhs_graph'], 'multigraph')
+        lhs_graph = graph_from_json(d['lhs_graph'])
+        rhs_graph = graph_from_json(d['rhs_graph'])
         # Mypy issue: https://github.com/python/mypy/issues/11673
         assert (isinstance(lhs_graph, GraphT) and isinstance(rhs_graph, GraphT))
         lhs_graph.set_auto_simplify(False)

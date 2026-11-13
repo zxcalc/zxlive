@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "PySide6>=6.7.2",
-    "pyzx>=0.10.4,<0.10.8",
+    "pyzx>=0.10.4",
     "networkx",
     "numpy",
     "shapely",

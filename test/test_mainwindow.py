@@ -30,7 +30,7 @@ from pyzx.utils import EdgeType, VertexType
 
 import zxlive.rewrite_action
 from zxlive.commands import AddNode, AddRewriteStep, ProofModeCommand
-from zxlive.dialogs import import_diagram_from_file
+from zxlive.dialogs import ImportGraphOutput, import_diagram_from_file
 from zxlive.common import GraphT, W_INPUT_OFFSET, new_graph
 from zxlive.edit_panel import GraphEditPanel
 from zxlive.mainwindow import MainWindow
@@ -314,9 +314,16 @@ def test_file_formats_preserved(app: MainWindow) -> None:
     zxlive.dialogs.show_error_msg = lambda *args, **kwargs: None
 
     def check_file_format(filename: str) -> None:
-        assert import_diagram_from_file(os.path.join(os.path.dirname(__file__), filename)), \
+        imported = import_diagram_from_file(os.path.join(os.path.dirname(__file__), filename))
+        assert imported, \
             (f"File format has changed. If this is intentional, please overwrite {filename} in the commit and note in "
              f"the commit description that this is a breaking change.")
+        if filename == "demo.zxg":
+            assert isinstance(imported, ImportGraphOutput)
+            assert len(imported.g.vertices()) == 24
+            assert len(list(imported.g.edges())) == 26
+            assert len(imported.g.inputs()) == 4
+            assert len(imported.g.outputs()) == 4
 
     check_file_format("demo.zxg")
     check_file_format("demo.zxp")
