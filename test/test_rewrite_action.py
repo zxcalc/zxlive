@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
@@ -155,6 +156,29 @@ def test_custom_rule_tooltip_contains_graph_preview(
 
     assert tooltip.startswith('<img src="data:image/png;base64,')
     assert tooltip.endswith("description")
+
+
+def test_fuse_simp_tooltip_uses_picture_when_previews_enabled(
+        qapp: QApplication, monkeypatch: Any) -> None:
+    action = RewriteAction.from_rewrite_data(rules_basic["fuse_simp"])
+    assert action.picture_path == "fuse_simp.png"
+    assert (Path(rewrite_action_module.__file__).parent / "tooltips" / action.picture_path).is_file()
+
+    monkeypatch.setattr(
+        type(rewrite_action_module.display_setting),
+        "previews_show",
+        property(lambda _self: False),
+    )
+    assert action.tooltip == rules_basic["fuse_simp"]["tooltip"]
+
+    monkeypatch.setattr(
+        type(rewrite_action_module.display_setting),
+        "previews_show",
+        property(lambda _self: True),
+    )
+    tooltip = action.tooltip
+    assert 'data:image/png;base64,' in tooltip
+    assert rules_basic["fuse_simp"]["tooltip"] in tooltip
 
 
 def test_do_rewrite_single_treats_empty_selection_as_all_vertices(monkeypatch: Any) -> None:
