@@ -133,6 +133,8 @@ def test_matching_snapshots_graph_rules_and_ui_thread(panel: ProofPanel, qtbot: 
                                                      monkeypatch: pytest.MonkeyPatch) -> None:
     model = _model(panel)
     action = _install_rule(model)
+    # Unfusion can attach GUI state to a live action after construction.
+    setattr(action, "unfusion_action", panel)
     jobs = _capture_jobs(model, monkeypatch)
     gui_thread = get_ident()
     parse = panel.parse_selection
@@ -149,6 +151,7 @@ def test_matching_snapshots_graph_rules_and_ui_thread(panel: ProofPanel, qtbot: 
     assert graph is not panel.graph
     assert actions[0] is not action
     assert actions[0].rule is not action.rule
+    assert not hasattr(actions[0], "unfusion_action")
     panel.graph.set_phase(1, 1)
     assert graph.phase(1) == 0
     assert vertices == [1]
@@ -200,6 +203,87 @@ def test_graph_edit_discards_old_applicability(panel: ProofPanel, qtbot: QtBot,
     model._update_on_timer()
     assert not action.enabled
     assert not model._matching_pending()
+
+
+def test_completed_but_unpublished_result_is_still_invalidated(panel: ProofPanel, qtbot: QtBot,
+                                                              monkeypatch: pytest.MonkeyPatch) -> None:
+    model = _model(panel)
+    action = _install_rule(model)
+    jobs = _capture_jobs(model, monkeypatch)
+    panel.graph_scene.select_vertices([0])
+    qtbot.waitUntil(lambda: len(jobs) == 1)
+    jobs[0][2].set_result([True])
+
+    # Completion is not publication: a change before the GUI polls must win.
+    panel.graph_scene.select_vertices([1])
+    model._update_on_timer()
+    assert not action.enabled
+    assert len(jobs) == 2
+    assert jobs[1][1][1] == [1]
+
+    # Returning to an earlier selection must not revive that earlier result.
+    panel.graph_scene.select_vertices([0])
+    jobs[1][2].set_result([True])
+    model._update_on_timer()
+    assert not action.enabled
+    assert len(jobs) == 3
+    callback, args, future = jobs[2]
+    future.set_result(callback(*args))
+    model._update_on_timer()
+    assert action.enabled
+    assert not model._matching_pending()
+
+
+@pytest.mark.parametrize("failure", ["snapshot", "worker"])
+def test_failed_refresh_disables_actions_and_next_refresh_recovers(panel: ProofPanel, qtbot: QtBot,
+                                                                  monkeypatch: pytest.MonkeyPatch,
+                                                                  failure: str) -> None:
+    model = _model(panel)
+    action = _install_rule(model)
+    action.enabled = True
+    jobs = _capture_jobs(model, monkeypatch)
+
+    if failure == "snapshot":
+        def fail() -> Any:
+            raise ValueError("snapshot failed")
+        with monkeypatch.context() as patch:
+            patch.setattr(panel, "parse_selection", fail)
+            model._update_on_timer()
+        assert not jobs
+    else:
+        qtbot.waitUntil(lambda: len(jobs) == 1)
+        jobs[0][2].set_exception(ValueError("worker failed"))
+        model._update_on_timer()
+
+    assert not action.enabled
+    assert not model._matching_pending()
+    model.schedule_selection_update()
+    model._update_on_timer()
+    callback, args, future = jobs[-1]
+    future.set_result(callback(*args))
+    model._update_on_timer()
+    assert action.enabled
+
+
+def test_cancelled_worker_stops_before_the_next_rule() -> None:
+    cancelled = Event()
+    called: list[str] = []
+
+    def first(_g: GraphT, _v: int) -> bool:
+        called.append("first")
+        cancelled.set()
+        return True
+
+    def second(_g: GraphT, _v: int) -> bool:
+        called.append("second")
+        return True
+
+    graph = new_graph()
+    vertex = graph.add_vertex(VertexType.Z)
+    actions = [RewriteAction(name, RewriteSingleVertex(matcher, lambda g, v: True), MATCH_SINGLE, "")
+               for name, matcher in [("first", first), ("second", second)]]
+    assert _match_selection(graph, [vertex], [], actions, cancelled) == [True]
+    assert called == ["first"]
 
 
 def test_pending_results_cannot_apply_a_rewrite(panel: ProofPanel, qtbot: QtBot,

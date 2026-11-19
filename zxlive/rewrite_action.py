@@ -358,18 +358,17 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self.proof_panel = proof_panel
         self.root_item = data
         self.executor = ThreadPoolExecutor(max_workers=1)
-        self._generation = 0
-        self._running_generation = 0
+        # At most one job runs. A pending refresh also makes its result stale.
         self._pending = False
         self._closed = False
         self._future: Future[list[bool]] | None = None
-        self._running_actions: list[RewriteAction] = []
         self._cancelled = Event()
         # A zero-delay timeout combines all signals from one selection gesture.
         # While matching, the same timer polls completion on the GUI thread.
         self._update_timer = QTimer(self)
         self._update_timer.setSingleShot(True)
         self._update_timer.timeout.connect(self._update_on_timer)
+        self.schedule_selection_update()
 
     def set_root(self, root: RewriteActionTree) -> None:
         self.beginResetModel()
@@ -451,7 +450,6 @@ class RewriteActionTreeModel(QAbstractItemModel):
     def schedule_selection_update(self) -> None:
         if self._closed:
             return
-        self._generation += 1
         self._pending = True
         self._cancelled.set()
         # Do not enqueue work or copy a graph for every selected vertex. If a
@@ -472,38 +470,38 @@ class RewriteActionTreeModel(QAbstractItemModel):
 
     def _start_selection_update(self) -> None:
         self._pending = False
-        self._running_generation = self._generation
-        self._running_actions = list(self.root_item.rewrite_actions())
         try:
             selection, edges = self.proof_panel.parse_selection()
             g = copy.deepcopy(self.proof_panel.graph_scene.g)
             # replace() excludes runtime UI attributes (e.g. the unfusion dialog).
             # Copy rule state as well, so applying a live action cannot race a match.
             actions = [replace(action, rule=copy.deepcopy(action.rule), enabled=False)
-                       for action in self._running_actions]
+                       for action in self.root_item.rewrite_actions()]
             self._cancelled = Event()
             self._future = self.executor.submit(_match_selection, g, selection, edges, actions, self._cancelled)
             self._update_timer.start(10)
         except Exception:
             logging.exception("Error scheduling rewrite matching")
-            for action in self._running_actions:
+            for action in self.root_item.rewrite_actions():
                 action.enabled = False
-            self._running_actions = []
         self.layoutChanged.emit()
 
     def _finish_selection_update(self) -> None:
         assert self._future is not None
+        future, self._future = self._future, None
+        # set_root() and selection/graph changes all request a refresh. If one
+        # arrived during this job, neither its results nor its tree are current.
+        if self._pending:
+            return
+        actions = list(self.root_item.rewrite_actions())
         try:
-            enabled = self._future.result()  # Only called after done(), on the GUI thread.
+            enabled = future.result()  # Only called after done(), on the GUI thread.
         except Exception:
             logging.exception("Error matching rewrites")
-            enabled = [False] * len(self._running_actions)
-        self._future = None
-        if self._running_generation == self._generation:
-            for action, active in zip(self._running_actions, enabled):
-                action.enabled = active
-            self.layoutChanged.emit()
-        self._running_actions = []
+            enabled = [False] * len(actions)
+        for action, active in zip(actions, enabled):
+            action.enabled = active
+        self.layoutChanged.emit()
 
     def release_resources(self) -> None:
         if self._closed:
@@ -513,7 +511,6 @@ class RewriteActionTreeModel(QAbstractItemModel):
         self._cancelled.set()
         self._update_timer.stop()
         self._future = None
-        self._running_actions = []
         # Workers own only data snapshots; no callback can reach a deleted model.
         self.executor.shutdown(wait=False, cancel_futures=True)
 
@@ -678,7 +675,6 @@ class RewriteActionTreeView(QTreeView):
                 self.expandAll()
             else:
                 self.expand(model.index(0, 0))
-        model.schedule_selection_update()
 
     def _schedule_selection_update(self) -> None:
         model = self.model()
