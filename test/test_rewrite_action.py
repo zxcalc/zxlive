@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Any, cast
 
@@ -300,7 +301,10 @@ def test_refreshing_reuses_the_model_and_its_worker(qtbot: QtBot, monkeypatch: A
     model = cast(RewriteActionTreeModel, panel.rewrites_panel.model())
     executor = model.executor
     submissions: list[object] = []
-    monkeypatch.setattr(executor, "submit", lambda callback: submissions.append(callback))
+    def submit(callback: object, *args: object) -> Future[list[bool]]:
+        submissions.append(callback)
+        return Future()
+    monkeypatch.setattr(executor, "submit", submit)
 
     panel.rewrites_panel.refresh_rewrites_model()
     panel.rewrites_panel.refresh_rewrites_model()
@@ -308,4 +312,6 @@ def test_refreshing_reuses_the_model_and_its_worker(qtbot: QtBot, monkeypatch: A
 
     assert panel.rewrites_panel.model() is model
     assert model.executor is executor
-    assert submissions == [model.update_on_selection]
+    qtbot.waitUntil(lambda: len(submissions) == 1)
+    assert submissions == [rewrite_action_module._match_selection]
+    panel.release_resources()

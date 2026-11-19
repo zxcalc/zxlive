@@ -264,11 +264,12 @@ class ProofPanel(BasePanel):
 
     def parse_selection(self) -> tuple[list[VT], list[ET]]:
         selection = list(self.graph_scene.selected_vertices)
+        selected = set(selection)
         edges = set(self.graph_scene.selected_edges)
         g = self.graph_scene.g
         for e in g.edges():
             s, t = g.edge_st(e)
-            if s in selection and t in selection:
+            if s in selected and t in selected:
                 edges.add(e)
 
         return selection, list(edges)
