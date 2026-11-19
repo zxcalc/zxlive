@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import copy
+import logging
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast, Union, Optional
-from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field, replace
+from threading import Event
+from typing import TYPE_CHECKING, cast, Union, Optional, Iterator
+from concurrent.futures import Future, ThreadPoolExecutor
 
 from pyzx.ft_rewrite import RewriteSingleVertex_ft
 from pyzx.rewrite import Rewrite, RewriteSingleVertex, RewriteDoubleVertex, RewriteSimpGraph
 
 from PySide6.QtCore import (Qt, QAbstractItemModel, QModelIndex, QPersistentModelIndex,
-                            Signal, QObject, QMetaObject, QPoint, QPointF, QLineF)
+                            QTimer, QPoint, QPointF, QLineF)
 from PySide6.QtGui import QPixmap, QColor, QPen, QAction
 from PySide6.QtWidgets import QAbstractItemView, QMenu, QTreeView, QMessageBox
 
@@ -325,15 +327,27 @@ class RewriteActionTree:
             if disabled:
                 self.rewrite.enabled = False
 
-    def update_on_selection(self, g: GraphT, selection: list[VT], edges: list[ET]) -> None:
+    def rewrite_actions(self) -> Iterator[RewriteAction]:
         for child in self.child_items:
-            child.update_on_selection(g, selection, edges)
+            yield from child.rewrite_actions()
         if self.rewrite is not None:
-            self.rewrite.update_active(g, selection, edges)
+            yield self.rewrite
 
 
-class SignalEmitter(QObject):
-    finished = Signal()
+def _match_selection(g: GraphT, selection: list[VT], edges: list[ET],
+                     actions: list[RewriteAction], cancelled: Event) -> list[bool]:
+    """Match private snapshots only; this worker must not access any Qt objects."""
+    enabled = []
+    for action in actions:
+        if cancelled.is_set():
+            break
+        try:
+            action.update_active(g, selection, edges)
+            enabled.append(action.enabled)
+        except Exception:
+            logging.exception("Error checking rewrite %s", action.name)
+            enabled.append(False)
+    return enabled
 
 
 class RewriteActionTreeModel(QAbstractItemModel):
@@ -343,14 +357,24 @@ class RewriteActionTreeModel(QAbstractItemModel):
         super().__init__(proof_panel)
         self.proof_panel = proof_panel
         self.root_item = data
-        self.emitter = SignalEmitter()
-        self.emitter.finished.connect(self.layoutChanged.emit)
         self.executor = ThreadPoolExecutor(max_workers=1)
+        # At most one job runs. A pending refresh also makes its result stale.
+        self._pending = False
+        self._closed = False
+        self._future: Future[list[bool]] | None = None
+        self._cancelled = Event()
+        # A zero-delay timeout combines all signals from one selection gesture.
+        # While matching, the same timer polls completion on the GUI thread.
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(True)
+        self._update_timer.timeout.connect(self._update_on_timer)
+        self.schedule_selection_update()
 
     def set_root(self, root: RewriteActionTree) -> None:
         self.beginResetModel()
         self.root_item = root
         self.endResetModel()
+        self.schedule_selection_update()
 
     def index(self, row: int, column: int, parent: Union[QModelIndex, QPersistentModelIndex] = QModelIndex()) -> \
             QModelIndex:
@@ -387,6 +411,8 @@ class RewriteActionTreeModel(QAbstractItemModel):
     def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
         if index.isValid():
             rewrite_action_tree = cast(RewriteActionTree, index.internalPointer())
+            if rewrite_action_tree.is_rewrite and self._matching_pending():
+                return Qt.ItemFlag.NoItemFlags
             return Qt.ItemFlag.ItemIsEnabled if rewrite_action_tree.enabled() else Qt.ItemFlag.NoItemFlags
         return Qt.ItemFlag.ItemIsEnabled
 
@@ -411,20 +437,82 @@ class RewriteActionTreeModel(QAbstractItemModel):
             return
         node = cast(RewriteActionTree, index.internalPointer())
         if node.is_rewrite:
-            node.rewrite_action.do_rewrite(self.proof_panel)
+            if not self._matching_pending():
+                node.rewrite_action.do_rewrite(self.proof_panel)
         else:
             self.proof_panel.rewrites_panel.setExpanded(
                 index, not self.proof_panel.rewrites_panel.isExpanded(index)
             )
 
-    def update_on_selection(self) -> None:
+    def _matching_pending(self) -> bool:
+        return self._closed or self._pending or self._future is not None
+
+    def schedule_selection_update(self) -> None:
+        if self._closed:
+            return
+        self._pending = True
+        self._cancelled.set()
+        # Do not enqueue work or copy a graph for every selected vertex. If a
+        # worker is busy, completion will start a single pass for the latest state.
+        if not self._update_timer.isActive():
+            self._update_timer.start(0)
+
+    def _update_on_timer(self) -> None:
+        if self._closed:
+            return
+        if self._future is not None:
+            if not self._future.done():
+                self._update_timer.start(10)
+                return
+            self._finish_selection_update()
+        if self._pending:
+            self._start_selection_update()
+
+    def _start_selection_update(self) -> None:
+        self._pending = False
         try:
             selection, edges = self.proof_panel.parse_selection()
-            g = self.proof_panel.graph_scene.g
-            self.root_item.update_on_selection(g, selection, edges)
-        finally:
-            # If an exception happens while matching some rule, we still want to update the view
-            QMetaObject.invokeMethod(self.emitter, "finished", Qt.ConnectionType.QueuedConnection)
+            g = copy.deepcopy(self.proof_panel.graph_scene.g)
+            # replace() excludes runtime UI attributes (e.g. the unfusion dialog).
+            # Copy rule state as well, so applying a live action cannot race a match.
+            actions = [replace(action, rule=copy.deepcopy(action.rule), enabled=False)
+                       for action in self.root_item.rewrite_actions()]
+            self._cancelled = Event()
+            self._future = self.executor.submit(_match_selection, g, selection, edges, actions, self._cancelled)
+            self._update_timer.start(10)
+        except Exception:
+            logging.exception("Error scheduling rewrite matching")
+            for action in self.root_item.rewrite_actions():
+                action.enabled = False
+        self.layoutChanged.emit()
+
+    def _finish_selection_update(self) -> None:
+        assert self._future is not None
+        future, self._future = self._future, None
+        # set_root() and selection/graph changes all request a refresh. If one
+        # arrived during this job, neither its results nor its tree are current.
+        if self._pending:
+            return
+        actions = list(self.root_item.rewrite_actions())
+        try:
+            enabled = future.result()  # Only called after done(), on the GUI thread.
+        except Exception:
+            logging.exception("Error matching rewrites")
+            enabled = [False] * len(actions)
+        for action, active in zip(actions, enabled):
+            action.enabled = active
+        self.layoutChanged.emit()
+
+    def release_resources(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        self._pending = False
+        self._cancelled.set()
+        self._update_timer.stop()
+        self._future = None
+        # Workers own only data snapshots; no callback can reach a deleted model.
+        self.executor.shutdown(wait=False, cancel_futures=True)
 
 
 class RewriteActionTreeView(QTreeView):
@@ -591,13 +679,13 @@ class RewriteActionTreeView(QTreeView):
     def _schedule_selection_update(self) -> None:
         model = self.model()
         if isinstance(model, RewriteActionTreeModel):
-            model.executor.submit(model.update_on_selection)
+            model.schedule_selection_update()
 
     def release_resources(self) -> None:
         model = self.model()
-        if isinstance(model, RewriteActionTreeModel):
+        if isinstance(model, RewriteActionTreeModel) and not model._closed:
             self.proof_panel.graph_scene.selection_changed_custom.disconnect(self._schedule_selection_update)
-            model.executor.shutdown(wait=True, cancel_futures=True)
+            model.release_resources()
 
     def fault_equivalent_mode_active(self) -> bool:
         return (is_feature_enabled(FAULT_EQUIVALENCE)
